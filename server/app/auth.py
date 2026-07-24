@@ -43,6 +43,8 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
     user = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="This account is disabled")
     return await issue_tokens(user, session)
 
 
@@ -55,6 +57,8 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_s
     user = await session.get(User, token.user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="This account is disabled")
     return await issue_tokens(user, session)
 
 

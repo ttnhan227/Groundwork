@@ -28,6 +28,7 @@ from app.schemas import (
     ConversationUpdate,
     MessageResponse,
 )
+from app.usage import record_ai_usage
 
 router = APIRouter(prefix="/conversations", tags=["RAG chat"])
 
@@ -175,6 +176,7 @@ async def ask_question(
     ))
     if not chunks:
         raise HTTPException(status_code=409, detail="The selected documents have no searchable text")
+    await record_ai_usage(user, "chat", session)
     try:
         raw_answer = await generate_answer(payload.question, [chunk.text for chunk in chunks], history)
     except RuntimeError as exc:

@@ -1,67 +1,126 @@
 # InsightPDF
 
-InsightPDF is an intelligent PDF workspace. Phases 1–3 are implemented: authenticated uploads are processed by Celery, sparse/scanned pages use Tesseract OCR, page text is chunked and embedded locally with Sentence Transformers, vectors are stored in PostgreSQL/pgvector, and persistent RAG conversations return source snippets and clickable page citations in the secured PDF.js viewer.
+InsightPDF is a portfolio-ready AI PDF workspace demonstrating production-oriented
+backend engineering, document processing, retrieval-augmented generation, secure object
+storage, asynchronous workers, and practical PDF transformations.
 
-## Repository structure
+## Highlights
+
+- JWT authentication with rotating hashed refresh tokens and account-status enforcement
+- Owner-isolated PDF storage, indexed text, conversations, citations, and generated files
+- Celery/Redis upload pipeline with PyMuPDF extraction and Tesseract OCR fallback
+- Local Sentence Transformer embeddings stored in PostgreSQL/pgvector
+- Multi-document Mistral RAG chat with conversation history and clickable page citations
+- Cached summaries, key points, action items, quizzes, translation, extraction, and comparison
+- Merge, split, rotate, extract/delete pages, conversions, and text/image watermarks
+- PDF.js viewer with thumbnails, text search, zoom, navigation, and citation jumps
+- Dashboard, profile/password management, usage statistics, failed-job indicators, and admin controls
+- Demo account with text, scanned, and versioned comparison PDFs
+- Docker Compose, Nginx, MinIO, migrations, automated tests, and GitHub Actions
+
+## Architecture
 
 ```text
-InsightPDF/
-├── client/          React + TypeScript application
-├── server/          FastAPI modular monolith
-├── docker-compose.yml
-└── .env.example
+Browser -> Nginx -> React client
+                 -> FastAPI API -> PostgreSQL + pgvector
+                                -> MinIO
+                                -> Redis -> Celery worker
+                                -> Mistral-compatible LLM
 ```
 
-## Run with Docker
+See [ARCHITECTURE.md](ARCHITECTURE.md) for flows and design trade-offs.
+
+## Stack
+
+React, TypeScript, PDF.js, FastAPI, Pydantic, SQLAlchemy, Alembic, PostgreSQL,
+pgvector, Celery, Redis, MinIO, Sentence Transformers, PyMuPDF, Tesseract, Pillow,
+Mistral, Docker Compose, Nginx, pytest, and GitHub Actions.
+
+## Quick start
 
 ```bash
 cp .env.example .env
-docker compose up --build
+# Add LLM_API_KEY and replace secrets
+docker compose up --build -d
+docker compose ps
 ```
 
-Open the app at `http://localhost:3000`, the API at `http://localhost:8000`, API docs at `http://localhost:8000/docs`, and the MinIO console at `http://localhost:9001`.
+Open:
 
-## Phase 1–3 API
+- Nginx application: `http://localhost:8080`
+- Direct frontend: `http://localhost:3000`
+- API documentation: `http://localhost:8000/docs`
+- MinIO console: `http://localhost:9001`
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/refresh`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
-- `GET /api/v1/documents`
-- `POST /api/v1/documents`
-- `GET /api/v1/documents/{id}`
-- `GET /api/v1/documents/{id}/job`
-- `GET /api/v1/documents/{id}/pages`
-- `GET /api/v1/documents/{id}/content`
-- `GET /api/v1/conversations`
-- `POST /api/v1/conversations`
-- `PATCH /api/v1/conversations/{id}`
-- `DELETE /api/v1/conversations/{id}`
-- `POST /api/v1/conversations/{id}/messages`
+Demo credentials:
 
-Uploads are accepted only when the extension, MIME type, size, and PDF file signature are valid. Objects are stored under an owner-scoped key and every document, job, extracted page, vector query, and conversation is filtered to the authenticated user. Set `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` for any OpenAI-compatible chat provider; embeddings remain local and do not consume a paid API.
+```text
+Email: demo@insightpdf.dev
+Password: DemoPassword123!
+```
 
-## Local verification
+The idempotent startup seed creates a text PDF, a scanned PDF, and two handbook versions.
+Change or disable the example demo credentials outside a portfolio environment.
+
+## Configuration
+
+All configuration is environment-based. See `.env.example` for database, Redis, MinIO,
+JWT, OCR, embeddings, Mistral, file/page quotas, request limits, AI usage limits, demo,
+admin, and CORS settings. Real secrets are excluded by `.gitignore`.
+
+## Verification
+
+Backend:
 
 ```bash
-cd server
-python -m pytest
+docker run --rm insightpdf-api python -m pytest -q
+```
 
-cd ../client
+Frontend:
+
+```bash
+cd client
+npm run lint
 npm test
-npm run build
+npm run test:e2e
 ```
 
-With the Docker stack running, execute the live Phase 1–3 workflow:
+Live workflows:
 
 ```bash
-cd server
-python scripts/live_phase_three_smoke.py
+docker compose exec -T api python scripts/live_phase_three_smoke.py
+docker compose exec -T api python scripts/live_phase_four_smoke.py
+docker compose exec -T api python scripts/live_phase_five_smoke.py
+docker compose exec -T api python scripts/live_phase_six_smoke.py
 ```
 
-This registers an isolated test user, uploads a generated PDF, waits for extraction and vector indexing, asks one grounded Mistral question, and verifies a Page 1 citation.
+These cover indexing/RAG citations, every structured AI feature, every PDF
+transformation, secured downloads, demo seeding, dashboard metrics, profile/password
+changes, document lifecycle actions, and security headers.
 
-## Scope
+## Security and reliability
 
-Summaries, quizzes, structured extraction, comparisons, and PDF transformations belong to later phases in the supplied specification.
+- Extension, MIME, signature, size, page-count, and image validation
+- Per-user authorization on every document, vector query, conversation, result, and artifact
+- Password hashing, JWT validation, refresh-token rotation/revocation, and account disabling
+- Redis-backed API rate limiting and configurable daily non-cached AI limits
+- Safe filenames and private authenticated downloads
+- CORS and security headers at API and Nginx layers
+- Prompt-injection boundary instructions and schema-validated structured LLM output
+- Background extraction retries and user-triggered retry for failed processing
+- Centralized production-safe unexpected-error responses
+
+This project demonstrates production-oriented design; it does not claim legal,
+regulatory, or enterprise security certification.
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md). CI runs backend lint/tests, frontend lint/tests,
+and Docker builds on pushes and pull requests.
+
+## Known scaling extension
+
+Document ingestion is already durable and asynchronous. Structured AI and PDF
+transformations intentionally execute synchronously for a simple portfolio demo.
+At higher traffic, these endpoints should return job IDs and use the existing
+Celery/Redis infrastructure for durable progress, cancellation, and retries.

@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Check, FileText, History, LogOut, MessageCircle, Pencil, RefreshCw, Search, Send, Sparkles, Trash2, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BookOpen, BrainCircuit, Check, Download, FileImage, FileText, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 
@@ -17,7 +17,7 @@ type DocumentItem = {
 };
 
 type Job = { status: string; progress: number; error_message: string | null };
-type AuthResult = { access_token: string; refresh_token: string; user: { display_name: string; email: string } };
+type AuthResult = { access_token: string; refresh_token: string; user: { id: string; display_name: string; email: string; role: "user" | "admin"; is_active: boolean } };
 type Citation = { document_id: string; document_name: string; page_number: number; snippet: string };
 type ChatMessage = { id?: string; role: "user" | "assistant"; content: string; citations?: Citation[]; created_at?: string };
 type Conversation = {
@@ -28,6 +28,18 @@ type Conversation = {
   created_at: string;
   updated_at: string;
 };
+type AIResult = {
+  id: string;
+  feature: string;
+  document_ids: string[];
+  parameters: Record<string, unknown>;
+  result: Record<string, unknown>;
+  cached: boolean;
+  created_at: string;
+};
+type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; created_at: string };
+type Stats = { document_count: number; page_count: number; storage_bytes: number; ai_requests: number; generated_files: number; failed_jobs: number };
+type AdminUser = AuthResult["user"] & Stats & { created_at: string };
 
 const AUTH_EXPIRED_EVENT = "insightpdf-auth-expired";
 
@@ -72,6 +84,120 @@ function FormattedAnswer({ content }: { content: string }) {
     }
     return <p key={index}><InlineText text={line} /></p>;
   })}</div>;
+}
+
+function PhaseFourResult({ value, documents, onPage }: { value: AIResult; documents: DocumentItem[]; onPage: (documentId: string, page: number) => void }) {
+  const result = value.result;
+  const references = (result.page_references ?? []) as Citation[];
+  const sections = ["added_sections", "removed_sections", "changed_sections", "numerical_changes"] as const;
+  if (value.feature === "quiz") {
+    const questions = (result.questions ?? []) as Array<{ question: string; options: string[]; correct_answer: string; explanation: string; page_references?: Citation[] }>;
+    return <div className="ai-result"><h3>{String(result.title ?? "Quiz")}</h3>{questions.map((question, index) =>
+      <details className="quiz-question" key={index}><summary><b>{index + 1}</b>{question.question}</summary>
+        <ol>{question.options.map((option) => <li key={option}>{option}</li>)}</ol>
+        <div className="quiz-answer"><strong>Answer: {question.correct_answer}</strong><p>{question.explanation}</p></div>
+        <PageLinks references={question.page_references ?? []} onPage={onPage} />
+      </details>)}</div>;
+  }
+  if (value.feature === "extraction") {
+    const items = (result.items ?? []) as Array<{ field: string; value: string; context?: string; page_references?: Citation[] }>;
+    return <div className="ai-result"><h3>Extracted information</h3><div className="extraction-grid">{items.map((item, index) =>
+      <article key={index}><small>{item.field.replaceAll("_", " ")}</small><strong>{item.value}</strong>{item.context && <p>{item.context}</p>}<PageLinks references={item.page_references ?? []} onPage={onPage} /></article>
+    )}</div></div>;
+  }
+  if (value.feature === "comparison") {
+    return <div className="ai-result comparison-result"><div className="similarity"><strong>{String(result.similarity_percent)}%</strong><span>text similarity</span></div>
+      <h3>Comparison overview</h3><p>{String(result.summary ?? "")}</p>
+      {sections.map((name) => {
+        const items = (result[name] ?? []) as Array<{ description: string; left_pages: number[]; right_pages: number[] }>;
+        return items.length ? <section key={name}><h4>{name.replaceAll("_", " ")}</h4>{items.map((item, index) =>
+          <article key={index}><p>{item.description}</p><div className="page-links">
+            {item.left_pages.map((page) => <button key={`l${page}`} onClick={() => onPage(value.document_ids[0], page)}>Original · p{page}</button>)}
+            {item.right_pages.map((page) => <button key={`r${page}`} onClick={() => onPage(value.document_ids[1], page)}>Compared · p{page}</button>)}
+          </div></article>)}</section> : null;
+      })}</div>;
+  }
+  return <div className="ai-result"><h3>{String(result.title ?? (value.feature === "translation" ? "Translation" : "Document insight"))}</h3>
+    {value.cached && <span className="cached-badge">Saved result</span>}
+    <FormattedAnswer content={String(result.content ?? "")} />
+    <PageLinks references={references} onPage={onPage} />
+    {value.feature === "translation" && <a className="download-result" href={`${API}/ai/results/${value.id}/download`} onClick={async (event) => {
+      event.preventDefault();
+      const response = await fetch(`${API}/ai/results/${value.id}/download`, { headers: { Authorization: `Bearer ${localStorage.getItem("insightpdf-auth") ? (JSON.parse(localStorage.getItem("insightpdf-auth")!).access_token) : ""}` } });
+      if (!response.ok) return;
+      const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = window.document.createElement("a");
+      link.href = url; link.download = `${documents.find((item) => item.id === value.document_ids[0])?.filename.replace(/\.pdf$/i, "") ?? "translation"}-translation.md`; link.click(); URL.revokeObjectURL(url);
+    }}><Download size={14} /> Download translation</a>}
+  </div>;
+}
+
+function PageLinks({ references, onPage }: { references: Citation[]; onPage: (documentId: string, page: number) => void }) {
+  if (!references.length) return null;
+  return <div className="page-links">{references.map((reference, index) =>
+    <button key={`${reference.document_id}-${reference.page_number}-${index}`} onClick={() => onPage(reference.document_id, reference.page_number)}>
+      {reference.document_name || "Document"} · Page {reference.page_number}
+    </button>)}</div>;
+}
+
+function AIWorkspace({ document, documents, token, compareMode, onClose, onPage }: {
+  document: DocumentItem | null; documents: DocumentItem[]; token: string; compareMode: boolean;
+  onClose: () => void; onPage: (documentId: string, page: number) => void;
+}) {
+  const [tool, setTool] = useState<"summary" | "quiz" | "extract" | "translate" | "compare">(compareMode ? "compare" : "summary");
+  const [style, setStyle] = useState("short");
+  const [count, setCount] = useState(5);
+  const [language, setLanguage] = useState("Vietnamese");
+  const [pages, setPages] = useState("");
+  const [customFields, setCustomFields] = useState("");
+  const [left, setLeft] = useState(document?.id ?? documents[0]?.id ?? "");
+  const [right, setRight] = useState(documents.find((item) => item.id !== left)?.id ?? "");
+  const [result, setResult] = useState<AIResult | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    if (!document && tool !== "compare") return;
+    setBusy(true); setError(""); setResult(null);
+    let path = `/ai/documents/${document?.id}/${tool}`;
+    let body: Record<string, unknown> = {};
+    if (tool === "summary") body = { style };
+    if (tool === "quiz") body = { question_count: count };
+    if (tool === "extract") body = { categories: ["people", "dates", "companies", "monetary_values", "deadlines", "action_items"], custom_fields: customFields.split(",").map((item) => item.trim()).filter(Boolean) };
+    if (tool === "translate") body = { target_language: language, page_numbers: pages.trim() ? pages.split(",").map(Number).filter((item) => Number.isInteger(item) && item > 0) : null, format: "markdown" };
+    if (tool === "compare") { path = "/ai/compare"; body = { left_document_id: left, right_document_id: right }; }
+    try {
+      setResult(await api<AIResult>(path, token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "AI tool failed"); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="ai-workspace-wrap"><button className="history-backdrop" aria-label="Close AI tools" onClick={onClose} />
+    <section className="ai-workspace">
+      <header><div><p className="eyebrow">Document intelligence</p><h2>{tool === "compare" ? "Compare PDFs" : document?.filename}</h2></div><button onClick={onClose}><X size={18} /></button></header>
+      <div className="ai-tool-tabs">
+        {!compareMode && <><button className={tool === "summary" ? "active" : ""} onClick={() => { setTool("summary"); setResult(null); }}><Sparkles size={15} /> Summarize</button>
+          <button className={tool === "quiz" ? "active" : ""} onClick={() => { setTool("quiz"); setResult(null); }}><ListChecks size={15} /> Quiz</button>
+          <button className={tool === "extract" ? "active" : ""} onClick={() => { setTool("extract"); setResult(null); }}><BrainCircuit size={15} /> Extract</button>
+          <button className={tool === "translate" ? "active" : ""} onClick={() => { setTool("translate"); setResult(null); }}><Languages size={15} /> Translate</button></>}
+        {compareMode && <button className="active"><RefreshCw size={15} /> Compare</button>}
+      </div>
+      <div className="ai-tool-body">
+        <div className="ai-controls">
+          {tool === "summary" && <label>Result type<select value={style} onChange={(event) => setStyle(event.target.value)}><option value="short">Short summary</option><option value="detailed">Detailed summary</option><option value="key_points">Key points</option><option value="action_items">Action items</option></select></label>}
+          {tool === "quiz" && <label>Number of questions<input type="number" min={1} max={20} value={count} onChange={(event) => setCount(Number(event.target.value))} /></label>}
+          {tool === "extract" && <label>Custom fields <small>Optional, comma-separated</small><input value={customFields} onChange={(event) => setCustomFields(event.target.value)} placeholder="invoice number, project owner" /></label>}
+          {tool === "translate" && <><label>Target language<input value={language} onChange={(event) => setLanguage(event.target.value)} /></label><label>Pages <small>Optional, comma-separated</small><input value={pages} onChange={(event) => setPages(event.target.value)} placeholder="1, 3, 5" /></label></>}
+          {tool === "compare" && <><label>Original document<select value={left} onChange={(event) => { setLeft(event.target.value); if (event.target.value === right) setRight(""); }}>{documents.map((item) => <option key={item.id} value={item.id}>{item.filename}</option>)}</select></label>
+            <label>Compare with<select value={right} onChange={(event) => setRight(event.target.value)}><option value="">Select a different PDF</option>{documents.filter((item) => item.id !== left).map((item) => <option key={item.id} value={item.id}>{item.filename}</option>)}</select></label></>}
+          <button className="run-ai-tool" disabled={busy || (tool === "compare" && (!left || !right))} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <Sparkles size={15} />}{busy ? "Working…" : tool === "compare" ? "Compare documents" : "Generate"}</button>
+        </div>
+        {error && <div className="form-error">{error}</div>}
+        {!result && !busy && <div className="ai-result-empty"><BrainCircuit size={38} /><strong>Ready when you are</strong><span>Choose your options and generate a grounded result from the indexed document text.</span></div>}
+        {busy && <div className="ai-result-empty"><RefreshCw className="spin" size={34} /><strong>Mistral is reading the indexed content</strong><span>This can take a few seconds. Repeating the same request will use the saved result.</span></div>}
+        {result && <PhaseFourResult value={result} documents={documents} onPage={onPage} />}
+      </div>
+    </section>
+  </div>;
 }
 
 function PdfThumbnail({ pdf, pageNumber, current, onSelect }: { pdf: PDFDocumentProxy; pageNumber: number; current: boolean; onSelect: () => void }) {
@@ -253,11 +379,13 @@ function ChatPanel({
 
   useEffect(() => {
     if (!conversation) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConversationId(conversation.id);
     setMessages(conversation.messages);
     setError("");
   }, [conversation]);
 
+  // documentIdKey tracks changes without depending on the caller's array identity.
   useEffect(() => {
     if (conversation) return;
     api<{ id: string }>("/conversations", token, {
@@ -265,6 +393,7 @@ function ChatPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: `Chat about ${documentLabel}`, document_ids: documentIds }),
     }).then((result) => { setConversationId(result.id); onChanged(); }).catch((reason) => setError(reason.message));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation, document.id, document.filename, documentIdKey, documentLabel, onChanged, token]);
 
   async function ask(event: FormEvent<HTMLFormElement>) {
@@ -431,6 +560,138 @@ function MultiDocumentChat({
   </div>;
 }
 
+async function downloadArtifact(artifact: Artifact, token: string) {
+  const response = await fetch(`${API}/pdf-tools/artifacts/${artifact.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+  if (response.status === 401) expireSession();
+  if (!response.ok) throw new Error("Could not download generated file");
+  const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = window.document.createElement("a");
+  link.href = url; link.download = artifact.filename; link.click(); URL.revokeObjectURL(url);
+}
+
+function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { documents: DocumentItem[]; token: string; initialDocument: DocumentItem | null; onClose: () => void }) {
+  const [tool, setTool] = useState("merge");
+  const [documentId, setDocumentId] = useState(initialDocument?.id ?? documents[0]?.id ?? "");
+  const [selected, setSelected] = useState<string[]>(initialDocument ? [initialDocument.id] : []);
+  const [pages, setPages] = useState("1");
+  const [ranges, setRanges] = useState("1");
+  const [degrees, setDegrees] = useState(90);
+  const [splitMode, setSplitMode] = useState("ranges");
+  const [imageFormat, setImageFormat] = useState("png");
+  const [dpi, setDpi] = useState(144);
+  const [images, setImages] = useState<File[]>([]);
+  const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
+  const [watermarkImage, setWatermarkImage] = useState<File | null>(null);
+  const [position, setPosition] = useState("center");
+  const [opacity, setOpacity] = useState(.25);
+  const [artifact, setArtifact] = useState<Artifact | null>(null);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pageNumbers = () => pages.split(",").map((item) => Number(item.trim())).filter((item) => Number.isInteger(item) && item > 0);
+
+  useEffect(() => {
+    api<Artifact[]>("/pdf-tools/artifacts", token).then(setArtifacts).catch(() => undefined);
+  }, [token]);
+
+  async function run() {
+    setBusy(true); setError(""); setArtifact(null);
+    try {
+      const path = `/pdf-tools/${tool}`; let init: RequestInit;
+      if (tool === "images-to-pdf") {
+        const data = new FormData(); images.forEach((image) => data.append("files", image));
+        init = { method: "POST", body: data };
+      } else if (tool === "watermark") {
+        const data = new FormData(); data.append("document_id", documentId); data.append("text", watermarkText);
+        data.append("page_numbers", pages); data.append("position", position); data.append("opacity", String(opacity)); data.append("rotation", "0");
+        if (watermarkImage) data.append("image", watermarkImage);
+        init = { method: "POST", body: data };
+      } else {
+        let body: Record<string, unknown> = { document_id: documentId };
+        if (tool === "merge") body = { document_ids: selected };
+        if (["extract", "delete-pages"].includes(tool)) body.page_numbers = pageNumbers();
+        if (tool === "rotate") body = { ...body, page_numbers: pageNumbers(), degrees };
+        if (tool === "split") body = { ...body, mode: splitMode, ranges: ranges.split(",").map((item) => item.trim()).filter(Boolean), page_numbers: pageNumbers() };
+        if (tool === "pdf-to-images") body = { ...body, page_numbers: pages.trim() ? pageNumbers() : null, format: imageFormat, dpi };
+        init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+      }
+      const generated = await api<Artifact>(path, token, init);
+      setArtifact(generated); setArtifacts((current) => [generated, ...current.filter((item) => item.id !== generated.id)]);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "PDF operation failed"); }
+    finally { setBusy(false); }
+  }
+
+  const tools = [
+    ["merge", "Merge"], ["split", "Split"], ["extract", "Extract pages"], ["delete-pages", "Delete pages"],
+    ["rotate", "Rotate"], ["pdf-to-images", "PDF to images"], ["images-to-pdf", "Images to PDF"], ["watermark", "Watermark"],
+  ];
+  const needsDocument = tool !== "merge" && tool !== "images-to-pdf";
+  const canRun = !busy && (tool === "merge" ? selected.length >= 2 : tool === "images-to-pdf" ? images.length > 0 : Boolean(documentId));
+
+  return <div className="pdf-tools-wrap"><button className="history-backdrop" aria-label="Close PDF tools" onClick={onClose} />
+    <section className="pdf-tools-panel"><header><div><p className="eyebrow">Phase 5 workspace</p><h2>PDF tools</h2></div><button onClick={onClose}><X size={18} /></button></header>
+      <div className="pdf-tools-layout"><nav>{tools.map(([id, label]) => <button className={tool === id ? "active" : ""} key={id} onClick={() => { setTool(id); setArtifact(null); setError(""); }}>{id.includes("image") ? <FileImage size={15} /> : <Scissors size={15} />}{label}</button>)}</nav>
+        <main><div className="tool-heading"><h3>{tools.find(([id]) => id === tool)?.[1]}</h3><p>Outputs are stored securely and available for download.</p></div>
+          <div className="tool-form">
+            {needsDocument && <label>PDF<select value={documentId} onChange={(event) => setDocumentId(event.target.value)}>{documents.map((item) => <option key={item.id} value={item.id}>{item.filename} · {item.page_count} pages</option>)}</select></label>}
+            {tool === "merge" && <div className="merge-picker">{documents.map((item) => <label key={item.id} className={selected.includes(item.id) ? "selected" : ""}><input type="checkbox" checked={selected.includes(item.id)} onChange={() => setSelected((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} /><FileText size={16} /><span>{item.filename}</span></label>)}</div>}
+            {["extract", "delete-pages", "rotate"].includes(tool) && <label>Pages <small>Comma-separated, e.g. 1, 3, 5</small><input value={pages} onChange={(event) => setPages(event.target.value)} /></label>}
+            {tool === "rotate" && <label>Rotation<select value={degrees} onChange={(event) => setDegrees(Number(event.target.value))}><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label>}
+            {tool === "split" && <><label>Split mode<select value={splitMode} onChange={(event) => setSplitMode(event.target.value)}><option value="ranges">Page ranges</option><option value="every_page">One PDF per page</option><option value="selected">Selected pages</option></select></label>{splitMode === "ranges" ? <label>Ranges <small>Comma-separated, e.g. 1-3, 4-7</small><input value={ranges} onChange={(event) => setRanges(event.target.value)} /></label> : splitMode === "selected" ? <label>Selected pages<input value={pages} onChange={(event) => setPages(event.target.value)} /></label> : null}</>}
+            {tool === "pdf-to-images" && <><label>Pages <small>Leave blank for all pages</small><input value={pages} onChange={(event) => setPages(event.target.value)} placeholder="All pages" /></label><label>Format<select value={imageFormat} onChange={(event) => setImageFormat(event.target.value)}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label><label>Resolution<select value={dpi} onChange={(event) => setDpi(Number(event.target.value))}><option value={96}>96 DPI</option><option value={144}>144 DPI</option><option value={216}>216 DPI</option><option value={300}>300 DPI</option></select></label></>}
+            {tool === "images-to-pdf" && <label className="image-drop"><Upload size={24} />Choose PNG/JPEG images<input type="file" accept="image/png,image/jpeg" multiple onChange={(event) => setImages(Array.from(event.target.files ?? []))} /><small>{images.length ? `${images.length} image(s), kept in selected order` : "Up to 50 images"}</small></label>}
+            {tool === "watermark" && <><label>Watermark text <small>Optional when using an image</small><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} /></label><label>Watermark image <small>Optional PNG/JPEG</small><input type="file" accept="image/png,image/jpeg" onChange={(event) => setWatermarkImage(event.target.files?.[0] ?? null)} /></label><label>Pages <small>Leave blank for every page</small><input value={pages} onChange={(event) => setPages(event.target.value)} /></label><label>Position<select value={position} onChange={(event) => setPosition(event.target.value)}><option value="center">Center</option><option value="top_left">Top left</option><option value="top_right">Top right</option><option value="bottom_left">Bottom left</option><option value="bottom_right">Bottom right</option></select></label><label>Opacity<input type="range" min=".05" max="1" step=".05" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} /><small>{Math.round(opacity * 100)}%</small></label></>}
+            <button className="run-pdf-tool" disabled={!canRun} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <Scissors size={15} />}{busy ? "Processing…" : "Create file"}</button>
+          </div>
+          {error && <div className="form-error">{error}</div>}
+          {artifact && <div className="artifact-ready"><Check size={25} /><div><strong>{artifact.filename}</strong><span>{(artifact.size_bytes / 1024).toFixed(1)} KB · Ready to download</span></div><button onClick={() => downloadArtifact(artifact, token).catch((reason) => setError(reason.message))}><Download size={15} /> Download</button></div>}
+          <section className="artifact-history"><h4>Recent generated files</h4>{artifacts.slice(0, 8).map((item) => <article key={item.id}><FileText size={17} /><div><strong>{item.filename}</strong><span>{item.operation.replaceAll("_", " ")} · {new Date(item.created_at).toLocaleString()}</span></div><button onClick={() => downloadArtifact(item, token).catch((reason) => setError(reason.message))}><Download size={14} /></button></article>)}</section>
+        </main>
+      </div>
+    </section>
+  </div>;
+}
+
+function AccountPanel({ user, token, stats, onUser, onClose }: {
+  user: AuthResult["user"]; token: string; stats: Stats | null; onUser: (user: AuthResult["user"]) => void; onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"profile" | "admin">("profile");
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (tab === "admin" && user.role === "admin") api<AdminUser[]>("/admin/users", token).then(setAdmins).catch((reason) => setError(reason.message));
+  }, [tab, token, user.role]);
+  async function updateProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(""); setMessage("");
+    const form = new FormData(event.currentTarget);
+    try {
+      const updated = await api<AuthResult["user"]>("/profile", token, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: form.get("display_name") }) });
+      onUser(updated); setMessage("Profile updated.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Update failed"); }
+  }
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(""); setMessage("");
+    const form = new FormData(event.currentTarget);
+    try {
+      await api("/profile/password", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current_password: form.get("current_password"), new_password: form.get("new_password") }) });
+      setMessage("Password changed. Existing refresh sessions were revoked."); event.currentTarget.reset();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Password change failed"); }
+  }
+  async function toggleAccount(item: AdminUser) {
+    const updated = await api<AuthResult["user"]>(`/admin/users/${item.id}/status`, token, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !item.is_active }) });
+    setAdmins((current) => current.map((value) => value.id === item.id ? { ...value, is_active: updated.is_active } : value));
+  }
+  return <div className="account-wrap"><button className="history-backdrop" aria-label="Close profile" onClick={onClose} /><section className="account-panel">
+    <header><div><p className="eyebrow">Account workspace</p><h2>{user.display_name}</h2></div><button onClick={onClose}><X size={18} /></button></header>
+    {user.role === "admin" && <nav><button className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}><UserRound size={15} /> Profile</button><button className={tab === "admin" ? "active" : ""} onClick={() => setTab("admin")}><ShieldCheck size={15} /> Admin</button></nav>}
+    <main>{error && <div className="form-error">{error}</div>}{message && <div className="success-note">{message}</div>}
+      {tab === "profile" ? <><div className="account-stats">{stats && <><article><strong>{stats.document_count}</strong><span>Documents</span></article><article><strong>{stats.page_count}</strong><span>Pages</span></article><article><strong>{(stats.storage_bytes / 1024 / 1024).toFixed(1)} MB</strong><span>Storage</span></article><article><strong>{stats.ai_requests}</strong><span>AI requests</span></article><article><strong>{stats.generated_files}</strong><span>Generated</span></article><article className={stats.failed_jobs ? "warn" : ""}><strong>{stats.failed_jobs}</strong><span>Failed jobs</span></article></>}</div>
+        <div className="profile-forms"><form onSubmit={updateProfile}><h3>Profile</h3><label>Email<input value={user.email} disabled /></label><label>Display name<input name="display_name" defaultValue={user.display_name} minLength={2} required /></label><button>Save profile</button></form>
+          <form onSubmit={changePassword}><h3>Change password</h3><label>Current password<input name="current_password" type="password" required /></label><label>New password<input name="new_password" type="password" minLength={8} required /></label><button>Update password</button></form></div></>
+        : <div className="admin-users"><h3>User management</h3>{admins.map((item) => <article key={item.id}><div><strong>{item.display_name}</strong><span>{item.email} · {item.role}</span></div><small>{item.document_count} docs · {item.ai_requests} AI</small><button className={item.is_active ? "" : "enable"} onClick={() => toggleAccount(item)}>{item.is_active ? "Disable" : "Enable"}</button></article>)}</div>}
+    </main></section></div>;
+}
+
 export default function Home() {
   const [initialAuth] = useState<AuthResult | null>(() => {
     if (typeof window === "undefined") return null;
@@ -454,6 +715,14 @@ export default function Home() {
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyDocumentFilter, setHistoryDocumentFilter] = useState<DocumentItem | null>(null);
   const [multiChatOpen, setMultiChatOpen] = useState(false);
+  const [aiDocument, setAIDocument] = useState<DocumentItem | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [pdfToolsOpen, setPDFToolsOpen] = useState(false);
+  const [pdfToolsDocument, setPDFToolsDocument] = useState<DocumentItem | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     function handleExpiredSession() {
@@ -465,6 +734,10 @@ export default function Home() {
       setChatDocument(null);
       setChatDocuments([]);
       setHistoryOpen(false);
+      setAIDocument(null);
+      setCompareOpen(false);
+      setPDFToolsOpen(false);
+      setAccountOpen(false);
       setError("Your session expired. Please log in again.");
     }
     window.addEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
@@ -480,6 +753,10 @@ export default function Home() {
         setJobs((current) => ({ ...current, [item.id]: job }));
       } catch { /* job may not exist for legacy documents */ }
     }));
+  }, []);
+
+  const loadStats = useCallback(async (accessToken: string) => {
+    setStats(await api<Stats>("/profile/stats", accessToken));
   }, []);
 
   const loadConversations = useCallback(async (): Promise<Conversation[]> => {
@@ -513,9 +790,10 @@ export default function Home() {
     if (!initialAuth) return;
     const timer = window.setTimeout(() => {
       loadDocuments(initialAuth.access_token).catch(() => undefined);
+      loadStats(initialAuth.access_token).catch(() => undefined);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialAuth, loadDocuments]);
+  }, [initialAuth, loadDocuments, loadStats]);
 
   useEffect(() => {
     if (!token || !documents.some((item) => !["ready", "failed"].includes(item.status))) return;
@@ -539,7 +817,7 @@ export default function Home() {
       });
       localStorage.setItem("insightpdf-auth", JSON.stringify(result));
       setToken(result.access_token); setUser(result.user);
-      await loadDocuments(result.access_token);
+      await Promise.all([loadDocuments(result.access_token), loadStats(result.access_token)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
     finally { setBusy(false); }
   }
@@ -550,7 +828,7 @@ export default function Home() {
     const data = new FormData(); data.append("file", file);
     try {
       await api("/documents", token, { method: "POST", body: data });
-      await loadDocuments(token);
+      await Promise.all([loadDocuments(token), loadStats(token)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Upload failed"); }
     finally { setBusy(false); }
   }
@@ -560,6 +838,30 @@ export default function Home() {
     setToken(""); setUser(null); setDocuments([]); setConversations([]);
   }
 
+  async function renameDocument(document: DocumentItem) {
+    const filename = window.prompt("New filename", document.filename);
+    if (!filename || filename === document.filename) return;
+    try {
+      await api(`/documents/${document.id}`, token, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename }) });
+      await loadDocuments(token);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Rename failed"); }
+  }
+
+  async function removeDocument(document: DocumentItem) {
+    if (!window.confirm(`Delete ${document.filename}? This removes its chats and indexed content.`)) return;
+    try {
+      await api(`/documents/${document.id}`, token, { method: "DELETE" });
+      await Promise.all([loadDocuments(token), loadStats(token)]);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed"); }
+  }
+
+  async function retryDocument(document: DocumentItem) {
+    try {
+      await api(`/documents/${document.id}/retry`, token, { method: "POST" });
+      await loadDocuments(token);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Retry failed"); }
+  }
+
   if (!token || !user) return (
     <main className="auth-page">
       <section className="auth-card">
@@ -567,6 +869,7 @@ export default function Home() {
         <p className="eyebrow">AI-powered PDF workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Upload PDFs, extract text, and process scanned pages securely.</p>
+        {mode === "login" && <div className="demo-account"><Sparkles size={15} /><div><strong>Portfolio demo</strong><span>demo@insightpdf.dev · DemoPassword123!</span></div></div>}
         <form onSubmit={authenticate}>
           {mode === "register" && <label>Display name<input name="display_name" minLength={2} required /></label>}
           <label>Email<input name="email" type="email" required /></label>
@@ -586,19 +889,26 @@ export default function Home() {
       <header className="workspace-header">
         <div className="auth-brand"><span><BookOpen size={21} /></span> Insight<b>PDF</b></div>
         <div><strong>{user.display_name}</strong><small>{user.email}</small></div>
+        <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><Settings size={16} /> Account</button>
         <button onClick={signOut}><LogOut size={17} /> Sign out</button>
       </header>
       <section className="workspace-content">
         <div className="workspace-title">
           <div><p className="eyebrow">Document workspace</p><h1>Your PDFs</h1><p>Text extraction and OCR run safely in the background.</p></div>
           <div className="workspace-actions">
+            <button disabled={!documents.some((item) => item.status === "ready")} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={16} /> PDF tools</button>
+            <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={16} /> Compare PDFs</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setMultiChatOpen(true)}><Sparkles size={16} /> Ask multiple PDFs</button>
             <label className={`real-upload ${busy ? "disabled" : ""}`}><Upload size={17} /> Upload PDF<input type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
           </div>
         </div>
         {error && <div className="form-error">{error}</div>}
+        <div className="dashboard-cards">{stats && <><article><LayoutDashboard size={17} /><div><strong>{stats.document_count}</strong><span>Documents</span></div></article><article><FileText size={17} /><div><strong>{stats.page_count}</strong><span>Pages indexed</span></div></article><article><Sparkles size={17} /><div><strong>{stats.ai_requests}</strong><span>AI requests</span></div></article><article><Download size={17} /><div><strong>{stats.generated_files}</strong><span>Generated files</span></div></article></>}</div>
+        <div className="document-filters"><label><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your PDFs" /></label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="ready">Ready</option><option value="processing">Processing</option><option value="failed">Failed</option></select></div>
         <div className="document-grid">
-          {documents.map((document) => {
+          {documents.filter((document) => document.filename.toLowerCase().includes(query.toLowerCase()) && (
+            statusFilter === "all" ? true : statusFilter === "processing" ? !["ready", "failed"].includes(document.status) : document.status === statusFilter
+          )).map((document) => {
             const job = jobs[document.id];
             const ready = document.status === "ready";
             return <article className="document-card" key={document.id}>
@@ -614,7 +924,12 @@ export default function Home() {
                 {(document.error_message || job?.error_message) && <small className="document-error">{document.error_message || job?.error_message}</small>}
               </div>
               <div className="document-actions">
+                <button title="Rename" onClick={() => renameDocument(document)}><Pencil size={13} /></button>
+                <button title="Delete" onClick={() => removeDocument(document)}><Trash2 size={13} /></button>
+                {document.status === "failed" && <button onClick={() => retryDocument(document)}><RefreshCw size={13} /> Retry</button>}
                 <button disabled={!ready} onClick={() => { setViewerPage(1); setViewer(document); }}>Open PDF</button>
+                <button disabled={!ready} onClick={() => { setPDFToolsDocument(document); setPDFToolsOpen(true); }}><Scissors size={14} /> Tools</button>
+                <button disabled={!ready} onClick={() => setAIDocument(document)}><Sparkles size={14} /> AI tools</button>
                 <button disabled={!ready || busy} onClick={() => openDocumentChat(document)}><MessageCircle size={14} /> Ask AI</button>
               </div>
             </article>;
@@ -637,6 +952,20 @@ export default function Home() {
       {multiChatOpen && <MultiDocumentChat documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setMultiChatOpen(false)} onCreated={(conversation, selected) => {
         setMultiChatOpen(false); setActiveConversation(conversation); setChatDocuments(selected); setChatDocument(selected[0]); loadConversations().catch(() => undefined);
       }} />}
+      {aiDocument && <AIWorkspace document={aiDocument} documents={documents.filter((item) => item.status === "ready")} token={token} compareMode={false} onClose={() => setAIDocument(null)} onPage={(documentId, page) => {
+        const selected = documents.find((item) => item.id === documentId);
+        if (selected) { setViewerPage(page); setViewer(selected); }
+      }} />}
+      {compareOpen && <AIWorkspace document={null} documents={documents.filter((item) => item.status === "ready")} token={token} compareMode onClose={() => setCompareOpen(false)} onPage={(documentId, page) => {
+        const selected = documents.find((item) => item.id === documentId);
+        if (selected) { setViewerPage(page); setViewer(selected); }
+      }} />}
+      {pdfToolsOpen && <PDFToolsWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} initialDocument={pdfToolsDocument} onClose={() => setPDFToolsOpen(false)} />}
+      {accountOpen && <AccountPanel user={user} token={token} stats={stats} onUser={(updated) => {
+        setUser(updated);
+        const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "{}");
+        localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
+      }} onClose={() => setAccountOpen(false)} />}
     </main>
   );
 }

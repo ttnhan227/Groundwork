@@ -56,3 +56,50 @@ test("includes Phase 3 chat and citation navigation", async () => {
   assert.match(css, /\.viewer-sidebar/);
   assert.match(css, /\.multi-chat-panel/);
 });
+
+test("includes Phase 4 document intelligence tools", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /AI tools/);
+  assert.match(page, /Compare PDFs/);
+  assert.match(page, /Summarize/);
+  assert.match(page, /Translate/);
+  assert.match(page, /\/ai\/compare/);
+  assert.match(page, /Download translation/);
+  assert.match(css, /\.ai-workspace/);
+  assert.match(css, /\.quiz-question/);
+});
+
+test("includes the complete Phase 5 PDF tools workspace", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  for (const label of ["Merge", "Split", "Extract pages", "Delete pages", "Rotate", "PDF to images", "Images to PDF", "Watermark"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /\/pdf-tools\/artifacts/);
+  assert.match(page, /downloadArtifact/);
+  assert.match(css, /\.pdf-tools-panel/);
+  assert.match(css, /\.artifact-ready/);
+});
+
+test("includes Phase 6 dashboard, account, admin, and demo experience", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /\/profile\/stats/);
+  assert.match(page, /\/profile\/password/);
+  assert.match(page, /\/admin\/users/);
+  assert.match(page, /Search your PDFs/);
+  assert.match(page, /Portfolio demo/);
+  assert.match(page, /demo@insightpdf\.dev/);
+  assert.match(page, /DemoPassword123!/);
+  assert.match(page, /retryDocument/);
+  assert.match(css, /\.dashboard-cards/);
+  assert.match(css, /\.account-panel/);
+  assert.match(css, /\.admin-users/);
+});

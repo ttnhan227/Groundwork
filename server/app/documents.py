@@ -3,16 +3,16 @@ import uuid
 
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
 from app.models import Document, DocumentPage, DocumentStatus, JobStatus, ProcessingJob, User
-from app.schemas import DocumentPageResponse, DocumentResponse, ProcessingJobResponse
+from app.schemas import DocumentPageResponse, DocumentRenameRequest, DocumentResponse, ProcessingJobResponse
 from app.storage import ObjectStorage
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -40,6 +40,35 @@ async def owned_document(document_id: uuid.UUID, user: User, session: AsyncSessi
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> Document:
     return await owned_document(document_id, user, session)
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+async def rename_document(
+    document_id: uuid.UUID, payload: DocumentRenameRequest,
+    user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
+) -> Document:
+    document = await owned_document(document_id, user, session)
+    filename = safe_filename(payload.filename)
+    if not filename.lower().endswith(".pdf"):
+        filename += ".pdf"
+    document.filename = filename
+    await session.commit()
+    await session.refresh(document)
+    return document
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document(
+    document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
+) -> Response:
+    document = await owned_document(document_id, user, session)
+    try:
+        ObjectStorage().remove(document.object_key)
+    except Exception:
+        pass
+    await session.delete(document)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @router.get("/{document_id}/job", response_model=ProcessingJobResponse)
@@ -89,6 +118,9 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
 ) -> Document:
     settings = get_settings()
+    document_count = await session.scalar(select(func.count(Document.id)).where(Document.owner_id == user.id))
+    if (document_count or 0) >= settings.max_documents_per_user:
+        raise HTTPException(status_code=422, detail=f"Document limit reached ({settings.max_documents_per_user})")
     filename = safe_filename(file.filename or "document.pdf")
     if not filename.lower().endswith(".pdf") or file.content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="Only PDF files are accepted")
@@ -131,3 +163,30 @@ async def upload_document(
         await session.commit()
         raise HTTPException(status_code=503, detail=document.error_message) from exc
     return document
+
+
+@router.post("/{document_id}/retry", response_model=ProcessingJobResponse)
+async def retry_document(
+    document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
+) -> ProcessingJob:
+    document = await owned_document(document_id, user, session)
+    if document.status != DocumentStatus.FAILED:
+        raise HTTPException(status_code=409, detail="Only failed documents can be retried")
+    job = ProcessingJob(document_id=document.id, status=JobStatus.QUEUED, progress=0)
+    document.status = DocumentStatus.UPLOADED
+    document.error_message = None
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+    from app.tasks import process_document
+    try:
+        task = process_document.delay(str(document.id))
+        job.task_id = task.id
+        await session.commit()
+    except Exception as exc:
+        job.status = JobStatus.FAILED
+        job.error_message = "Processing queue is temporarily unavailable"
+        document.status = DocumentStatus.FAILED
+        await session.commit()
+        raise HTTPException(status_code=503, detail=job.error_message) from exc
+    return job

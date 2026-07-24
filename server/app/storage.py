@@ -21,8 +21,11 @@ class ObjectStorage:
             self.client.make_bucket(self.bucket)
 
     def upload_pdf(self, object_key: str, data: bytes) -> None:
+        self.upload(object_key, data, "application/pdf")
+
+    def upload(self, object_key: str, data: bytes, content_type: str) -> None:
         self.ensure_bucket()
-        self.client.put_object(self.bucket, object_key, BytesIO(data), len(data), content_type="application/pdf")
+        self.client.put_object(self.bucket, object_key, BytesIO(data), len(data), content_type=content_type)
 
     def remove(self, object_key: str) -> None:
         self.client.remove_object(self.bucket, object_key)

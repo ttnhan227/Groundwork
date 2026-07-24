@@ -17,5 +17,6 @@ redis==5.2.1
 PyMuPDF==1.26.3
 pytesseract==0.3.13
 Pillow==11.3.0
+pypdf==5.8.0
 pgvector==0.4.1
 sentence-transformers==5.0.0

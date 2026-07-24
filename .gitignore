@@ -8,6 +8,8 @@ client/node_modules/
 client/.next/
 client/dist/
 client/.wrangler/
+client/test-results/
+client/playwright-report/
 postgres_data/
 minio_data/
 InsightPDF AI SaaS Application Specification.docx

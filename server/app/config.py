@@ -29,7 +29,14 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.mistral.ai/v1"
     llm_model: str = "mistral-small-latest"
     llm_timeout_seconds: int = 60
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    ai_daily_request_limit: int = 100
+    request_rate_limit_per_minute: int = 120
+    max_documents_per_user: int = 100
+    demo_email: str = "demo@insightpdf.dev"
+    demo_password: str = "DemoPassword123!"
+    admin_email: str = ""
+    admin_password: str = ""
+    cors_origins: str = "http://localhost:5173,http://localhost:3000,http://localhost:8080"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

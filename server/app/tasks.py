@@ -17,7 +17,7 @@ from app.storage import ObjectStorage
 async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id))
+        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc()))
         if document is None or job is None:
             raise ValueError("Document or processing job no longer exists")
         document.status = DocumentStatus.EXTRACTING
@@ -32,7 +32,7 @@ async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
 async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id))
+        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc()))
         if document is None or job is None:
             return
         await session.execute(delete(DocumentPage).where(DocumentPage.document_id == document_id))
@@ -51,7 +51,7 @@ async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
 
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id))
+        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc()))
         if document is None or job is None:
             return
         await session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
