@@ -1,15 +1,18 @@
 import re
 import uuid
 
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
-from app.models import Document, User
-from app.schemas import DocumentResponse
+from app.models import Document, DocumentPage, DocumentStatus, JobStatus, ProcessingJob, User
+from app.schemas import DocumentPageResponse, DocumentResponse, ProcessingJobResponse
 from app.storage import ObjectStorage
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -25,6 +28,58 @@ def safe_filename(name: str) -> str:
 async def list_documents(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> list[Document]:
     result = await session.scalars(select(Document).where(Document.owner_id == user.id).order_by(Document.created_at.desc()))
     return list(result)
+
+
+async def owned_document(document_id: uuid.UUID, user: User, session: AsyncSession) -> Document:
+    document = await session.scalar(select(Document).where(Document.id == document_id, Document.owner_id == user.id))
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.get("/{document_id}", response_model=DocumentResponse)
+async def get_document(document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> Document:
+    return await owned_document(document_id, user, session)
+
+
+@router.get("/{document_id}/job", response_model=ProcessingJobResponse)
+async def get_processing_job(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProcessingJob:
+    await owned_document(document_id, user, session)
+    job = await session.scalar(
+        select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc())
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="Processing job not found")
+    return job
+
+
+@router.get("/{document_id}/pages", response_model=list[DocumentPageResponse])
+async def get_document_pages(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentPage]:
+    await owned_document(document_id, user, session)
+    result = await session.scalars(
+        select(DocumentPage).where(DocumentPage.document_id == document_id).order_by(DocumentPage.page_number)
+    )
+    return list(result)
+
+
+@router.get("/{document_id}/content")
+async def download_document(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    document = await owned_document(document_id, user, session)
+    data = ObjectStorage().download(document.object_key)
+    disposition = f'inline; filename="{safe_filename(document.filename)}"'
+    return StreamingResponse(BytesIO(data), media_type="application/pdf", headers={"Content-Disposition": disposition})
 
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
@@ -58,6 +113,21 @@ async def upload_document(
         size_bytes=len(data),
     )
     session.add(document)
+    job = ProcessingJob(document_id=document_id, status=JobStatus.QUEUED, progress=0)
+    session.add(job)
     await session.commit()
     await session.refresh(document)
+    from app.tasks import process_document
+
+    try:
+        task = process_document.delay(str(document.id))
+        job.task_id = task.id
+        await session.commit()
+    except Exception as exc:
+        document.status = DocumentStatus.FAILED
+        document.error_message = "Processing queue is temporarily unavailable"
+        job.status = JobStatus.FAILED
+        job.error_message = document.error_message
+        await session.commit()
+        raise HTTPException(status_code=503, detail=document.error_message) from exc
     return document

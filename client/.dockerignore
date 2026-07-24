@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.next/
+.vinext/
+coverage/
+npm-debug.log*

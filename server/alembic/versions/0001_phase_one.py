@@ -10,8 +10,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    role = sa.Enum("USER", "ADMIN", name="userrole")
-    status = sa.Enum("UPLOADED", "FAILED", name="documentstatus")
+    role = postgresql.ENUM("USER", "ADMIN", name="userrole", create_type=False)
+    status = postgresql.ENUM("UPLOADED", "FAILED", name="documentstatus", create_type=False)
     role.create(op.get_bind())
     status.create(op.get_bind())
     op.create_table(

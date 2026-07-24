@@ -12,3 +12,10 @@ minio==7.2.16
 httpx==0.28.1
 pytest==8.4.1
 pytest-asyncio==1.1.0
+celery[redis]==5.5.3
+redis==5.2.1
+PyMuPDF==1.26.3
+pytesseract==0.3.13
+Pillow==11.3.0
+pgvector==0.4.1
+sentence-transformers==5.0.0
