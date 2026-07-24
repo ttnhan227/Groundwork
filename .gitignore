@@ -1,0 +1,13 @@
+.env
+__pycache__/
+.pytest_cache/
+.venv/
+server/.venv/
+*.pyc
+client/node_modules/
+client/.next/
+client/dist/
+client/.wrangler/
+postgres_data/
+minio_data/
+InsightPDF AI SaaS Application Specification.docx
