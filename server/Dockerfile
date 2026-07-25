@@ -10,4 +10,5 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.7.1 \
     && pip install --no-cache-dir -r requirements.txt
 COPY . .
-CMD ["/bin/sh", "-c", "alembic upgrade head && python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+RUN chmod +x /app/start.sh
+CMD ["/app/start.sh"]
