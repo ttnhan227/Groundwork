@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     max_page_count: int = 500
     ocr_text_density_threshold: int = 40
     ocr_language: str = "eng"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_dimensions: int = 384
+    embedding_provider: str = "api"
+    embedding_model: str = "mistral-embed"
+    embedding_dimensions: int = 1024
     chunk_size: int = 900
     chunk_overlap: int = 150
     rag_top_k: int = 6

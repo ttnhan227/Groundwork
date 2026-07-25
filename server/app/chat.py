@@ -15,7 +15,7 @@ from app.rag import (
     build_retrieval_query,
     clean_user_answer,
     cited_sources,
-    embed_texts,
+    embed_texts_async,
     generate_answer,
     is_casual_message,
     relevant_snippet,
@@ -163,7 +163,7 @@ async def ask_question(
         return ChatResponse(answer=answer, citations=[])
 
     retrieval_query = build_retrieval_query(payload.question, history)
-    query_vector = embed_texts([retrieval_query])[0]
+    query_vector = (await embed_texts_async([retrieval_query]))[0]
     settings = get_settings()
     chunks = list(await session.scalars(
         select(DocumentChunk)

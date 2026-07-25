@@ -8,6 +8,7 @@ from app.rag import (
     chunk_pages,
     clean_user_answer,
     cited_sources,
+    embed_texts,
     generate_answer,
     is_casual_message,
     relevant_snippet,
@@ -26,6 +27,35 @@ def test_chunking_preserves_page_citations_and_overlap() -> None:
 def test_chunking_rejects_invalid_overlap() -> None:
     with pytest.raises(ValueError):
         chunk_pages([(1, "content")], size=10, overlap=10)
+
+
+def test_hosted_embeddings_are_batched_sorted_and_normalized() -> None:
+    response = MagicMock()
+    response.raise_for_status.return_value = None
+    response.json.return_value = {
+        "data": [
+            {"index": 1, "embedding": [0.0, 2.0]},
+            {"index": 0, "embedding": [3.0, 4.0]},
+        ]
+    }
+    client = MagicMock()
+    client.__enter__.return_value.post.return_value = response
+    with (
+        patch("app.rag.get_settings") as settings,
+        patch("app.rag.httpx.Client", return_value=client),
+    ):
+        settings.return_value.embedding_provider = "api"
+        settings.return_value.embedding_model = "mistral-embed"
+        settings.return_value.embedding_dimensions = 3
+        settings.return_value.llm_api_key = "test"
+        settings.return_value.llm_base_url = "https://api.example/v1"
+        settings.return_value.llm_timeout_seconds = 10
+        vectors = embed_texts(["first", "second"])
+    assert vectors == [[0.6, 0.8, 0.0], [0.0, 1.0, 0.0]]
+    assert client.__enter__.return_value.post.call_args.kwargs["json"] == {
+        "model": "mistral-embed",
+        "input": ["first", "second"],
+    }
 
 
 def test_citations_use_referenced_sources_and_collapse_duplicate_pages() -> None:

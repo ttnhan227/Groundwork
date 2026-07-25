@@ -72,7 +72,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.celery_app:celery_app worker --loglevel=INFO
+    command: celery -A app.celery_app:celery_app worker --loglevel=INFO --pool=solo --concurrency=1
     volumes:
       - model_cache:/root/.cache/huggingface
     healthcheck:

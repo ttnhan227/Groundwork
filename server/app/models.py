@@ -146,7 +146,7 @@ class DocumentChunk(Base):
     page_number: Mapped[int] = mapped_column(Integer)
     chunk_index: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(Vector(384))
+    embedding: Mapped[list[float]] = mapped_column(Vector(1024))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

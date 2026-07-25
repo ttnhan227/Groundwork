@@ -21,4 +21,3 @@ Pillow==11.3.0
 pypdf==5.8.0
 python-docx==1.2.0
 pgvector==0.4.1
-sentence-transformers==5.0.0

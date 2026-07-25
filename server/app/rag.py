@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+import math
 import re
 from typing import TypeVar
 
@@ -156,11 +157,78 @@ def embedding_model():
     return SentenceTransformer(get_settings().embedding_model)
 
 
+def _normalize_embedding(vector: list[float], dimensions: int) -> list[float]:
+    if len(vector) > dimensions:
+        raise RuntimeError(f"Embedding provider returned {len(vector)} dimensions; expected {dimensions}")
+    fitted = [*vector, *([0.0] * (dimensions - len(vector)))]
+    magnitude = math.sqrt(sum(value * value for value in fitted))
+    return [value / magnitude for value in fitted] if magnitude else fitted
+
+
+def _embedding_payload(texts: list[str]) -> dict:
+    settings = get_settings()
+    return {"model": settings.embedding_model, "input": texts}
+
+
+def _api_embeddings(texts: list[str]) -> list[list[float]]:
+    settings = get_settings()
+    if not settings.llm_api_key:
+        raise RuntimeError("LLM_API_KEY is not configured")
+    vectors: list[list[float]] = []
+    with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
+        for start in range(0, len(texts), 64):
+            response = client.post(
+                f"{settings.llm_base_url.rstrip('/')}/embeddings",
+                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+                json=_embedding_payload(texts[start:start + 64]),
+            )
+            response.raise_for_status()
+            items = sorted(response.json()["data"], key=lambda item: item["index"])
+            vectors.extend(
+                _normalize_embedding(item["embedding"], settings.embedding_dimensions)
+                for item in items
+            )
+    return vectors
+
+
 def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
+    settings = get_settings()
+    if settings.embedding_provider == "api":
+        return _api_embeddings(texts)
+    if settings.embedding_provider != "local":
+        raise RuntimeError(f"Unsupported embedding provider: {settings.embedding_provider}")
     vectors = embedding_model().encode(texts, normalize_embeddings=True)
-    return [vector.tolist() for vector in vectors]
+    return [
+        _normalize_embedding(vector.tolist(), settings.embedding_dimensions)
+        for vector in vectors
+    ]
+
+
+async def embed_texts_async(texts: list[str]) -> list[list[float]]:
+    if not texts:
+        return []
+    settings = get_settings()
+    if settings.embedding_provider != "api":
+        return embed_texts(texts)
+    if not settings.llm_api_key:
+        raise RuntimeError("LLM_API_KEY is not configured")
+    vectors: list[list[float]] = []
+    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+        for start in range(0, len(texts), 64):
+            response = await client.post(
+                f"{settings.llm_base_url.rstrip('/')}/embeddings",
+                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+                json=_embedding_payload(texts[start:start + 64]),
+            )
+            response.raise_for_status()
+            items = sorted(response.json()["data"], key=lambda item: item["index"])
+            vectors.extend(
+                _normalize_embedding(item["embedding"], settings.embedding_dimensions)
+                for item in items
+            )
+    return vectors
 
 
 async def generate_answer(question: str, context: list[str], history: list[tuple[str, str]]) -> str:
