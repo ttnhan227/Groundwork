@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,10 +9,14 @@ from app.ai_features import router as ai_router
 from app.chat import router as chat_router
 from app.config import get_settings
 from app.documents import router as documents_router
+from app.jobs import router as jobs_router
 from app.pdf_tools import router as pdf_tools_router
 from app.users import router as users_router
-from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
+from app.logging_config import configure_logging
+from app.middleware import RateLimitMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
 
+configure_logging()
+logger = logging.getLogger("insightpdf.errors")
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="1.0.0", description="InsightPDF AI document workspace API.")
 app.add_middleware(
@@ -22,12 +28,14 @@ app.add_middleware(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(pdf_tools_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(jobs_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
@@ -36,5 +44,10 @@ async def health() -> dict[str, str]:
 
 
 @app.exception_handler(Exception)
-async def unexpected_error(_: Request, __: Exception) -> JSONResponse:
+async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
+    logger.exception(
+        "unhandled_request_error",
+        exc_info=error,
+        extra={"method": request.method, "path": request.url.path},
+    )
     return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL_ERROR", "message": "An unexpected error occurred.", "details": {}}})

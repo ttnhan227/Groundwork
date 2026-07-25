@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.rag import (
+    answer_declines_context,
     build_retrieval_query,
     chunk_pages,
     clean_user_answer,
@@ -43,6 +44,11 @@ def test_citations_use_referenced_sources_and_collapse_duplicate_pages() -> None
 
 def test_uncited_answer_does_not_attach_irrelevant_sources() -> None:
     assert cited_sources("Hello! How can I help?", [1, 2], lambda source: source) == []
+
+
+def test_context_decline_detection_prevents_fallback_citations() -> None:
+    assert answer_declines_context("The answer cannot be found in the provided context.")
+    assert not answer_declines_context("The policy allows two remote days each week.")
 
 
 def test_casual_messages_are_detected_without_matching_real_questions() -> None:

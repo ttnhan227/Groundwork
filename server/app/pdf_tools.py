@@ -1,4 +1,3 @@
-import json
 import uuid
 from io import BytesIO
 
@@ -99,6 +98,23 @@ async def download_artifact(
         BytesIO(data), media_type=artifact.content_type,
         headers={"Content-Disposition": f'attachment; filename="{safe_filename(artifact.filename)}"'},
     )
+
+
+@router.get("/artifacts/{artifact_id}", response_model=ArtifactResponse)
+async def get_artifact(
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> GeneratedArtifact:
+    artifact = await session.scalar(
+        select(GeneratedArtifact).where(
+            GeneratedArtifact.id == artifact_id,
+            GeneratedArtifact.owner_id == user.id,
+        )
+    )
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Generated file not found")
+    return artifact
 
 
 @router.post("/merge", response_model=ArtifactResponse, status_code=status.HTTP_201_CREATED)

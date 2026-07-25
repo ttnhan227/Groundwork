@@ -37,13 +37,14 @@ stores the conversation, and returns deduplicated page citations.
 ### Generated content and PDF tools
 
 Structured AI results are validated with Pydantic and cached by user, documents, feature,
-and parameters. PDF transformations execute against owner-authorized source objects and
-write private generated artifacts to MinIO. Downloads always pass through an authenticated
-API endpoint.
+and parameters. AI and PDF requests create owner-scoped processing jobs; Celery workers
+execute them, record progress/errors, and attach the stored result or generated artifact.
+Multipart images are staged under private UUID keys and removed after processing.
+Downloads always pass through an authenticated API endpoint.
 
 ## Trade-offs
 
 This is a production-oriented portfolio system, not an enterprise compliance claim.
-Document ingestion is durable and asynchronous. AI and PDF transformation requests are
-currently synchronous for a simpler public demo; moving them to durable Celery job
-orchestration is the clearest scaling extension.
+Document ingestion, AI generation, and JSON-based and multipart PDF operations are durable
+Celery jobs. For a larger deployment, route ingestion, embeddings, AI, and transformations
+to dedicated queues with independent concurrency and autoscaling limits.

@@ -4,7 +4,7 @@ import fitz
 from sqlalchemy.pool import NullPool
 
 from app.database import engine
-from app.processing import extract_pages
+from app.processing import extract_pages, requires_ocr
 
 
 def make_pdf(text: str = "") -> bytes:
@@ -31,6 +31,11 @@ def test_sparse_page_uses_ocr() -> None:
     assert pages[0].method == "ocr"
     assert pages[0].text == "Scanned page text"
     ocr.assert_called_once()
+
+
+def test_ocr_preflight_detects_sparse_pages() -> None:
+    assert requires_ocr(make_pdf(), 10)
+    assert not requires_ocr(make_pdf("A sufficiently long native text page"), 10)
 
 
 def test_page_limit_is_enforced() -> None:

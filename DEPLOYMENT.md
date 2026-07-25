@@ -4,33 +4,69 @@
 
 - PostgreSQL 16 with pgvector
 - Redis
-- S3-compatible object storage (MinIO locally)
-- API and Celery images built from `server/Dockerfile`
+- Private S3-compatible object storage
+- FastAPI API and Celery worker images built from `server/Dockerfile`
 - Client image built from `client/Dockerfile`
-- Nginx reverse proxy
+- Nginx or an equivalent TLS-terminating reverse proxy
 
-## Configuration
+## Production configuration
 
-Copy `.env.example` to `.env`, replace every secret, and configure the Mistral-compatible
-LLM endpoint. Use a strong random JWT secret and non-default database/MinIO credentials.
-Set the public frontend origin in `CORS_ORIGINS`.
+Copy `.env.example`, then replace every example secret and credential. Required
+production decisions include:
 
-## Local production-style launch
+- strong random `JWT_SECRET`
+- private database, Redis and object-storage credentials
+- public HTTPS origins in `CORS_ORIGINS`
+- an OpenAI-compatible `LLM_BASE_URL`, key and model
+- conservative file, page, document, request and daily AI limits
+- whether demo seeding and example credentials remain enabled
+
+Build the client with `NEXT_PUBLIC_API_URL` when the API is hosted at a separate
+origin. Keep the default `/api/v1` when frontend and API share the Nginx origin.
+
+## Production-style local launch
 
 ```bash
 docker compose up --build -d
 docker compose ps
+curl --fail http://localhost:8080/health
 ```
 
-Use `http://localhost:8080` through Nginx. Direct development ports remain available at
-3000 and 8000. Database migrations and idempotent demo seeding run before API startup.
+All listed services should become healthy. The API applies Alembic migrations
+and runs the idempotent seed before accepting traffic.
 
-## Operational notes
+## Release verification
 
-- Persist the PostgreSQL and MinIO volumes and back them up together.
-- Terminate TLS before Nginx or add certificates to the proxy.
-- Keep PostgreSQL, Redis, and MinIO private.
-- Rotate the LLM and JWT secrets if exposed.
-- Set strict AI and request limits for a public demo.
-- Monitor failed processing jobs and MinIO/PostgreSQL capacity.
-- Do not deploy the example credentials unchanged outside a portfolio demo.
+```bash
+docker compose exec -T api python -m pytest -q
+cd client && npm run lint && npm test && npm run test:e2e
+docker compose exec -T api python scripts/live_phase_three_smoke.py
+docker compose exec -T api python scripts/live_phase_four_smoke.py
+docker compose exec -T api python scripts/live_phase_five_smoke.py
+docker compose exec -T api python scripts/live_phase_six_smoke.py
+```
+
+## Operational guidance
+
+- Terminate TLS before Nginx and redirect HTTP to HTTPS.
+- Keep PostgreSQL, Redis and MinIO on private networks.
+- Run API and workers as non-root users in a hardened deployment.
+- Back up PostgreSQL and object storage as a coordinated dataset.
+- Persist Redis when queued work must survive infrastructure restarts.
+- Use separate worker queues/concurrency limits for OCR, embeddings, AI and PDF work.
+- Monitor failed jobs, queue depth, request latency, AI usage and storage capacity.
+- Rotate LLM, JWT, database and object-storage credentials on exposure.
+- Apply a retention policy to staged objects and generated artifacts.
+- Do not deploy the example demo/admin passwords outside an intentionally public demo.
+
+## Rollback
+
+Deploy the previous application images first. Only downgrade the database after
+reviewing the target migration:
+
+```bash
+docker compose exec api alembic history
+docker compose exec api alembic downgrade <revision>
+```
+
+Database and object-storage backups should be tested before production schema changes.

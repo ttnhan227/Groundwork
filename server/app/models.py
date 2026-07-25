@@ -117,7 +117,16 @@ class ProcessingJob(Base):
     __tablename__ = "processing_jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    operation: Mapped[str] = mapped_column(String(50), default="document_processing", index=True)
+    parameters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    result_kind: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    result_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     task_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.QUEUED, index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)

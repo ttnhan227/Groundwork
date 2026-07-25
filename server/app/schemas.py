@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models import DocumentStatus, JobStatus, MessageRole, UserRole
 
@@ -64,12 +64,36 @@ class DocumentPageResponse(BaseModel):
 class ProcessingJobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    document_id: uuid.UUID | None
+    operation: str
+    parameters: dict
     status: JobStatus
     progress: int
     retry_count: int
     error_message: str | None
     started_at: datetime | None
     completed_at: datetime | None
+    result_kind: str | None
+    result_id: uuid.UUID | None
+    created_at: datetime
+
+
+class OperationJobCreate(BaseModel):
+    operation: str = Field(
+        pattern=(
+            "^(summary|quiz|extraction|translation|comparison|merge|split|rotate|"
+            "delete_pages|extract_pages|pdf_to_images|images_to_pdf|watermark|"
+            "pdf_to_docx|docx_to_pdf|docx_to_markdown)$"
+        )
+    )
+    parameters: dict
+
+    @field_validator("parameters")
+    @classmethod
+    def limit_parameters(cls, value: dict) -> dict:
+        if len(str(value)) > 20_000:
+            raise ValueError("Job parameters are too large")
+        return value
 
 
 class ConversationCreate(BaseModel):

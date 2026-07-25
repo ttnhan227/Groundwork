@@ -60,6 +60,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   worker:
     build: ./server
@@ -79,6 +80,7 @@ services:
       interval: 20s
       timeout: 10s
       retries: 5
+    restart: unless-stopped
 
   client:
     build: ./client
@@ -87,6 +89,7 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+    restart: unless-stopped
 
   nginx:
     image: nginx:1.27-alpine
@@ -104,6 +107,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
 volumes:
   postgres_data:

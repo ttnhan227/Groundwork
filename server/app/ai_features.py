@@ -318,6 +318,28 @@ async def download_result(
     return PlainTextResponse(content, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+@router.get("/results/{result_id}", response_model=AIResultResponse)
+async def get_result(
+    result_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AIResultResponse:
+    stored = await session.scalar(
+        select(AIResult).where(AIResult.id == result_id, AIResult.owner_id == user.id)
+    )
+    if stored is None:
+        raise HTTPException(status_code=404, detail="AI result not found")
+    return AIResultResponse(
+        id=stored.id,
+        feature=stored.feature.value,
+        document_ids=[uuid.UUID(value) for value in stored.document_ids],
+        parameters=stored.parameters,
+        result=stored.result,
+        cached=True,
+        created_at=stored.created_at,
+    )
+
+
 @router.post("/compare", response_model=AIResultResponse)
 async def compare(
     payload: ComparisonRequest,

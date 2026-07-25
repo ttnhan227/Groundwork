@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
+import Providers from "./providers";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -11,8 +12,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(origin),
     title: "InsightPDF — Intelligent document workspace",
-    description: "Securely upload, organize, and prepare PDF documents for intelligent workflows.",
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    description: "Securely upload, understand, compare, and transform PDF documents with AI.",
+    icons: {
+      icon: [{ url: "/favicon.ico", type: "image/x-icon" }],
+      shortcut: "/favicon.ico",
+      apple: "/favicon.ico",
+    },
     openGraph: {
       title: "InsightPDF",
       description: "Your intelligent document workspace",
@@ -30,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><Providers>{children}</Providers></body>
     </html>
   );
 }

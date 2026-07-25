@@ -36,6 +36,22 @@ def cited_sources(answer: str, sources: list[T], source_key) -> list[T]:
     return unique
 
 
+def answer_declines_context(answer: str) -> bool:
+    normalized = answer.lower()
+    return any(
+        phrase in normalized
+        for phrase in (
+            "cannot be found",
+            "can't be found",
+            "not found in the",
+            "does not contain",
+            "do not contain",
+            "insufficient context",
+            "provided context does not",
+        )
+    )
+
+
 def is_casual_message(message: str) -> bool:
     normalized = re.sub(r"[^a-z\s]", "", message.lower()).strip()
     return normalized in {

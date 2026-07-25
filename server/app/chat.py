@@ -2,7 +2,7 @@ import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,7 @@ from app.database import get_session
 from app.dependencies import current_user
 from app.models import Citation, Conversation, Document, DocumentChunk, DocumentStatus, Message, MessageRole, User
 from app.rag import (
+    answer_declines_context,
     build_retrieval_query,
     clean_user_answer,
     cited_sources,
@@ -184,6 +185,8 @@ async def ask_question(
     except (httpx.HTTPError, KeyError, IndexError) as exc:
         raise HTTPException(status_code=502, detail="The configured language model is unavailable") from exc
     cited_chunks = cited_sources(raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number))
+    if not cited_chunks and not answer_declines_context(raw_answer):
+        cited_chunks = chunks[:1]
     answer = clean_user_answer(raw_answer)
     user_message = Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question)
     assistant_message = Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer)

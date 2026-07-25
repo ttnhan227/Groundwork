@@ -66,7 +66,9 @@ test("includes Phase 4 document intelligence tools", async () => {
   assert.match(page, /Compare PDFs/);
   assert.match(page, /Summarize/);
   assert.match(page, /Translate/);
-  assert.match(page, /\/ai\/compare/);
+  assert.match(page, /queueOperation/);
+  assert.match(page, /\/jobs/);
+  assert.match(page, /\/ai\/results/);
   assert.match(page, /Download translation/);
   assert.match(css, /\.ai-workspace/);
   assert.match(css, /\.quiz-question/);
@@ -96,6 +98,7 @@ test("includes Phase 6 dashboard, account, admin, and demo experience", async ()
   assert.match(page, /\/admin\/users/);
   assert.match(page, /Search your PDFs/);
   assert.match(page, /Portfolio demo/);
+  assert.match(page, /src="\/logo\.png"/);
   assert.match(page, /demo@insightpdf\.dev/);
   assert.match(page, /DemoPassword123!/);
   assert.match(page, /retryDocument/);

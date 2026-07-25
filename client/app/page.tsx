@@ -1,10 +1,13 @@
 "use client";
 
-import { BookOpen, BrainCircuit, Check, Download, FileImage, FileText, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BrainCircuit, Check, Download, FileImage, FileText, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
 
 type DocumentItem = {
   id: string;
@@ -16,7 +19,17 @@ type DocumentItem = {
   created_at: string;
 };
 
-type Job = { status: string; progress: number; error_message: string | null };
+type Job = {
+  id?: string;
+  status: string;
+  progress: number;
+  error_message: string | null;
+  result_kind?: string | null;
+  result_id?: string | null;
+  operation?: string;
+  retry_count?: number;
+  created_at?: string;
+};
 type AuthResult = { access_token: string; refresh_token: string; user: { id: string; display_name: string; email: string; role: "user" | "admin"; is_active: boolean } };
 type Citation = { document_id: string; document_name: string; page_number: number; snippet: string };
 type ChatMessage = { id?: string; role: "user" | "assistant"; content: string; citations?: Citation[]; created_at?: string };
@@ -40,6 +53,12 @@ type AIResult = {
 type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; created_at: string };
 type Stats = { document_count: number; page_count: number; storage_bytes: number; ai_requests: number; generated_files: number; failed_jobs: number };
 type AdminUser = AuthResult["user"] & Stats & { created_at: string };
+const authSchema = z.object({
+  display_name: z.string().trim().max(120).optional(),
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+});
+type AuthFields = z.infer<typeof authSchema>;
 
 const AUTH_EXPIRED_EVENT = "insightpdf-auth-expired";
 
@@ -59,6 +78,33 @@ async function api<T>(path: string, token?: string, init?: RequestInit): Promise
     throw new Error(body?.detail ?? body?.error?.message ?? "Request failed");
   }
   return response.status === 204 ? (undefined as T) : response.json();
+}
+
+async function waitForJob(job: Job, token: string): Promise<Job> {
+  if (!job.id) throw new Error("The server did not return a job ID");
+  const deadline = Date.now() + 180_000;
+  let current = job;
+  while (!["completed", "failed"].includes(current.status)) {
+    if (Date.now() >= deadline) throw new Error("The operation is still running. Check Processing jobs shortly.");
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
+    current = await api<Job>(`/jobs/status/${job.id}`, token);
+  }
+  if (current.status === "failed") throw new Error(current.error_message ?? "Background operation failed");
+  if (!current.result_id) throw new Error("The job completed without a result");
+  return current;
+}
+
+async function queueOperation(
+  operation: string,
+  parameters: Record<string, unknown>,
+  token: string,
+): Promise<Job> {
+  const job = await api<Job>("/jobs", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operation, parameters }),
+  });
+  return waitForJob(job, token);
 }
 
 function InlineText({ text }: { text: string }) {
@@ -158,15 +204,17 @@ function AIWorkspace({ document, documents, token, compareMode, onClose, onPage 
   async function run() {
     if (!document && tool !== "compare") return;
     setBusy(true); setError(""); setResult(null);
-    let path = `/ai/documents/${document?.id}/${tool}`;
     let body: Record<string, unknown> = {};
     if (tool === "summary") body = { style };
     if (tool === "quiz") body = { question_count: count };
     if (tool === "extract") body = { categories: ["people", "dates", "companies", "monetary_values", "deadlines", "action_items"], custom_fields: customFields.split(",").map((item) => item.trim()).filter(Boolean) };
     if (tool === "translate") body = { target_language: language, page_numbers: pages.trim() ? pages.split(",").map(Number).filter((item) => Number.isInteger(item) && item > 0) : null, format: "markdown" };
-    if (tool === "compare") { path = "/ai/compare"; body = { left_document_id: left, right_document_id: right }; }
+    if (tool === "compare") body = { left_document_id: left, right_document_id: right };
     try {
-      setResult(await api<AIResult>(path, token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+      const operation = tool === "extract" ? "extraction" : tool === "compare" ? "comparison" : tool;
+      const parameters = tool === "compare" ? body : { document_id: document?.id, ...body };
+      const job = await queueOperation(operation, parameters, token);
+      setResult(await api<AIResult>(`/ai/results/${job.result_id}`, token));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "AI tool failed"); }
     finally { setBusy(false); }
   }
@@ -193,7 +241,7 @@ function AIWorkspace({ document, documents, token, compareMode, onClose, onPage 
         </div>
         {error && <div className="form-error">{error}</div>}
         {!result && !busy && <div className="ai-result-empty"><BrainCircuit size={38} /><strong>Ready when you are</strong><span>Choose your options and generate a grounded result from the indexed document text.</span></div>}
-        {busy && <div className="ai-result-empty"><RefreshCw className="spin" size={34} /><strong>Mistral is reading the indexed content</strong><span>This can take a few seconds. Repeating the same request will use the saved result.</span></div>}
+        {busy && <div className="ai-result-empty"><RefreshCw className="spin" size={34} /><strong>InsightPDF is analyzing your documents</strong><span>This can take a few seconds. Repeating the same request will use the saved result.</span></div>}
         {result && <PhaseFourResult value={result} documents={documents} onPage={onPage} />}
       </div>
     </section>
@@ -432,7 +480,12 @@ function ChatPanel({
       {busy && <div className="chat-thinking"><RefreshCw className="spin" size={14} /> Searching indexed pages…</div>}
     </div>
     {error && <div className="chat-error">{error}</div>}
-    <form onSubmit={ask}><div className="chat-input"><input name="question" aria-label="Question" placeholder="Ask a follow-up question…" disabled={!conversationId || busy} /><small>Answers use indexed document content</small></div><button aria-label="Send" disabled={!conversationId || busy}><Send size={17} /></button></form>
+    <form onSubmit={ask}><div className="chat-input"><textarea name="question" aria-label="Question" placeholder="Ask a follow-up question…" rows={1} disabled={!conversationId || busy} onKeyDown={(event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        event.currentTarget.form?.requestSubmit();
+      }
+    }} /><small>Enter to send · Shift+Enter for a new line</small></div><button aria-label="Send" disabled={!conversationId || busy}><Send size={17} /></button></form>
   </aside>;
 }
 
@@ -579,6 +632,7 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   const [imageFormat, setImageFormat] = useState("png");
   const [dpi, setDpi] = useState(144);
   const [images, setImages] = useState<File[]>([]);
+  const [wordFile, setWordFile] = useState<File | null>(null);
   const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
   const [watermarkImage, setWatermarkImage] = useState<File | null>(null);
   const [position, setPosition] = useState("center");
@@ -596,15 +650,26 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   async function run() {
     setBusy(true); setError(""); setArtifact(null);
     try {
-      const path = `/pdf-tools/${tool}`; let init: RequestInit;
+      let generated: Artifact;
       if (tool === "images-to-pdf") {
         const data = new FormData(); images.forEach((image) => data.append("files", image));
-        init = { method: "POST", body: data };
-      } else if (tool === "watermark") {
+        const queued = await api<Job>("/jobs/images-to-pdf", token, { method: "POST", body: data });
+        const job = await waitForJob(queued, token);
+        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
+      } else if (tool === "word-to-pdf" || tool === "word-to-markdown") {
+        const data = new FormData();
+        if (wordFile) data.append("file", wordFile);
+        data.append("target", tool === "word-to-pdf" ? "pdf" : "markdown");
+        const queued = await api<Job>("/jobs/convert-docx", token, { method: "POST", body: data });
+        const job = await waitForJob(queued, token);
+        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
+      } else if (tool === "watermark" && watermarkImage) {
         const data = new FormData(); data.append("document_id", documentId); data.append("text", watermarkText);
         data.append("page_numbers", pages); data.append("position", position); data.append("opacity", String(opacity)); data.append("rotation", "0");
         if (watermarkImage) data.append("image", watermarkImage);
-        init = { method: "POST", body: data };
+        const queued = await api<Job>("/jobs/watermark", token, { method: "POST", body: data });
+        const job = await waitForJob(queued, token);
+        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
       } else {
         let body: Record<string, unknown> = { document_id: documentId };
         if (tool === "merge") body = { document_ids: selected };
@@ -612,9 +677,16 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
         if (tool === "rotate") body = { ...body, page_numbers: pageNumbers(), degrees };
         if (tool === "split") body = { ...body, mode: splitMode, ranges: ranges.split(",").map((item) => item.trim()).filter(Boolean), page_numbers: pageNumbers() };
         if (tool === "pdf-to-images") body = { ...body, page_numbers: pages.trim() ? pageNumbers() : null, format: imageFormat, dpi };
-        init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+        if (tool === "watermark") body = { ...body, text: watermarkText, page_numbers: pageNumbers(), position, opacity, rotation: 0 };
+        const operationNames: Record<string, string> = {
+          extract: "extract_pages",
+          "delete-pages": "delete_pages",
+          "pdf-to-images": "pdf_to_images",
+          "pdf-to-word": "pdf_to_docx",
+        };
+        const job = await queueOperation(operationNames[tool] ?? tool, body, token);
+        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
       }
-      const generated = await api<Artifact>(path, token, init);
       setArtifact(generated); setArtifacts((current) => [generated, ...current.filter((item) => item.id !== generated.id)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "PDF operation failed"); }
     finally { setBusy(false); }
@@ -623,9 +695,11 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   const tools = [
     ["merge", "Merge"], ["split", "Split"], ["extract", "Extract pages"], ["delete-pages", "Delete pages"],
     ["rotate", "Rotate"], ["pdf-to-images", "PDF to images"], ["images-to-pdf", "Images to PDF"], ["watermark", "Watermark"],
+    ["pdf-to-word", "PDF to Word"], ["word-to-pdf", "Word to PDF"], ["word-to-markdown", "Word to Markdown"],
   ];
-  const needsDocument = tool !== "merge" && tool !== "images-to-pdf";
-  const canRun = !busy && (tool === "merge" ? selected.length >= 2 : tool === "images-to-pdf" ? images.length > 0 : Boolean(documentId));
+  const needsWordFile = tool === "word-to-pdf" || tool === "word-to-markdown";
+  const needsDocument = tool !== "merge" && tool !== "images-to-pdf" && !needsWordFile;
+  const canRun = !busy && (tool === "merge" ? selected.length >= 2 : tool === "images-to-pdf" ? images.length > 0 : needsWordFile ? Boolean(wordFile) : Boolean(documentId));
 
   return <div className="pdf-tools-wrap"><button className="history-backdrop" aria-label="Close PDF tools" onClick={onClose} />
     <section className="pdf-tools-panel"><header><div><p className="eyebrow">Phase 5 workspace</p><h2>PDF tools</h2></div><button onClick={onClose}><X size={18} /></button></header>
@@ -638,7 +712,9 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
             {tool === "rotate" && <label>Rotation<select value={degrees} onChange={(event) => setDegrees(Number(event.target.value))}><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label>}
             {tool === "split" && <><label>Split mode<select value={splitMode} onChange={(event) => setSplitMode(event.target.value)}><option value="ranges">Page ranges</option><option value="every_page">One PDF per page</option><option value="selected">Selected pages</option></select></label>{splitMode === "ranges" ? <label>Ranges <small>Comma-separated, e.g. 1-3, 4-7</small><input value={ranges} onChange={(event) => setRanges(event.target.value)} /></label> : splitMode === "selected" ? <label>Selected pages<input value={pages} onChange={(event) => setPages(event.target.value)} /></label> : null}</>}
             {tool === "pdf-to-images" && <><label>Pages <small>Leave blank for all pages</small><input value={pages} onChange={(event) => setPages(event.target.value)} placeholder="All pages" /></label><label>Format<select value={imageFormat} onChange={(event) => setImageFormat(event.target.value)}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label><label>Resolution<select value={dpi} onChange={(event) => setDpi(Number(event.target.value))}><option value={96}>96 DPI</option><option value={144}>144 DPI</option><option value={216}>216 DPI</option><option value={300}>300 DPI</option></select></label></>}
-            {tool === "images-to-pdf" && <label className="image-drop"><Upload size={24} />Choose PNG/JPEG images<input type="file" accept="image/png,image/jpeg" multiple onChange={(event) => setImages(Array.from(event.target.files ?? []))} /><small>{images.length ? `${images.length} image(s), kept in selected order` : "Up to 50 images"}</small></label>}
+            {tool === "images-to-pdf" && <><label className="image-drop"><Upload size={24} />Choose PNG/JPEG images<input type="file" accept="image/png,image/jpeg" multiple onChange={(event) => setImages(Array.from(event.target.files ?? []))} /><small>{images.length ? `${images.length} image(s)` : "Up to 50 images"}</small></label>
+              {images.length > 0 && <div className="image-order-list" aria-label="Image order">{images.map((image, index) => <article key={`${image.name}-${image.lastModified}-${index}`}><span>{index + 1}. {image.name}</span><button disabled={index === 0} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index - 1 ? current[index] : itemIndex === index ? current[index - 1] : item))}>Up</button><button disabled={index === images.length - 1} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index + 1 ? current[index] : itemIndex === index ? current[index + 1] : item))}>Down</button><button onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}</div>}</>}
+            {needsWordFile && <label className="image-drop"><Upload size={24} />Choose a Word document<input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setWordFile(event.target.files?.[0] ?? null)} /><small>{wordFile?.name ?? "DOCX files up to 50 MB"}</small></label>}
             {tool === "watermark" && <><label>Watermark text <small>Optional when using an image</small><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} /></label><label>Watermark image <small>Optional PNG/JPEG</small><input type="file" accept="image/png,image/jpeg" onChange={(event) => setWatermarkImage(event.target.files?.[0] ?? null)} /></label><label>Pages <small>Leave blank for every page</small><input value={pages} onChange={(event) => setPages(event.target.value)} /></label><label>Position<select value={position} onChange={(event) => setPosition(event.target.value)}><option value="center">Center</option><option value="top_left">Top left</option><option value="top_right">Top right</option><option value="bottom_left">Bottom left</option><option value="bottom_right">Bottom right</option></select></label><label>Opacity<input type="range" min=".05" max="1" step=".05" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} /><small>{Math.round(opacity * 100)}%</small></label></>}
             <button className="run-pdf-tool" disabled={!canRun} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <Scissors size={15} />}{busy ? "Processing…" : "Create file"}</button>
           </div>
@@ -692,6 +768,24 @@ function AccountPanel({ user, token, stats, onUser, onClose }: {
     </main></section></div>;
 }
 
+function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void }) {
+  const [items, setItems] = useState<Job[]>([]);
+  const [error, setError] = useState("");
+  const load = useCallback(() => api<Job[]>("/jobs", token).then(setItems).catch((reason) => setError(reason.message)), [token]);
+  useEffect(() => { load(); const timer = window.setInterval(load, 2500); return () => window.clearInterval(timer); }, [load]);
+  async function retry(job: Job) {
+    if (!job.id) return;
+    try {
+      await api(`/jobs/status/${job.id}/retry`, token, { method: "POST" });
+      await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Retry failed"); }
+  }
+  return <div className="jobs-wrap"><button className="history-backdrop" aria-label="Close processing jobs" onClick={onClose} /><section className="jobs-panel" role="dialog" aria-label="Processing jobs">
+    <header><div><p className="eyebrow">Background activity</p><h2>Processing jobs</h2></div><button aria-label="Close processing jobs" onClick={onClose}><X size={18} /></button></header>
+    <main>{error && <div className="form-error">{error}</div>}{items.map((job) => <article key={job.id}><div><strong>{(job.operation ?? "document processing").replaceAll("_", " ")}</strong><span>{job.created_at ? new Date(job.created_at).toLocaleString() : ""} · {job.progress}%</span></div><b className={`job-state ${job.status}`}>{job.status}</b>{job.status === "failed" && job.operation !== "document_processing" && <button onClick={() => retry(job)}>Retry</button>}{job.error_message && <small>{job.error_message}</small>}</article>)}{!items.length && !error && <div className="empty-workspace"><RefreshCw size={30} /><h3>No processing jobs yet</h3></div>}</main>
+  </section></div>;
+}
+
 export default function Home() {
   const [initialAuth] = useState<AuthResult | null>(() => {
     if (typeof window === "undefined") return null;
@@ -720,9 +814,14 @@ export default function Home() {
   const [pdfToolsOpen, setPDFToolsOpen] = useState(false);
   const [pdfToolsDocument, setPDFToolsDocument] = useState<DocumentItem | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [jobsOpen, setJobsOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const authForm = useForm<AuthFields>({
+    resolver: zodResolver(authSchema),
+    defaultValues: { display_name: "", email: "", password: "" },
+  });
 
   useEffect(() => {
     function handleExpiredSession() {
@@ -801,18 +900,21 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [token, documents, loadDocuments]);
 
-  async function authenticate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function authenticate(values: AuthFields) {
     setBusy(true); setError("");
-    const form = new FormData(event.currentTarget);
+    if (mode === "register" && !values.display_name?.trim()) {
+      setError("Display name must contain at least two characters.");
+      setBusy(false);
+      return;
+    }
     try {
       const result = await api<AuthResult>(`/auth/${mode}`, undefined, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: form.get("email"),
-          password: form.get("password"),
-          ...(mode === "register" ? { display_name: form.get("display_name") } : {}),
+          email: values.email,
+          password: values.password,
+          ...(mode === "register" ? { display_name: values.display_name } : {}),
         }),
       });
       localStorage.setItem("insightpdf-auth", JSON.stringify(result));
@@ -865,15 +967,17 @@ export default function Home() {
   if (!token || !user) return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand"><span><BookOpen size={24} /></span> Insight<b>PDF</b></div>
+        {/* The bundled logo is already optimized and served directly by the Vite runtime. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="auth-brand auth-brand-login"><img src="/logo.png" alt="InsightPDF" /></div>
         <p className="eyebrow">AI-powered PDF workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Upload PDFs, extract text, and process scanned pages securely.</p>
         {mode === "login" && <div className="demo-account"><Sparkles size={15} /><div><strong>Portfolio demo</strong><span>demo@insightpdf.dev · DemoPassword123!</span></div></div>}
-        <form onSubmit={authenticate}>
-          {mode === "register" && <label>Display name<input name="display_name" minLength={2} required /></label>}
-          <label>Email<input name="email" type="email" required /></label>
-          <label>Password<input name="password" type="password" minLength={8} required /></label>
+        <form onSubmit={authForm.handleSubmit(authenticate)}>
+          {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
+          <label>Email<input {...authForm.register("email")} type="email" required /></label>
+          <label>Password<input {...authForm.register("password")} type="password" minLength={8} required /></label>
           {error && <div className="form-error">{error}</div>}
           <button disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</button>
         </form>
@@ -887,8 +991,10 @@ export default function Home() {
   return (
     <main className="workspace-page">
       <header className="workspace-header">
-        <div className="auth-brand"><span><BookOpen size={21} /></span> Insight<b>PDF</b></div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="auth-brand auth-brand-header"><img src="/logo.png" alt="InsightPDF" /></div>
         <div><strong>{user.display_name}</strong><small>{user.email}</small></div>
+        <button onClick={() => setJobsOpen(true)}><RefreshCw size={16} /> Processing jobs</button>
         <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><Settings size={16} /> Account</button>
         <button onClick={signOut}><LogOut size={17} /> Sign out</button>
       </header>
@@ -966,6 +1072,7 @@ export default function Home() {
         const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "{}");
         localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
       }} onClose={() => setAccountOpen(false)} />}
+      {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
     </main>
   );
 }

@@ -1,11 +1,22 @@
 from io import BytesIO
+from typing import Protocol
 
 from minio import Minio
 
 from app.config import get_settings
 
 
-class ObjectStorage:
+class StorageBackend(Protocol):
+    """Replaceable private-object storage contract."""
+
+    def upload(self, object_key: str, data: bytes, content_type: str) -> None: ...
+    def remove(self, object_key: str) -> None: ...
+    def download(self, object_key: str) -> bytes: ...
+
+
+class MinIOStorage:
+    """MinIO/S3 implementation of the storage contract."""
+
     def __init__(self) -> None:
         settings = get_settings()
         self.bucket = settings.minio_bucket_originals
@@ -37,3 +48,26 @@ class ObjectStorage:
         finally:
             response.close()
             response.release_conn()
+
+
+class ObjectStorage:
+    """Application-facing storage facade.
+
+    Callers depend on this facade rather than the MinIO SDK. A different
+    backend can be injected in tests or wired here for S3/Azure deployments.
+    """
+
+    def __init__(self, backend: StorageBackend | None = None) -> None:
+        self.backend = backend or MinIOStorage()
+
+    def upload_pdf(self, object_key: str, data: bytes) -> None:
+        self.backend.upload(object_key, data, "application/pdf")
+
+    def upload(self, object_key: str, data: bytes, content_type: str) -> None:
+        self.backend.upload(object_key, data, content_type)
+
+    def remove(self, object_key: str) -> None:
+        self.backend.remove(object_key)
+
+    def download(self, object_key: str) -> bytes:
+        return self.backend.download(object_key)

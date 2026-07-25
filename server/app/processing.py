@@ -13,6 +13,17 @@ class ExtractedPage:
     method: str
 
 
+def requires_ocr(pdf_data: bytes, text_density_threshold: int, max_pages: int = 500) -> bool:
+    """Return whether any page needs OCR while also validating the page limit."""
+    document = fitz.open(stream=pdf_data, filetype="pdf")
+    try:
+        if document.page_count > max_pages:
+            raise ValueError(f"PDF exceeds the {max_pages}-page limit")
+        return any(len(page.get_text("text").strip()) < text_density_threshold for page in document)
+    finally:
+        document.close()
+
+
 def extract_pages(
     pdf_data: bytes,
     text_density_threshold: int,

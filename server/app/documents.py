@@ -145,7 +145,13 @@ async def upload_document(
         size_bytes=len(data),
     )
     session.add(document)
-    job = ProcessingJob(document_id=document_id, status=JobStatus.QUEUED, progress=0)
+    job = ProcessingJob(
+        document_id=document_id,
+        owner_id=user.id,
+        operation="document_processing",
+        status=JobStatus.QUEUED,
+        progress=0,
+    )
     session.add(job)
     await session.commit()
     await session.refresh(document)
@@ -172,7 +178,13 @@ async def retry_document(
     document = await owned_document(document_id, user, session)
     if document.status != DocumentStatus.FAILED:
         raise HTTPException(status_code=409, detail="Only failed documents can be retried")
-    job = ProcessingJob(document_id=document.id, status=JobStatus.QUEUED, progress=0)
+    job = ProcessingJob(
+        document_id=document.id,
+        owner_id=user.id,
+        operation="document_processing",
+        status=JobStatus.QUEUED,
+        progress=0,
+    )
     document.status = DocumentStatus.UPLOADED
     document.error_message = None
     session.add(job)
