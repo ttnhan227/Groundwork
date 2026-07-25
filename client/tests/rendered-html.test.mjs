@@ -81,10 +81,10 @@ test("includes Phase 6 dashboard, account, admin, and demo experience", async ()
   assert.match(page, /\/profile\/password/);
   assert.match(page, /\/admin\/users/);
   assert.match(page, /Search your PDFs/);
-  assert.match(page, /Portfolio demo/);
+  assert.match(page, /Demo workspace/);
+  assert.match(page, /Explore populated demo/);
   assert.match(page, /src="\/logo\.png"/);
-  assert.match(page, /demo@insightpdf\.dev/);
-  assert.match(page, /DemoPassword123!/);
+  assert.match(page, /openDemoWorkspace/);
   assert.match(page, /retryDocument/);
   assert.match(css, /\.dashboard-cards/);
   assert.match(css, /\.account-panel/);

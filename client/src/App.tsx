@@ -1043,6 +1043,15 @@ function WorkspaceApp() {
     finally { setBusy(false); }
   }
 
+  async function openDemoWorkspace() {
+    setMode("login");
+    await authenticate({
+      email: "demo@insightpdf.dev",
+      password: "DemoPassword123!",
+      display_name: "",
+    });
+  }
+
   async function upload(file?: File) {
     if (!file || !token) return;
     setBusy(true); setError("");
@@ -1090,7 +1099,11 @@ function WorkspaceApp() {
         <p className="eyebrow">AI-powered PDF workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Upload PDFs, extract text, and process scanned pages securely.</p>
-        {mode === "login" && <div className="demo-account"><Sparkles size={15} /><div><strong>Portfolio demo</strong><span>demo@insightpdf.dev · DemoPassword123!</span></div></div>}
+        {mode === "login" && <section className="demo-account">
+          <Sparkles size={17} />
+          <div><strong>Demo workspace</strong><span>Open a populated workspace with sample PDFs, AI tools, conversations, and generated files.</span></div>
+          <button type="button" onClick={openDemoWorkspace} disabled={busy}>{busy ? "Opening…" : "Explore populated demo"}</button>
+        </section>}
         <form onSubmit={authForm.handleSubmit(authenticate)}>
           {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
           <label>Email<input {...authForm.register("email")} type="email" required /></label>
