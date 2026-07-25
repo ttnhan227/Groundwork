@@ -1,7 +1,7 @@
 import uuid
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,7 @@ from app.pdf_operations import (
 )
 from app.schemas import (
     ArtifactResponse,
+    ArtifactRenameRequest,
     MergeRequest,
     PDFToImagesRequest,
     PageOperationRequest,
@@ -31,6 +32,20 @@ from app.schemas import (
 from app.storage import ObjectStorage
 
 router = APIRouter(prefix="/pdf-tools", tags=["PDF tools"])
+
+
+async def _owned_artifact(
+    artifact_id: uuid.UUID, user: User, session: AsyncSession
+) -> GeneratedArtifact:
+    artifact = await session.scalar(
+        select(GeneratedArtifact).where(
+            GeneratedArtifact.id == artifact_id,
+            GeneratedArtifact.owner_id == user.id,
+        )
+    )
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Generated file not found")
+    return artifact
 
 
 async def _ready_document(identifier: uuid.UUID, user: User, session: AsyncSession) -> Document:
@@ -88,11 +103,7 @@ async def download_artifact(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    artifact = await session.scalar(
-        select(GeneratedArtifact).where(GeneratedArtifact.id == artifact_id, GeneratedArtifact.owner_id == user.id)
-    )
-    if artifact is None:
-        raise HTTPException(status_code=404, detail="Generated file not found")
+    artifact = await _owned_artifact(artifact_id, user, session)
     data = ObjectStorage().download(artifact.object_key)
     return StreamingResponse(
         BytesIO(data), media_type=artifact.content_type,
@@ -106,15 +117,37 @@ async def get_artifact(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> GeneratedArtifact:
-    artifact = await session.scalar(
-        select(GeneratedArtifact).where(
-            GeneratedArtifact.id == artifact_id,
-            GeneratedArtifact.owner_id == user.id,
-        )
-    )
-    if artifact is None:
-        raise HTTPException(status_code=404, detail="Generated file not found")
+    return await _owned_artifact(artifact_id, user, session)
+
+
+@router.patch("/artifacts/{artifact_id}", response_model=ArtifactResponse)
+async def rename_artifact(
+    artifact_id: uuid.UUID,
+    payload: ArtifactRenameRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> GeneratedArtifact:
+    artifact = await _owned_artifact(artifact_id, user, session)
+    artifact.filename = safe_filename(payload.filename)
+    await session.commit()
+    await session.refresh(artifact)
     return artifact
+
+
+@router.delete("/artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_artifact(
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    artifact = await _owned_artifact(artifact_id, user, session)
+    try:
+        ObjectStorage().remove(artifact.object_key)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Generated-file storage is temporarily unavailable") from exc
+    await session.delete(artifact)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/merge", response_model=ArtifactResponse, status_code=status.HTTP_201_CREATED)

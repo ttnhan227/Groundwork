@@ -1,4 +1,4 @@
-import { BrainCircuit, Check, Download, FileImage, FileText, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BrainCircuit, Check, Download, FileImage, FileText, FolderOpen, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useForm } from "react-hook-form";
@@ -619,6 +619,126 @@ async function downloadArtifact(artifact: Artifact, token: string) {
   link.href = url; link.download = artifact.filename; link.click(); URL.revokeObjectURL(url);
 }
 
+async function downloadDocumentFile(document: DocumentItem, token: string) {
+  const response = await fetch(`${API}/documents/${document.id}/content`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) expireSession();
+  if (!response.ok) throw new Error("Could not download PDF");
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = document.filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function MyFolder({ documents, token, onDocuments, onClose }: {
+  documents: DocumentItem[];
+  token: string;
+  onDocuments: (documents: DocumentItem[]) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"documents" | "generated">("documents");
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
+
+  useEffect(() => {
+    api<Artifact[]>("/pdf-tools/artifacts", token).then(setArtifacts).catch((reason) => setError(reason.message));
+  }, [token]);
+
+  async function renameDocumentItem(document: DocumentItem) {
+    const filename = window.prompt("Rename PDF", document.filename)?.trim();
+    if (!filename || filename === document.filename) return;
+    setBusyId(document.id); setError("");
+    try {
+      const updated = await api<DocumentItem>(`/documents/${document.id}`, token, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      onDocuments(documents.map((item) => item.id === updated.id ? updated : item));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not rename PDF"); }
+    finally { setBusyId(""); }
+  }
+
+  async function deleteDocumentItem(document: DocumentItem) {
+    if (!window.confirm(`Delete "${document.filename}"?`)) return;
+    setBusyId(document.id); setError("");
+    try {
+      await api(`/documents/${document.id}`, token, { method: "DELETE" });
+      onDocuments(documents.filter((item) => item.id !== document.id));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete PDF"); }
+    finally { setBusyId(""); }
+  }
+
+  async function renameArtifact(item: Artifact) {
+    const filename = window.prompt("Rename generated file", item.filename)?.trim();
+    if (!filename || filename === item.filename) return;
+    setBusyId(item.id); setError("");
+    try {
+      const updated = await api<Artifact>(`/pdf-tools/artifacts/${item.id}`, token, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      setArtifacts((current) => current.map((artifact) => artifact.id === updated.id ? updated : artifact));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not rename generated file"); }
+    finally { setBusyId(""); }
+  }
+
+  async function deleteArtifact(item: Artifact) {
+    if (!window.confirm(`Delete "${item.filename}"?`)) return;
+    setBusyId(item.id); setError("");
+    try {
+      await api(`/pdf-tools/artifacts/${item.id}`, token, { method: "DELETE" });
+      setArtifacts((current) => current.filter((artifact) => artifact.id !== item.id));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete generated file"); }
+    finally { setBusyId(""); }
+  }
+
+  const normalized = query.trim().toLowerCase();
+  const visibleDocuments = documents.filter((item) => item.filename.toLowerCase().includes(normalized));
+  const visibleArtifacts = artifacts.filter((item) => item.filename.toLowerCase().includes(normalized));
+
+  return <div className="folder-wrap"><button className="history-backdrop" aria-label="Close my folder" onClick={onClose} />
+    <section className="folder-panel" role="dialog" aria-label="My folder">
+      <header><div><p className="eyebrow">File library</p><h2>My folder</h2></div><button aria-label="Close my folder" onClick={onClose}><X size={18} /></button></header>
+      <nav>
+        <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}><FileText size={15} /> Uploaded PDFs <span>{documents.length}</span></button>
+        <button className={tab === "generated" ? "active" : ""} onClick={() => setTab("generated")}><Sparkles size={15} /> Generated files <span>{artifacts.length}</span></button>
+      </nav>
+      <div className="folder-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search files" /></div>
+      {error && <div className="form-error">{error}</div>}
+      <main>
+        {tab === "documents" && visibleDocuments.map((item) => <article className="folder-item" key={item.id}>
+          <div className="folder-file-icon pdf"><FileText size={19} /></div>
+          <div><strong>{item.filename}</strong><span>{(item.size_bytes / 1024 / 1024).toFixed(1)} MB · {item.page_count ?? "—"} pages · {item.status.replaceAll("_", " ")}</span></div>
+          <div className="folder-actions">
+            <button disabled={busyId === item.id} title="Download" onClick={() => downloadDocumentFile(item, token).catch((reason) => setError(reason.message))}><Download size={14} /></button>
+            <button disabled={busyId === item.id} title="Rename" onClick={() => renameDocumentItem(item)}><Pencil size={14} /></button>
+            <button disabled={busyId === item.id} title="Delete" onClick={() => deleteDocumentItem(item)}><Trash2 size={14} /></button>
+          </div>
+        </article>)}
+        {tab === "generated" && visibleArtifacts.map((item) => <article className="folder-item" key={item.id}>
+          <div className="folder-file-icon generated"><Sparkles size={18} /></div>
+          <div><strong>{item.filename}</strong><span>{(item.size_bytes / 1024).toFixed(1)} KB · {item.operation.replaceAll("_", " ")} · {new Date(item.created_at).toLocaleDateString()}</span></div>
+          <div className="folder-actions">
+            <button disabled={busyId === item.id} title="Download" onClick={() => downloadArtifact(item, token).catch((reason) => setError(reason.message))}><Download size={14} /></button>
+            <button disabled={busyId === item.id} title="Rename" onClick={() => renameArtifact(item)}><Pencil size={14} /></button>
+            <button disabled={busyId === item.id} title="Delete" onClick={() => deleteArtifact(item)}><Trash2 size={14} /></button>
+          </div>
+        </article>)}
+        {((tab === "documents" && !visibleDocuments.length) || (tab === "generated" && !visibleArtifacts.length)) &&
+          <div className="folder-empty"><FolderOpen size={34} /><strong>No files found</strong><span>{query ? "Try another search." : tab === "documents" ? "Uploaded PDFs will appear here." : "Converted and generated files will appear here."}</span></div>}
+      </main>
+    </section>
+  </div>;
+}
+
 function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { documents: DocumentItem[]; token: string; initialDocument: DocumentItem | null; onClose: () => void }) {
   const [tool, setTool] = useState("merge");
   const [documentId, setDocumentId] = useState(initialDocument?.id ?? documents[0]?.id ?? "");
@@ -813,6 +933,7 @@ function WorkspaceApp() {
   const [pdfToolsDocument, setPDFToolsDocument] = useState<DocumentItem | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -989,6 +1110,7 @@ function WorkspaceApp() {
       <header className="workspace-header">
         <div className="auth-brand auth-brand-header"><img src="/logo.png" alt="InsightPDF" /></div>
         <div><strong>{user.display_name}</strong><small>{user.email}</small></div>
+        <button onClick={() => setFolderOpen(true)}><FolderOpen size={16} /> My folder</button>
         <button onClick={() => setJobsOpen(true)}><RefreshCw size={16} /> Processing jobs</button>
         <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><Settings size={16} /> Account</button>
         <button onClick={signOut}><LogOut size={17} /> Sign out</button>
@@ -1068,6 +1190,7 @@ function WorkspaceApp() {
         localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
       }} onClose={() => setAccountOpen(false)} />}
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
+      {folderOpen && <MyFolder documents={documents} token={token} onDocuments={setDocuments} onClose={() => setFolderOpen(false)} />}
     </main>
   );
 }
@@ -1077,15 +1200,15 @@ function LandingPage({ onOpen }: { onOpen: () => void }) {
     <main className="landing-page">
       <header className="landing-nav">
         <a className="landing-brand" href="/" aria-label="InsightPDF home">
-          <img src="/logo.png" alt="" />
-          <span>InsightPDF</span>
+          <img src="/favicon.ico" alt="" />
+          <span>Insight<b>PDF</b></span>
         </a>
         <button className="landing-nav-cta" onClick={onOpen}>Open app <span>→</span></button>
       </header>
 
       <section className="landing-hero">
         <div className="landing-mark" aria-hidden="true">
-          <FileText size={38} strokeWidth={1.45} />
+          <img src="/favicon.ico" alt="" />
         </div>
         <h1>Understand any PDF.<br />Without the busywork.</h1>
         <p>Read, search, summarize, compare, and transform your documents in one focused workspace.</p>

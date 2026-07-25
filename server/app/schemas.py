@@ -214,6 +214,10 @@ class ArtifactResponse(BaseModel):
     created_at: datetime
 
 
+class ArtifactRenameRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+
+
 class ProfileUpdateRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=120)
 
