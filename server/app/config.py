@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     minio_access_key: str = "insightpdf"
     minio_secret_key: str = "insightpdf-secret"
     minio_secure: bool = False
+    minio_region: str = "us-east-1"
     minio_bucket_originals: str = "original-documents"
     redis_url: str = "redis://redis:6379/0"
     max_file_size_mb: int = 50

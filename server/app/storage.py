@@ -1,7 +1,8 @@
-from io import BytesIO
 from typing import Protocol
 
-from minio import Minio
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
 
 from app.config import get_settings
 
@@ -14,40 +15,47 @@ class StorageBackend(Protocol):
     def download(self, object_key: str) -> bytes: ...
 
 
-class MinIOStorage:
-    """MinIO/S3 implementation of the storage contract."""
+class S3Storage:
+    """S3-compatible storage, including Supabase Storage and MinIO."""
 
     def __init__(self) -> None:
         settings = get_settings()
         self.bucket = settings.minio_bucket_originals
-        self.client = Minio(
-            settings.minio_endpoint,
-            access_key=settings.minio_access_key,
-            secret_key=settings.minio_secret_key,
-            secure=settings.minio_secure,
+        endpoint = settings.minio_endpoint.rstrip("/")
+        if not endpoint.startswith(("http://", "https://")):
+            scheme = "https" if settings.minio_secure else "http"
+            endpoint = f"{scheme}://{endpoint}"
+        self.client = boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=settings.minio_access_key,
+            aws_secret_access_key=settings.minio_secret_key,
+            region_name=settings.minio_region,
+            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
         )
 
     def ensure_bucket(self) -> None:
-        if not self.client.bucket_exists(self.bucket):
-            self.client.make_bucket(self.bucket)
+        try:
+            self.client.head_bucket(Bucket=self.bucket)
+        except ClientError as exc:
+            status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if status not in (404, 400):
+                raise
+            self.client.create_bucket(Bucket=self.bucket)
 
     def upload_pdf(self, object_key: str, data: bytes) -> None:
         self.upload(object_key, data, "application/pdf")
 
     def upload(self, object_key: str, data: bytes, content_type: str) -> None:
         self.ensure_bucket()
-        self.client.put_object(self.bucket, object_key, BytesIO(data), len(data), content_type=content_type)
+        self.client.put_object(Bucket=self.bucket, Key=object_key, Body=data, ContentType=content_type)
 
     def remove(self, object_key: str) -> None:
-        self.client.remove_object(self.bucket, object_key)
+        self.client.delete_object(Bucket=self.bucket, Key=object_key)
 
     def download(self, object_key: str) -> bytes:
-        response = self.client.get_object(self.bucket, object_key)
-        try:
-            return response.read()
-        finally:
-            response.close()
-            response.release_conn()
+        response = self.client.get_object(Bucket=self.bucket, Key=object_key)
+        return response["Body"].read()
 
 
 class ObjectStorage:
@@ -58,7 +66,7 @@ class ObjectStorage:
     """
 
     def __init__(self, backend: StorageBackend | None = None) -> None:
-        self.backend = backend or MinIOStorage()
+        self.backend = backend or S3Storage()
 
     def upload_pdf(self, object_key: str, data: bytes) -> None:
         self.backend.upload(object_key, data, "application/pdf")

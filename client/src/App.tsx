@@ -1,5 +1,3 @@
-"use client";
-
 import { BrainCircuit, Check, Download, FileImage, FileText, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
@@ -7,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 
 type DocumentItem = {
   id: string;
@@ -274,7 +272,7 @@ function PdfThumbnail({ pdf, pageNumber, current, onSelect }: { pdf: PDFDocument
       if (!context) return;
       canvas.current.width = viewport.width;
       canvas.current.height = viewport.height;
-      task = pdfPage.render({ canvasContext: context, viewport });
+      task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
       await task.promise;
     })().catch(() => undefined);
     return () => { cancelled = true; task?.cancel(); };
@@ -326,7 +324,7 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
       if (!context) return;
       canvas.current.width = viewport.width;
       canvas.current.height = viewport.height;
-      task = pdfPage.render({ canvasContext: context, viewport });
+      task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
       await task.promise;
     })();
     return () => task?.cancel();
@@ -967,8 +965,6 @@ export default function Home() {
   if (!token || !user) return (
     <main className="auth-page">
       <section className="auth-card">
-        {/* The bundled logo is already optimized and served directly by the Vite runtime. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <div className="auth-brand auth-brand-login"><img src="/logo.png" alt="InsightPDF" /></div>
         <p className="eyebrow">AI-powered PDF workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
@@ -991,7 +987,6 @@ export default function Home() {
   return (
     <main className="workspace-page">
       <header className="workspace-header">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <div className="auth-brand auth-brand-header"><img src="/logo.png" alt="InsightPDF" /></div>
         <div><strong>{user.display_name}</strong><small>{user.email}</small></div>
         <button onClick={() => setJobsOpen(true)}><RefreshCw size={16} /> Processing jobs</button>
@@ -1046,13 +1041,13 @@ export default function Home() {
       {viewer && <PdfViewer document={viewer} token={token} initialPage={viewerPage} onHistory={() => {
         setHistoryDocumentFilter(viewer); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => setViewer(null)} />}
-      {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={loadConversations} onHistory={() => {
+      {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onHistory={() => {
         setHistoryDocumentFilter(chatDocument); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => { setChatDocument(null); setActiveConversation(null); }} onCitation={(citation) => {
         const cited = documents.find((item) => item.id === citation.document_id);
         if (cited) { setViewerPage(citation.page_number); setViewer(cited); }
       }} />}
-      {historyOpen && <ConversationHistory conversations={conversations} documents={documents} busy={historyBusy} documentFilter={historyDocumentFilter} onRefresh={loadConversations} onClose={() => setHistoryOpen(false)} onOpen={(conversation, document) => {
+      {historyOpen && <ConversationHistory conversations={conversations} documents={documents} busy={historyBusy} documentFilter={historyDocumentFilter} onRefresh={async () => { await loadConversations(); }} onClose={() => setHistoryOpen(false)} onOpen={(conversation, document) => {
         setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(documents.filter((item) => conversation.document_ids.includes(item.id))); setChatDocument(document);
       }} />}
       {multiChatOpen && <MultiDocumentChat documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setMultiChatOpen(false)} onCreated={(conversation, selected) => {

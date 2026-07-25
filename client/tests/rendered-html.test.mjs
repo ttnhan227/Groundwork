@@ -2,33 +2,17 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-  return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-}
-
-test("server-renders the InsightPDF authentication shell", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  const html = await response.text();
+test("builds the InsightPDF static application shell", async () => {
+  const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
   assert.match(html, /<title>InsightPDF/);
-  assert.match(html, /AI-powered PDF workspace/);
-  assert.match(html, /Welcome back/);
-  assert.match(html, /Sign in/);
-  assert.doesNotMatch(html, /Your site is taking shape/);
+  assert.match(html, /<div id="root"><\/div>/);
+  assert.match(html, /\/assets\/index-/);
 });
 
 test("includes Phase 3 chat and citation navigation", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /\/conversations/);
   assert.match(page, /Ask InsightPDF/);
@@ -59,8 +43,8 @@ test("includes Phase 3 chat and citation navigation", async () => {
 
 test("includes Phase 4 document intelligence tools", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /AI tools/);
   assert.match(page, /Compare PDFs/);
@@ -76,8 +60,8 @@ test("includes Phase 4 document intelligence tools", async () => {
 
 test("includes the complete Phase 5 PDF tools workspace", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   for (const label of ["Merge", "Split", "Extract pages", "Delete pages", "Rotate", "PDF to images", "Images to PDF", "Watermark"]) {
     assert.match(page, new RegExp(label));
@@ -90,8 +74,8 @@ test("includes the complete Phase 5 PDF tools workspace", async () => {
 
 test("includes Phase 6 dashboard, account, admin, and demo experience", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /\/profile\/stats/);
   assert.match(page, /\/profile\/password/);

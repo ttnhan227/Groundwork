@@ -31,7 +31,7 @@ Browser
   |
   v
 Nginx :8080
-  |-- /             -> React/vinext client
+  |-- /             -> React/Vite client
   `-- /api/v1       -> FastAPI
                         |-- PostgreSQL + pgvector
                         |-- MinIO through a replaceable storage interface
@@ -58,7 +58,7 @@ separate modules while sharing one deployment boundary. See
 
 ## Stack
 
-React 19, TypeScript, vinext/Vite, Tailwind CSS, PDF.js, Vitest, Playwright,
+React 19, TypeScript, Vite, Tailwind CSS, PDF.js, Vitest, Playwright,
 FastAPI, Pydantic, SQLAlchemy 2, Alembic, PostgreSQL 16, pgvector, Celery,
 Redis, MinIO, Sentence Transformers, PyMuPDF, pypdf, Pillow, Tesseract and Nginx.
 
@@ -105,7 +105,7 @@ All backend configuration is environment-based. `.env.example` documents:
 - demo and optional admin accounts
 
 The browser normally uses the same-origin `/api/v1` path through Nginx.
-Set `NEXT_PUBLIC_API_URL` at client build time only when the API is hosted at a
+Set `VITE_API_URL` at client build time only when the API is hosted at a
 different public origin.
 
 ## Database migrations

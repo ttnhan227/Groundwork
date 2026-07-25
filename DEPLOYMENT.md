@@ -21,8 +21,12 @@ production decisions include:
 - conservative file, page, document, request and daily AI limits
 - whether demo seeding and example credentials remain enabled
 
-Build the client with `NEXT_PUBLIC_API_URL` when the API is hosted at a separate
+Build the client with `VITE_API_URL` when the API is hosted at a separate
 origin. Keep the default `/api/v1` when frontend and API share the Nginx origin.
+
+For Render, the repository-level `render.yaml` creates the frontend as a Static
+Site with `client` as its root directory and `dist` as its publish directory.
+Set `VITE_API_URL` to the public backend URL ending in `/api/v1`.
 
 ## Production-style local launch
 

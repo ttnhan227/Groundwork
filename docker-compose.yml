@@ -88,7 +88,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "3000:80"
     restart: unless-stopped
 
   nginx:
