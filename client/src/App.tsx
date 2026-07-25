@@ -784,7 +784,7 @@ function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void
   </section></div>;
 }
 
-export default function Home() {
+function WorkspaceApp() {
   const [initialAuth] = useState<AuthResult | null>(() => {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem("insightpdf-auth");
@@ -1070,4 +1070,70 @@ export default function Home() {
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
     </main>
   );
+}
+
+function LandingPage({ onOpen }: { onOpen: () => void }) {
+  return (
+    <main className="landing-page">
+      <header className="landing-nav">
+        <a className="landing-brand" href="/" aria-label="InsightPDF home">
+          <img src="/logo.png" alt="" />
+          <span>InsightPDF</span>
+        </a>
+        <button className="landing-nav-cta" onClick={onOpen}>Open app <span>→</span></button>
+      </header>
+
+      <section className="landing-hero">
+        <div className="landing-mark" aria-hidden="true">
+          <FileText size={38} strokeWidth={1.45} />
+        </div>
+        <h1>Understand any PDF.<br />Without the busywork.</h1>
+        <p>Read, search, summarize, compare, and transform your documents in one focused workspace.</p>
+        <button className="landing-primary" onClick={onOpen}>Open InsightPDF <span>→</span></button>
+        <div className="landing-demo" aria-label="InsightPDF example">
+          <div className="landing-demo-top">
+            <span><i /> annual-report.pdf</span>
+            <small>42 pages</small>
+          </div>
+          <div className="landing-question">Summarize the key financial changes</div>
+          <div className="landing-answer">
+            <Sparkles size={18} />
+            <p>Revenue increased while operating costs declined, improving the company&apos;s margin across the year.</p>
+          </div>
+          <div className="landing-citations"><span>Page 12</span><span>Page 27</span><span>Page 31</span></div>
+        </div>
+      </section>
+
+      <section className="landing-features" aria-label="Features">
+        <article><strong>Ask your documents</strong><p>Get clear answers grounded in page-level citations.</p></article>
+        <article><strong>Work with PDFs</strong><p>Merge, split, convert, translate, and compare in one place.</p></article>
+        <article><strong>Your files stay private</strong><p>Authenticated access and private object storage by default.</p></article>
+      </section>
+
+      <footer className="landing-footer">
+        <span>InsightPDF</span>
+        <button onClick={onOpen}>Get started →</button>
+      </footer>
+    </main>
+  );
+}
+
+export default function Home() {
+  const [appOpen, setAppOpen] = useState(
+    () => new URLSearchParams(window.location.search).has("app"),
+  );
+
+  useEffect(() => {
+    const syncRoute = () => setAppOpen(new URLSearchParams(window.location.search).has("app"));
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  function openApp() {
+    window.history.pushState({}, "", "/?app=1");
+    setAppOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
+  return appOpen ? <WorkspaceApp /> : <LandingPage onOpen={openApp} />;
 }
