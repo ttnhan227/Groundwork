@@ -1181,15 +1181,22 @@ function WorkspaceApp() {
         {mode === "login" && <section className="demo-account">
           <Sparkles size={17} />
           <div><strong>Demo workspace</strong><span>Open a populated workspace with sample PDFs, AI tools, conversations, and generated files.</span></div>
-          <button type="button" onClick={openDemoWorkspace} disabled={busy}>{busy ? "Opening…" : "Explore populated demo"}</button>
+          <button type="button" onClick={openDemoWorkspace} disabled={busy}>{busy ? <><RefreshCw size={14} className="spin" /> Logging you in…</> : "Explore populated demo"}</button>
         </section>}
         <form onSubmit={authForm.handleSubmit(authenticate)}>
           {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
           <label>Email<input {...authForm.register("email")} type="email" required /></label>
           <label>Password<input {...authForm.register("password")} type="password" minLength={8} required /></label>
           {error && <div className="form-error">{error}</div>}
-          <button disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</button>
+          <button disabled={busy}>{busy ? <><RefreshCw size={15} className="spin" /> {mode === "login" ? "Logging you in…" : "Creating your account…"}</> : mode === "login" ? "Sign in" : "Create account"}</button>
         </form>
+        {busy && <div className="auth-loading" role="status" aria-live="polite">
+          <span className="auth-loading-spinner"><RefreshCw size={18} className="spin" /></span>
+          <div>
+            <strong>{mode === "login" ? "Connecting to your workspace" : "Preparing your workspace"}</strong>
+            <small>The free demo server may take up to 30 seconds to wake. Please keep this page open.</small>
+          </div>
+        </div>}
         <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
           {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
         </button>

@@ -585,3 +585,40 @@ button { color: inherit; }
   .copilot-panel > header, .copilot-panel form { padding-left: 20px; padding-right: 20px; }
   .plan-preview { margin-left: 20px; margin-right: 20px; }
 }
+.auth-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #ddd7fa;
+  border-radius: 12px;
+  color: #40356f;
+  background: #f7f5ff;
+}
+
+.auth-loading-spinner {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #fff;
+  background: #6653c7;
+}
+
+.auth-loading div {
+  display: grid;
+  gap: 3px;
+}
+
+.auth-loading strong {
+  font-size: 13px;
+}
+
+.auth-loading small {
+  color: #706a84;
+  font-size: 11px;
+  line-height: 1.45;
+}
