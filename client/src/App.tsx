@@ -1,9 +1,12 @@
 import { BrainCircuit, Check, Download, FileImage, FileText, FolderOpen, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+
+const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 
 const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 const DEMO_ENABLED = (import.meta.env.VITE_DEMO_ENABLED ?? "true").toLowerCase() !== "false";
@@ -295,6 +298,65 @@ function PdfThumbnail({ pdf, pageNumber, current, onSelect }: { pdf: PDFDocument
   </button>;
 }
 
+function DocumentMiniPreview({ document, token, onOpen }: { document: DocumentItem; token: string; onOpen: () => void }) {
+  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let objectUrl = "";
+    let cancelled = false;
+    fetch(`${API}/documents/${document.id}/thumbnail`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Preview unavailable");
+      objectUrl = URL.createObjectURL(await response.blob());
+      if (!cancelled) setSource(objectUrl);
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [document.id, token]);
+
+  return <button className="chat-document-preview" type="button" onClick={onOpen}>
+    <span className="chat-preview-image">
+      {source ? <img src={source} alt={`First page of ${document.filename}`} /> : failed ? <FileText size={24} /> : <RefreshCw className="spin" size={18} />}
+    </span>
+    <span><strong>{document.filename}</strong><small>{document.page_count ?? "—"} pages · Click to open</small></span>
+  </button>;
+}
+
+function DocumentCardPreview({ document, token, onOpen }: { document: DocumentItem; token: string; onOpen: () => void }) {
+  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (document.status !== "ready") return;
+    let objectUrl = "";
+    let cancelled = false;
+    fetch(`${API}/documents/${document.id}/thumbnail`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Preview unavailable");
+      objectUrl = URL.createObjectURL(await response.blob());
+      if (!cancelled) setSource(objectUrl);
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [document.id, document.status, token]);
+
+  return <button className="document-card-preview" type="button" disabled={document.status !== "ready"} onClick={onOpen} aria-label={`Open ${document.filename}`}>
+    {source
+      ? <img src={source} alt={`First page of ${document.filename}`} />
+      : <span className={document.status === "ready" && !failed ? "preview-loading" : ""}>
+          {document.status === "ready" && !failed ? <RefreshCw className="spin" size={20} /> : <FileText size={27} />}
+        </span>}
+    {source && <i>Preview</i>}
+  </button>;
+}
+
 function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { document: DocumentItem; token: string; initialPage?: number; onHistory: () => void; onClose: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
@@ -304,20 +366,43 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
   const [searchResults, setSearchResults] = useState<{ page: number; snippet: string }[]>([]);
   const [searching, setSearching] = useState(false);
   const [sideMode, setSideMode] = useState<"pages" | "search">("pages");
+  const [loadStage, setLoadStage] = useState<"downloading" | "opening" | "rendering" | "ready">("downloading");
+  const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+        pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
         const response = await fetch(`${API}/documents/${document.id}/content`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.status === 401) expireSession();
         if (!response.ok) throw new Error("Could not load this PDF");
-        const loaded = await pdfjs.getDocument({ data: await response.arrayBuffer() }).promise;
+        const total = Number(response.headers.get("content-length")) || 0;
+        let data: Uint8Array;
+        if (response.body && total) {
+          const reader = response.body.getReader();
+          const chunks: Uint8Array[] = [];
+          let received = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            if (!cancelled) setDownloadPercent(Math.round(received / total * 100));
+          }
+          data = new Uint8Array(received);
+          let offset = 0;
+          for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+        } else {
+          data = new Uint8Array(await response.arrayBuffer());
+        }
+        if (!cancelled) setLoadStage("opening");
+        const loaded = await pdfjs.getDocument({ data }).promise;
         if (!cancelled) setPdf(loaded);
+        if (!cancelled) setLoadStage("rendering");
         setPage(initialPage);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : "Could not load this PDF");
@@ -338,6 +423,7 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
       canvas.current.height = viewport.height;
       task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
       await task.promise;
+      setLoadStage("ready");
     })();
     return () => task?.cancel();
   }, [page, scale, pdf]);
@@ -390,14 +476,22 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
             {searchResults.map((result) => <button key={result.page} onClick={() => setPage(result.page)}><b>Page {result.page}</b><span>{result.snippet}</span></button>)}
           </div>}
         </aside>
-        <div className="viewer-stage">{error ? <p>{error}</p> : <canvas ref={canvas} />}</div>
+        <div className="viewer-stage">{error ? <p>{error}</p> : <>
+          {loadStage !== "ready" && <div className="viewer-loading" role="status" aria-live="polite">
+            <span className="viewer-loading-icon"><RefreshCw className="spin" size={22} /></span>
+            <strong>{loadStage === "downloading" ? "Loading document" : loadStage === "opening" ? "Opening PDF" : "Rendering first page"}</strong>
+            <small>{loadStage === "downloading" && downloadPercent !== null ? `${downloadPercent}% downloaded` : "Preparing a clear preview…"}</small>
+            <i><b style={{ width: downloadPercent !== null && loadStage === "downloading" ? `${downloadPercent}%` : "38%" }} /></i>
+          </div>}
+          <canvas ref={canvas} className={loadStage === "ready" ? "" : "viewer-canvas-loading"} />
+        </>}</div>
       </div>
     </div>
   );
 }
 
 function ChatPanel({
-  document, documentIds, documentLabel, token, conversation, onClose, onCitation, onChanged, onHistory,
+  document, documentIds, documentLabel, token, conversation, onClose, onCitation, onChanged, onHistory, onPreview,
 }: {
   document: DocumentItem;
   documentIds: string[];
@@ -408,6 +502,7 @@ function ChatPanel({
   onCitation: (citation: Citation) => void;
   onChanged: () => void;
   onHistory: () => void;
+  onPreview: () => void;
 }) {
   const [conversationId, setConversationId] = useState(conversation?.id ?? "");
   const [messages, setMessages] = useState<ChatMessage[]>(conversation?.messages ?? []);
@@ -479,6 +574,7 @@ function ChatPanel({
 
   return <aside className="chat-panel">
     <header><span className="chat-brand"><Sparkles size={18} /></span><div><strong>Ask InsightPDF</strong><small>{documentLabel}</small></div><button className="new-chat-button" title="Start new conversation" onClick={beginNewConversation}><MessageCircle size={15} /><span>New chat</span></button><button aria-label="Document chat history" title="Chat history" onClick={onHistory}><History size={17} /></button><button aria-label="Close chat" onClick={onClose}><X size={18} /></button></header>
+    <DocumentMiniPreview document={document} token={token} onOpen={onPreview} />
     <div className="chat-messages">
       {!messages.length && <div className="chat-empty"><MessageCircle size={30} /><strong>Ask about this PDF</strong><span>Answers are grounded in indexed pages and include source citations.</span></div>}
       {messages.map((message, index) => <div className={`chat-message ${message.role}`} key={index}>
@@ -646,6 +742,30 @@ async function downloadDocumentFile(document: DocumentItem, token: string) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadDocumentArchive(documents: DocumentItem[], token: string) {
+  const response = await fetch(`${API}/documents/download-zip`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ document_ids: documents.map((document) => document.id) }),
+  });
+  if (response.status === 401) expireSession();
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail ?? "Could not prepare the ZIP download");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  const date = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `insightpdf-documents-${date}.zip`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function MyFolder({ documents, token, onDocuments, onClose }: {
   documents: DocumentItem[];
   token: string;
@@ -657,6 +777,8 @@ function MyFolder({ documents, token, onDocuments, onClose }: {
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [archiveBusy, setArchiveBusy] = useState(false);
 
   useEffect(() => {
     api<Artifact[]>("/pdf-tools/artifacts", token).then(setArtifacts).catch((reason) => setError(reason.message));
@@ -715,6 +837,18 @@ function MyFolder({ documents, token, onDocuments, onClose }: {
   const normalized = query.trim().toLowerCase();
   const visibleDocuments = documents.filter((item) => item.filename.toLowerCase().includes(normalized));
   const visibleArtifacts = artifacts.filter((item) => item.filename.toLowerCase().includes(normalized));
+  const selectedDocuments = documents.filter((item) => selectedIds.includes(item.id));
+
+  async function downloadSelectedDocuments() {
+    setArchiveBusy(true); setError("");
+    try {
+      await downloadDocumentArchive(selectedDocuments, token);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not prepare the ZIP download");
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
 
   return <div className="folder-wrap"><button className="history-backdrop" aria-label="Close my folder" onClick={onClose} />
     <section className="folder-panel" role="dialog" aria-label="My folder">
@@ -724,9 +858,23 @@ function MyFolder({ documents, token, onDocuments, onClose }: {
         <button className={tab === "generated" ? "active" : ""} onClick={() => setTab("generated")}><Sparkles size={15} /> Generated files <span>{artifacts.length}</span></button>
       </nav>
       <div className="folder-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search files" /></div>
+      {tab === "documents" && visibleDocuments.length > 0 && <div className="folder-bulk-actions">
+        <label><input type="checkbox" checked={visibleDocuments.every((item) => selectedIds.includes(item.id))} onChange={(event) => {
+          const visibleIds = visibleDocuments.map((item) => item.id);
+          setSelectedIds((current) => event.target.checked
+            ? [...new Set([...current, ...visibleIds])]
+            : current.filter((id) => !visibleIds.includes(id)));
+        }} /> Select all shown</label>
+        <span>{selectedIds.length ? `${selectedIds.length} selected` : "Select PDFs to download together"}</span>
+        <button disabled={selectedDocuments.length < 2 || archiveBusy} onClick={downloadSelectedDocuments}>
+          {archiveBusy ? <RefreshCw size={14} className="spin" /> : <Download size={14} />}
+          {archiveBusy ? `Preparing ${selectedDocuments.length} PDFs…` : "Download ZIP"}
+        </button>
+      </div>}
       {error && <div className="form-error">{error}</div>}
       <main>
         {tab === "documents" && visibleDocuments.map((item) => <article className="folder-item" key={item.id}>
+          <label className="folder-select" title={`Select ${item.filename}`}><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /></label>
           <div className="folder-file-icon pdf"><FileText size={19} /></div>
           <div><strong>{item.filename}</strong><span>{(item.size_bytes / 1024 / 1024).toFixed(1)} MB · {item.page_count ?? "—"} pages · {item.status.replaceAll("_", " ")}</span></div>
           <div className="folder-actions">
@@ -735,7 +883,7 @@ function MyFolder({ documents, token, onDocuments, onClose }: {
             <button disabled={busyId === item.id} title="Delete" onClick={() => deleteDocumentItem(item)}><Trash2 size={14} /></button>
           </div>
         </article>)}
-        {tab === "generated" && visibleArtifacts.map((item) => <article className="folder-item" key={item.id}>
+        {tab === "generated" && visibleArtifacts.map((item) => <article className="folder-item no-select" key={item.id}>
           <div className="folder-file-icon generated"><Sparkles size={18} /></div>
           <div><strong>{item.filename}</strong><span>{(item.size_bytes / 1024).toFixed(1)} KB · {item.operation.replaceAll("_", " ")} · {new Date(item.created_at).toLocaleDateString()}</span></div>
           <div className="folder-actions">
@@ -1236,7 +1384,7 @@ function WorkspaceApp() {
             const job = jobs[document.id];
             const ready = document.status === "ready";
             return <article className="document-card" key={document.id}>
-              <div className="pdf-badge"><FileText size={25} /></div>
+              <DocumentCardPreview document={document} token={token} onOpen={() => { setViewerPage(1); setViewer(document); }} />
               <div className="document-info">
                 <strong>{document.filename}</strong>
                 <span>{(document.size_bytes / 1024 / 1024).toFixed(1)} MB · {document.page_count ?? "—"} pages</span>
@@ -1261,10 +1409,12 @@ function WorkspaceApp() {
           {!documents.length && <div className="empty-workspace"><Upload size={34} /><h2>No PDFs yet</h2><p>Upload your first document to start extraction.</p></div>}
         </div>
       </section>
-      {viewer && <PdfViewer document={viewer} token={token} initialPage={viewerPage} onHistory={() => {
+      {viewer && <PdfViewer key={viewer.id} document={viewer} token={token} initialPage={viewerPage} onHistory={() => {
         setHistoryDocumentFilter(viewer); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => setViewer(null)} />}
-      {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onHistory={() => {
+      {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onPreview={() => {
+        setViewerPage(1); setViewer(chatDocument);
+      }} onHistory={() => {
         setHistoryDocumentFilter(chatDocument); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => { setChatDocument(null); setActiveConversation(null); }} onCitation={(citation) => {
         const cited = documents.find((item) => item.id === citation.document_id);

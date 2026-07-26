@@ -1,18 +1,22 @@
 import re
+import tempfile
 import uuid
+import zipfile
 
+import fitz
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
 from app.models import Document, DocumentPage, DocumentStatus, JobStatus, ProcessingJob, User
-from app.schemas import DocumentPageResponse, DocumentRenameRequest, DocumentResponse, ProcessingJobResponse
+from app.schemas import DocumentArchiveRequest, DocumentPageResponse, DocumentRenameRequest, DocumentResponse, ProcessingJobResponse
 from app.storage import ObjectStorage
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -28,6 +32,80 @@ def safe_filename(name: str) -> str:
 async def list_documents(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> list[Document]:
     result = await session.scalars(select(Document).where(Document.owner_id == user.id).order_by(Document.created_at.desc()))
     return list(result)
+
+
+def unique_archive_name(filename: str, used_names: set[str]) -> str:
+    safe_name = safe_filename(filename)
+    stem, separator, suffix = safe_name.rpartition(".")
+    if not separator:
+        stem, suffix = safe_name, ""
+    candidate = safe_name
+    counter = 2
+    while candidate.casefold() in used_names:
+        candidate = f"{stem} ({counter}){'.' + suffix if suffix else ''}"
+        counter += 1
+    used_names.add(candidate.casefold())
+    return candidate
+
+
+def build_documents_archive(documents: list[Document]):
+    archive = tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
+    storage = ObjectStorage()
+    used_names: set[str] = set()
+    try:
+        with zipfile.ZipFile(archive, mode="w", compression=zipfile.ZIP_STORED) as bundle:
+            for document in documents:
+                bundle.writestr(
+                    unique_archive_name(document.filename, used_names),
+                    storage.download(document.object_key),
+                )
+        archive.seek(0)
+        return archive
+    except Exception:
+        archive.close()
+        raise
+
+
+@router.post("/download-zip")
+async def download_documents_archive(
+    payload: DocumentArchiveRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    requested_ids = list(dict.fromkeys(payload.document_ids))
+    if len(requested_ids) < 2:
+        raise HTTPException(status_code=422, detail="Select at least two different documents")
+    result = await session.scalars(
+        select(Document).where(Document.id.in_(requested_ids), Document.owner_id == user.id)
+    )
+    by_id = {document.id: document for document in result}
+    if len(by_id) != len(requested_ids):
+        raise HTTPException(status_code=404, detail="One or more documents were not found")
+    documents = [by_id[document_id] for document_id in requested_ids]
+    total_size = sum(document.size_bytes for document in documents)
+    if total_size > 500 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Selected documents exceed the 500 MB archive limit")
+
+    try:
+        archive = await run_in_threadpool(build_documents_archive, documents)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Could not prepare the document archive")
+
+    def stream_archive():
+        try:
+            while chunk := archive.read(1024 * 1024):
+                yield chunk
+        finally:
+            archive.close()
+
+    return StreamingResponse(
+        stream_archive(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="insightpdf-documents.zip"',
+            "X-Document-Count": str(len(documents)),
+        },
+    )
 
 
 async def owned_document(document_id: uuid.UUID, user: User, session: AsyncSession) -> Document:
@@ -109,6 +187,27 @@ async def download_document(
     data = ObjectStorage().download(document.object_key)
     disposition = f'inline; filename="{safe_filename(document.filename)}"'
     return StreamingResponse(BytesIO(data), media_type="application/pdf", headers={"Content-Disposition": disposition})
+
+
+@router.get("/{document_id}/thumbnail")
+async def document_thumbnail(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    document = await owned_document(document_id, user, session)
+    pdf = fitz.open(stream=ObjectStorage().download(document.object_key), filetype="pdf")
+    try:
+        if not pdf.page_count:
+            raise HTTPException(status_code=422, detail="The PDF has no pages")
+        image = pdf[0].get_pixmap(matrix=fitz.Matrix(.55, .55), alpha=False).tobytes("png")
+    finally:
+        pdf.close()
+    return Response(
+        content=image,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)

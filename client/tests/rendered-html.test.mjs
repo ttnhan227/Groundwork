@@ -72,7 +72,7 @@ test("includes the complete Phase 5 PDF tools workspace", async () => {
   assert.match(css, /\.artifact-ready/);
 });
 
-test("includes Phase 6 dashboard, account, admin, and demo experience", async () => {
+test("includes Phase 6 dashboard, account, admin, and optional demo access", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
@@ -81,8 +81,8 @@ test("includes Phase 6 dashboard, account, admin, and demo experience", async ()
   assert.match(page, /\/profile\/password/);
   assert.match(page, /\/admin\/users/);
   assert.match(page, /Search your PDFs/);
-  assert.match(page, /Demo workspace/);
-  assert.match(page, /Explore populated demo/);
+  assert.match(page, /VITE_DEMO_ENABLED/);
+  assert.match(page, /Open the demo workspace/);
   assert.match(page, /src="\/logo\.png"/);
   assert.match(page, /openDemoWorkspace/);
   assert.match(page, /retryDocument/);

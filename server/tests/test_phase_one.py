@@ -1,4 +1,4 @@
-from app.documents import safe_filename
+from app.documents import safe_filename, unique_archive_name
 from app.security import hash_password, verify_password
 from app.storage import ObjectStorage
 
@@ -12,6 +12,13 @@ def test_password_hash_round_trip() -> None:
 
 def test_filename_is_sanitized() -> None:
     assert safe_filename("../../quarterly<script>.pdf") == "quarterly_script_.pdf"
+
+
+def test_archive_filenames_are_unique() -> None:
+    used: set[str] = set()
+    assert unique_archive_name("report.pdf", used) == "report.pdf"
+    assert unique_archive_name("REPORT.pdf", used) == "REPORT (2).pdf"
+    assert unique_archive_name("../../report.pdf", used) == "report (3).pdf"
 
 
 def test_storage_facade_accepts_replaceable_backend() -> None:

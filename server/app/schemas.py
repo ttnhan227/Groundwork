@@ -54,6 +54,10 @@ class DocumentRenameRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=180)
 
 
+class DocumentArchiveRequest(BaseModel):
+    document_ids: list[uuid.UUID] = Field(min_length=2, max_length=25)
+
+
 class DocumentPageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     page_number: int
