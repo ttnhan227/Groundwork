@@ -5,6 +5,7 @@ import uuid
 from difflib import SequenceMatcher
 
 import httpx
+import fitz
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, ValidationError
@@ -24,6 +25,7 @@ from app.schemas import (
     SummaryRequest,
     TranslationRequest,
 )
+from app.storage import ObjectStorage
 from app.usage import record_ai_usage
 
 router = APIRouter(prefix="/ai", tags=["AI document tools"])
@@ -86,6 +88,52 @@ class ComparisonPayload(BaseModel):
     changed_sections: list[ComparisonSection] = []
     numerical_changes: list[ComparisonSection] = []
     similarity_percent: float = Field(ge=0, le=100)
+    analysis_scope: str = "text_only"
+    visual_comparison_performed: bool = False
+    warnings: list[str] = []
+
+
+def _comparison_evidence(
+    left_text: str,
+    right_text: str,
+    left_visual_pages: list[int],
+    right_visual_pages: list[int],
+) -> tuple[float, list[str], str, bool]:
+    left_readable, right_readable = left_text.strip(), right_text.strip()
+    similarity = round(SequenceMatcher(None, left_readable, right_readable, autojunk=False).ratio() * 100, 1)
+    warnings: list[str] = []
+    prefix = ""
+    insufficient = not left_readable or not right_readable
+    if insufficient:
+        similarity = 0.0
+        missing = []
+        if not left_readable:
+            missing.append("the original document")
+        if not right_readable:
+            missing.append("the compared document")
+        names = " and ".join(missing)
+        warnings.append(f"No readable text was extracted from {names}.")
+        prefix = "A complete comparison is not possible because one or more documents contain no readable text. "
+    if left_visual_pages or right_visual_pages:
+        details = []
+        if left_visual_pages:
+            details.append(f"original pages {', '.join(map(str, left_visual_pages))}")
+        if right_visual_pages:
+            details.append(f"compared pages {', '.join(map(str, right_visual_pages))}")
+        warnings.append(
+            f"Visual content was detected on {'; '.join(details)}. Images were not semantically compared."
+        )
+        if not prefix:
+            prefix = "This result compares extracted text only; it does not establish that visual content is identical. "
+    return similarity, warnings, prefix, insufficient
+
+
+def _visual_pages(document: Document) -> list[int]:
+    source = fitz.open(stream=ObjectStorage().download(document.object_key), filetype="pdf")
+    try:
+        return [index + 1 for index, page in enumerate(source) if page.get_images(full=True)]
+    finally:
+        source.close()
 
 
 def _cache_key(feature: AIFeature, document_ids: list[uuid.UUID], parameters: dict) -> str:
@@ -172,6 +220,8 @@ async def _cached_or_generate(
     context: str,
     user: User,
     session: AsyncSession,
+    result_overrides: dict | None = None,
+    summary_prefix: str = "",
 ) -> AIResultResponse:
     document_ids = [document.id for document in documents]
     key = _cache_key(feature, document_ids, parameters)
@@ -186,6 +236,10 @@ async def _cached_or_generate(
             result = schema.model_validate(raw).model_dump(mode="json")
         except ValidationError as exc:
             raise HTTPException(status_code=502, detail="The language model result did not match the required format") from exc
+        if summary_prefix and "summary" in result:
+            result["summary"] = summary_prefix + str(result["summary"])
+        if result_overrides:
+            result.update(result_overrides)
         stored = AIResult(
             owner_id=user.id,
             feature=feature,
@@ -353,15 +407,36 @@ async def compare(
     left_pages, right_pages = await _pages(left, session), await _pages(right, session)
     left_text = "\n".join(page.text for page in left_pages)
     right_text = "\n".join(page.text for page in right_pages)
-    similarity = round(SequenceMatcher(None, left_text, right_text, autojunk=False).ratio() * 100, 1)
+    left_visual_pages, right_visual_pages = _visual_pages(left), _visual_pages(right)
+    similarity, warnings, summary_prefix, insufficient = _comparison_evidence(
+        left_text, right_text, left_visual_pages, right_visual_pages
+    )
     instruction = (
         "Compare the two documents. Return {\"summary\": string, \"added_sections\": "
         "[{\"description\": string, \"left_pages\": [integer], \"right_pages\": [integer]}], "
         "\"removed_sections\": [...], \"changed_sections\": [...], \"numerical_changes\": [...], "
         f"\"similarity_percent\": {similarity}}}. Added means only in the right document; removed means only "
-        "in the left. Focus on meaningful differences and exact numerical changes."
+        "in the left. Focus on meaningful differences and exact numerical changes. Never claim the documents "
+        "are visually identical: only extracted text is supplied."
     )
+    parameters = {**payload.model_dump(mode="json"), "comparison_version": 2}
+    overrides = {
+        "similarity_percent": similarity,
+        "analysis_scope": "extracted_text_only",
+        "visual_comparison_performed": False,
+        "warnings": warnings,
+    }
+    if insufficient:
+        overrides.update({
+            "summary": summary_prefix.rstrip(),
+            "added_sections": [],
+            "removed_sections": [],
+            "changed_sections": [],
+            "numerical_changes": [],
+        })
+        summary_prefix = ""
     return await _cached_or_generate(
-        AIFeature.COMPARISON, [left, right], payload.model_dump(mode="json"), ComparisonPayload,
+        AIFeature.COMPARISON, [left, right], parameters, ComparisonPayload,
         instruction, _context([(left, left_pages), (right, right_pages)]), user, session,
+        result_overrides=overrides, summary_prefix=summary_prefix,
     )

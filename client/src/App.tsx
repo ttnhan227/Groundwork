@@ -160,8 +160,10 @@ function PhaseFourResult({ value, documents, onPage }: { value: AIResult; docume
     )}</div></div>;
   }
   if (value.feature === "comparison") {
+    const warnings = (result.warnings ?? []) as string[];
     return <div className="ai-result comparison-result"><div className="similarity"><strong>{String(result.similarity_percent)}%</strong><span>text similarity</span></div>
       <h3>Comparison overview</h3><p>{String(result.summary ?? "")}</p>
+      {warnings.map((warning, index) => <div className="comparison-warning" role="alert" key={index}><ShieldCheck size={15} /><span>{warning}</span></div>)}
       {sections.map((name) => {
         const items = (result[name] ?? []) as Array<{ description: string; left_pages: number[]; right_pages: number[] }>;
         return items.length ? <section key={name}><h4>{name.replaceAll("_", " ")}</h4>{items.map((item, index) =>

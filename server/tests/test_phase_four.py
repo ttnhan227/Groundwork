@@ -10,6 +10,7 @@ from app.ai_features import (
     SummaryPayload,
     TranslationPayload,
     _cache_key,
+    _comparison_evidence,
     _llm_json,
 )
 from app.models import AIFeature
@@ -43,6 +44,16 @@ def test_phase_four_structured_payloads_validate_page_references() -> None:
         "changed_sections": [{"description": "Deadline changed", "left_pages": [1], "right_pages": [2]}],
         "similarity_percent": 82.5,
     })
+
+
+def test_comparison_never_calls_unreadable_image_document_identical() -> None:
+    similarity, warnings, prefix, insufficient = _comparison_evidence(
+        "A readable contract", "", [], [1]
+    )
+    assert similarity == 0
+    assert insufficient
+    assert "complete comparison is not possible" in prefix.lower()
+    assert any("images were not semantically compared" in warning for warning in warnings)
 
 
 @pytest.mark.asyncio
