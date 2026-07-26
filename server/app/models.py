@@ -225,6 +225,9 @@ class GeneratedArtifact(Base):
     content_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     parameters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    linked_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     owner: Mapped[User] = relationship(back_populates="generated_artifacts")

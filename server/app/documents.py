@@ -15,7 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
-from app.models import Document, DocumentPage, DocumentStatus, JobStatus, ProcessingJob, User
+from app.models import Document, DocumentPage, DocumentStatus, GeneratedArtifact, JobStatus, ProcessingJob, User
 from app.schemas import DocumentArchiveRequest, DocumentPageResponse, DocumentRenameRequest, DocumentResponse, ProcessingJobResponse
 from app.storage import ObjectStorage
 
@@ -48,16 +48,16 @@ def unique_archive_name(filename: str, used_names: set[str]) -> str:
     return candidate
 
 
-def build_documents_archive(documents: list[Document]):
+def build_documents_archive(files: list[tuple[str, str]]):
     archive = tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
     storage = ObjectStorage()
     used_names: set[str] = set()
     try:
         with zipfile.ZipFile(archive, mode="w", compression=zipfile.ZIP_STORED) as bundle:
-            for document in documents:
+            for filename, object_key in files:
                 bundle.writestr(
-                    unique_archive_name(document.filename, used_names),
-                    storage.download(document.object_key),
+                    unique_archive_name(filename, used_names),
+                    storage.download(object_key),
                 )
         archive.seek(0)
         return archive
@@ -72,22 +72,33 @@ async def download_documents_archive(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    requested_ids = list(dict.fromkeys(payload.document_ids))
-    if len(requested_ids) < 2:
-        raise HTTPException(status_code=422, detail="Select at least two different documents")
-    result = await session.scalars(
-        select(Document).where(Document.id.in_(requested_ids), Document.owner_id == user.id)
-    )
-    by_id = {document.id: document for document in result}
-    if len(by_id) != len(requested_ids):
-        raise HTTPException(status_code=404, detail="One or more documents were not found")
-    documents = [by_id[document_id] for document_id in requested_ids]
-    total_size = sum(document.size_bytes for document in documents)
+    references = list(dict.fromkeys((item.kind, item.id) for item in payload.files))
+    if len(references) < 2:
+        raise HTTPException(status_code=422, detail="Select at least two different files")
+    document_ids = [identifier for kind, identifier in references if kind == "document"]
+    artifact_ids = [identifier for kind, identifier in references if kind == "artifact"]
+    documents = list(await session.scalars(
+        select(Document).where(Document.id.in_(document_ids), Document.owner_id == user.id)
+    )) if document_ids else []
+    artifacts = list(await session.scalars(
+        select(GeneratedArtifact).where(GeneratedArtifact.id.in_(artifact_ids), GeneratedArtifact.owner_id == user.id)
+    )) if artifact_ids else []
+    document_map = {item.id: item for item in documents}
+    artifact_map = {item.id: item for item in artifacts}
+    if len(document_map) != len(document_ids) or len(artifact_map) != len(artifact_ids):
+        raise HTTPException(status_code=404, detail="One or more files were not found")
+    files = [
+        (document_map[identifier].filename, document_map[identifier].object_key)
+        if kind == "document"
+        else (artifact_map[identifier].filename, artifact_map[identifier].object_key)
+        for kind, identifier in references
+    ]
+    total_size = sum(document_map[item].size_bytes for item in document_ids) + sum(artifact_map[item].size_bytes for item in artifact_ids)
     if total_size > 500 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Selected documents exceed the 500 MB archive limit")
 
     try:
-        archive = await run_in_threadpool(build_documents_archive, documents)
+        archive = await run_in_threadpool(build_documents_archive, files)
     except Exception:
         raise HTTPException(status_code=503, detail="Could not prepare the document archive")
 
@@ -103,7 +114,7 @@ async def download_documents_archive(
         media_type="application/zip",
         headers={
             "Content-Disposition": 'attachment; filename="insightpdf-documents.zip"',
-            "X-Document-Count": str(len(documents)),
+            "X-File-Count": str(len(files)),
         },
     )
 

@@ -80,7 +80,9 @@ test("includes Phase 6 dashboard, account, admin, and optional demo access", asy
   assert.match(page, /\/profile\/stats/);
   assert.match(page, /\/profile\/password/);
   assert.match(page, /\/admin\/users/);
-  assert.match(page, /Search your PDFs/);
+  assert.match(page, /Search your documents/);
+  assert.match(page, /Your Documents/);
+  assert.match(page, /Save source images to workspace/);
   assert.match(page, /VITE_DEMO_ENABLED/);
   assert.match(page, /Open the demo workspace/);
   assert.match(page, /src="\/logo\.png"/);

@@ -1,4 +1,5 @@
 from app.documents import safe_filename, unique_archive_name
+from app.pdf_tools import _render_file_card
 from app.security import hash_password, verify_password
 from app.storage import ObjectStorage
 
@@ -19,6 +20,11 @@ def test_archive_filenames_are_unique() -> None:
     assert unique_archive_name("report.pdf", used) == "report.pdf"
     assert unique_archive_name("REPORT.pdf", used) == "REPORT (2).pdf"
     assert unique_archive_name("../../report.pdf", used) == "report (3).pdf"
+
+
+def test_generated_file_card_is_a_png_preview() -> None:
+    preview = _render_file_card("notes.md", "text/markdown", "Quarterly findings")
+    assert preview.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_storage_facade_accepts_replaceable_backend() -> None:

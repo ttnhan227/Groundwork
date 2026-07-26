@@ -103,6 +103,7 @@ async def create_job(
 @router.post("/images-to-pdf", response_model=ProcessingJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def create_images_to_pdf_job(
     files: list[UploadFile] = File(...),
+    save_sources: bool = Form(default=False),
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ProcessingJob:
@@ -112,6 +113,7 @@ async def create_images_to_pdf_job(
         raise HTTPException(status_code=415, detail="Only PNG and JPEG images are accepted")
     storage = ObjectStorage()
     staged: list[str] = []
+    source_files: list[dict[str, str]] = []
     try:
         for position, file in enumerate(files):
             content = await file.read(20 * 1024 * 1024 + 1)
@@ -120,8 +122,15 @@ async def create_images_to_pdf_job(
             key = f"{user.id}/staging/{uuid.uuid4()}/{position:03d}"
             storage.upload(key, content, file.content_type or "application/octet-stream")
             staged.append(key)
+            source_files.append({
+                "filename": safe_filename(file.filename or f"image-{position + 1}.png"),
+                "content_type": file.content_type or "application/octet-stream",
+            })
         return await create_job_without_documents(
-            "images_to_pdf", {"staged_keys": staged}, user, session
+            "images_to_pdf",
+            {"staged_keys": staged, "save_sources": save_sources, "source_files": source_files},
+            user,
+            session,
         )
     except Exception:
         for key in staged:

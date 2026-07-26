@@ -1,15 +1,19 @@
 import uuid
+import zipfile
 from io import BytesIO
 
+import fitz
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
+from PIL import Image, ImageDraw, ImageOps
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.database import get_session
 from app.dependencies import current_user
 from app.documents import owned_document, safe_filename
-from app.models import Document, DocumentStatus, GeneratedArtifact, User
+from app.models import Document, DocumentStatus, GeneratedArtifact, JobStatus, ProcessingJob, User
 from app.pdf_operations import (
     delete_pages,
     images_to_pdf,
@@ -23,6 +27,7 @@ from app.pdf_operations import (
 from app.schemas import (
     ArtifactResponse,
     ArtifactRenameRequest,
+    DocumentResponse,
     MergeRequest,
     PDFToImagesRequest,
     PageOperationRequest,
@@ -32,6 +37,135 @@ from app.schemas import (
 from app.storage import ObjectStorage
 
 router = APIRouter(prefix="/pdf-tools", tags=["PDF tools"])
+
+
+def _render_pdf_preview(data: bytes) -> bytes:
+    pdf = fitz.open(stream=data, filetype="pdf")
+    try:
+        if not pdf.page_count:
+            raise ValueError("PDF has no pages")
+        return pdf[0].get_pixmap(matrix=fitz.Matrix(.7, .7), alpha=False).tobytes("png")
+    finally:
+        pdf.close()
+
+
+def _render_image_preview(data: bytes) -> bytes:
+    with Image.open(BytesIO(data)) as source:
+        image = ImageOps.exif_transpose(source).convert("RGB")
+        image.thumbnail((420, 540))
+        canvas = Image.new("RGB", (420, 540), "white")
+        x = (canvas.width - image.width) // 2
+        y = (canvas.height - image.height) // 2
+        canvas.paste(image, (x, y))
+        output = BytesIO()
+        canvas.save(output, "PNG", optimize=True)
+        return output.getvalue()
+
+
+def _render_file_card(filename: str, content_type: str, excerpt: str = "") -> bytes:
+    image = Image.new("RGB", (420, 540), "#f7f5fb")
+    draw = ImageDraw.Draw(image)
+    extension = (filename.rsplit(".", 1)[-1] if "." in filename else "FILE").upper()[:8]
+    draw.rounded_rectangle((28, 28, 392, 512), radius=22, fill="white", outline="#ddd7e8", width=3)
+    draw.rounded_rectangle((55, 58, 180, 112), radius=12, fill="#6f5bd3")
+    draw.text((78, 75), extension, fill="white")
+    display_name = filename[:34] + ("…" if len(filename) > 34 else "")
+    draw.text((55, 145), display_name, fill="#252132")
+    draw.text((55, 178), content_type[:45], fill="#777184")
+    lines = [line.strip() for line in excerpt.replace("\r", "").split("\n") if line.strip()]
+    y = 225
+    for line in lines[:8]:
+        wrapped = [line[index:index + 45] for index in range(0, min(len(line), 135), 45)]
+        for part in wrapped:
+            draw.text((55, y), part, fill="#514b5d")
+            y += 22
+            if y > 455:
+                break
+        if y > 455:
+            break
+    if not lines:
+        draw.text((55, 235), "Ready to download", fill="#777184")
+    output = BytesIO()
+    image.save(output, "PNG", optimize=True)
+    return output.getvalue()
+
+
+def _artifact_preview(artifact: GeneratedArtifact) -> bytes:
+    data = ObjectStorage().download(artifact.object_key)
+    content_type = artifact.content_type.lower()
+    filename = artifact.filename.lower()
+    if content_type == "application/pdf" or filename.endswith(".pdf"):
+        return _render_pdf_preview(data)
+    if content_type.startswith("image/") or filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+        return _render_image_preview(data)
+    if content_type == "application/zip" or filename.endswith(".zip"):
+        with zipfile.ZipFile(BytesIO(data)) as archive:
+            for member in archive.infolist():
+                if member.is_dir() or member.file_size > 20 * 1024 * 1024:
+                    continue
+                member_name = member.filename.lower()
+                member_data = archive.read(member)
+                if member_name.endswith((".png", ".jpg", ".jpeg", ".webp")):
+                    return _render_image_preview(member_data)
+                if member_name.endswith(".pdf"):
+                    return _render_pdf_preview(member_data)
+            names = "\n".join(member.filename for member in archive.infolist()[:8])
+            return _render_file_card(artifact.filename, artifact.content_type, names)
+    excerpt = ""
+    if filename.endswith((".md", ".txt")) or content_type.startswith("text/"):
+        excerpt = data[:4000].decode("utf-8", errors="replace")
+    elif filename.endswith(".docx"):
+        from docx import Document as WordDocument
+        word = WordDocument(BytesIO(data))
+        excerpt = "\n".join(paragraph.text for paragraph in word.paragraphs[:10])
+    return _render_file_card(artifact.filename, artifact.content_type, excerpt)
+
+
+def _artifact_as_pdf(artifact: GeneratedArtifact) -> bytes:
+    data = ObjectStorage().download(artifact.object_key)
+    content_type = artifact.content_type.lower()
+    filename = artifact.filename.lower()
+    if content_type == "application/pdf" or filename.endswith(".pdf"):
+        return data
+    if content_type.startswith("image/") or filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+        return images_to_pdf([data])
+    if content_type == "application/zip" or filename.endswith(".zip"):
+        parts: list[bytes] = []
+        with zipfile.ZipFile(BytesIO(data)) as archive:
+            for member in archive.infolist():
+                if member.is_dir() or member.file_size > 20 * 1024 * 1024:
+                    continue
+                member_data = archive.read(member)
+                member_name = member.filename.lower()
+                if member_name.endswith(".pdf"):
+                    parts.append(member_data)
+                elif member_name.endswith((".png", ".jpg", ".jpeg", ".webp")):
+                    parts.append(images_to_pdf([member_data]))
+        if not parts:
+            raise ValueError("This ZIP does not contain PDFs or supported images")
+        return merge_pdfs(parts)
+    text = ""
+    if filename.endswith((".md", ".txt")) or content_type.startswith("text/"):
+        text = data.decode("utf-8", errors="replace")
+    elif filename.endswith(".docx"):
+        from docx import Document as WordDocument
+        word = WordDocument(BytesIO(data))
+        text = "\n".join(paragraph.text for paragraph in word.paragraphs)
+    if text.strip():
+        pdf = fitz.open()
+        try:
+            lines = text.splitlines() or [text]
+            for start in range(0, len(lines), 45):
+                page = pdf.new_page()
+                page.insert_textbox(
+                    fitz.Rect(54, 54, page.rect.width - 54, page.rect.height - 54),
+                    "\n".join(lines[start:start + 45]),
+                    fontsize=10,
+                )
+            return pdf.tobytes(garbage=4, deflate=True)
+        finally:
+            pdf.close()
+    raise ValueError("This file type cannot be indexed for PDF or AI tools")
 
 
 async def _owned_artifact(
@@ -97,6 +231,24 @@ async def list_artifacts(
     ))
 
 
+@router.get("/artifacts/{artifact_id}/thumbnail")
+async def artifact_thumbnail(
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    artifact = await _owned_artifact(artifact_id, user, session)
+    try:
+        image = await run_in_threadpool(_artifact_preview, artifact)
+    except Exception:
+        image = _render_file_card(artifact.filename, artifact.content_type)
+    return Response(
+        content=image,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.get("/artifacts/{artifact_id}/download")
 async def download_artifact(
     artifact_id: uuid.UUID,
@@ -120,6 +272,66 @@ async def get_artifact(
     return await _owned_artifact(artifact_id, user, session)
 
 
+@router.post("/artifacts/{artifact_id}/index", response_model=DocumentResponse)
+async def index_artifact(
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Document:
+    artifact = await _owned_artifact(artifact_id, user, session)
+    if artifact.linked_document_id:
+        linked = await session.get(Document, artifact.linked_document_id)
+        if linked is not None and linked.owner_id == user.id:
+            return linked
+
+    try:
+        data = await run_in_threadpool(_artifact_as_pdf, artifact)
+    except (ValueError, TypeError, RuntimeError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    document_id = uuid.uuid4()
+    filename = artifact.filename.rsplit(".", 1)[0] + ".pdf"
+    object_key = f"{user.id}/{document_id}/{safe_filename(filename)}"
+    try:
+        ObjectStorage().upload_pdf(object_key, data)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Document storage is temporarily unavailable") from exc
+
+    document = Document(
+        id=document_id,
+        owner_id=user.id,
+        filename=safe_filename(filename),
+        object_key=object_key,
+        content_type="application/pdf",
+        size_bytes=len(data),
+    )
+    job = ProcessingJob(
+        document_id=document_id,
+        owner_id=user.id,
+        operation="document_processing",
+        status=JobStatus.QUEUED,
+        progress=0,
+    )
+    session.add_all([document, job])
+    artifact.linked_document_id = document_id
+    await session.commit()
+    await session.refresh(document)
+
+    from app.tasks import process_document
+    try:
+        task = process_document.delay(str(document.id))
+        job.task_id = task.id
+        await session.commit()
+    except Exception as exc:
+        document.status = DocumentStatus.FAILED
+        document.error_message = "Processing queue is temporarily unavailable"
+        job.status = JobStatus.FAILED
+        job.error_message = document.error_message
+        await session.commit()
+        raise HTTPException(status_code=503, detail=document.error_message) from exc
+    return document
+
+
 @router.patch("/artifacts/{artifact_id}", response_model=ArtifactResponse)
 async def rename_artifact(
     artifact_id: uuid.UUID,
@@ -129,6 +341,10 @@ async def rename_artifact(
 ) -> GeneratedArtifact:
     artifact = await _owned_artifact(artifact_id, user, session)
     artifact.filename = safe_filename(payload.filename)
+    if artifact.linked_document_id:
+        linked = await session.get(Document, artifact.linked_document_id)
+        if linked is not None:
+            linked.filename = artifact.filename.rsplit(".", 1)[0] + ".pdf"
     await session.commit()
     await session.refresh(artifact)
     return artifact
@@ -141,10 +357,15 @@ async def delete_artifact(
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     artifact = await _owned_artifact(artifact_id, user, session)
+    linked = await session.get(Document, artifact.linked_document_id) if artifact.linked_document_id else None
     try:
         ObjectStorage().remove(artifact.object_key)
+        if linked is not None:
+            ObjectStorage().remove(linked.object_key)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Generated-file storage is temporarily unavailable") from exc
+    if linked is not None:
+        await session.delete(linked)
     await session.delete(artifact)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

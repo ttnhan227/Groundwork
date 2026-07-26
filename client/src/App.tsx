@@ -1,4 +1,4 @@
-import { BrainCircuit, Check, Download, FileImage, FileText, FolderOpen, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BrainCircuit, Check, Download, ExternalLink, Eye, FileImage, FileText, FolderOpen, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -52,7 +52,7 @@ type AIResult = {
   cached: boolean;
   created_at: string;
 };
-type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; created_at: string };
+type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; linked_document_id: string | null; created_at: string };
 type WorkflowPlan = {
   id: string;
   status: string;
@@ -355,6 +355,106 @@ function DocumentCardPreview({ document, token, onOpen }: { document: DocumentIt
         </span>}
     {source && <i>Preview</i>}
   </button>;
+}
+
+function ArtifactCardPreview({ artifact, token, onOpen }: { artifact: Artifact; token: string; onOpen: () => void }) {
+  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let objectUrl = "";
+    let cancelled = false;
+    fetch(`${API}/pdf-tools/artifacts/${artifact.id}/thumbnail`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Preview unavailable");
+      objectUrl = URL.createObjectURL(await response.blob());
+      if (!cancelled) setSource(objectUrl);
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [artifact.id, token]);
+
+  return <button className="document-card-preview artifact-card-preview" type="button" onClick={onOpen} aria-label={`Open ${artifact.filename}`}>
+    {source
+      ? <img src={source} alt={`Preview of ${artifact.filename}`} />
+      : <span className={!failed ? "preview-loading" : ""}>{!failed ? <RefreshCw className="spin" size={20} /> : <FileText size={27} />}</span>}
+    {source && <i>Preview</i>}
+  </button>;
+}
+
+function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory, onClose }: {
+  artifact?: Artifact;
+  document?: DocumentItem;
+  token: string;
+  initialPage?: number;
+  onHistory?: () => void;
+  onClose: () => void;
+}) {
+  const [source, setSource] = useState("");
+  const [textPreview, setTextPreview] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const filename = artifact?.filename ?? document?.filename ?? "Document";
+  const contentType = artifact?.content_type ?? "application/pdf";
+  const sizeBytes = artifact?.size_bytes ?? document?.size_bytes ?? 0;
+  const description = artifact?.operation.replaceAll("_", " ") ?? `${document?.page_count ?? "—"} pages`;
+  const isPdf = contentType === "application/pdf" || filename.toLowerCase().endsWith(".pdf");
+  const isImage = contentType.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(filename);
+  const isText = contentType.startsWith("text/") || /\.(md|txt)$/i.test(filename);
+
+  useEffect(() => {
+    let objectUrl = "";
+    let cancelled = false;
+    const endpoint = document
+      ? `${API}/documents/${document.id}/content`
+      : isPdf || isImage || isText
+        ? `${API}/pdf-tools/artifacts/${artifact!.id}/download`
+        : `${API}/pdf-tools/artifacts/${artifact!.id}/thumbnail`;
+    fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
+      if (!response.ok) throw new Error("Preview unavailable");
+      if (isText) {
+        const blob = await response.blob();
+        const value = await blob.text();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setTextPreview(value);
+          setSource(objectUrl);
+        }
+      } else {
+        objectUrl = URL.createObjectURL(await response.blob());
+        if (!cancelled) setSource(isPdf && initialPage > 1 ? `${objectUrl}#page=${initialPage}` : objectUrl);
+      }
+    }).catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Preview unavailable"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [artifact?.id, document, initialPage, isImage, isPdf, isText, token]);
+
+  return <div className="artifact-viewer-wrap">
+    <button className="history-backdrop" aria-label="Close file preview" onClick={onClose} />
+    <section className="artifact-viewer" role="dialog" aria-modal="true" aria-label={`Preview ${filename}`}>
+      <header>
+        <div><strong>{filename}</strong><small>{description} · {(sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div>
+        {onHistory && <button onClick={onHistory}><History size={15} /> History</button>}
+        {source && <button onClick={() => window.open(source, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
+        {!isPdf && <button onClick={() => artifact ? downloadArtifact(artifact, token).catch(() => undefined) : document ? downloadDocumentFile(document, token).catch(() => undefined) : undefined}><Download size={15} /> Download</button>}
+        <button aria-label="Close preview" onClick={onClose}><X size={18} /></button>
+      </header>
+      <main className={isPdf ? "pdf" : isImage ? "image" : isText ? "text" : "generated"}>
+        {loading && <div className="artifact-viewer-loading"><RefreshCw className="spin" size={22} /><strong>Opening preview…</strong></div>}
+        {error && <div className="artifact-viewer-loading"><FileText size={28} /><strong>{error}</strong><span>Download the file to view it in its native application.</span></div>}
+        {!loading && !error && isPdf && source && <iframe src={source} title={filename} />}
+        {!loading && !error && isImage && source && <img src={source} alt={filename} />}
+        {!loading && !error && isText && <pre>{textPreview}</pre>}
+        {!loading && !error && !isPdf && !isImage && !isText && source && <div className="generated-preview-sheet"><img src={source} alt={`Generated preview of ${filename}`} /><small>Content preview · Download to edit or inspect the original file.</small></div>}
+      </main>
+    </section>
+  </div>;
 }
 
 function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { document: DocumentItem; token: string; initialPage?: number; onHistory: () => void; onClose: () => void }) {
@@ -742,14 +842,19 @@ async function downloadDocumentFile(document: DocumentItem, token: string) {
   URL.revokeObjectURL(url);
 }
 
-async function downloadDocumentArchive(documents: DocumentItem[], token: string) {
+async function downloadDocumentArchive(documents: DocumentItem[], token: string, artifacts: Artifact[] = []) {
   const response = await fetch(`${API}/documents/download-zip`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ document_ids: documents.map((document) => document.id) }),
+    body: JSON.stringify({
+      files: [
+        ...documents.map((document) => ({ kind: "document", id: document.id })),
+        ...artifacts.map((artifact) => ({ kind: "artifact", id: artifact.id })),
+      ],
+    }),
   });
   if (response.status === 401) expireSession();
   if (!response.ok) {
@@ -910,6 +1015,7 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   const [imageFormat, setImageFormat] = useState("png");
   const [dpi, setDpi] = useState(144);
   const [images, setImages] = useState<File[]>([]);
+  const [saveSourceImages, setSaveSourceImages] = useState(false);
   const [wordFile, setWordFile] = useState<File | null>(null);
   const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
   const [watermarkImage, setWatermarkImage] = useState<File | null>(null);
@@ -931,6 +1037,7 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
       let generated: Artifact;
       if (tool === "images-to-pdf") {
         const data = new FormData(); images.forEach((image) => data.append("files", image));
+        data.append("save_sources", String(saveSourceImages));
         const queued = await api<Job>("/jobs/images-to-pdf", token, { method: "POST", body: data });
         const job = await waitForJob(queued, token);
         generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
@@ -991,7 +1098,7 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
             {tool === "split" && <><label>Split mode<select value={splitMode} onChange={(event) => setSplitMode(event.target.value)}><option value="ranges">Page ranges</option><option value="every_page">One PDF per page</option><option value="selected">Selected pages</option></select></label>{splitMode === "ranges" ? <label>Ranges <small>Comma-separated, e.g. 1-3, 4-7</small><input value={ranges} onChange={(event) => setRanges(event.target.value)} /></label> : splitMode === "selected" ? <label>Selected pages<input value={pages} onChange={(event) => setPages(event.target.value)} /></label> : null}</>}
             {tool === "pdf-to-images" && <><label>Pages <small>Leave blank for all pages</small><input value={pages} onChange={(event) => setPages(event.target.value)} placeholder="All pages" /></label><label>Format<select value={imageFormat} onChange={(event) => setImageFormat(event.target.value)}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label><label>Resolution<select value={dpi} onChange={(event) => setDpi(Number(event.target.value))}><option value={96}>96 DPI</option><option value={144}>144 DPI</option><option value={216}>216 DPI</option><option value={300}>300 DPI</option></select></label></>}
             {tool === "images-to-pdf" && <><label className="image-drop"><Upload size={24} />Choose PNG/JPEG images<input type="file" accept="image/png,image/jpeg" multiple onChange={(event) => setImages(Array.from(event.target.files ?? []))} /><small>{images.length ? `${images.length} image(s)` : "Up to 50 images"}</small></label>
-              {images.length > 0 && <div className="image-order-list" aria-label="Image order">{images.map((image, index) => <article key={`${image.name}-${image.lastModified}-${index}`}><span>{index + 1}. {image.name}</span><button disabled={index === 0} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index - 1 ? current[index] : itemIndex === index ? current[index - 1] : item))}>Up</button><button disabled={index === images.length - 1} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index + 1 ? current[index] : itemIndex === index ? current[index + 1] : item))}>Down</button><button onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}</div>}</>}
+              {images.length > 0 && <><label className="save-source-images"><input type="checkbox" checked={saveSourceImages} onChange={(event) => setSaveSourceImages(event.target.checked)} /><span><strong>Save source images to workspace</strong><small>Off by default to avoid clutter and extra storage.</small></span></label><div className="image-order-list" aria-label="Image order">{images.map((image, index) => <article key={`${image.name}-${image.lastModified}-${index}`}><span>{index + 1}. {image.name}</span><button disabled={index === 0} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index - 1 ? current[index] : itemIndex === index ? current[index - 1] : item))}>Up</button><button disabled={index === images.length - 1} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index + 1 ? current[index] : itemIndex === index ? current[index + 1] : item))}>Down</button><button onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}</div></>}</>}
             {needsWordFile && <label className="image-drop"><Upload size={24} />Choose a Word document<input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setWordFile(event.target.files?.[0] ?? null)} /><small>{wordFile?.name ?? "DOCX files up to 50 MB"}</small></label>}
             {tool === "watermark" && <><label>Watermark text <small>Optional when using an image</small><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} /></label><label>Watermark image <small>Optional PNG/JPEG</small><input type="file" accept="image/png,image/jpeg" onChange={(event) => setWatermarkImage(event.target.files?.[0] ?? null)} /></label><label>Pages <small>Leave blank for every page</small><input value={pages} onChange={(event) => setPages(event.target.value)} /></label><label>Position<select value={position} onChange={(event) => setPosition(event.target.value)}><option value="center">Center</option><option value="top_left">Top left</option><option value="top_right">Top right</option><option value="bottom_left">Bottom left</option><option value="bottom_right">Bottom right</option></select></label><label>Opacity<input type="range" min=".05" max="1" step=".05" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} /><small>{Math.round(opacity * 100)}%</small></label></>}
             <button className="run-pdf-tool" disabled={!canRun} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <Scissors size={15} />}{busy ? "Processing…" : "Create file"}</button>
@@ -1142,11 +1249,13 @@ function WorkspaceApp() {
   const [token, setToken] = useState(initialAuth?.access_token ?? "");
   const [user, setUser] = useState<AuthResult["user"] | null>(initialAuth?.user ?? null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [workspaceArtifacts, setWorkspaceArtifacts] = useState<Artifact[]>([]);
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [viewer, setViewer] = useState<DocumentItem | null>(null);
+  const [artifactViewer, setArtifactViewer] = useState<Artifact | null>(null);
   const [viewerPage, setViewerPage] = useState(1);
   const [chatDocument, setChatDocument] = useState<DocumentItem | null>(null);
   const [chatDocuments, setChatDocuments] = useState<DocumentItem[]>([]);
@@ -1162,11 +1271,19 @@ function WorkspaceApp() {
   const [pdfToolsDocument, setPDFToolsDocument] = useState<DocumentItem | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
-  const [folderOpen, setFolderOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "pdfs" | "converted" | "images">("all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "name" | "size" | "type">("newest");
+  const [selectedFileKeys, setSelectedFileKeys] = useState<string[]>([]);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ kind: "document"; item: DocumentItem } | { kind: "artifact"; item: Artifact } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [openActionMenu, setOpenActionMenu] = useState("");
+  const [preparingArtifactId, setPreparingArtifactId] = useState("");
   const authForm = useForm<AuthFields>({
     resolver: zodResolver(authSchema),
     defaultValues: { display_name: "", email: "", password: "" },
@@ -1177,8 +1294,11 @@ function WorkspaceApp() {
       setToken("");
       setUser(null);
       setDocuments([]);
+      setWorkspaceArtifacts([]);
       setConversations([]);
       setViewer(null);
+      setArtifactViewer(null);
+      setRenameTarget(null);
       setChatDocument(null);
       setChatDocuments([]);
       setHistoryOpen(false);
@@ -1205,6 +1325,10 @@ function WorkspaceApp() {
 
   const loadStats = useCallback(async (accessToken: string) => {
     setStats(await api<Stats>("/profile/stats", accessToken));
+  }, []);
+
+  const loadWorkspaceArtifacts = useCallback(async (accessToken: string) => {
+    setWorkspaceArtifacts(await api<Artifact[]>("/pdf-tools/artifacts", accessToken));
   }, []);
 
   const loadConversations = useCallback(async (): Promise<Conversation[]> => {
@@ -1239,9 +1363,10 @@ function WorkspaceApp() {
     const timer = window.setTimeout(() => {
       loadDocuments(initialAuth.access_token).catch(() => undefined);
       loadStats(initialAuth.access_token).catch(() => undefined);
+      loadWorkspaceArtifacts(initialAuth.access_token).catch(() => undefined);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialAuth, loadDocuments, loadStats]);
+  }, [initialAuth, loadDocuments, loadStats, loadWorkspaceArtifacts]);
 
   useEffect(() => {
     if (!token || !documents.some((item) => !["ready", "failed"].includes(item.status))) return;
@@ -1268,7 +1393,7 @@ function WorkspaceApp() {
       });
       localStorage.setItem("insightpdf-auth", JSON.stringify(result));
       setToken(result.access_token); setUser(result.user);
-      await Promise.all([loadDocuments(result.access_token), loadStats(result.access_token)]);
+      await Promise.all([loadDocuments(result.access_token), loadStats(result.access_token), loadWorkspaceArtifacts(result.access_token)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
     finally { setBusy(false); }
   }
@@ -1295,22 +1420,19 @@ function WorkspaceApp() {
 
   function signOut() {
     localStorage.removeItem("insightpdf-auth");
-    setToken(""); setUser(null); setDocuments([]); setConversations([]);
+    setToken(""); setUser(null); setDocuments([]); setWorkspaceArtifacts([]); setConversations([]); setArtifactViewer(null); setRenameTarget(null);
   }
 
-  async function renameDocument(document: DocumentItem) {
-    const filename = window.prompt("New filename", document.filename);
-    if (!filename || filename === document.filename) return;
-    try {
-      await api(`/documents/${document.id}`, token, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename }) });
-      await loadDocuments(token);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Rename failed"); }
+  function renameDocument(document: DocumentItem) {
+    setRenameTarget({ kind: "document", item: document });
+    setRenameValue(document.filename);
   }
 
   async function removeDocument(document: DocumentItem) {
     if (!window.confirm(`Delete ${document.filename}? This removes its chats and indexed content.`)) return;
     try {
       await api(`/documents/${document.id}`, token, { method: "DELETE" });
+      setSelectedFileKeys((current) => current.filter((key) => key !== `document:${document.id}`));
       await Promise.all([loadDocuments(token), loadStats(token)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed"); }
   }
@@ -1321,6 +1443,151 @@ function WorkspaceApp() {
       await loadDocuments(token);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Retry failed"); }
   }
+
+  function renameWorkspaceArtifact(artifact: Artifact) {
+    setRenameTarget({ kind: "artifact", item: artifact });
+    setRenameValue(artifact.filename);
+  }
+
+  async function saveWorkspaceRename(event: FormEvent) {
+    event.preventDefault();
+    const filename = renameValue.trim();
+    if (!renameTarget || !filename) return;
+    if (filename === renameTarget.item.filename) {
+      setRenameTarget(null);
+      return;
+    }
+    setRenameBusy(true); setError("");
+    try {
+      if (renameTarget.kind === "document") {
+        const updated = await api<DocumentItem>(`/documents/${renameTarget.item.id}`, token, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename }),
+        });
+        setDocuments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      } else {
+        const updated = await api<Artifact>(`/pdf-tools/artifacts/${renameTarget.item.id}`, token, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename }),
+        });
+        setWorkspaceArtifacts((current) => current.map((item) => item.id === updated.id ? updated : item));
+      }
+      setRenameTarget(null);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Rename failed"); }
+    finally { setRenameBusy(false); }
+  }
+
+  async function removeWorkspaceArtifact(artifact: Artifact) {
+    if (!window.confirm(`Delete ${artifact.filename}?`)) return;
+    try {
+      await api(`/pdf-tools/artifacts/${artifact.id}`, token, { method: "DELETE" });
+      setSelectedFileKeys((current) => current.filter((key) => key !== `artifact:${artifact.id}`));
+      setWorkspaceArtifacts((current) => current.filter((item) => item.id !== artifact.id));
+      if (artifact.linked_document_id) {
+        setDocuments((current) => current.filter((item) => item.id !== artifact.linked_document_id));
+      }
+      if (artifactViewer?.id === artifact.id) setArtifactViewer(null);
+      await loadStats(token);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed"); }
+  }
+
+  async function ensureArtifactDocument(artifact: Artifact): Promise<DocumentItem> {
+    setPreparingArtifactId(artifact.id);
+    setError("");
+    try {
+      let document = await api<DocumentItem>(`/pdf-tools/artifacts/${artifact.id}/index`, token, { method: "POST" });
+      setWorkspaceArtifacts((current) => current.map((item) =>
+        item.id === artifact.id ? { ...item, linked_document_id: document.id } : item
+      ));
+      if (document.status === "failed") {
+        await api(`/documents/${document.id}/retry`, token, { method: "POST" });
+        document = await api<DocumentItem>(`/documents/${document.id}`, token);
+      }
+      const deadline = Date.now() + 180_000;
+      while (!["ready", "failed"].includes(document.status)) {
+        if (Date.now() >= deadline) throw new Error("Indexing is still running. Try again from this file in a moment.");
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        document = await api<DocumentItem>(`/documents/${document.id}`, token);
+      }
+      if (document.status === "failed") throw new Error(document.error_message ?? "This file could not be prepared for AI.");
+      setDocuments((current) => [document, ...current.filter((item) => item.id !== document.id)]);
+      return document;
+    } finally {
+      setPreparingArtifactId("");
+    }
+  }
+
+  async function openArtifactPDFTools(artifact: Artifact) {
+    try {
+      const document = await ensureArtifactDocument(artifact);
+      setPDFToolsDocument(document);
+      setPDFToolsOpen(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not prepare this file for PDF tools");
+    }
+  }
+
+  async function openArtifactAI(artifact: Artifact, feature: "workspace" | "chat") {
+    try {
+      const document = await ensureArtifactDocument(artifact);
+      if (feature === "workspace") setAIDocument(document);
+      else await openDocumentChat(document);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not prepare this file for AI");
+    }
+  }
+
+  async function downloadSelectedWorkspaceFiles() {
+    const selectedDocuments = documents.filter((document) => selectedFileKeys.includes(`document:${document.id}`));
+    const selectedArtifacts = workspaceArtifacts.filter((artifact) => selectedFileKeys.includes(`artifact:${artifact.id}`));
+    const selectedCount = selectedDocuments.length + selectedArtifacts.length;
+    if (!selectedCount) return;
+    setArchiveBusy(true); setError("");
+    try {
+      if (selectedCount === 1) {
+        if (selectedDocuments[0]) await downloadDocumentFile(selectedDocuments[0], token);
+        else await downloadArtifact(selectedArtifacts[0], token);
+      } else {
+        await downloadDocumentArchive(selectedDocuments, token, selectedArtifacts);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not prepare the ZIP download");
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
+  const isImageArtifact = (artifact: Artifact) =>
+    artifact.content_type.startsWith("image/") || artifact.operation === "pdf_to_images";
+  const artifactDocumentIds = new Set(workspaceArtifacts.flatMap((artifact) => artifact.linked_document_id ? [artifact.linked_document_id] : []));
+  const visibleDocuments = documents.filter((document) =>
+    !artifactDocumentIds.has(document.id) &&
+    document.filename.toLowerCase().includes(query.toLowerCase()) &&
+    (statusFilter === "all" ? true : statusFilter === "processing"
+      ? !["ready", "failed"].includes(document.status)
+      : document.status === statusFilter)
+  );
+  const visibleArtifacts = workspaceArtifacts.filter((artifact) =>
+    artifact.filename.toLowerCase().includes(query.toLowerCase())
+  );
+  const workspaceItems = [
+    ...(typeFilter === "converted" || typeFilter === "images" ? [] : visibleDocuments.map((item) => ({ kind: "pdf" as const, item }))),
+    ...(typeFilter === "pdfs" ? [] : visibleArtifacts
+      .filter((item) =>
+        typeFilter === "images" ? isImageArtifact(item)
+          : typeFilter === "converted" ? !isImageArtifact(item)
+            : true
+      )
+      .map((item) => ({ kind: "artifact" as const, item }))),
+  ].sort((left, right) => {
+    if (sortOrder === "name") return left.item.filename.localeCompare(right.item.filename);
+    if (sortOrder === "size") return right.item.size_bytes - left.item.size_bytes;
+    if (sortOrder === "type") {
+      const leftType = left.kind === "pdf" ? "pdf" : left.item.content_type;
+      const rightType = right.kind === "pdf" ? "pdf" : right.item.content_type;
+      return leftType.localeCompare(rightType);
+    }
+    return new Date(right.item.created_at).getTime() - new Date(left.item.created_at).getTime();
+  });
+  const visibleFileKeys = workspaceItems.map((entry) => `${entry.kind === "pdf" ? "document" : "artifact"}:${entry.item.id}`);
 
   if (!token || !user) return (
     <main className="auth-page">
@@ -1358,14 +1625,13 @@ function WorkspaceApp() {
       <header className="workspace-header">
         <div className="auth-brand auth-brand-header"><img src="/logo.png" alt="InsightPDF" /></div>
         <div><strong>{user.display_name}</strong><small>{user.email}</small></div>
-        <button onClick={() => setFolderOpen(true)}><FolderOpen size={16} /> My folder</button>
         <button onClick={() => setJobsOpen(true)}><RefreshCw size={16} /> Processing jobs</button>
         <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><Settings size={16} /> Account</button>
         <button onClick={signOut}><LogOut size={17} /> Sign out</button>
       </header>
       <section className="workspace-content">
         <div className="workspace-title">
-          <div><p className="eyebrow">Document workspace</p><h1>Your PDFs</h1><p>Text extraction and OCR run safely in the background.</p></div>
+          <div><p className="eyebrow">Document workspace</p><h1>Your Documents</h1><p>Original PDFs and generated results, together in one workspace.</p></div>
           <div className="workspace-actions">
             <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setCopilotOpen(true)}><BrainCircuit size={16} /> Ask copilot</button>
             <button disabled={!documents.some((item) => item.status === "ready")} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={16} /> PDF tools</button>
@@ -1375,43 +1641,107 @@ function WorkspaceApp() {
           </div>
         </div>
         {error && <div className="form-error">{error}</div>}
-        <div className="dashboard-cards">{stats && <><article><LayoutDashboard size={17} /><div><strong>{stats.document_count}</strong><span>Documents</span></div></article><article><FileText size={17} /><div><strong>{stats.page_count}</strong><span>Pages indexed</span></div></article><article><Sparkles size={17} /><div><strong>{stats.ai_requests}</strong><span>AI requests</span></div></article><article><Download size={17} /><div><strong>{stats.generated_files}</strong><span>Generated files</span></div></article></>}</div>
-        <div className="document-filters"><label><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your PDFs" /></label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="ready">Ready</option><option value="processing">Processing</option><option value="failed">Failed</option></select></div>
+        <div className="dashboard-cards">{stats && <><article><LayoutDashboard size={17} /><div><strong>{documents.length + workspaceArtifacts.length}</strong><span>All files</span></div></article><article><FileText size={17} /><div><strong>{stats.page_count}</strong><span>Pages indexed</span></div></article><article><Sparkles size={17} /><div><strong>{stats.ai_requests}</strong><span>AI requests</span></div></article><article><Download size={17} /><div><strong>{stats.generated_files}</strong><span>Generated files</span></div></article></>}</div>
+        <div className="document-type-tabs" role="tablist" aria-label="Document types">
+          <button role="tab" aria-selected={typeFilter === "all"} className={typeFilter === "all" ? "active" : ""} onClick={() => setTypeFilter("all")}>All <span>{documents.length + workspaceArtifacts.length}</span></button>
+          <button role="tab" aria-selected={typeFilter === "pdfs"} className={typeFilter === "pdfs" ? "active" : ""} onClick={() => setTypeFilter("pdfs")}>Uploaded PDFs <span>{documents.length}</span></button>
+          <button role="tab" aria-selected={typeFilter === "converted"} className={typeFilter === "converted" ? "active" : ""} onClick={() => setTypeFilter("converted")}>Converted <span>{workspaceArtifacts.filter((item) => !isImageArtifact(item)).length}</span></button>
+          <button role="tab" aria-selected={typeFilter === "images"} className={typeFilter === "images" ? "active" : ""} onClick={() => setTypeFilter("images")}>Images <span>{workspaceArtifacts.filter(isImageArtifact).length}</span></button>
+        </div>
+        <div className="document-filters">
+          <label><Search size={15} /><input aria-label="Search documents" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your documents" /></label>
+          {(typeFilter === "all" || typeFilter === "pdfs") && <select aria-label="PDF processing status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All PDF statuses</option><option value="ready">Ready</option><option value="processing">Processing</option><option value="failed">Failed</option></select>}
+          <select aria-label="Sort documents" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="newest">Newest first</option><option value="name">Name</option><option value="size">File size</option><option value="type">File type</option></select>
+        </div>
+        {workspaceItems.length > 0 && <div className="workspace-bulk-actions">
+          <label><input type="checkbox" checked={visibleFileKeys.every((key) => selectedFileKeys.includes(key))} onChange={(event) => {
+            setSelectedFileKeys((current) => event.target.checked
+              ? [...new Set([...current, ...visibleFileKeys])]
+              : current.filter((key) => !visibleFileKeys.includes(key)));
+          }} /><span>{selectedFileKeys.length ? "Select all shown" : `${workspaceItems.length} item${workspaceItems.length === 1 ? "" : "s"}`}</span></label>
+          {selectedFileKeys.length > 0 && <>
+            <strong>{selectedFileKeys.length > 25 ? `${selectedFileKeys.length} selected · choose 25 or fewer` : `${selectedFileKeys.length} selected`}</strong>
+            <button className="selection-clear" title="Clear selection" aria-label="Clear selection" onClick={() => setSelectedFileKeys([])}><X size={15} /></button>
+            <button className="selection-download" disabled={selectedFileKeys.length > 25 || archiveBusy} onClick={downloadSelectedWorkspaceFiles}>
+              {archiveBusy ? <RefreshCw size={14} className="spin" /> : <Download size={14} />}
+              {archiveBusy ? (selectedFileKeys.length === 1 ? "Downloading…" : "Preparing ZIP…") : "Download"}
+            </button>
+          </>}
+        </div>}
         <div className="document-grid">
-          {documents.filter((document) => document.filename.toLowerCase().includes(query.toLowerCase()) && (
-            statusFilter === "all" ? true : statusFilter === "processing" ? !["ready", "failed"].includes(document.status) : document.status === statusFilter
-          )).map((document) => {
+          {workspaceItems.map((entry) => {
+            if (entry.kind === "artifact") {
+              const artifact = entry.item;
+              return <article className="document-card generated-document-card" key={`artifact-${artifact.id}`}>
+                <label className="workspace-document-select" title={`Select ${artifact.filename}`}><input type="checkbox" checked={selectedFileKeys.includes(`artifact:${artifact.id}`)} onChange={(event) => setSelectedFileKeys((current) => event.target.checked ? [...current, `artifact:${artifact.id}`] : current.filter((key) => key !== `artifact:${artifact.id}`))} /></label>
+                <ArtifactCardPreview artifact={artifact} token={token} onOpen={() => setArtifactViewer(artifact)} />
+                <div className="document-info">
+                  <strong>{artifact.filename}</strong>
+                  <span>{(artifact.size_bytes / 1024 / 1024).toFixed(1)} MB · {artifact.filename.split(".").pop()?.toUpperCase() ?? "FILE"} · {new Date(artifact.created_at).toLocaleDateString()}</span>
+                  <div className="phase-status ready">
+                    {preparingArtifactId === artifact.id ? <RefreshCw size={13} className="spin" /> : <Check size={13} />}
+                    {preparingArtifactId === artifact.id ? "Preparing for tools…" : artifact.operation.replaceAll("_", " ")}
+                  </div>
+                </div>
+                <div className="document-actions">
+                  <button className="more-actions-button" aria-label={`More actions for ${artifact.filename}`} title="More actions" onClick={() => setOpenActionMenu((current) => current === `artifact:${artifact.id}` ? "" : `artifact:${artifact.id}`)}><MoreVertical size={17} /></button>
+                  {openActionMenu === `artifact:${artifact.id}` && <><button className="action-menu-backdrop" aria-label="Close actions menu" onClick={() => setOpenActionMenu("")} /><nav className="file-action-menu" aria-label={`Actions for ${artifact.filename}`}>
+                    <button onClick={() => { setArtifactViewer(artifact); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
+                    <button onClick={() => { renameWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
+                    <button onClick={() => { downloadArtifact(artifact, token).catch((reason) => setError(reason.message)); setOpenActionMenu(""); }}><Download size={14} /> Download</button>
+                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactPDFTools(artifact); setOpenActionMenu(""); }}><Scissors size={14} /> {preparingArtifactId === artifact.id ? "Preparing…" : "PDF tools"}</button>
+                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "workspace"); setOpenActionMenu(""); }}><Sparkles size={14} /> AI tools</button>
+                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "chat"); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
+                    <button className="danger" onClick={() => { removeWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
+                  </nav></>}
+                </div>
+              </article>;
+            }
+            const document = entry.item;
             const job = jobs[document.id];
             const ready = document.status === "ready";
             return <article className="document-card" key={document.id}>
+              <label className="workspace-document-select" title={`Select ${document.filename}`}><input type="checkbox" checked={selectedFileKeys.includes(`document:${document.id}`)} onChange={(event) => setSelectedFileKeys((current) => event.target.checked ? [...current, `document:${document.id}`] : current.filter((key) => key !== `document:${document.id}`))} /></label>
               <DocumentCardPreview document={document} token={token} onOpen={() => { setViewerPage(1); setViewer(document); }} />
               <div className="document-info">
                 <strong>{document.filename}</strong>
-                <span>{(document.size_bytes / 1024 / 1024).toFixed(1)} MB · {document.page_count ?? "—"} pages</span>
+                <span>{(document.size_bytes / 1024 / 1024).toFixed(1)} MB · PDF · {new Date(document.created_at).toLocaleDateString()}</span>
                 <div className={`phase-status ${ready ? "ready" : document.status === "failed" ? "failed" : ""}`}>
                   {ready ? <Check size={13} /> : <RefreshCw size={13} className="spin" />}
-                  {document.status.replaceAll("_", " ")}
+                  {ready ? `Uploaded · Ready · ${document.page_count ?? "—"} ${document.page_count === 1 ? "page" : "pages"}` : document.status.replaceAll("_", " ")}
                 </div>
                 {!ready && document.status !== "failed" && <div className="job-progress"><i style={{ width: `${job?.progress ?? 0}%` }} /></div>}
                 {(document.error_message || job?.error_message) && <small className="document-error">{document.error_message || job?.error_message}</small>}
               </div>
               <div className="document-actions">
-                <button title="Rename" onClick={() => renameDocument(document)}><Pencil size={13} /></button>
-                <button title="Delete" onClick={() => removeDocument(document)}><Trash2 size={13} /></button>
-                {document.status === "failed" && <button onClick={() => retryDocument(document)}><RefreshCw size={13} /> Retry</button>}
-                <button disabled={!ready} onClick={() => { setViewerPage(1); setViewer(document); }}>Open PDF</button>
-                <button disabled={!ready} onClick={() => { setPDFToolsDocument(document); setPDFToolsOpen(true); }}><Scissors size={14} /> Tools</button>
-                <button disabled={!ready} onClick={() => setAIDocument(document)}><Sparkles size={14} /> AI tools</button>
-                <button disabled={!ready || busy} onClick={() => openDocumentChat(document)}><MessageCircle size={14} /> Ask AI</button>
+                <button className="more-actions-button" aria-label={`More actions for ${document.filename}`} title="More actions" onClick={() => setOpenActionMenu((current) => current === `document:${document.id}` ? "" : `document:${document.id}`)}><MoreVertical size={17} /></button>
+                {openActionMenu === `document:${document.id}` && <><button className="action-menu-backdrop" aria-label="Close actions menu" onClick={() => setOpenActionMenu("")} /><nav className="file-action-menu" aria-label={`Actions for ${document.filename}`}>
+                  <button disabled={!ready} onClick={() => { setViewerPage(1); setViewer(document); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
+                  <button onClick={() => { renameDocument(document); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
+                  {document.status === "failed" && <button onClick={() => { retryDocument(document); setOpenActionMenu(""); }}><RefreshCw size={14} /> Retry processing</button>}
+                  <button disabled={!ready} onClick={() => { setPDFToolsDocument(document); setPDFToolsOpen(true); setOpenActionMenu(""); }}><Scissors size={14} /> PDF tools</button>
+                  <button disabled={!ready} onClick={() => { setAIDocument(document); setOpenActionMenu(""); }}><Sparkles size={14} /> AI tools</button>
+                  <button disabled={!ready || busy} onClick={() => { openDocumentChat(document); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
+                  <button className="danger" onClick={() => { removeDocument(document); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
+                </nav></>}
               </div>
             </article>;
           })}
-          {!documents.length && <div className="empty-workspace"><Upload size={34} /><h2>No PDFs yet</h2><p>Upload your first document to start extraction.</p></div>}
+          {!workspaceItems.length && <div className="empty-workspace">{typeFilter === "images" ? <FileImage size={34} /> : <Upload size={34} />}<h2>No documents found</h2><p>{query ? "Try another search or filter." : typeFilter === "images" ? "Image conversion results will appear here. Source images remain temporary unless saved as an output." : "Upload a PDF or create a converted file to get started."}</p></div>}
         </div>
       </section>
-      {viewer && <PdfViewer key={viewer.id} document={viewer} token={token} initialPage={viewerPage} onHistory={() => {
+      {viewer && <ArtifactViewer key={viewer.id} document={viewer} token={token} initialPage={viewerPage} onHistory={() => {
         setHistoryDocumentFilter(viewer); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => setViewer(null)} />}
+      {artifactViewer && <ArtifactViewer key={artifactViewer.id} artifact={artifactViewer} token={token} onClose={() => setArtifactViewer(null)} />}
+      {renameTarget && <div className="rename-dialog-wrap">
+        <button className="history-backdrop" aria-label="Cancel rename" onClick={() => setRenameTarget(null)} />
+        <form className="rename-dialog" role="dialog" aria-modal="true" aria-label="Rename file" onSubmit={saveWorkspaceRename}>
+          <header><div><p className="eyebrow">File details</p><h2>Rename file</h2></div><button type="button" aria-label="Cancel rename" onClick={() => setRenameTarget(null)}><X size={17} /></button></header>
+          <label>Filename<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} maxLength={180} required /></label>
+          <div><button type="button" onClick={() => setRenameTarget(null)}>Cancel</button><button type="submit" disabled={renameBusy || !renameValue.trim()}>{renameBusy ? <RefreshCw size={14} className="spin" /> : <Pencil size={14} />} {renameBusy ? "Saving…" : "Save name"}</button></div>
+        </form>
+      </div>}
       {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onPreview={() => {
         setViewerPage(1); setViewer(chatDocument);
       }} onHistory={() => {
@@ -1434,7 +1764,11 @@ function WorkspaceApp() {
         const selected = documents.find((item) => item.id === documentId);
         if (selected) { setViewerPage(page); setViewer(selected); }
       }} />}
-      {pdfToolsOpen && <PDFToolsWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} initialDocument={pdfToolsDocument} onClose={() => setPDFToolsOpen(false)} />}
+      {pdfToolsOpen && <PDFToolsWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} initialDocument={pdfToolsDocument} onClose={() => {
+        setPDFToolsOpen(false);
+        loadWorkspaceArtifacts(token).catch(() => undefined);
+        loadStats(token).catch(() => undefined);
+      }} />}
       {accountOpen && <AccountPanel user={user} token={token} stats={stats} onUser={(updated) => {
         setUser(updated);
         const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "{}");
@@ -1442,7 +1776,6 @@ function WorkspaceApp() {
       }} onClose={() => setAccountOpen(false)} />}
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
       {copilotOpen && <CopilotWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setCopilotOpen(false)} />}
-      {folderOpen && <MyFolder documents={documents} token={token} onDocuments={setDocuments} onClose={() => setFolderOpen(false)} />}
     </main>
   );
 }

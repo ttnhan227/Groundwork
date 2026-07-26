@@ -231,9 +231,12 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             result_kind = "artifact"
         elif operation == "images_to_pdf":
             staged_keys = parameters.pop("staged_keys")
+            save_sources = parameters.pop("save_sources", False)
+            source_files = parameters.pop("source_files", [])
             storage = ObjectStorage()
             try:
-                data = images_to_pdf([storage.download(key) for key in staged_keys])
+                source_data = [storage.download(key) for key in staged_keys]
+                data = images_to_pdf(source_data)
                 result = await _store(
                     "images_to_pdf",
                     "images.pdf",
@@ -243,6 +246,18 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                     user,
                     session,
                 )
+                if save_sources:
+                    for index, image_data in enumerate(source_data):
+                        metadata = source_files[index] if index < len(source_files) else {}
+                        await _store(
+                            "saved_source_image",
+                            metadata.get("filename", f"image-{index + 1}.png"),
+                            image_data,
+                            metadata.get("content_type", "image/png"),
+                            {"source": "images_to_pdf"},
+                            user,
+                            session,
+                        )
             finally:
                 for key in staged_keys:
                     try:

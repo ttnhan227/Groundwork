@@ -54,8 +54,13 @@ class DocumentRenameRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=180)
 
 
+class ArchiveFileReference(BaseModel):
+    kind: str = Field(pattern="^(document|artifact)$")
+    id: uuid.UUID
+
+
 class DocumentArchiveRequest(BaseModel):
-    document_ids: list[uuid.UUID] = Field(min_length=2, max_length=25)
+    files: list[ArchiveFileReference] = Field(min_length=2, max_length=25)
 
 
 class DocumentPageResponse(BaseModel):
@@ -244,6 +249,7 @@ class ArtifactResponse(BaseModel):
     content_type: str
     size_bytes: int
     parameters: dict
+    linked_document_id: uuid.UUID | None
     created_at: datetime
 
 
