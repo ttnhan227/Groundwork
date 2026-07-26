@@ -622,3 +622,27 @@ button { color: inherit; }
   font-size: 11px;
   line-height: 1.45;
 }
+.demo-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  border: 0;
+  color: #777184;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.demo-link:hover:not(:disabled) {
+  color: #5e4bc6;
+  text-decoration: underline;
+}
+
+.demo-link:disabled {
+  cursor: wait;
+  opacity: .65;
+}

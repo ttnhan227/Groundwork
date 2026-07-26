@@ -23,6 +23,8 @@ production decisions include:
 
 Build the client with `VITE_API_URL` when the API is hosted at a separate
 origin. Keep the default `/api/v1` when frontend and API share the Nginx origin.
+Set `VITE_DEMO_ENABLED=false` in a production client build to hide one-click
+access to the seeded demo account.
 
 For Render, the repository-level `render.yaml` creates the frontend as a Static
 Site with `client` as its root directory and `dist` as its publish directory.

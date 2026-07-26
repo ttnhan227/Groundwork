@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 const API = import.meta.env.VITE_API_URL ?? "/api/v1";
+const DEMO_ENABLED = (import.meta.env.VITE_DEMO_ENABLED ?? "true").toLowerCase() !== "false";
 
 type DocumentItem = {
   id: string;
@@ -1178,11 +1179,6 @@ function WorkspaceApp() {
         <p className="eyebrow">AI-powered PDF workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Upload PDFs, extract text, and process scanned pages securely.</p>
-        {mode === "login" && <section className="demo-account">
-          <Sparkles size={17} />
-          <div><strong>Demo workspace</strong><span>Open a populated workspace with sample PDFs, AI tools, conversations, and generated files.</span></div>
-          <button type="button" onClick={openDemoWorkspace} disabled={busy}>{busy ? <><RefreshCw size={14} className="spin" /> Logging you in…</> : "Explore populated demo"}</button>
-        </section>}
         <form onSubmit={authForm.handleSubmit(authenticate)}>
           {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
           <label>Email<input {...authForm.register("email")} type="email" required /></label>
@@ -1200,6 +1196,9 @@ function WorkspaceApp() {
         <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
           {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
         </button>
+        {DEMO_ENABLED && mode === "login" && <button className="demo-link" type="button" onClick={openDemoWorkspace} disabled={busy}>
+          <Sparkles size={14} /> {busy ? "Opening demo workspace…" : "Just exploring? Open the demo workspace"}
+        </button>}
       </section>
     </main>
   );
