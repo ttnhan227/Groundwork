@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.mistral.ai/v1"
     llm_model: str = "mistral-small-latest"
+    vision_model: str = "mistral-small-latest"
+    vision_max_pages: int = 6
     llm_timeout_seconds: int = 60
     ai_daily_request_limit: int = 100
     request_rate_limit_per_minute: int = 120

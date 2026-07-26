@@ -53,7 +53,7 @@ def test_comparison_never_calls_unreadable_image_document_identical() -> None:
     assert similarity == 0
     assert insufficient
     assert "complete comparison is not possible" in prefix.lower()
-    assert any("images were not semantically compared" in warning for warning in warnings)
+    assert any("images were not semantically compared" in warning.lower() for warning in warnings)
 
 
 @pytest.mark.asyncio

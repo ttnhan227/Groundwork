@@ -1,5 +1,7 @@
+import base64
 import uuid
 
+import fitz
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -17,7 +19,9 @@ from app.rag import (
     cited_sources,
     embed_texts_async,
     generate_answer,
+    generate_visual_answer,
     is_casual_message,
+    requires_visual_answer,
     relevant_snippet,
 )
 from app.schemas import (
@@ -30,8 +34,26 @@ from app.schemas import (
     MessageResponse,
 )
 from app.usage import record_ai_usage
+from app.storage import ObjectStorage
 
 router = APIRouter(prefix="/conversations", tags=["RAG chat"])
+
+
+def _visual_sources(documents: list[Document], limit: int) -> list[tuple[Document, int, str]]:
+    sources: list[tuple[Document, int, str]] = []
+    storage = ObjectStorage()
+    for document in documents:
+        pdf = fitz.open(stream=storage.download(document.object_key), filetype="pdf")
+        try:
+            for index, page in enumerate(pdf):
+                if len(sources) >= limit:
+                    return sources
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(1.35, 1.35), alpha=False)
+                encoded = base64.b64encode(pixmap.tobytes("jpeg", jpg_quality=80)).decode("ascii")
+                sources.append((document, index + 1, f"data:image/jpeg;base64,{encoded}"))
+        finally:
+            pdf.close()
+    return sources
 
 
 def serialize(conversation: Conversation) -> ConversationResponse:
@@ -162,31 +184,48 @@ async def ask_question(
         await session.commit()
         return ChatResponse(answer=answer, citations=[])
 
-    retrieval_query = build_retrieval_query(payload.question, history)
-    query_vector = (await embed_texts_async([retrieval_query]))[0]
     settings = get_settings()
-    chunks = list(await session.scalars(
-        select(DocumentChunk)
-        .join(Document, Document.id == DocumentChunk.document_id)
-        .where(
-            DocumentChunk.document_id.in_(document_ids),
-            Document.owner_id == user.id,
-        )
-        .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
-        .limit(settings.rag_top_k)
-    ))
-    if not chunks:
-        raise HTTPException(status_code=409, detail="The selected documents have no searchable text")
+    visual_mode = requires_visual_answer(payload.question)
+    chunks: list[DocumentChunk] = []
+    if not visual_mode:
+        retrieval_query = build_retrieval_query(payload.question, history)
+        query_vector = (await embed_texts_async([retrieval_query]))[0]
+        chunks = list(await session.scalars(
+            select(DocumentChunk)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(
+                DocumentChunk.document_id.in_(document_ids),
+                Document.owner_id == user.id,
+            )
+            .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
+            .limit(settings.rag_top_k)
+        ))
+        visual_mode = not chunks
     await record_ai_usage(user, "chat", session)
     try:
-        raw_answer = await generate_answer(payload.question, [chunk.text for chunk in chunks], history)
+        visual_sources = _visual_sources(conversation.documents, settings.vision_max_pages) if visual_mode else []
+        if visual_mode and not visual_sources:
+            raise HTTPException(status_code=409, detail="The selected documents contain no readable pages")
+        raw_answer = (
+            await generate_visual_answer(
+                payload.question,
+                [(document.filename, page, data_url) for document, page, data_url in visual_sources],
+                history,
+            )
+            if visual_mode
+            else await generate_answer(payload.question, [chunk.text for chunk in chunks], history)
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (httpx.HTTPError, KeyError, IndexError) as exc:
         raise HTTPException(status_code=502, detail="The configured language model is unavailable") from exc
     cited_chunks = cited_sources(raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number))
-    if not cited_chunks and not answer_declines_context(raw_answer):
-        cited_chunks = chunks[:1]
+    cited_visuals = cited_sources(raw_answer, visual_sources, lambda item: (item[0].id, item[1]))
+    if not cited_chunks and not cited_visuals and not answer_declines_context(raw_answer):
+        if visual_mode:
+            cited_visuals = visual_sources[:1]
+        else:
+            cited_chunks = chunks[:1]
     answer = clean_user_answer(raw_answer)
     user_message = Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question)
     assistant_message = Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer)
@@ -205,9 +244,18 @@ async def ask_question(
     ]
     session.add_all(citations)
     await session.commit()
+    visual_citations = [
+        CitationResponse(
+            document_id=document.id,
+            document_name=document.filename,
+            page_number=page_number,
+            snippet="Visual analysis of this rendered PDF page.",
+        )
+        for document, page_number, _ in cited_visuals
+    ]
     return ChatResponse(
         answer=answer,
-        citations=[
+        citations=visual_citations or [
             CitationResponse(
                 document_id=chunk.document_id,
                 document_name=names[chunk.document_id],

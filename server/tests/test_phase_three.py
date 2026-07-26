@@ -10,6 +10,7 @@ from app.rag import (
     cited_sources,
     embed_texts,
     generate_answer,
+    requires_visual_answer,
     is_casual_message,
     relevant_snippet,
 )
@@ -85,6 +86,12 @@ def test_casual_messages_are_detected_without_matching_real_questions() -> None:
     assert is_casual_message("Hi!")
     assert is_casual_message("thank you")
     assert not is_casual_message("Tell me the school name")
+
+
+def test_visual_questions_are_routed_to_page_image_analysis() -> None:
+    assert requires_visual_answer("Who is the character in this PDF?")
+    assert requires_visual_answer("What is shown in the picture?")
+    assert not requires_visual_answer("What is the payment deadline?")
 
 
 def test_follow_up_retrieval_includes_recent_subject() -> None:
