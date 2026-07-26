@@ -1,5 +1,48 @@
 # InsightPDF Version 2 Product Roadmap
 
+## Updated release focus — Document Preparation Copilot
+
+Version 2 is intentionally narrowed to one complete, commercially testable
+workflow:
+
+> Prepare PDFs for safe external sharing from one plain-language request.
+
+The release loop is upload → inspect → propose → approve → execute in order →
+verify → download with a change report. InsightPDF will first serve operations,
+legal, HR, and compliance users who repeatedly prepare document packages.
+
+### Version 2 committed scope
+
+1. A registered, schema-validated catalog of deterministic preparation tools
+2. Natural-language planning with visible parameters, risk, cost, and verification
+3. Explicit approval for destructive or sensitive steps
+4. Ordered execution against copies; original files are never overwritten
+5. Compression, rotation, page removal/extraction, numbering, and watermarking
+6. Blank-page, orientation, and sensitive-text inspection with user correction
+7. Permanent redaction with extraction-based verification
+8. Multi-file batch execution with per-file outcomes
+9. Downloadable prepared PDFs and human-readable change reports
+10. Saved reusable preparation presets
+
+### Release sequence
+
+- **V2 Preview:** safe planning, ordered execution of core preparation tools,
+  per-step PDF validation, downloadable results, and embedded change-report data.
+- **V2 Beta:** document inspection, reviewable redaction, batch preparation, and
+  visible change reports.
+- **V2 Release:** saved presets, recovery, accessibility, security testing, and
+  validation with recurring real-user workflows.
+
+### Explicitly deferred
+
+Arbitrary PDF content editing, broad annotation, full Office conversion parity,
+form creation, personal signatures, signature requests, and consumer-style
+collections of every PDF utility do not block Version 2. They will be reconsidered
+only when repeated customer behavior supports them.
+
+The broader plan below remains a capability reference, not the Version 2 release
+commitment.
+
 ## Product direction
 
 Version 1 established InsightPDF as an AI-powered PDF workspace. Version 2 will

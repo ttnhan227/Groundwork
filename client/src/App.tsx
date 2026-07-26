@@ -49,6 +49,15 @@ type AIResult = {
   created_at: string;
 };
 type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; created_at: string };
+type WorkflowPlan = {
+  id: string;
+  status: string;
+  command: string;
+  document_id: string;
+  confirmation_required: boolean;
+  estimated_ai_calls: number;
+  steps: Array<{ id: string; tool: string; title: string; parameters: Record<string, unknown>; risk: string; confirmation_required: boolean; verification: string }>;
+};
 type Stats = { document_count: number; page_count: number; storage_bytes: number; ai_requests: number; generated_files: number; failed_jobs: number };
 type AdminUser = AuthResult["user"] & Stats & { created_at: string };
 const authSchema = z.object({
@@ -904,6 +913,75 @@ function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void
   </section></div>;
 }
 
+function CopilotWorkspace({ documents, token, onClose }: { documents: DocumentItem[]; token: string; onClose: () => void }) {
+  const [documentId, setDocumentId] = useState(documents[0]?.id ?? "");
+  const [command, setCommand] = useState("");
+  const [plan, setPlan] = useState<WorkflowPlan | null>(null);
+  const [approved, setApproved] = useState(false);
+  const [artifact, setArtifact] = useState<Artifact | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function propose(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true); setError(""); setPlan(null); setArtifact(null); setApproved(false);
+    try {
+      setPlan(await api<WorkflowPlan>("/workflows/plan", token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command, document_id: documentId }),
+      }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not create a safe plan");
+    } finally { setBusy(false); }
+  }
+
+  async function execute() {
+    if (!plan) return;
+    setBusy(true); setError("");
+    try {
+      const queued = await api<Job>("/workflows/execute", token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: plan.command, document_id: plan.document_id, approved }),
+      });
+      const completed = await waitForJob(queued, token);
+      setArtifact(await api<Artifact>(`/pdf-tools/artifacts/${completed.result_id}`, token));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Workflow execution failed");
+    } finally { setBusy(false); }
+  }
+
+  return <div className="copilot-shell">
+    <button className="history-backdrop" aria-label="Close document copilot" onClick={onClose} />
+    <section className="copilot-panel" role="dialog" aria-modal="true" aria-label="Document copilot">
+      <header>
+        <div><p className="eyebrow">InsightPDF 2</p><h2>Document copilot</h2><span>Describe the outcome. Review every step before anything runs.</span></div>
+        <button aria-label="Close document copilot" onClick={onClose}><X size={18} /></button>
+      </header>
+      <form onSubmit={propose}>
+        <label>Work on<select value={documentId} onChange={(event) => setDocumentId(event.target.value)} required>
+          {documents.map((document) => <option key={document.id} value={document.id}>{document.filename}</option>)}
+        </select></label>
+        <label>What do you want to do?<textarea value={command} onChange={(event) => setCommand(event.target.value)} minLength={3} required placeholder="Rotate pages 2-3, add page numbers, then compress the PDF strongly" /></label>
+        <div className="copilot-examples"><button type="button" onClick={() => setCommand("Compress the PDF with balanced quality")}>Compress</button><button type="button" onClick={() => setCommand("Add page numbers at the bottom")}>Number pages</button><button type="button" onClick={() => setCommand("Summarize the key points")}>Summarize</button></div>
+        {error && <div className="form-error">{error}</div>}
+        <button className="copilot-primary" disabled={busy}>{busy ? "Inspecting request…" : "Create safe plan"}<Sparkles size={16} /></button>
+      </form>
+      {plan && <section className="plan-preview">
+        <div className="plan-heading"><div><span>PROPOSED PLAN</span><strong>{plan.steps.length} step{plan.steps.length === 1 ? "" : "s"}</strong></div><b>{plan.estimated_ai_calls ? `${plan.estimated_ai_calls} AI call` : "No AI cost"}</b></div>
+        <ol>{plan.steps.map((step) => <li key={step.id}>
+          <i>{step.id.replace("step-", "")}</i><div><strong>{step.title}</strong><span>{Object.entries(step.parameters).filter(([key]) => key !== "document_id").map(([key, value]) => `${key.replaceAll("_", " ")}: ${Array.isArray(value) ? value.join(", ") || "all" : String(value)}`).join(" · ") || "Default settings"}</span><small><ShieldCheck size={12} /> Verify: {step.verification.replaceAll("_", " ")}{step.confirmation_required ? " · Confirmation required" : ""}</small></div><b className={`risk-${step.risk}`}>{step.risk}</b>
+        </li>)}</ol>
+        {plan.confirmation_required && <label className="approval-check"><input type="checkbox" checked={approved} onChange={(event) => setApproved(event.target.checked)} /><span>I reviewed and approve the destructive steps above.</span></label>}
+        <button className="execute-plan" disabled={busy || (plan.confirmation_required && !approved)} onClick={execute}>{busy ? <><RefreshCw size={15} className="spin" /> Running workflow…</> : <><Check size={15} /> Approve and run</>}</button>
+        <p>InsightPDF validates ownership and parameters again, executes each step in order, and verifies the PDF after every change.</p>
+      </section>}
+      {artifact && <section className="workflow-result"><Check size={24} /><div><strong>Workflow verified</strong><span>{artifact.filename} · {(artifact.size_bytes / 1024).toFixed(1)} KB</span></div><button onClick={() => downloadArtifact(artifact, token).catch((reason) => setError(reason.message))}><Download size={15} /> Download</button></section>}
+    </section>
+  </div>;
+}
+
 function WorkspaceApp() {
   const [initialAuth] = useState<AuthResult | null>(() => {
     if (typeof window === "undefined") return null;
@@ -934,6 +1012,7 @@ function WorkspaceApp() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1132,6 +1211,7 @@ function WorkspaceApp() {
         <div className="workspace-title">
           <div><p className="eyebrow">Document workspace</p><h1>Your PDFs</h1><p>Text extraction and OCR run safely in the background.</p></div>
           <div className="workspace-actions">
+            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setCopilotOpen(true)}><BrainCircuit size={16} /> Ask copilot</button>
             <button disabled={!documents.some((item) => item.status === "ready")} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={16} /> PDF tools</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={16} /> Compare PDFs</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setMultiChatOpen(true)}><Sparkles size={16} /> Ask multiple PDFs</button>
@@ -1203,6 +1283,7 @@ function WorkspaceApp() {
         localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
       }} onClose={() => setAccountOpen(false)} />}
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
+      {copilotOpen && <CopilotWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setCopilotOpen(false)} />}
       {folderOpen && <MyFolder documents={documents} token={token} onDocuments={setDocuments} onClose={() => setFolderOpen(false)} />}
     </main>
   );

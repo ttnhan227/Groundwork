@@ -1,6 +1,6 @@
-# InsightPDF
+# InsightPDF 2
 
-InsightPDF is a portfolio-ready AI PDF workspace for uploading, understanding,
+InsightPDF 2 is an AI document copilot and PDF workspace for uploading, understanding,
 comparing, organizing, and transforming PDF documents. It combines asynchronous
 document processing, retrieval-augmented generation, OCR, private object storage,
 structured AI outputs, and practical PDF tools in one Docker Compose application.
@@ -9,6 +9,8 @@ structured AI outputs, and practical PDF tools in one Docker Compose application
 
 ## Features
 
+- Versioned document-tool registry and natural-language, review-before-run workflow plans
+- PDF compression presets and configurable page numbering with deterministic output verification
 - Registration, login, rotating hashed refresh tokens, logout, profile and password management
 - Owner-isolated PDF upload, rename, search, filtering, deletion and authenticated downloads
 - Asynchronous PyMuPDF extraction, Tesseract OCR fallback, chunking and local embeddings

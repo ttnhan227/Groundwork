@@ -515,3 +515,73 @@ button { color: inherit; }
   .folder-item { grid-template-columns: 38px minmax(0, 1fr); }.folder-actions { grid-column: 2; }.folder-panel > nav { overflow-x: auto; }
   .dashboard-cards { grid-template-columns: repeat(2, 1fr); }.document-filters { flex-direction: column; }.profile-forms { grid-template-columns: 1fr; }.account-stats { grid-template-columns: repeat(2, 1fr); }
 }
+.copilot-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.copilot-panel {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid rgba(126, 107, 255, .22);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 32px 90px rgba(30, 25, 69, .3);
+}
+
+.copilot-panel > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 30px 22px;
+  color: #fff;
+  background: linear-gradient(135deg, #211a4f, #5d48ca);
+}
+
+.copilot-panel > header h2 { margin: 3px 0 6px; font-size: 27px; }
+.copilot-panel > header span { color: rgba(255,255,255,.75); font-size: 13px; }
+.copilot-panel > header button { align-self: flex-start; color: #fff; background: rgba(255,255,255,.12); }
+.copilot-panel form { display: grid; gap: 16px; padding: 24px 30px; }
+.copilot-panel label { display: grid; gap: 7px; color: #514d66; font-size: 12px; font-weight: 700; }
+.copilot-panel select, .copilot-panel textarea { width: 100%; border: 1px solid #dedbea; border-radius: 11px; padding: 11px 12px; background: #fbfaff; color: #211f2c; font: inherit; }
+.copilot-panel textarea { min-height: 92px; resize: vertical; }
+.copilot-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.copilot-examples button { padding: 7px 11px; border: 1px solid #e4e0f5; border-radius: 999px; color: #5b4ab0; background: #f7f5ff; font-size: 12px; }
+.copilot-primary { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 43px; border-radius: 11px; color: #fff; background: #5e4bc6; }
+.copilot-launch { color: #fff !important; background: #5e4bc6 !important; border-color: #5e4bc6 !important; }
+.plan-preview { margin: 0 30px 30px; padding: 20px; border: 1px solid #e5e1f3; border-radius: 16px; background: #faf9fe; }
+.plan-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.plan-heading div { display: grid; gap: 3px; }
+.plan-heading span { color: #7769b3; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.plan-heading > b { padding: 5px 9px; border-radius: 999px; color: #297057; background: #e9f7f1; font-size: 11px; }
+.plan-preview ol { display: grid; gap: 9px; margin: 16px 0; padding: 0; list-style: none; }
+.plan-preview li { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 11px; padding: 12px; border: 1px solid #ebe8f5; border-radius: 12px; background: #fff; }
+.plan-preview li > i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; color: #fff; background: #6653c7; font-style: normal; font-size: 12px; font-weight: 800; }
+.plan-preview li div { display: grid; gap: 3px; min-width: 0; }
+.plan-preview li span { overflow: hidden; color: #686477; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.plan-preview li small { display: flex; align-items: center; gap: 4px; color: #817c91; font-size: 10px; }
+.plan-preview li > b { padding: 4px 7px; border-radius: 999px; font-size: 10px; text-transform: uppercase; }
+.risk-low { color: #267058; background: #e9f7f1; }
+.risk-medium { color: #9b6519; background: #fff4d9; }
+.plan-preview > p { margin: 0; color: #777284; font-size: 11px; line-height: 1.55; }
+.approval-check { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 8px !important; margin: 0 0 12px; padding: 10px; border-radius: 10px; background: #fff4d9; }
+.approval-check input { width: 16px; height: 16px; }
+.execute-plan { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-bottom: 10px; padding: 11px; border-radius: 10px; color: #fff; background: #2c7a5c; }
+.execute-plan:disabled { opacity: .5; }
+.workflow-result { display: flex; align-items: center; gap: 12px; margin: 0 30px 30px; padding: 16px; border: 1px solid #bfe5d5; border-radius: 14px; color: #236448; background: #effaf5; }
+.workflow-result div { display: grid; flex: 1; gap: 3px; }
+.workflow-result span { font-size: 12px; color: #567468; }
+.workflow-result button { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-radius: 9px; color: #fff; background: #287458; }
+
+@media (max-width: 640px) {
+  .copilot-shell { padding: 0; }
+  .copilot-panel { max-height: 100vh; height: 100vh; border-radius: 0; }
+  .copilot-panel > header, .copilot-panel form { padding-left: 20px; padding-right: 20px; }
+  .plan-preview { margin-left: 20px; margin-right: 20px; }
+}

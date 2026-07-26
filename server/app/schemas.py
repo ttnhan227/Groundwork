@@ -83,7 +83,7 @@ class OperationJobCreate(BaseModel):
         pattern=(
             "^(summary|quiz|extraction|translation|comparison|merge|split|rotate|"
             "delete_pages|extract_pages|pdf_to_images|images_to_pdf|watermark|"
-            "pdf_to_docx|docx_to_pdf|docx_to_markdown)$"
+            "pdf_to_docx|docx_to_pdf|docx_to_markdown|compress_pdf|add_page_numbers|workflow)$"
         )
     )
     parameters: dict
@@ -94,6 +94,35 @@ class OperationJobCreate(BaseModel):
         if len(str(value)) > 20_000:
             raise ValueError("Job parameters are too large")
         return value
+
+
+class WorkflowPlanRequest(BaseModel):
+    command: str = Field(min_length=3, max_length=2000)
+    document_id: uuid.UUID
+
+
+class WorkflowExecuteRequest(WorkflowPlanRequest):
+    approved: bool = False
+
+
+class WorkflowStep(BaseModel):
+    id: str
+    tool: str
+    title: str
+    parameters: dict
+    risk: str
+    confirmation_required: bool
+    verification: str
+
+
+class WorkflowPlanResponse(BaseModel):
+    id: uuid.UUID
+    status: str
+    command: str
+    document_id: uuid.UUID
+    steps: list[WorkflowStep]
+    confirmation_required: bool
+    estimated_ai_calls: int
 
 
 class ConversationCreate(BaseModel):

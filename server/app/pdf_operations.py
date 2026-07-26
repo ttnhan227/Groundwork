@@ -186,3 +186,46 @@ def watermark_pdf(
         return document.tobytes(garbage=4, deflate=True)
     finally:
         document.close()
+
+
+def compress_pdf(data: bytes, preset: str = "balanced") -> bytes:
+    if preset not in {"basic", "balanced", "strong"}:
+        raise ValueError("Compression preset must be basic, balanced, or strong")
+    document = fitz.open(stream=data, filetype="pdf")
+    try:
+        # PyMuPDF's safe structural compression preserves searchable text. Stronger
+        # presets additionally clean duplicate and unreachable objects.
+        garbage = {"basic": 2, "balanced": 3, "strong": 4}[preset]
+        return document.tobytes(garbage=garbage, deflate=True, deflate_images=True, deflate_fonts=True)
+    finally:
+        document.close()
+
+
+def add_page_numbers(
+    data: bytes,
+    page_numbers: list[int] | None = None,
+    position: str = "bottom_center",
+    start_number: int = 1,
+) -> bytes:
+    document = fitz.open(stream=data, filetype="pdf")
+    try:
+        pages = _validated_pages(document, page_numbers)
+        alignments = {
+            "bottom_left": (fitz.TEXT_ALIGN_LEFT, False),
+            "bottom_center": (fitz.TEXT_ALIGN_CENTER, False),
+            "bottom_right": (fitz.TEXT_ALIGN_RIGHT, False),
+            "top_left": (fitz.TEXT_ALIGN_LEFT, True),
+            "top_center": (fitz.TEXT_ALIGN_CENTER, True),
+            "top_right": (fitz.TEXT_ALIGN_RIGHT, True),
+        }
+        if position not in alignments:
+            raise ValueError("Invalid page-number position")
+        alignment, top = alignments[position]
+        for offset, page_number in enumerate(pages):
+            page = document[page_number - 1]
+            y = 18 if top else page.rect.height - 30
+            box = fitz.Rect(28, y, page.rect.width - 28, y + 16)
+            page.insert_textbox(box, str(start_number + offset), fontsize=10, color=(.2, .2, .2), align=alignment, overlay=True)
+        return document.tobytes(garbage=4, deflate=True)
+    finally:
+        document.close()
