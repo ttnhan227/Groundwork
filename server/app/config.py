@@ -33,9 +33,15 @@ class Settings(BaseSettings):
     vision_model: str = "mistral-small-latest"
     vision_max_pages: int = 6
     llm_timeout_seconds: int = 60
-    ai_daily_request_limit: int = 100
+    ai_daily_request_limit: int = 10
+    ai_global_daily_request_limit: int = 100
     request_rate_limit_per_minute: int = 120
+    registration_rate_limit_per_hour: int = 5
+    ai_rate_limit_per_minute: int = 10
     max_documents_per_user: int = 100
+    daily_upload_limit_per_user: int = 10
+    global_daily_upload_limit: int = 100
+    registration_enabled: bool = True
     demo_email: str = "demo@insightpdf.dev"
     demo_password: str = "DemoPassword123!"
     admin_email: str = ""

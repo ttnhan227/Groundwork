@@ -2,12 +2,11 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 async function signInDemo(page: Page) {
-  await page.goto("/");
-  await expect(page.getByText("Portfolio demo")).toBeVisible();
+  await page.goto("/?app=1");
   await page.getByLabel("Email").fill("demo@insightpdf.dev");
   await page.getByLabel("Password").fill("DemoPassword123!");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Your PDFs" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your Documents" })).toBeVisible();
   await expect(page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" })).toBeVisible();
 }
 
@@ -18,10 +17,9 @@ test("recruiter can sign in, inspect seeded documents, and open the PDF viewer",
   await expect(page.getByRole("dialog", { name: "Processing jobs" })).toBeVisible();
   await page.locator(".jobs-panel header").getByRole("button", { name: "Close processing jobs" }).click();
   const card = page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" });
-  await card.getByRole("button", { name: "Open PDF" }).click();
-  await expect(page.getByRole("dialog").getByText("employee-handbook-v1.pdf")).toBeVisible();
-  await expect(page.getByLabel("Search PDF")).toBeVisible();
-  await expect(page.locator(".viewer-stage canvas")).toBeVisible();
+  await card.getByRole("button", { name: "Open employee-handbook-v1.pdf" }).click();
+  await expect(page.getByRole("dialog", { name: "Preview employee-handbook-v1.pdf" })).toBeVisible();
+  await expect(page.locator(".artifact-viewer iframe")).toBeVisible();
 });
 
 test("new user can register, upload a real PDF, and wait for indexing", async ({ page, request }) => {
@@ -38,14 +36,14 @@ test("new user can register, upload a real PDF, and wait for indexing", async ({
   });
   const sourcePdf = await sourceResponse.body();
 
-  await page.goto("/");
+  await page.goto("/?app=1");
   await page.getByRole("button", { name: "Need an account? Register" }).click();
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await page.getByLabel("Display name").fill("Playwright User");
   await page.getByLabel("Email").fill(`playwright-${suffix}@example.com`);
   await page.getByLabel("Password").fill("PlaywrightPassword!42");
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("heading", { name: "Your PDFs" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your Documents" })).toBeVisible();
 
   await page.locator('input[type="file"][accept*="pdf"]').setInputFiles({
     name: "playwright-upload.pdf",
@@ -75,13 +73,15 @@ test("live AI flow returns citations and a cached summary", async ({ page }) => 
   test.skip(!process.env.RUN_LIVE_AI_E2E, "Set RUN_LIVE_AI_E2E=1 when a funded LLM is configured");
   await signInDemo(page);
   const card = page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" });
-  await card.getByRole("button", { name: "Ask AI" }).click();
+  await card.getByRole("button", { name: "More actions for employee-handbook-v1.pdf" }).click();
+  await page.getByRole("navigation", { name: "Actions for employee-handbook-v1.pdf" }).getByRole("button", { name: "Ask AI" }).click();
   const question = page.getByLabel("Question");
   await question.fill("What is the remote work policy?");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("button", { name: /Page 1/ })).toBeVisible({ timeout: 120_000 });
   await page.getByRole("button", { name: "Close chat" }).click();
-  await card.getByRole("button", { name: "AI tools" }).click();
+  await card.getByRole("button", { name: "More actions for employee-handbook-v1.pdf" }).click();
+  await page.getByRole("navigation", { name: "Actions for employee-handbook-v1.pdf" }).getByRole("button", { name: "AI tools" }).click();
   await page.getByRole("button", { name: "Generate" }).click();
   await expect(page.locator(".ai-result")).toBeVisible({ timeout: 120_000 });
 });

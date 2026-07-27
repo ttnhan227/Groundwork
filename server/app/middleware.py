@@ -50,19 +50,36 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
         settings = get_settings()
-        address = request.client.host if request.client else "unknown"
+        forwarded = request.headers.get("x-forwarded-for", "")
+        address = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "unknown")
         minute = int(time.time() // 60)
-        key = f"rate:{address}:{minute}"
+        path = request.url.path
+        if path.endswith("/auth/register"):
+            window = int(time.time() // 3600)
+            key = f"rate:register:{address}:{window}"
+            limit = settings.registration_rate_limit_per_hour
+            expiry = 3700
+            retry_after = "3600"
+        elif any(segment in path for segment in ("/chat", "/ai/", "/jobs")) and request.method == "POST":
+            key = f"rate:ai:{address}:{minute}"
+            limit = settings.ai_rate_limit_per_minute
+            expiry = 70
+            retry_after = "60"
+        else:
+            key = f"rate:all:{address}:{minute}"
+            limit = settings.request_rate_limit_per_minute
+            expiry = 70
+            retry_after = "60"
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
         try:
             count = await redis.incr(key)
             if count == 1:
-                await redis.expire(key, 70)
-            if count > settings.request_rate_limit_per_minute:
+                await redis.expire(key, expiry)
+            if count > limit:
                 return JSONResponse(
                     status_code=429,
                     content={"error": {"code": "RATE_LIMITED", "message": "Too many requests. Try again shortly.", "details": {}}},
-                    headers={"Retry-After": "60"},
+                    headers={"Retry-After": retry_after},
                 )
         except Exception:
             pass

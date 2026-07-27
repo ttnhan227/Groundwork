@@ -2,6 +2,7 @@ import re
 import tempfile
 import uuid
 import zipfile
+from datetime import UTC, datetime
 
 import fitz
 from io import BytesIO
@@ -228,6 +229,20 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
 ) -> Document:
     settings = get_settings()
+    today = datetime.now(UTC).date()
+    daily_user_uploads = await session.scalar(
+        select(func.count(Document.id)).where(
+            Document.owner_id == user.id,
+            func.date(Document.created_at) == today,
+        )
+    )
+    if (daily_user_uploads or 0) >= settings.daily_upload_limit_per_user:
+        raise HTTPException(status_code=429, detail="Daily upload limit reached")
+    daily_global_uploads = await session.scalar(
+        select(func.count(Document.id)).where(func.date(Document.created_at) == today)
+    )
+    if (daily_global_uploads or 0) >= settings.global_daily_upload_limit:
+        raise HTTPException(status_code=429, detail="The preview has reached its daily upload limit")
     document_count = await session.scalar(select(func.count(Document.id)).where(Document.owner_id == user.id))
     if (document_count or 0) >= settings.max_documents_per_user:
         raise HTTPException(status_code=422, detail=f"Document limit reached ({settings.max_documents_per_user})")

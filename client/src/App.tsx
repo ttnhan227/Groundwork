@@ -10,6 +10,7 @@ const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 
 const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 const DEMO_ENABLED = (import.meta.env.VITE_DEMO_ENABLED ?? "true").toLowerCase() !== "false";
+const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
 
 type DocumentItem = {
   id: string;
@@ -433,7 +434,7 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory,
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [artifact?.id, document, initialPage, isImage, isPdf, isText, token]);
+  }, [artifact, document, initialPage, isImage, isPdf, isText, token]);
 
   return <div className="artifact-viewer-wrap">
     <button className="history-backdrop" aria-label="Close file preview" onClick={onClose} />
@@ -457,6 +458,8 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory,
   </div>;
 }
 
+// Kept temporarily as the richer canvas viewer fallback while the native PDF viewer is evaluated.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { document: DocumentItem; token: string; initialPage?: number; onHistory: () => void; onClose: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
@@ -871,6 +874,8 @@ async function downloadDocumentArchive(documents: DocumentItem[], token: string,
   URL.revokeObjectURL(url);
 }
 
+// Kept temporarily for migration reference until the unified workspace rollout is finalized.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MyFolder({ documents, token, onDocuments, onClose }: {
   documents: DocumentItem[];
   token: string;
@@ -1610,9 +1615,9 @@ function WorkspaceApp() {
             <small>The free demo server may take up to 30 seconds to wake. Please keep this page open.</small>
           </div>
         </div>}
-        <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
+        {(REGISTRATION_ENABLED || mode === "register") && <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
           {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
-        </button>
+        </button>}
         {DEMO_ENABLED && mode === "login" && <button className="demo-link" type="button" onClick={openDemoWorkspace} disabled={busy}>
           <Sparkles size={14} /> {busy ? "Opening demo workspace…" : "Just exploring? Open the demo workspace"}
         </button>}

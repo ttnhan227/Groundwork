@@ -17,6 +17,15 @@ async def record_ai_usage(user: User, feature: str, session: AsyncSession, cache
             AIUsageRecord.cached.is_(False),
         )
     )
-    if not cached and (used or 0) >= get_settings().ai_daily_request_limit:
+    settings = get_settings()
+    if not cached and (used or 0) >= settings.ai_daily_request_limit:
         raise HTTPException(status_code=429, detail="Daily AI request limit reached")
+    global_used = await session.scalar(
+        select(func.count(AIUsageRecord.id)).where(
+            func.date(AIUsageRecord.created_at) == today,
+            AIUsageRecord.cached.is_(False),
+        )
+    )
+    if not cached and (global_used or 0) >= settings.ai_global_daily_request_limit:
+        raise HTTPException(status_code=429, detail="The preview has reached its daily AI limit")
     session.add(AIUsageRecord(owner_id=user.id, feature=feature, cached=cached))

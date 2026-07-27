@@ -29,6 +29,8 @@ async def issue_tokens(user: User, session: AsyncSession) -> TokenResponse:
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
+    if not get_settings().registration_enabled:
+        raise HTTPException(status_code=403, detail="Public registration is currently disabled")
     existing = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
