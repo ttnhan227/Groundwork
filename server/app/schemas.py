@@ -171,7 +171,8 @@ class ConversationCreate(BaseModel):
 
 
 class ConversationUpdate(BaseModel):
-    title: str = Field(min_length=1, max_length=160)
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    document_ids: list[uuid.UUID] | None = Field(default=None, max_length=20)
 
 
 class CitationResponse(BaseModel):

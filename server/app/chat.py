@@ -147,14 +147,26 @@ async def create_conversation(
 
 
 @router.patch("/{conversation_id}", response_model=ConversationResponse)
-async def rename_conversation(
+async def update_conversation(
     conversation_id: uuid.UUID,
     payload: ConversationUpdate,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
     conversation = await owned_conversation(conversation_id, user, session)
-    conversation.title = payload.title.strip()
+    if payload.title is not None:
+        conversation.title = payload.title.strip()
+    if payload.document_ids is not None:
+        documents = list(await session.scalars(
+            select(Document).where(
+                Document.id.in_(payload.document_ids),
+                Document.owner_id == user.id,
+                Document.status == DocumentStatus.READY,
+            )
+        ))
+        if len(documents) != len(set(payload.document_ids)):
+            raise HTTPException(status_code=422, detail="Every selected document must be owned by you and ready")
+        conversation.documents = documents
     await session.commit()
     return serialize(await owned_conversation(conversation_id, user, session))
 

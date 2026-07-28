@@ -36,6 +36,10 @@ test("includes Phase 3 chat and citation navigation", async () => {
   assert.match(page, /document_ids: selected/);
   assert.match(page, /Your session expired\. Please log in again\./);
   assert.match(page, /response\.status === 401/);
+  assert.match(page, /AUTH_REFRESHED_EVENT/);
+  assert.match(page, /authenticatedFetch/);
+  assert.match(page, /\/auth\/refresh/);
+  assert.match(page, /saved\.access_token !== token/);
   assert.match(css, /\.chat-panel/);
   assert.match(css, /\.history-panel/);
   assert.match(css, /\.viewer-sidebar/);

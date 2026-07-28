@@ -80,19 +80,61 @@ const authSchema = z.object({
 type AuthFields = z.infer<typeof authSchema>;
 
 const AUTH_EXPIRED_EVENT = "insightpdf-auth-expired";
+const AUTH_REFRESHED_EVENT = "insightpdf-auth-refreshed";
+let refreshPromise: Promise<AuthResult> | null = null;
 
 function expireSession() {
   localStorage.removeItem("insightpdf-auth");
   window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 }
 
+async function refreshSession(): Promise<AuthResult> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+    if (!saved?.refresh_token) {
+      expireSession();
+      throw new Error("Your session expired. Please log in again.");
+    }
+    const response = await fetch(`${API}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: saved.refresh_token }),
+    });
+    if (!response.ok) {
+      if ([400, 401, 403].includes(response.status)) expireSession();
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.detail ?? "Could not refresh your session");
+    }
+    const refreshed = await response.json() as AuthResult;
+    localStorage.setItem("insightpdf-auth", JSON.stringify(refreshed));
+    window.dispatchEvent(new CustomEvent<AuthResult>(AUTH_REFRESHED_EVENT, { detail: refreshed }));
+    return refreshed;
+  })().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function authenticatedFetch(input: RequestInfo | URL, token: string, init: RequestInit = {}): Promise<Response> {
+  const send = (accessToken: string) => {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    return fetch(input, { ...init, headers });
+  };
+  let response = await send(token);
+  if (response.status !== 401) return response;
+
+  const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+  const refreshed = saved?.access_token && saved.access_token !== token ? saved : await refreshSession();
+  response = await send(refreshed.access_token);
+  if (response.status === 401) expireSession();
+  return response;
+}
+
 async function api<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
-  });
+  const response = token
+    ? await authenticatedFetch(`${API}${path}`, token, init)
+    : await fetch(`${API}${path}`, init);
   if (!response.ok) {
-    if (response.status === 401 && token) expireSession();
     const body = await response.json().catch(() => null);
     throw new Error(body?.detail ?? body?.error?.message ?? "Request failed");
   }
@@ -204,7 +246,9 @@ function PhaseFourResult({ value, documents, onPage }: { value: AIResult; docume
     <button className="download-result" onClick={exportResult}><Download size={14} /> Export result</button>
     {value.feature === "translation" && <a className="download-result" href={`${API}/ai/results/${value.id}/download`} onClick={async (event) => {
       event.preventDefault();
-      const response = await fetch(`${API}/ai/results/${value.id}/download`, { headers: { Authorization: `Bearer ${localStorage.getItem("insightpdf-auth") ? (JSON.parse(localStorage.getItem("insightpdf-auth")!).access_token) : ""}` } });
+      const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+      if (!saved?.access_token) return;
+      const response = await authenticatedFetch(`${API}/ai/results/${value.id}/download`, saved.access_token);
       if (!response.ok) return;
       const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = window.document.createElement("a");
       link.href = url; link.download = `${documents.find((item) => item.id === value.document_ids[0])?.filename.replace(/\.pdf$/i, "") ?? "translation"}-translation.md`; link.click(); URL.revokeObjectURL(url);
@@ -327,9 +371,7 @@ function DocumentMiniPreview({ document, token, onOpen }: { document: DocumentIt
   useEffect(() => {
     let objectUrl = "";
     let cancelled = false;
-    fetch(`${API}/documents/${document.id}/thumbnail`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(async (response) => {
+    authenticatedFetch(`${API}/documents/${document.id}/thumbnail`, token).then(async (response) => {
       if (!response.ok) throw new Error("Preview unavailable");
       objectUrl = URL.createObjectURL(await response.blob());
       if (!cancelled) setSource(objectUrl);
@@ -356,9 +398,7 @@ function DocumentCardPreview({ document, token, onOpen }: { document: DocumentIt
     if (document.status !== "ready") return;
     let objectUrl = "";
     let cancelled = false;
-    fetch(`${API}/documents/${document.id}/thumbnail`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(async (response) => {
+    authenticatedFetch(`${API}/documents/${document.id}/thumbnail`, token).then(async (response) => {
       if (!response.ok) throw new Error("Preview unavailable");
       objectUrl = URL.createObjectURL(await response.blob());
       if (!cancelled) setSource(objectUrl);
@@ -386,9 +426,7 @@ function ArtifactCardPreview({ artifact, token, onOpen }: { artifact: Artifact; 
   useEffect(() => {
     let objectUrl = "";
     let cancelled = false;
-    fetch(`${API}/pdf-tools/artifacts/${artifact.id}/thumbnail`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(async (response) => {
+    authenticatedFetch(`${API}/pdf-tools/artifacts/${artifact.id}/thumbnail`, token).then(async (response) => {
       if (!response.ok) throw new Error("Preview unavailable");
       objectUrl = URL.createObjectURL(await response.blob());
       if (!cancelled) setSource(objectUrl);
@@ -436,7 +474,7 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSea
       : isPdf || isImage || isText
         ? `${API}/pdf-tools/artifacts/${artifact!.id}/download`
         : `${API}/pdf-tools/artifacts/${artifact!.id}/thumbnail`;
-    fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
+    authenticatedFetch(endpoint, token).then(async (response) => {
       if (!response.ok) throw new Error("Preview unavailable");
       if (isText) {
         const blob = await response.blob();
@@ -519,9 +557,7 @@ function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClo
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
-        const response = await fetch(`${API}/documents/${document.id}/content`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await authenticatedFetch(`${API}/documents/${document.id}/content`, token);
         if (response.status === 401) expireSession();
         if (!response.ok) throw new Error("Could not load this PDF");
         const total = Number(response.headers.get("content-length")) || 0;
@@ -695,7 +731,7 @@ function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClo
   );
 }
 
-function ChatPanel({
+export function ChatPanel({
   document, documentIds, documentLabel, token, conversation, embedded = false, onClose, onCitation, onChanged, onHistory, onPreview,
 }: {
   document: DocumentItem;
@@ -772,10 +808,9 @@ function ChatPanel({
     ]);
     setBusy(true); setError("");
     try {
-      const response = await fetch(`${API}/conversations/${conversationId}/messages/stream`, {
+      const response = await authenticatedFetch(`${API}/conversations/${conversationId}/messages/stream`, token, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
             Accept: "text/event-stream",
           },
@@ -871,73 +906,24 @@ function ChatPanel({
   </aside>;
 }
 
-function IntegratedChatHub({
-  documents, token, onChanged, onHistory, onPreview, onCitation,
+function HomeChat({
+  token, documents, conversation, initialDocumentIds, onChanged, onHistory, onPreview, onCitation, onUploadFile, onArtifactCreated, onNewChat,
 }: {
-  documents: DocumentItem[];
   token: string;
+  documents: DocumentItem[];
+  conversation?: Conversation | null;
+  initialDocumentIds: string[];
   onChanged: () => void;
   onHistory: () => void;
   onPreview: (document: DocumentItem) => void;
   onCitation: (citation: Citation) => void;
-}) {
-  const [selected, setSelected] = useState<string[]>(documents[0] ? [documents[0].id] : []);
-  const [activeIds, setActiveIds] = useState<string[]>(documents[0] ? [documents[0].id] : []);
-  const [filter, setFilter] = useState("");
-  const chosen = documents.filter((document) => activeIds.includes(document.id));
-  const visible = documents.filter((document) =>
-    [document.display_title ?? "", document.filename, ...document.tags].join(" ").toLowerCase().includes(filter.toLowerCase())
-  );
-
-  useEffect(() => {
-    if (!documents[0] || selected.length || activeIds.length) return;
-    // Documents can arrive after authentication while this view is already mounted.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelected([documents[0].id]);
-    setActiveIds([documents[0].id]);
-  }, [activeIds.length, documents, selected.length]);
-
-  return <section className="integrated-chat-hub">
-    <aside className="chat-source-picker">
-      <header><div><strong>Chat sources</strong><span>Select one or more documents</span></div><b>{selected.length}</b></header>
-      <label><Search size={14} /><input aria-label="Search chat documents" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search files" /></label>
-      <div>{visible.map((document) => <label key={document.id} className={selected.includes(document.id) ? "selected" : ""}>
-        <input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} />
-        <FileText size={16} /><span><strong>{document.display_title || document.filename}</strong><small>{document.page_count ?? "—"} pages</small></span>
-      </label>)}</div>
-      <button disabled={!selected.length || selected.join(",") === activeIds.join(",")} onClick={() => setActiveIds(selected)}><MessageCircle size={15} /> Start chat with {selected.length || 0} {selected.length === 1 ? "file" : "files"}</button>
-    </aside>
-    <main>
-      {chosen.length ? <ChatPanel
-        key={activeIds.join(",")}
-        embedded
-        document={chosen[0]}
-        documentIds={activeIds}
-        documentLabel={chosen.length === 1 ? chosen[0].filename : `${chosen.length} selected documents`}
-        token={token}
-        conversation={null}
-        onChanged={onChanged}
-        onHistory={onHistory}
-        onPreview={() => onPreview(chosen[0])}
-        onCitation={onCitation}
-        onClose={() => undefined}
-      /> : <div className="integrated-chat-empty"><MessageCircle size={30} /><strong>Select a document to begin</strong><span>Your answers will be grounded only in the files you choose.</span></div>}
-    </main>
-  </section>;
-}
-
-function HomeChat({
-  token, documents, onChanged, onOpenDocuments, onUploadFile, onArtifactCreated,
-}: {
-  token: string;
-  documents: DocumentItem[];
-  onChanged: () => void;
-  onOpenDocuments: () => void;
   onUploadFile: (file: File) => Promise<void>;
   onArtifactCreated: (artifact: Artifact) => void;
+  onNewChat: () => void;
 }) {
-  const [conversationId, setConversationId] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState(conversation?.id ?? "");
+  const [messages, setMessages] = useState<ChatMessage[]>(conversation?.messages ?? []);
+  const [selectedIds, setSelectedIds] = useState<string[]>(conversation?.document_ids ?? initialDocumentIds);
   const [draft, setDraft] = useState(() => {
     const pendingPrompt = sessionStorage.getItem("insightpdf-pending-prompt") ?? "";
     sessionStorage.removeItem("insightpdf-pending-prompt");
@@ -950,13 +936,22 @@ function HomeChat({
   const [createTheme, setCreateTheme] = useState("minimal");
   const [sourceId, setSourceId] = useState("");
   const [createdArtifacts, setCreatedArtifacts] = useState<Artifact[]>([]);
+  useEffect(() => {
+    if (!conversation) return;
+    // Restore the complete global conversation, including every attached document.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setConversationId(conversation.id);
+    setMessages(conversation.messages);
+    setSelectedIds(conversation.document_ids);
+    setError("");
+  }, [conversation]);
 
   async function ensureConversation() {
     if (conversationId) return conversationId;
     const conversation = await api<Conversation>("/conversations", token, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "InsightPDF AI chat", document_ids: [] }),
+      body: JSON.stringify({ title: selectedIds.length ? "Document conversation" : "New conversation", document_ids: selectedIds }),
     });
     setConversationId(conversation.id);
     onChanged();
@@ -993,9 +988,9 @@ function HomeChat({
     setError("");
     try {
       const id = await ensureConversation();
-      const response = await fetch(`${API}/conversations/${id}/messages/stream`, {
+      const response = await authenticatedFetch(`${API}/conversations/${id}/messages/stream`, token, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "text/event-stream" },
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ question }),
       });
       if (!response.ok) {
@@ -1015,14 +1010,14 @@ function HomeChat({
           const event = frame.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim();
           const data = frame.split("\n").find((line) => line.startsWith("data:"))?.slice(5).trim();
           if (!event || !data) continue;
-          const payload = JSON.parse(data) as { text?: string; answer?: string; message?: string };
+          const payload = JSON.parse(data) as { text?: string; answer?: string; citations?: Citation[]; message?: string };
           if (event === "token" && payload.text) {
             setMessages((current) => current.map((message, index) =>
               index === current.length - 1 ? { ...message, content: message.content + payload.text } : message
             ));
           } else if (event === "complete" && payload.answer) {
             setMessages((current) => current.map((message, index) =>
-              index === current.length - 1 ? { ...message, content: payload.answer ?? message.content } : message
+              index === current.length - 1 ? { ...message, content: payload.answer ?? message.content, citations: payload.citations ?? [] } : message
             ));
           } else if (event === "error") throw new Error(payload.message ?? "The response stream failed");
         }
@@ -1041,23 +1036,42 @@ function HomeChat({
     setMessages([]);
     setDraft("");
     setError("");
+    setSelectedIds([]);
+    onNewChat();
+  }
+
+  async function updateSources(documentId: string, checked: boolean) {
+    const next = checked
+      ? [...selectedIds, documentId]
+      : selectedIds.filter((id) => id !== documentId);
+    setSelectedIds(next);
+    if (!conversationId) return;
+    try {
+      await api(`/conversations/${conversationId}`, token, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document_ids: next }),
+      });
+      onChanged();
+    } catch (reason) {
+      setSelectedIds(selectedIds);
+      setError(reason instanceof Error ? reason.message : "Could not update chat sources");
+    }
   }
 
   return <section className="home-chat">
     <header>
       <div className="hub-ai-brand"><BrandMark className="hub-brand-mark" /><strong>Insight<span>PDF</span></strong></div>
-      {!!messages.length && <button onClick={newChat}><MessageCircle size={15} /> New chat</button>}
+      <div className="home-chat-header-actions"><button onClick={onHistory}><History size={15} /> History</button>{!!messages.length && <button onClick={newChat}><MessageCircle size={15} /> New chat</button>}</div>
     </header>
     <div className="home-chat-messages">
       {!messages.length && <div className="home-chat-empty">
-        <BrandMark className="home-chat-logo" />
         <h1>What can I help you with?</h1>
-        <p>Chat with InsightPDF AI, or switch to document chat when you need answers grounded in your files.</p>
-        <button onClick={onOpenDocuments}><FolderOpen size={15} /> Chat with documents</button>
+        <p>Ask generally, or attach one or more documents for answers grounded in their pages.</p>
       </div>}
       {messages.map((message, index) => <article className={message.role} key={index}>
         {message.role === "assistant" && <span><BrandMark /></span>}
-        <div>{message.role === "assistant" ? <FormattedAnswer content={message.content} /> : <p>{message.content}</p>}</div>
+        <div>{message.role === "assistant" ? <><FormattedAnswer content={message.content} />{!!message.citations?.length && <div className="citation-list"><span className="citation-heading">Sources</span>{message.citations.map((citation, citationIndex) => <button key={citationIndex} onClick={() => onCitation(citation)}><b>{citation.document_name}</b><em>Page {citation.page_number}</em><span>{citation.snippet}</span></button>)}</div>}</> : <p>{message.content}</p>}</div>
       </article>)}
       {createdArtifacts.map((artifact) => <article className="home-created-file" key={artifact.id}>
         <span>{artifact.filename.endsWith(".pptx") ? <Presentation size={18} /> : <FileText size={18} />}</span>
@@ -1067,6 +1081,18 @@ function HomeChat({
       {busy && <div className="home-chat-thinking"><RefreshCw className="spin" size={14} /> {createFormat === "chat" ? "InsightPDF is thinking…" : "Mistral is writing your document…"}</div>}
     </div>
     {error && <div className="chat-error">{error}</div>}
+    <details className="home-chat-sources">
+      <summary><FolderOpen size={14} /><span>{selectedIds.length ? `${selectedIds.length} document${selectedIds.length === 1 ? "" : "s"} attached` : "Attach documents"}</span></summary>
+      <div>
+        {!documents.length && <p>Upload and index a document to use it as chat context.</p>}
+        {documents.map((document) => <label key={document.id}>
+          <input type="checkbox" checked={selectedIds.includes(document.id)} onChange={(event) => updateSources(document.id, event.target.checked)} />
+          <FileText size={14} />
+          <span><strong>{document.display_title || document.filename}</strong><small>{document.page_count ?? "—"} pages</small></span>
+          <button type="button" onClick={(event) => { event.preventDefault(); onPreview(document); }}><Eye size={14} /></button>
+        </label>)}
+      </div>
+    </details>
     <div className="home-create-controls">
       <div className="home-create-types" aria-label="AI action">
         <button className={createFormat === "chat" ? "active" : ""} onClick={() => setCreateFormat("chat")}><MessageCircle size={14} /> Ask AI</button>
@@ -1106,7 +1132,7 @@ function HomeChat({
       }} />
       <button aria-label="Send message" disabled={busy || !draft.trim()}><Send size={18} /></button>
     </form>
-    <small>{createFormat === "chat" ? "Ask anything, attach a source, or choose a creation format." : `InsightPDF will create and save a real ${createFormat.toUpperCase()} file.`}</small>
+    <small>{createFormat === "chat" ? `${selectedIds.length ? "Answers use the attached document context and include citations." : "General chat · attach documents whenever you need grounded answers."}` : `InsightPDF will create and save a real ${createFormat.toUpperCase()} file.`}</small>
   </section>;
 }
 
@@ -1168,7 +1194,7 @@ function ConversationHistory({
             <div className="history-actions">
               <button aria-label="Rename conversation" onClick={() => setEditing(conversation.id)}><Pencil size={14} /></button>
               <button aria-label="Delete conversation" onClick={() => remove(conversation)}><Trash2 size={14} /></button>
-              <button disabled={!attachedDocuments.length} onClick={() => onOpen(conversation)}>Open</button>
+              <button onClick={() => onOpen(conversation)}>Open</button>
             </div>
           </article>;
         })}
@@ -1230,18 +1256,14 @@ function MultiDocumentChat({
 }
 
 async function downloadArtifact(artifact: Artifact, token: string) {
-  const response = await fetch(`${API}/pdf-tools/artifacts/${artifact.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
-  if (response.status === 401) expireSession();
+  const response = await authenticatedFetch(`${API}/pdf-tools/artifacts/${artifact.id}/download`, token);
   if (!response.ok) throw new Error("Could not download generated file");
   const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = window.document.createElement("a");
   link.href = url; link.download = artifact.filename; link.click(); URL.revokeObjectURL(url);
 }
 
 async function downloadDocumentFile(document: DocumentItem, token: string) {
-  const response = await fetch(`${API}/documents/${document.id}/content`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (response.status === 401) expireSession();
+  const response = await authenticatedFetch(`${API}/documents/${document.id}/content`, token);
   if (!response.ok) throw new Error("Could not download PDF");
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
@@ -1253,10 +1275,9 @@ async function downloadDocumentFile(document: DocumentItem, token: string) {
 }
 
 async function downloadDocumentArchive(documents: DocumentItem[], token: string, artifacts: Artifact[] = []) {
-  const response = await fetch(`${API}/documents/download-zip`, {
+  const response = await authenticatedFetch(`${API}/documents/download-zip`, token, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -1266,7 +1287,6 @@ async function downloadDocumentArchive(documents: DocumentItem[], token: string,
       ],
     }),
   });
-  if (response.status === 401) expireSession();
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
     throw new Error(detail?.detail ?? "Could not prepare the ZIP download");
@@ -1763,7 +1783,6 @@ function WorkspaceApp({
   const [artifactViewer, setArtifactViewer] = useState<Artifact | null>(null);
   const [viewerPage, setViewerPage] = useState(1);
   const [viewerSearch, setViewerSearch] = useState("");
-  const [chatDocument, setChatDocument] = useState<DocumentItem | null>(null);
   const [chatDocuments, setChatDocuments] = useState<DocumentItem[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -1781,7 +1800,7 @@ function WorkspaceApp({
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [newCollectionName, setNewCollectionName] = useState("");
   const [draggingUpload, setDraggingUpload] = useState(false);
-  const [hubView, setHubView] = useState<"home" | "chat" | "documents" | "presentations">("home");
+  const [hubView, setHubView] = useState<"home" | "documents" | "presentations">("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "pdfs" | "converted" | "images">("all");
@@ -1816,7 +1835,6 @@ function WorkspaceApp({
       setViewer(null);
       setArtifactViewer(null);
       setRenameTarget(null);
-      setChatDocument(null);
       setChatDocuments([]);
       setHistoryOpen(false);
       setAIDocument(null);
@@ -1825,8 +1843,17 @@ function WorkspaceApp({
       setAccountOpen(false);
       setError("Your session expired. Please log in again.");
     }
+    function handleRefreshedSession(event: Event) {
+      const refreshed = (event as CustomEvent<AuthResult>).detail;
+      setToken(refreshed.access_token);
+      setUser(refreshed.user);
+    }
     window.addEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
-    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
+    window.addEventListener(AUTH_REFRESHED_EVENT, handleRefreshedSession);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
+      window.removeEventListener(AUTH_REFRESHED_EVENT, handleRefreshedSession);
+    };
   }, []);
 
   const loadDocuments = useCallback(async (accessToken: string) => {
@@ -1866,7 +1893,7 @@ function WorkspaceApp({
   function openDocumentChat(document: DocumentItem) {
     setActiveConversation(null);
     setChatDocuments([document]);
-    setChatDocument(document);
+    setHubView("home");
   }
 
   useEffect(() => {
@@ -1898,7 +1925,7 @@ function WorkspaceApp({
       const target = event.target as HTMLElement | null;
       const typing = target?.matches("input, textarea, select, [contenteditable=true]");
       if (event.key === "Escape") {
-        setViewer(null); setArtifactViewer(null); setChatDocument(null); setHistoryOpen(false);
+        setViewer(null); setArtifactViewer(null); setHistoryOpen(false);
         setAIDocument(null); setCompareOpen(false); setPDFToolsOpen(false); setOpenActionMenu("");
         return;
       }
@@ -2228,7 +2255,6 @@ function WorkspaceApp({
           <button className={hubView === "documents" ? "active" : ""} onClick={() => setHubView("documents")}><FolderOpen size={18} /><span>Documents</span><i>{documents.length + workspaceArtifacts.length}</i></button>
           <button className={hubView === "presentations" ? "active" : ""} onClick={() => setHubView("presentations")}><Presentation size={18} /><span>Presentations</span></button>
           <span className="hub-nav-label">AI workspace</span>
-          <button className={hubView === "chat" ? "active" : ""} disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><Quote size={18} /><span>Document chat</span></button>
           <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={18} /><span>Compare</span></button>
           <span className="hub-nav-label">Tools</span>
           <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>Document tools</span></button>
@@ -2241,7 +2267,7 @@ function WorkspaceApp({
         </div>
       </aside>
       <header className="hub-topbar">
-        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "chat" ? "Document chat" : hubView === "presentations" ? "Presentations" : "Documents"}</strong><small>{hubView === "home" ? "Ask, attach, and create" : hubView === "chat" ? "Grounded answers from one or multiple documents" : hubView === "presentations" ? "Generate a slide story from an idea or document" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
+        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "presentations" ? "Presentations" : "Documents"}</strong><small>{hubView === "home" ? "Ask, attach documents, and create" : hubView === "presentations" ? "Generate a slide story from an idea or document" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
         <button title="Keyboard shortcuts: / search, U upload" aria-label="Keyboard shortcuts"><Keyboard size={17} /></button>
         <button onClick={() => setJobsOpen(true)} aria-label="Processing jobs"><RefreshCw size={17} /></button>
         <label className={`hub-upload ${busy ? "disabled" : ""}`}><Upload size={16} /> Upload<input ref={uploadInputRef} type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
@@ -2249,29 +2275,37 @@ function WorkspaceApp({
       <section className="workspace-content hub-content">
         {hubView === "home" ? <div className="hub-home">
           <HomeChat
+            key={`${activeConversation?.id ?? "new"}:${chatDocuments.map((item) => item.id).join(",")}`}
             token={token}
             documents={readyDocuments}
+            conversation={activeConversation}
+            initialDocumentIds={activeConversation?.document_ids ?? chatDocuments.map((item) => item.id)}
             onChanged={() => loadConversations().catch(() => undefined)}
+            onHistory={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}
+            onPreview={(document) => { setViewerPage(1); setViewerSearch(""); setViewer(document); }}
+            onCitation={(citation) => {
+              const cited = documents.find((item) => item.id === citation.document_id);
+              if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
+            }}
+            onNewChat={() => { setActiveConversation(null); setChatDocuments([]); }}
             onArtifactCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }}
-            onOpenDocuments={() => setHubView("chat")}
             onUploadFile={async (file) => {
               await upload(file);
-              setHubView("documents");
             }}
           />
           <section className="hub-conversation">
             <div className="hub-ai-brand"><span className="hub-brand-mark"><FileText size={20} /></span><strong>Insight<span>PDF</span> <i>AI</i></strong></div>
             <h1>What can I help you understand?</h1>
-            <button className="hub-prompt" disabled={!readyDocuments.length} onClick={() => setHubView("chat")}>
+            <button className="hub-prompt" disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && openDocumentChat(readyDocuments[0])}>
               <span>{readyDocuments.length ? "Ask anything about your documents…" : "Upload a document to start asking questions"}</span>
               <i><Send size={17} /></i>
             </button>
-            <div className="hub-prompt-hints"><span>Try:</span><button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}>Summarize latest</button><button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}>Compare files</button><button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}>Find across documents</button></div>
+            <div className="hub-prompt-hints"><span>Try:</span><button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}>Summarize latest</button><button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}>Compare files</button><button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && openDocumentChat(readyDocuments[0])}>Find across documents</button></div>
           </section>
           <section className="hub-quick-tools">
             <header><div><strong>Quick tools</strong><span>Open a specialized workflow</span></div></header>
             <div>
-              <button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><span><MessageCircle size={19} /></span><strong>Ask documents</strong><small>Grounded answers with citations</small></button>
+              <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && openDocumentChat(readyDocuments[0])}><span><MessageCircle size={19} /></span><strong>Ask documents</strong><small>Attach files in the main chat</small></button>
               <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}><span><AlignLeft size={19} /></span><strong>Summarize</strong><small>Turn long files into key points</small></button>
               <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><span><RefreshCw size={19} /></span><strong>Compare</strong><small>Find changes and differences</small></button>
               <button onClick={() => setHubView("presentations")}><span><Presentation size={19} /></span><strong>Create slides</strong><small>Generate a presentation draft</small></button>
@@ -2288,21 +2322,11 @@ function WorkspaceApp({
               <button onClick={() => setHubView("documents")}><FolderOpen size={15} /> Open documents</button>
             </section>
           </div>
-        </div> : hubView === "chat" ? <IntegratedChatHub
-          documents={readyDocuments}
-          token={token}
-          onChanged={() => { loadConversations().catch(() => undefined); }}
-          onHistory={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}
-          onPreview={(document) => { setViewerPage(1); setViewerSearch(""); setViewer(document); }}
-          onCitation={(citation) => {
-            const cited = documents.find((item) => item.id === citation.document_id);
-            if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
-          }}
-        /> : hubView === "presentations" ? <PresentationStudio documents={readyDocuments} artifacts={workspaceArtifacts} token={token} onCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }} /> : <header className="documents-heading"><div><h1>Your documents</h1><p>Upload, organize, preview, and use AI with PDFs, Word files, and presentations.</p></div></header>}
+        </div> : hubView === "presentations" ? <PresentationStudio documents={readyDocuments} artifacts={workspaceArtifacts} token={token} onCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }} /> : <header className="documents-heading"><div><h1>Your documents</h1><p>Upload, organize, preview, and use AI with PDFs, Word files, and presentations.</p></div></header>}
         <div className="workspace-title">
           <div><p className="eyebrow">AI-first document workspace</p><h1>What do you want to understand?</h1><p>Upload a PDF, ask grounded questions, compare versions, or transform it into something useful.</p></div>
           <div className="workspace-actions">
-            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setHubView("chat")}><Quote size={16} /> Ask documents</button>
+            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => readyDocuments[0] && openDocumentChat(readyDocuments[0])}><Quote size={16} /> Ask documents</button>
             <button disabled={!documents.some((item) => item.status === "ready")} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={16} /> PDF tools</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={16} /> Compare PDFs</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setMultiChatOpen(true)}><GitCompareArrows size={16} /> Ask multiple PDFs</button>
@@ -2430,20 +2454,12 @@ function WorkspaceApp({
           <div><button type="button" onClick={() => setRenameTarget(null)}>Cancel</button><button type="submit" disabled={renameBusy || !renameValue.trim()}>{renameBusy ? <RefreshCw size={14} className="spin" /> : <Pencil size={14} />} {renameBusy ? "Saving…" : "Save name"}</button></div>
         </form>
       </div>}
-      {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onPreview={() => {
-        setViewerPage(1); setViewerSearch(""); setViewer(chatDocument);
-      }} onHistory={() => {
-        setHistoryOpen(true); loadConversations().catch(() => undefined);
-      }} onClose={() => { setChatDocument(null); setActiveConversation(null); }} onCitation={(citation) => {
-        const cited = documents.find((item) => item.id === citation.document_id);
-        if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
-      }} />}
       {historyOpen && <ConversationHistory conversations={conversations} documents={documents} busy={historyBusy} onRefresh={async () => { await loadConversations(); }} onClose={() => setHistoryOpen(false)} onOpen={(conversation) => {
         const attached = documents.filter((item) => conversation.document_ids.includes(item.id));
-        setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(attached); setChatDocument(attached[0] ?? null);
+        setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(attached); setHubView("home");
       }} />}
       {multiChatOpen && <MultiDocumentChat documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setMultiChatOpen(false)} onCreated={(conversation, selected) => {
-        setMultiChatOpen(false); setActiveConversation(conversation); setChatDocuments(selected); setChatDocument(selected[0]); loadConversations().catch(() => undefined);
+        setMultiChatOpen(false); setActiveConversation(conversation); setChatDocuments(selected); setHubView("home"); loadConversations().catch(() => undefined);
       }} />}
       {aiDocument && <AIWorkspace document={aiDocument} documents={documents.filter((item) => item.status === "ready")} token={token} compareMode={false} onClose={() => setAIDocument(null)} onPage={(documentId, page) => {
         const selected = documents.find((item) => item.id === documentId);
