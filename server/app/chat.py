@@ -1,9 +1,12 @@
 import base64
+import json
 import uuid
+from collections.abc import AsyncIterator
 
 import fitz
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -23,6 +26,9 @@ from app.rag import (
     is_casual_message,
     requires_visual_answer,
     relevant_snippet,
+    stream_answer,
+    stream_general_answer,
+    stream_visual_answer,
 )
 from app.schemas import (
     ChatRequest,
@@ -175,6 +181,7 @@ async def ask_question(
     conversation = await owned_conversation(conversation_id, user, session)
     document_ids = [document.id for document in conversation.documents]
     history = [(message.role.value, message.content) for message in conversation.messages]
+    general_mode = not document_ids
     if is_casual_message(payload.question):
         answer = "Hello! Ask me anything about this PDF, and I’ll answer using its indexed content."
         session.add_all([
@@ -264,4 +271,154 @@ async def ask_question(
             )
             for chunk in cited_chunks
         ],
+    )
+
+
+def _sse(event: str, payload: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
+
+
+@router.post("/{conversation_id}/messages/stream")
+async def stream_question(
+    conversation_id: uuid.UUID,
+    payload: ChatRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """Stream provider tokens and persist the completed exchange before the final event."""
+    conversation = await owned_conversation(conversation_id, user, session)
+    document_ids = [document.id for document in conversation.documents]
+    history = [(message.role.value, message.content) for message in conversation.messages]
+    general_mode = not document_ids
+    casual_answer = (
+        "Hello! Ask me anything about this PDF, and I’ll answer using its indexed content."
+        if is_casual_message(payload.question)
+        else None
+    )
+    settings = get_settings()
+    visual_mode = False
+    chunks: list[DocumentChunk] = []
+    visual_sources: list[tuple[Document, int, str]] = []
+    if casual_answer is None and not general_mode:
+        visual_mode = requires_visual_answer(payload.question)
+        if not visual_mode:
+            retrieval_query = build_retrieval_query(payload.question, history)
+            query_vector = (await embed_texts_async([retrieval_query]))[0]
+            chunks = list(await session.scalars(
+                select(DocumentChunk)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    DocumentChunk.document_id.in_(document_ids),
+                    Document.owner_id == user.id,
+                )
+                .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
+                .limit(settings.rag_top_k)
+            ))
+            visual_mode = not chunks
+        visual_sources = (
+            _visual_sources(conversation.documents, settings.vision_max_pages)
+            if visual_mode else []
+        )
+        if visual_mode and not visual_sources:
+            raise HTTPException(status_code=409, detail="The selected documents contain no readable pages")
+        await record_ai_usage(user, "chat", session)
+    elif casual_answer is None:
+        await record_ai_usage(user, "chat", session)
+
+    async def events() -> AsyncIterator[str]:
+        raw_parts: list[str] = []
+        try:
+            if casual_answer is not None:
+                raw_parts.append(casual_answer)
+                yield _sse("token", {"text": casual_answer})
+            else:
+                provider_stream = (
+                    stream_general_answer(payload.question, history)
+                    if general_mode
+                    else stream_visual_answer(
+                        payload.question,
+                        [
+                            (document.filename, page, data_url)
+                            for document, page, data_url in visual_sources
+                        ],
+                        history,
+                    )
+                    if visual_mode
+                    else stream_answer(payload.question, [chunk.text for chunk in chunks], history)
+                )
+                async for token_part in provider_stream:
+                    raw_parts.append(token_part)
+                    yield _sse("token", {"text": token_part})
+
+            raw_answer = "".join(raw_parts).strip()
+            cited_chunks = cited_sources(
+                raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number)
+            )
+            cited_visuals = cited_sources(
+                raw_answer, visual_sources, lambda item: (item[0].id, item[1])
+            )
+            if not general_mode and not cited_chunks and not cited_visuals and not answer_declines_context(raw_answer):
+                if visual_mode:
+                    cited_visuals = visual_sources[:1]
+                else:
+                    cited_chunks = chunks[:1]
+            answer = clean_user_answer(raw_answer)
+            user_message = Message(
+                conversation_id=conversation.id, role=MessageRole.USER, content=payload.question
+            )
+            assistant_message = Message(
+                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer
+            )
+            session.add_all([user_message, assistant_message])
+            await session.flush()
+            names = {document.id: document.filename for document in conversation.documents}
+            stored_citations = [
+                Citation(
+                    message_id=assistant_message.id,
+                    chunk_id=chunk.id,
+                    document_id=chunk.document_id,
+                    page_number=chunk.page_number,
+                    snippet=relevant_snippet(chunk.text, answer, payload.question),
+                )
+                for chunk in cited_chunks
+            ]
+            session.add_all(stored_citations)
+            await session.commit()
+            response_citations = [
+                CitationResponse(
+                    document_id=document.id,
+                    document_name=document.filename,
+                    page_number=page_number,
+                    snippet="Visual analysis of this rendered PDF page.",
+                )
+                for document, page_number, _ in cited_visuals
+            ] or [
+                CitationResponse(
+                    document_id=chunk.document_id,
+                    document_name=names[chunk.document_id],
+                    page_number=chunk.page_number,
+                    snippet=relevant_snippet(chunk.text, answer, payload.question),
+                )
+                for chunk in cited_chunks
+            ]
+            yield _sse("complete", {
+                "answer": answer,
+                "citations": [
+                    citation.model_dump(mode="json") for citation in response_citations
+                ],
+            })
+        except (RuntimeError, httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as exc:
+            await session.rollback()
+            yield _sse("error", {"message": (
+                str(exc) if isinstance(exc, RuntimeError)
+                else "The configured language model is unavailable"
+            )})
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
     )

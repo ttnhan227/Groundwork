@@ -59,6 +59,7 @@ class User(Base):
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
     ai_results: Mapped[list["AIResult"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
     generated_artifacts: Mapped[list["GeneratedArtifact"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    collections: Mapped[list["Collection"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
     ai_usage_records: Mapped[list["AIUsageRecord"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
@@ -85,12 +86,30 @@ class Document(Base):
     status: Mapped[DocumentStatus] = mapped_column(Enum(DocumentStatus), default=DocumentStatus.UPLOADED, index=True)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    display_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    collection_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("collections.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     owner: Mapped[User] = relationship(back_populates="documents")
     pages: Mapped[list["DocumentPage"]] = relationship(cascade="all, delete-orphan")
     jobs: Mapped[list["ProcessingJob"]] = relationship(cascade="all, delete-orphan")
     chunks: Mapped[list["DocumentChunk"]] = relationship(cascade="all, delete-orphan")
+
+
+class Collection(Base):
+    __tablename__ = "collections"
+    __table_args__ = (UniqueConstraint("owner_id", "name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    color: Mapped[str] = mapped_column(String(20), default="#3154d8")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    owner: Mapped[User] = relationship(back_populates="collections")
 
 
 conversation_documents = Table(
@@ -227,6 +246,9 @@ class GeneratedArtifact(Base):
     parameters: Mapped[dict] = mapped_column(JSONB, default=dict)
     linked_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
+    collection_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("collections.id", ondelete="SET NULL"), index=True, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 

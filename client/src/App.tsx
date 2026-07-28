@@ -1,4 +1,4 @@
-import { BrainCircuit, Check, Download, ExternalLink, Eye, FileImage, FileText, FolderOpen, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Activity, BrainCircuit, Check, Download, ExternalLink, Eye, FileImage, FileText, FolderOpen, FolderPlus, History, Keyboard, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, PanelLeftClose, PanelLeftOpen, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Tag, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -19,6 +19,9 @@ type DocumentItem = {
   status: string;
   page_count: number | null;
   error_message: string | null;
+  display_title: string | null;
+  tags: string[];
+  collection_id: string | null;
   created_at: string;
 };
 
@@ -53,7 +56,8 @@ type AIResult = {
   cached: boolean;
   created_at: string;
 };
-type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; linked_document_id: string | null; created_at: string };
+type Artifact = { id: string; operation: string; filename: string; content_type: string; size_bytes: number; parameters: Record<string, unknown>; linked_document_id: string | null; collection_id: string | null; created_at: string };
+type Collection = { id: string; name: string; color: string; created_at: string };
 type WorkflowPlan = {
   id: string;
   status: string;
@@ -90,6 +94,15 @@ async function api<T>(path: string, token?: string, init?: RequestInit): Promise
     throw new Error(body?.detail ?? body?.error?.message ?? "Request failed");
   }
   return response.status === 204 ? (undefined as T) : response.json();
+}
+
+function downloadTextFile(filename: string, content: string, contentType = "text/markdown") {
+  const url = URL.createObjectURL(new Blob([content], { type: contentType }));
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 async function waitForJob(job: Job, token: string): Promise<Job> {
@@ -148,6 +161,10 @@ function PhaseFourResult({ value, documents, onPage }: { value: AIResult; docume
   const result = value.result;
   const references = (result.page_references ?? []) as Citation[];
   const sections = ["added_sections", "removed_sections", "changed_sections", "numerical_changes"] as const;
+  const exportResult = () => downloadTextFile(
+    `${documents.find((item) => item.id === value.document_ids[0])?.filename.replace(/\.pdf$/i, "") ?? "insightpdf"}-${value.feature}.md`,
+    `# ${String(result.title ?? value.feature.replaceAll("_", " "))}\n\n${String(result.content ?? result.summary ?? "")}\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`,
+  );
   if (value.feature === "quiz") {
     const questions = (result.questions ?? []) as Array<{ question: string; options: string[]; correct_answer: string; explanation: string; page_references?: Citation[] }>;
     return <div className="ai-result"><h3>{String(result.title ?? "Quiz")}</h3>{questions.map((question, index) =>
@@ -181,6 +198,7 @@ function PhaseFourResult({ value, documents, onPage }: { value: AIResult; docume
     {value.cached && <span className="cached-badge">Saved result</span>}
     <FormattedAnswer content={String(result.content ?? "")} />
     <PageLinks references={references} onPage={onPage} />
+    <button className="download-result" onClick={exportResult}><Download size={14} /> Export result</button>
     {value.feature === "translation" && <a className="download-result" href={`${API}/ai/results/${value.id}/download`} onClick={async (event) => {
       event.preventDefault();
       const response = await fetch(`${API}/ai/results/${value.id}/download`, { headers: { Authorization: `Bearer ${localStorage.getItem("insightpdf-auth") ? (JSON.parse(localStorage.getItem("insightpdf-auth")!).access_token) : ""}` } });
@@ -386,11 +404,12 @@ function ArtifactCardPreview({ artifact, token, onOpen }: { artifact: Artifact; 
   </button>;
 }
 
-function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory, onClose }: {
+function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSearch = "", onHistory, onClose }: {
   artifact?: Artifact;
   document?: DocumentItem;
   token: string;
   initialPage?: number;
+  initialSearch?: string;
   onHistory?: () => void;
   onClose: () => void;
 }) {
@@ -398,6 +417,7 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory,
   const [textPreview, setTextPreview] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [documentSearch, setDocumentSearch] = useState(initialSearch);
   const filename = artifact?.filename ?? document?.filename ?? "Document";
   const contentType = artifact?.content_type ?? "application/pdf";
   const sizeBytes = artifact?.size_bytes ?? document?.size_bytes ?? 0;
@@ -426,7 +446,12 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory,
         }
       } else {
         objectUrl = URL.createObjectURL(await response.blob());
-        if (!cancelled) setSource(isPdf && initialPage > 1 ? `${objectUrl}#page=${initialPage}` : objectUrl);
+        if (!cancelled) {
+          const parameters = new URLSearchParams();
+          if (initialPage > 1) parameters.set("page", String(initialPage));
+          if (initialSearch.trim()) parameters.set("search", initialSearch.trim().slice(0, 180));
+          setSource(isPdf && parameters.size ? `${objectUrl}#${parameters.toString()}` : objectUrl);
+        }
       }
     }).catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Preview unavailable"); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -434,13 +459,24 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory,
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [artifact, document, initialPage, isImage, isPdf, isText, token]);
+  }, [artifact, document, initialPage, initialSearch, isImage, isPdf, isText, token]);
+
+  function searchOpenPDF(event: FormEvent) {
+    event.preventDefault();
+    if (!isPdf || !source || !documentSearch.trim()) return;
+    const base = source.split("#")[0];
+    const parameters = new URLSearchParams();
+    parameters.set("page", String(initialPage));
+    parameters.set("search", documentSearch.trim().slice(0, 180));
+    setSource(`${base}#${parameters.toString()}`);
+  }
 
   return <div className="artifact-viewer-wrap">
     <button className="history-backdrop" aria-label="Close file preview" onClick={onClose} />
     <section className="artifact-viewer" role="dialog" aria-modal="true" aria-label={`Preview ${filename}`}>
       <header>
         <div><strong>{filename}</strong><small>{description} · {(sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div>
+        {isPdf && <form className="artifact-viewer-search" onSubmit={searchOpenPDF}><Search size={14} /><input aria-label="Search within document" value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Search this document" /><button type="submit">Find</button></form>}
         {onHistory && <button onClick={onHistory}><History size={15} /> History</button>}
         {source && <button onClick={() => window.open(source, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
         {!isPdf && <button onClick={() => artifact ? downloadArtifact(artifact, token).catch(() => undefined) : document ? downloadDocumentFile(document, token).catch(() => undefined) : undefined}><Download size={15} /> Download</button>}
@@ -458,13 +494,16 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, onHistory,
   </div>;
 }
 
-// Kept temporarily as the richer canvas viewer fallback while the native PDF viewer is evaluated.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { document: DocumentItem; token: string; initialPage?: number; onHistory: () => void; onClose: () => void }) {
+function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onHistory, onClose }: { document: DocumentItem; token: string; initialPage?: number; initialSearch?: string; onHistory: () => void; onClose: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const [pdfSource, setPdfSource] = useState("");
   const [page, setPage] = useState(initialPage);
   const [scale, setScale] = useState(1.2);
+  const [activeSearch, setActiveSearch] = useState(initialSearch);
+  const [highlightBoxes, setHighlightBoxes] = useState<{ left: number; top: number; width: number; height: number }[]>([]);
+  const [citationStatus, setCitationStatus] = useState<"idle" | "matched" | "not-found">("idle");
+  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [error, setError] = useState("");
   const [searchResults, setSearchResults] = useState<{ page: number; snippet: string }[]>([]);
   const [searching, setSearching] = useState(false);
@@ -474,6 +513,7 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
 
   useEffect(() => {
     let cancelled = false;
+    let objectUrl = "";
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
@@ -502,6 +542,8 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
         } else {
           data = new Uint8Array(await response.arrayBuffer());
         }
+        objectUrl = URL.createObjectURL(new Blob([data.slice().buffer], { type: "application/pdf" }));
+        if (!cancelled) setPdfSource(objectUrl);
         if (!cancelled) setLoadStage("opening");
         const loaded = await pdfjs.getDocument({ data }).promise;
         if (!cancelled) setPdf(loaded);
@@ -511,7 +553,10 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
         setError(reason instanceof Error ? reason.message : "Could not load this PDF");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [document.id, token, initialPage]);
 
   useEffect(() => {
@@ -526,10 +571,57 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
       canvas.current.height = viewport.height;
       task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
       await task.promise;
+      const content = await pdfPage.getTextContent();
+      const items = content.items.filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => "str" in item && Boolean(item.str));
+      const joined = items.map((item) => item.str).join(" ");
+      const normalized = joined.replace(/\s+/g, " ").toLowerCase();
+      const requested = activeSearch.replace(/^[\s\u2026.]+|[\s\u2026.]+$/g, "").replace(/\s+/g, " ").toLowerCase();
+      let matchStart = requested ? normalized.indexOf(requested) : -1;
+      let matchLength = requested.length;
+      if (matchStart < 0 && requested) {
+        const words = requested.split(" ").filter((word) => word.length > 2);
+        for (let width = Math.min(10, words.length); width >= 3 && matchStart < 0; width -= 1) {
+          for (let start = 0; start + width <= words.length; start += 1) {
+            const candidate = words.slice(start, start + width).join(" ");
+            const found = normalized.indexOf(candidate);
+            if (found >= 0) { matchStart = found; matchLength = candidate.length; break; }
+          }
+        }
+      }
+      const boxes: { left: number; top: number; width: number; height: number }[] = [];
+      if (matchStart >= 0) {
+        let cursor = 0;
+        for (const item of items) {
+          const itemStart = cursor;
+          const itemEnd = cursor + item.str.length;
+          cursor = itemEnd + 1;
+          if (itemEnd < matchStart || itemStart > matchStart + matchLength) continue;
+          const transform = viewport.transform;
+          const source = item.transform;
+          const tx = [
+            transform[0] * source[0] + transform[2] * source[1],
+            transform[1] * source[0] + transform[3] * source[1],
+            transform[0] * source[2] + transform[2] * source[3],
+            transform[1] * source[2] + transform[3] * source[3],
+            transform[0] * source[4] + transform[2] * source[5] + transform[4],
+            transform[1] * source[4] + transform[3] * source[5] + transform[5],
+          ];
+          const height = Math.max(8, Math.hypot(tx[2], tx[3]));
+          boxes.push({
+            left: tx[4],
+            top: tx[5] - height,
+            width: Math.max(4, item.width * scale),
+            height,
+          });
+        }
+      }
+      setPageSize({ width: viewport.width, height: viewport.height });
+      setHighlightBoxes(boxes);
+      setCitationStatus(activeSearch ? (boxes.length ? "matched" : "not-found") : "idle");
       setLoadStage("ready");
     })();
     return () => task?.cancel();
-  }, [page, scale, pdf]);
+  }, [activeSearch, page, scale, pdf]);
 
   useEffect(() => () => { pdf?.destroy(); }, [pdf]);
 
@@ -538,6 +630,7 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
     if (!pdf) return;
     const query = String(new FormData(event.currentTarget).get("query") ?? "").trim().toLowerCase();
     if (!query) { setSearchResults([]); setSideMode("pages"); return; }
+    setActiveSearch(query);
     setSearching(true);
     setSideMode("search");
     const matches: { page: number; snippet: string }[] = [];
@@ -557,7 +650,7 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
   }
 
   return (
-    <div className="viewer-wrap" role="dialog" aria-modal="true">
+    <div className="viewer-wrap" role="dialog" aria-modal="true" aria-label={`Preview ${document.filename}`}>
       <div className="viewer-toolbar">
         <strong>{document.filename}</strong>
         <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
@@ -566,6 +659,9 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
         <button aria-label="Zoom out" onClick={() => setScale((value) => Math.max(.6, value - .2))}><ZoomOut size={18} /></button>
         <button aria-label="Zoom in" onClick={() => setScale((value) => Math.min(2.4, value + .2))}><ZoomIn size={18} /></button>
         <form className="viewer-search" onSubmit={searchPdf}><Search size={15} /><input name="query" placeholder="Search PDF" aria-label="Search PDF" /><button aria-label="Run search">Search</button></form>
+        {activeSearch && citationStatus === "matched" && <span className="citation-locator matched">Source highlighted</span>}
+        {activeSearch && citationStatus === "not-found" && <span className="citation-locator">Source page opened · exact text highlight unavailable</span>}
+        {pdfSource && <button onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
         <button className="viewer-history" onClick={onHistory}><History size={17} /> Chat history</button>
         <button className="viewer-close" aria-label="Close viewer" onClick={onClose}><X size={20} /></button>
       </div>
@@ -586,7 +682,12 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
             <small>{loadStage === "downloading" && downloadPercent !== null ? `${downloadPercent}% downloaded` : "Preparing a clear preview…"}</small>
             <i><b style={{ width: downloadPercent !== null && loadStage === "downloading" ? `${downloadPercent}%` : "38%" }} /></i>
           </div>}
-          <canvas ref={canvas} className={loadStage === "ready" ? "" : "viewer-canvas-loading"} />
+          <div className="pdf-page-surface" style={{ width: pageSize.width || undefined, height: pageSize.height || undefined }}>
+            <canvas ref={canvas} className={loadStage === "ready" ? "" : "viewer-canvas-loading"} />
+            <div className="pdf-highlight-layer" aria-hidden="true">
+              {highlightBoxes.map((box, index) => <mark key={index} style={box} />)}
+            </div>
+          </div>
         </>}</div>
       </div>
     </div>
@@ -594,13 +695,14 @@ function PdfViewer({ document, token, initialPage = 1, onHistory, onClose }: { d
 }
 
 function ChatPanel({
-  document, documentIds, documentLabel, token, conversation, onClose, onCitation, onChanged, onHistory, onPreview,
+  document, documentIds, documentLabel, token, conversation, embedded = false, onClose, onCitation, onChanged, onHistory, onPreview,
 }: {
   document: DocumentItem;
   documentIds: string[];
   documentLabel: string;
   token: string;
   conversation?: Conversation | null;
+  embedded?: boolean;
   onClose: () => void;
   onCitation: (citation: Citation) => void;
   onChanged: () => void;
@@ -611,7 +713,12 @@ function ChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>(conversation?.messages ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [draft, setDraft] = useState("");
   const documentIdKey = documentIds.join(",");
+  const starterPrompts = documentIds.length > 1
+    ? ["What do these documents have in common?", "Summarize the key differences", "List important dates across all files"]
+    : ["Summarize this document", "What are the key points?", "List important dates and action items"];
+  const followUpPrompts = ["Explain that more simply", "What should I pay attention to?", "Turn this into an action checklist"];
 
   async function beginNewConversation() {
     setBusy(true);
@@ -650,36 +757,100 @@ function ChatPanel({
       body: JSON.stringify({ title: `Chat about ${documentLabel}`, document_ids: documentIds }),
     }).then((result) => { setConversationId(result.id); onChanged(); }).catch((reason) => setError(reason.message));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation, document.id, document.filename, documentIdKey, documentLabel, onChanged, token]);
+  }, [conversation, document.id, document.filename, documentIdKey, documentLabel, token]);
 
-  async function ask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function askQuestion(question: string) {
     if (!conversationId || busy) return;
-    const form = new FormData(event.currentTarget);
-    const question = String(form.get("question") ?? "").trim();
+    question = question.trim();
     if (!question) return;
-    event.currentTarget.reset();
-    setMessages((current) => [...current, { role: "user", content: question }]);
+    setDraft("");
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: question },
+      { role: "assistant", content: "", citations: [] },
+    ]);
     setBusy(true); setError("");
     try {
-      const result = await api<{ answer: string; citations: Citation[] }>(
-        `/conversations/${conversationId}/messages`, token, {
+      const response = await fetch(`${API}/conversations/${conversationId}/messages/stream`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
           body: JSON.stringify({ question }),
-        },
-      );
-      setMessages((current) => [...current, { role: "assistant", content: result.answer, citations: result.citations }]);
+      });
+      if (!response.ok) {
+        if (response.status === 401) expireSession();
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? "Could not answer");
+      }
+      if (!response.body) throw new Error("Streaming is unavailable in this browser");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let completed = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+        for (const frame of frames) {
+          const event = frame.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim();
+          const data = frame.split("\n").find((line) => line.startsWith("data:"))?.slice(5).trim();
+          if (!event || !data) continue;
+          const payload = JSON.parse(data) as { text?: string; answer?: string; citations?: Citation[]; message?: string };
+          if (event === "token" && payload.text) {
+            setMessages((current) => current.map((message, position) =>
+              position === current.length - 1
+                ? { ...message, content: message.content + payload.text }
+                : message
+            ));
+          } else if (event === "complete") {
+            completed = true;
+            setMessages((current) => current.map((message, position) =>
+              position === current.length - 1
+                ? { ...message, content: payload.answer ?? message.content, citations: payload.citations ?? [] }
+                : message
+            ));
+          } else if (event === "error") {
+            throw new Error(payload.message ?? "The response stream failed");
+          }
+        }
+        if (done) break;
+      }
+      if (!completed) throw new Error("The response stream ended before completion");
       onChanged();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not answer"); }
     finally { setBusy(false); }
   }
 
-  return <aside className="chat-panel">
-    <header><span className="chat-brand"><Sparkles size={18} /></span><div><strong>Ask InsightPDF</strong><small>{documentLabel}</small></div><button className="new-chat-button" title="Start new conversation" onClick={beginNewConversation}><MessageCircle size={15} /><span>New chat</span></button><button aria-label="Document chat history" title="Chat history" onClick={onHistory}><History size={17} /></button><button aria-label="Close chat" onClick={onClose}><X size={18} /></button></header>
+  function exportConversation() {
+    const markdown = [
+      `# ${conversation?.title ?? `Chat about ${documentLabel}`}`, "",
+      `Documents: ${documentLabel}`, "",
+      ...messages.flatMap((message) => [
+        `## ${message.role === "assistant" ? "InsightPDF" : "You"}`, "",
+        message.content,
+        ...(message.citations?.length ? ["", "Sources:", ...message.citations.map((citation) =>
+          `- ${citation.document_name}, page ${citation.page_number}: ${citation.snippet}`
+        )] : []),
+        "",
+      ]),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+    const link = window.document.createElement("a");
+    link.href = url;
+    link.download = `${document.filename.replace(/\.pdf$/i, "")}-chat.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return <aside className={`chat-panel ${embedded ? "embedded" : ""}`}>
+    <header><span className="chat-brand"><FileText size={18} /></span><div><strong>Ask InsightPDF</strong><small>{documentLabel}</small></div><button title="Export conversation" aria-label="Export conversation" onClick={exportConversation}><Download size={16} /></button><button className="new-chat-button" title="Start new conversation" onClick={beginNewConversation}><MessageCircle size={15} /><span>New chat</span></button><button aria-label="Document chat history" title="Chat history" onClick={onHistory}><History size={17} /></button>{!embedded && <button aria-label="Close chat" onClick={onClose}><X size={18} /></button>}</header>
     <DocumentMiniPreview document={document} token={token} onOpen={onPreview} />
     <div className="chat-messages">
-      {!messages.length && <div className="chat-empty"><MessageCircle size={30} /><strong>Ask about this PDF</strong><span>Answers are grounded in indexed pages and include source citations.</span></div>}
+      {!messages.length && <div className="chat-empty"><MessageCircle size={30} /><strong>Ask about this PDF</strong><span>Answers are grounded in indexed pages and include source citations.</span><div className="suggested-prompts">{starterPrompts.map((prompt) => <button key={prompt} onClick={() => askQuestion(prompt)}>{prompt}</button>)}</div></div>}
       {messages.map((message, index) => <div className={`chat-message ${message.role}`} key={index}>
         {message.role === "assistant" ? <><div className="assistant-label"><Sparkles size={13} /> InsightPDF</div><FormattedAnswer content={message.content} /></> : <p>{message.content}</p>}
         {!!message.citations?.length && <div className="citation-list"><span className="citation-heading">Sources</span>{message.citations.map((citation, citationIndex) => <button key={citationIndex} onClick={() => onCitation(citation)}>
@@ -687,15 +858,188 @@ function ChatPanel({
         </button>)}</div>}
       </div>)}
       {busy && <div className="chat-thinking"><RefreshCw className="spin" size={14} /> Searching indexed pages…</div>}
+      {!busy && messages.at(-1)?.role === "assistant" && <div className="follow-up-prompts"><span>Continue with</span>{followUpPrompts.map((prompt) => <button key={prompt} onClick={() => askQuestion(prompt)}>{prompt}</button>)}</div>}
     </div>
     {error && <div className="chat-error">{error}</div>}
-    <form onSubmit={ask}><div className="chat-input"><textarea name="question" aria-label="Question" placeholder="Ask a follow-up question…" rows={1} disabled={!conversationId || busy} onKeyDown={(event) => {
+    <form onSubmit={(event) => { event.preventDefault(); askQuestion(draft); }}><div className="chat-input"><textarea name="question" aria-label="Question" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a follow-up question…" rows={1} disabled={!conversationId || busy} onKeyDown={(event) => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         event.currentTarget.form?.requestSubmit();
       }
     }} /><small>Enter to send · Shift+Enter for a new line</small></div><button aria-label="Send" disabled={!conversationId || busy}><Send size={17} /></button></form>
   </aside>;
+}
+
+function IntegratedChatHub({
+  documents, token, onChanged, onHistory, onPreview, onCitation,
+}: {
+  documents: DocumentItem[];
+  token: string;
+  onChanged: () => void;
+  onHistory: () => void;
+  onPreview: (document: DocumentItem) => void;
+  onCitation: (citation: Citation) => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(documents[0] ? [documents[0].id] : []);
+  const [activeIds, setActiveIds] = useState<string[]>(documents[0] ? [documents[0].id] : []);
+  const [filter, setFilter] = useState("");
+  const chosen = documents.filter((document) => activeIds.includes(document.id));
+  const visible = documents.filter((document) =>
+    [document.display_title ?? "", document.filename, ...document.tags].join(" ").toLowerCase().includes(filter.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (!documents[0] || selected.length || activeIds.length) return;
+    // Documents can arrive after authentication while this view is already mounted.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelected([documents[0].id]);
+    setActiveIds([documents[0].id]);
+  }, [activeIds.length, documents, selected.length]);
+
+  return <section className="integrated-chat-hub">
+    <aside className="chat-source-picker">
+      <header><div><strong>Chat sources</strong><span>Select one or more documents</span></div><b>{selected.length}</b></header>
+      <label><Search size={14} /><input aria-label="Search chat documents" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search files" /></label>
+      <div>{visible.map((document) => <label key={document.id} className={selected.includes(document.id) ? "selected" : ""}>
+        <input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} />
+        <FileText size={16} /><span><strong>{document.display_title || document.filename}</strong><small>{document.page_count ?? "—"} pages</small></span>
+      </label>)}</div>
+      <button disabled={!selected.length || selected.join(",") === activeIds.join(",")} onClick={() => setActiveIds(selected)}><MessageCircle size={15} /> Start chat with {selected.length || 0} {selected.length === 1 ? "file" : "files"}</button>
+    </aside>
+    <main>
+      {chosen.length ? <ChatPanel
+        key={activeIds.join(",")}
+        embedded
+        document={chosen[0]}
+        documentIds={activeIds}
+        documentLabel={chosen.length === 1 ? chosen[0].filename : `${chosen.length} selected documents`}
+        token={token}
+        conversation={null}
+        onChanged={onChanged}
+        onHistory={onHistory}
+        onPreview={() => onPreview(chosen[0])}
+        onCitation={onCitation}
+        onClose={() => undefined}
+      /> : <div className="integrated-chat-empty"><MessageCircle size={30} /><strong>Select a document to begin</strong><span>Your answers will be grounded only in the files you choose.</span></div>}
+    </main>
+  </section>;
+}
+
+function HomeChat({
+  token, onChanged, onOpenDocuments,
+}: {
+  token: string;
+  onChanged: () => void;
+  onOpenDocuments: () => void;
+}) {
+  const [conversationId, setConversationId] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [draft, setDraft] = useState(() => {
+    const pendingPrompt = sessionStorage.getItem("insightpdf-pending-prompt") ?? "";
+    sessionStorage.removeItem("insightpdf-pending-prompt");
+    return pendingPrompt;
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function ensureConversation() {
+    if (conversationId) return conversationId;
+    const conversation = await api<Conversation>("/conversations", token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "InsightPDF AI chat", document_ids: [] }),
+    });
+    setConversationId(conversation.id);
+    onChanged();
+    return conversation.id;
+  }
+
+  async function sendQuestion(value: string) {
+    const question = value.trim();
+    if (!question || busy) return;
+    setDraft("");
+    setMessages((current) => [...current, { role: "user", content: question }, { role: "assistant", content: "" }]);
+    setBusy(true);
+    setError("");
+    try {
+      const id = await ensureConversation();
+      const response = await fetch(`${API}/conversations/${id}/messages/stream`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "text/event-stream" },
+        body: JSON.stringify({ question }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? "Could not answer");
+      }
+      if (!response.body) throw new Error("Streaming is unavailable in this browser");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        buffer += decoder.decode(chunk, { stream: !done }).replace(/\r\n/g, "\n");
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+        for (const frame of frames) {
+          const event = frame.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim();
+          const data = frame.split("\n").find((line) => line.startsWith("data:"))?.slice(5).trim();
+          if (!event || !data) continue;
+          const payload = JSON.parse(data) as { text?: string; answer?: string; message?: string };
+          if (event === "token" && payload.text) {
+            setMessages((current) => current.map((message, index) =>
+              index === current.length - 1 ? { ...message, content: message.content + payload.text } : message
+            ));
+          } else if (event === "complete" && payload.answer) {
+            setMessages((current) => current.map((message, index) =>
+              index === current.length - 1 ? { ...message, content: payload.answer ?? message.content } : message
+            ));
+          } else if (event === "error") throw new Error(payload.message ?? "The response stream failed");
+        }
+        if (done) break;
+      }
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not answer");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function newChat() {
+    setConversationId("");
+    setMessages([]);
+    setDraft("");
+    setError("");
+  }
+
+  return <section className="home-chat">
+    <header>
+      <div className="hub-ai-brand"><span className="hub-brand-mark"><FileText size={20} /></span><strong>Insight<span>PDF</span> <i>AI</i></strong></div>
+      {!!messages.length && <button onClick={newChat}><MessageCircle size={15} /> New chat</button>}
+    </header>
+    <div className="home-chat-messages">
+      {!messages.length && <div className="home-chat-empty">
+        <span className="home-chat-logo"><FileText size={27} /></span>
+        <h1>What can I help you with?</h1>
+        <p>Chat with InsightPDF AI, or switch to document chat when you need answers grounded in your files.</p>
+        <button onClick={onOpenDocuments}><FolderOpen size={15} /> Chat with documents</button>
+      </div>}
+      {messages.map((message, index) => <article className={message.role} key={index}>
+        {message.role === "assistant" && <span><Sparkles size={14} /></span>}
+        <div>{message.role === "assistant" ? <FormattedAnswer content={message.content} /> : <p>{message.content}</p>}</div>
+      </article>)}
+      {busy && <div className="home-chat-thinking"><RefreshCw className="spin" size={14} /> InsightPDF is thinking…</div>}
+    </div>
+    {error && <div className="chat-error">{error}</div>}
+    <form onSubmit={(event) => { event.preventDefault(); sendQuestion(draft); }}>
+      <textarea aria-label="Message InsightPDF AI" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message InsightPDF AI…" rows={1} disabled={busy} onKeyDown={(event) => {
+        if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+      }} />
+      <button aria-label="Send message" disabled={busy || !draft.trim()}><Send size={18} /></button>
+    </form>
+    <small>General AI chat does not read your documents. Use Ask AI to chat with selected files.</small>
+  </section>;
 }
 
 function ConversationHistory({
@@ -1176,6 +1520,8 @@ function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void
   </section></div>;
 }
 
+// Legacy safe-workflow planner retained for a future dedicated automation screen.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CopilotWorkspace({ documents, token, onClose }: { documents: DocumentItem[]; token: string; onClose: () => void }) {
   const [documentId, setDocumentId] = useState(documents[0]?.id ?? "");
   const [command, setCommand] = useState("");
@@ -1255,6 +1601,7 @@ function WorkspaceApp() {
   const [user, setUser] = useState<AuthResult["user"] | null>(initialAuth?.user ?? null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [workspaceArtifacts, setWorkspaceArtifacts] = useState<Artifact[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState("");
@@ -1262,6 +1609,7 @@ function WorkspaceApp() {
   const [viewer, setViewer] = useState<DocumentItem | null>(null);
   const [artifactViewer, setArtifactViewer] = useState<Artifact | null>(null);
   const [viewerPage, setViewerPage] = useState(1);
+  const [viewerSearch, setViewerSearch] = useState("");
   const [chatDocument, setChatDocument] = useState<DocumentItem | null>(null);
   const [chatDocuments, setChatDocuments] = useState<DocumentItem[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -1276,9 +1624,13 @@ function WorkspaceApp() {
   const [pdfToolsDocument, setPDFToolsDocument] = useState<DocumentItem | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
-  const [copilotOpen, setCopilotOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState("all");
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [draggingUpload, setDraggingUpload] = useState(false);
+  const [hubView, setHubView] = useState<"home" | "chat" | "documents">("home");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "pdfs" | "converted" | "images">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "name" | "size" | "type">("newest");
@@ -1289,10 +1641,17 @@ function WorkspaceApp() {
   const [renameBusy, setRenameBusy] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState("");
   const [preparingArtifactId, setPreparingArtifactId] = useState("");
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const workspaceSearchRef = useRef<HTMLInputElement>(null);
   const authForm = useForm<AuthFields>({
     resolver: zodResolver(authSchema),
     defaultValues: { display_name: "", email: "", password: "" },
   });
+
+  useEffect(() => {
+    document.documentElement.removeAttribute("data-theme");
+    localStorage.removeItem("insightpdf-theme");
+  }, []);
 
   useEffect(() => {
     function handleExpiredSession() {
@@ -1300,6 +1659,7 @@ function WorkspaceApp() {
       setUser(null);
       setDocuments([]);
       setWorkspaceArtifacts([]);
+      setCollections([]);
       setConversations([]);
       setViewer(null);
       setArtifactViewer(null);
@@ -1336,6 +1696,10 @@ function WorkspaceApp() {
     setWorkspaceArtifacts(await api<Artifact[]>("/pdf-tools/artifacts", accessToken));
   }, []);
 
+  const loadCollections = useCallback(async (accessToken: string) => {
+    setCollections(await api<Collection[]>("/collections", accessToken));
+  }, []);
+
   const loadConversations = useCallback(async (): Promise<Conversation[]> => {
     if (!token) return [];
     setHistoryBusy(true);
@@ -1369,15 +1733,34 @@ function WorkspaceApp() {
       loadDocuments(initialAuth.access_token).catch(() => undefined);
       loadStats(initialAuth.access_token).catch(() => undefined);
       loadWorkspaceArtifacts(initialAuth.access_token).catch(() => undefined);
+      loadCollections(initialAuth.access_token).catch(() => undefined);
+      api<Conversation[]>("/conversations", initialAuth.access_token).then(setConversations).catch(() => undefined);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialAuth, loadDocuments, loadStats, loadWorkspaceArtifacts]);
+  }, [initialAuth, loadCollections, loadDocuments, loadStats, loadWorkspaceArtifacts]);
 
   useEffect(() => {
     if (!token || !documents.some((item) => !["ready", "failed"].includes(item.status))) return;
     const timer = window.setInterval(() => loadDocuments(token).catch(() => undefined), 2500);
     return () => window.clearInterval(timer);
   }, [token, documents, loadDocuments]);
+
+  useEffect(() => {
+    function keyboardShortcuts(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.matches("input, textarea, select, [contenteditable=true]");
+      if (event.key === "Escape") {
+        setViewer(null); setArtifactViewer(null); setChatDocument(null); setHistoryOpen(false);
+        setAIDocument(null); setCompareOpen(false); setPDFToolsOpen(false); setOpenActionMenu("");
+        return;
+      }
+      if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === "/") { event.preventDefault(); workspaceSearchRef.current?.focus(); }
+      if (event.key.toLowerCase() === "u") { event.preventDefault(); uploadInputRef.current?.click(); }
+    }
+    window.addEventListener("keydown", keyboardShortcuts);
+    return () => window.removeEventListener("keydown", keyboardShortcuts);
+  }, []);
 
   async function authenticate(values: AuthFields) {
     setBusy(true); setError("");
@@ -1398,7 +1781,10 @@ function WorkspaceApp() {
       });
       localStorage.setItem("insightpdf-auth", JSON.stringify(result));
       setToken(result.access_token); setUser(result.user);
-      await Promise.all([loadDocuments(result.access_token), loadStats(result.access_token), loadWorkspaceArtifacts(result.access_token)]);
+      await Promise.all([
+        loadDocuments(result.access_token), loadStats(result.access_token), loadWorkspaceArtifacts(result.access_token),
+        loadCollections(result.access_token), api<Conversation[]>("/conversations", result.access_token).then(setConversations),
+      ]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
     finally { setBusy(false); }
   }
@@ -1414,6 +1800,10 @@ function WorkspaceApp() {
 
   async function upload(file?: File) {
     if (!file || !token) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Drop a PDF file. Other formats can be converted from PDF tools.");
+      return;
+    }
     setBusy(true); setError("");
     const data = new FormData(); data.append("file", file);
     try {
@@ -1423,9 +1813,55 @@ function WorkspaceApp() {
     finally { setBusy(false); }
   }
 
+  async function createCollection(event: FormEvent) {
+    event.preventDefault();
+    const name = newCollectionName.trim();
+    if (!name) return;
+    try {
+      const created = await api<Collection>("/collections", token, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color: "#3154d8" }),
+      });
+      setCollections((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setCollectionFilter(created.id);
+      setNewCollectionName("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not create collection"); }
+  }
+
+  async function assignDocumentCollection(document: DocumentItem, collectionId: string | null) {
+    try {
+      const updated = await api<DocumentItem>(`/documents/${document.id}/metadata`, token, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_title: document.display_title, tags: document.tags, collection_id: collectionId }),
+      });
+      setDocuments((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not move document"); }
+  }
+
+  async function assignArtifactCollection(artifact: Artifact, collectionId: string | null) {
+    try {
+      await api(`/pdf-tools/artifacts/${artifact.id}/collection`, token, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_title: null, tags: [], collection_id: collectionId }),
+      });
+      setWorkspaceArtifacts((current) => current.map((item) =>
+        item.id === artifact.id ? { ...item, collection_id: collectionId } : item
+      ));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not move generated file"); }
+  }
+
+  async function generateDocumentMetadata(document: DocumentItem) {
+    setBusy(true); setError("");
+    try {
+      const updated = await api<DocumentItem>(`/documents/${document.id}/generate-metadata`, token, { method: "POST" });
+      setDocuments((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not generate document metadata"); }
+    finally { setBusy(false); }
+  }
+
   function signOut() {
     localStorage.removeItem("insightpdf-auth");
-    setToken(""); setUser(null); setDocuments([]); setWorkspaceArtifacts([]); setConversations([]); setArtifactViewer(null); setRenameTarget(null);
+    setToken(""); setUser(null); setDocuments([]); setWorkspaceArtifacts([]); setCollections([]); setConversations([]); setArtifactViewer(null); setRenameTarget(null);
   }
 
   function renameDocument(document: DocumentItem) {
@@ -1565,13 +2001,15 @@ function WorkspaceApp() {
   const artifactDocumentIds = new Set(workspaceArtifacts.flatMap((artifact) => artifact.linked_document_id ? [artifact.linked_document_id] : []));
   const visibleDocuments = documents.filter((document) =>
     !artifactDocumentIds.has(document.id) &&
-    document.filename.toLowerCase().includes(query.toLowerCase()) &&
+    [document.filename, document.display_title ?? "", ...document.tags].join(" ").toLowerCase().includes(query.toLowerCase()) &&
+    (collectionFilter === "all" ? true : collectionFilter === "none" ? !document.collection_id : document.collection_id === collectionFilter) &&
     (statusFilter === "all" ? true : statusFilter === "processing"
       ? !["ready", "failed"].includes(document.status)
       : document.status === statusFilter)
   );
   const visibleArtifacts = workspaceArtifacts.filter((artifact) =>
-    artifact.filename.toLowerCase().includes(query.toLowerCase())
+    artifact.filename.toLowerCase().includes(query.toLowerCase()) &&
+    (collectionFilter === "all" ? true : collectionFilter === "none" ? !artifact.collection_id : artifact.collection_id === collectionFilter)
   );
   const workspaceItems = [
     ...(typeFilter === "converted" || typeFilter === "images" ? [] : visibleDocuments.map((item) => ({ kind: "pdf" as const, item }))),
@@ -1593,6 +2031,11 @@ function WorkspaceApp() {
     return new Date(right.item.created_at).getTime() - new Date(left.item.created_at).getTime();
   });
   const visibleFileKeys = workspaceItems.map((entry) => `${entry.kind === "pdf" ? "document" : "artifact"}:${entry.item.id}`);
+  const recentActivity = [
+    ...documents.map((item) => ({ id: `document-${item.id}`, icon: "document", title: item.display_title || item.filename, detail: item.status === "ready" ? "Document ready" : item.status.replaceAll("_", " "), date: item.created_at })),
+    ...workspaceArtifacts.map((item) => ({ id: `artifact-${item.id}`, icon: "artifact", title: item.filename, detail: item.operation.replaceAll("_", " "), date: item.created_at })),
+    ...conversations.map((item) => ({ id: `chat-${item.id}`, icon: "chat", title: item.title, detail: `${item.messages.length} chat messages`, date: item.updated_at })),
+  ].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()).slice(0, 6);
 
   if (!token || !user) return (
     <main className="auth-page">
@@ -1625,28 +2068,109 @@ function WorkspaceApp() {
     </main>
   );
 
+  const readyDocuments = documents.filter((item) => item.status === "ready");
+
   return (
-    <main className="workspace-page">
-      <header className="workspace-header">
-        <div className="auth-brand auth-brand-header"><img src="/logo.png" alt="InsightPDF" /></div>
-        <div><strong>{user.display_name}</strong><small>{user.email}</small></div>
-        <button onClick={() => setJobsOpen(true)}><RefreshCw size={16} /> Processing jobs</button>
-        <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><Settings size={16} /> Account</button>
-        <button onClick={signOut}><LogOut size={17} /> Sign out</button>
+    <main className={`workspace-page hub-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} data-hub-view={hubView}>
+      <aside className="hub-sidebar">
+        <div className="hub-brand">
+          <span className="hub-brand-mark"><FileText size={19} /></span>
+          <strong>Insight<span>PDF</span></strong>
+          <button aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+        </div>
+        <nav aria-label="Workspace navigation">
+          <button className={hubView === "home" ? "active" : ""} onClick={() => setHubView("home")}><LayoutDashboard size={18} /><span>Home</span></button>
+          <button className={hubView === "documents" ? "active" : ""} onClick={() => setHubView("documents")}><FolderOpen size={18} /><span>Documents</span><i>{documents.length + workspaceArtifacts.length}</i></button>
+          <span className="hub-nav-label">AI workspace</span>
+          <button className={hubView === "chat" ? "active" : ""} disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><BrainCircuit size={18} /><span>Ask AI</span></button>
+          <button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><MessageCircle size={18} /><span>Multi-document</span></button>
+          <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={18} /><span>Compare</span></button>
+          <span className="hub-nav-label">Tools</span>
+          <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>PDF tools</span></button>
+          <button onClick={() => { setHistoryDocumentFilter(null); setHistoryOpen(true); loadConversations().catch(() => undefined); }}><History size={18} /><span>Chat history</span></button>
+          <button onClick={() => setJobsOpen(true)}><RefreshCw size={18} /><span>Processing</span></button>
+        </nav>
+        <div className="hub-sidebar-footer">
+          <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><UserRound size={17} /><span className="hub-user"><strong>{user.display_name}</strong><small>{user.email}</small></span><Settings size={14} /></button>
+          <button onClick={signOut}><LogOut size={17} /><span>Sign out</span></button>
+        </div>
+      </aside>
+      <header className="hub-topbar">
+        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "chat" ? "Ask AI" : "Documents"}</strong><small>{hubView === "home" ? "Ask, create, and organize" : hubView === "chat" ? "Chat with one or multiple documents" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
+        <button title="Keyboard shortcuts: / search, U upload" aria-label="Keyboard shortcuts"><Keyboard size={17} /></button>
+        <button onClick={() => setJobsOpen(true)} aria-label="Processing jobs"><RefreshCw size={17} /></button>
+        <label className={`hub-upload ${busy ? "disabled" : ""}`}><Upload size={16} /> Upload<input ref={uploadInputRef} type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
       </header>
-      <section className="workspace-content">
+      <section className="workspace-content hub-content">
+        {hubView === "home" ? <div className="hub-home">
+          <HomeChat token={token} onChanged={() => loadConversations().catch(() => undefined)} onOpenDocuments={() => setHubView("chat")} />
+          <section className="hub-conversation">
+            <div className="hub-ai-brand"><span className="hub-brand-mark"><FileText size={20} /></span><strong>Insight<span>PDF</span> <i>AI</i></strong></div>
+            <h1>What can I help you understand?</h1>
+            <button className="hub-prompt" disabled={!readyDocuments.length} onClick={() => setHubView("chat")}>
+              <span>{readyDocuments.length ? "Ask anything about your documents…" : "Upload a document to start asking questions"}</span>
+              <i><Send size={17} /></i>
+            </button>
+            <div className="hub-prompt-hints"><span>Try:</span><button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}>Summarize latest</button><button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}>Compare files</button><button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}>Find across documents</button></div>
+          </section>
+          <section className="hub-quick-tools">
+            <header><div><strong>Quick tools</strong><span>Open a specialized workflow</span></div></header>
+            <div>
+              <button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><span><MessageCircle size={19} /></span><strong>Ask documents</strong><small>Grounded answers with citations</small></button>
+              <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}><span><Sparkles size={19} /></span><strong>Summarize</strong><small>Turn long files into key points</small></button>
+              <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><span><RefreshCw size={19} /></span><strong>Compare</strong><small>Find changes and differences</small></button>
+              <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><span><Scissors size={19} /></span><strong>PDF tools</strong><small>Convert, merge, split, and edit</small></button>
+            </div>
+          </section>
+          <div className="hub-home-grid">
+            <section className="hub-recent">
+              <header><div><strong>Recent</strong><span>Your latest work</span></div><button onClick={() => setHubView("documents")}>View all</button></header>
+              <div>{recentActivity.slice(0, 5).map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={16} /> : item.icon === "artifact" ? <Sparkles size={16} /> : <FileText size={16} />}<span><strong>{item.title}</strong><small>{item.detail}</small></span><time>{new Date(item.date).toLocaleDateString()}</time></article>)}</div>
+            </section>
+            <section className="hub-overview">
+              <header><strong>Workspace</strong><span>At a glance</span></header>
+              <div><article><strong>{documents.length + workspaceArtifacts.length}</strong><span>Files</span></article><article><strong>{stats?.page_count ?? 0}</strong><span>Pages</span></article><article><strong>{stats?.ai_requests ?? 0}</strong><span>AI requests</span></article></div>
+              <button onClick={() => setHubView("documents")}><FolderOpen size={15} /> Open documents</button>
+            </section>
+          </div>
+        </div> : hubView === "chat" ? <IntegratedChatHub
+          documents={readyDocuments}
+          token={token}
+          onChanged={() => { loadConversations().catch(() => undefined); }}
+          onHistory={() => { setHistoryDocumentFilter(null); setHistoryOpen(true); loadConversations().catch(() => undefined); }}
+          onPreview={(document) => { setViewerPage(1); setViewerSearch(""); setViewer(document); }}
+          onCitation={(citation) => {
+            const cited = documents.find((item) => item.id === citation.document_id);
+            if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
+          }}
+        /> : <header className="documents-heading"><div><h1>Your documents</h1><p>Upload, organize, preview, and use AI with every file.</p></div></header>}
         <div className="workspace-title">
-          <div><p className="eyebrow">Document workspace</p><h1>Your Documents</h1><p>Original PDFs and generated results, together in one workspace.</p></div>
+          <div><p className="eyebrow">AI-first document workspace</p><h1>What do you want to understand?</h1><p>Upload a PDF, ask grounded questions, compare versions, or transform it into something useful.</p></div>
           <div className="workspace-actions">
-            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setCopilotOpen(true)}><BrainCircuit size={16} /> Ask copilot</button>
+            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setHubView("chat")}><BrainCircuit size={16} /> Ask documents</button>
             <button disabled={!documents.some((item) => item.status === "ready")} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={16} /> PDF tools</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={16} /> Compare PDFs</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setMultiChatOpen(true)}><Sparkles size={16} /> Ask multiple PDFs</button>
             <label className={`real-upload ${busy ? "disabled" : ""}`}><Upload size={17} /> Upload PDF<input type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
           </div>
         </div>
+        <button className={`ai-upload-dropzone ${draggingUpload ? "dragging" : ""}`} type="button" onClick={() => uploadInputRef.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDraggingUpload(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDraggingUpload(false)} onDrop={(event) => {
+          event.preventDefault(); setDraggingUpload(false); upload(event.dataTransfer.files[0]);
+        }}>
+          {busy ? <RefreshCw className="spin" size={25} /> : <Upload size={25} />}
+          <span><strong>{busy ? "Uploading and preparing your document…" : "Drop a PDF here to begin"}</strong><small>or click to browse · U opens the file picker</small></span>
+          <Sparkles size={19} />
+        </button>
         {error && <div className="form-error">{error}</div>}
         <div className="dashboard-cards">{stats && <><article><LayoutDashboard size={17} /><div><strong>{documents.length + workspaceArtifacts.length}</strong><span>All files</span></div></article><article><FileText size={17} /><div><strong>{stats.page_count}</strong><span>Pages indexed</span></div></article><article><Sparkles size={17} /><div><strong>{stats.ai_requests}</strong><span>AI requests</span></div></article><article><Download size={17} /><div><strong>{stats.generated_files}</strong><span>Generated files</span></div></article></>}</div>
+        {!!recentActivity.length && <section className="recent-activity"><header><Activity size={16} /><div><strong>Recent activity</strong><span>Your latest documents, results, and conversations</span></div></header><div>{recentActivity.map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={15} /> : item.icon === "artifact" ? <Sparkles size={15} /> : <FileText size={15} />}<span><strong>{item.title}</strong><small>{item.detail} · {new Date(item.date).toLocaleDateString()}</small></span></article>)}</div></section>}
+        <div className="collection-bar">
+          <FolderOpen size={16} />
+          <button className={collectionFilter === "all" ? "active" : ""} onClick={() => setCollectionFilter("all")}>All documents</button>
+          <button className={collectionFilter === "none" ? "active" : ""} onClick={() => setCollectionFilter("none")}>Unfiled</button>
+          {collections.map((collection) => <button className={collectionFilter === collection.id ? "active" : ""} key={collection.id} onClick={() => setCollectionFilter(collection.id)}><i style={{ background: collection.color }} />{collection.name}</button>)}
+          <form onSubmit={createCollection}><FolderPlus size={14} /><input aria-label="New collection name" value={newCollectionName} onChange={(event) => setNewCollectionName(event.target.value)} placeholder="New collection" /><button disabled={!newCollectionName.trim()}>Add</button></form>
+        </div>
         <div className="document-type-tabs" role="tablist" aria-label="Document types">
           <button role="tab" aria-selected={typeFilter === "all"} className={typeFilter === "all" ? "active" : ""} onClick={() => setTypeFilter("all")}>All <span>{documents.length + workspaceArtifacts.length}</span></button>
           <button role="tab" aria-selected={typeFilter === "pdfs"} className={typeFilter === "pdfs" ? "active" : ""} onClick={() => setTypeFilter("pdfs")}>Uploaded PDFs <span>{documents.length}</span></button>
@@ -1654,7 +2178,7 @@ function WorkspaceApp() {
           <button role="tab" aria-selected={typeFilter === "images"} className={typeFilter === "images" ? "active" : ""} onClick={() => setTypeFilter("images")}>Images <span>{workspaceArtifacts.filter(isImageArtifact).length}</span></button>
         </div>
         <div className="document-filters">
-          <label><Search size={15} /><input aria-label="Search documents" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your documents" /></label>
+          <label><Search size={15} /><input ref={workspaceSearchRef} aria-label="Search documents" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, filenames, and tags · /" /></label>
           {(typeFilter === "all" || typeFilter === "pdfs") && <select aria-label="PDF processing status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All PDF statuses</option><option value="ready">Ready</option><option value="processing">Processing</option><option value="failed">Failed</option></select>}
           <select aria-label="Sort documents" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="newest">Newest first</option><option value="name">Name</option><option value="size">File size</option><option value="type">File type</option></select>
         </div>
@@ -1697,6 +2221,7 @@ function WorkspaceApp() {
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactPDFTools(artifact); setOpenActionMenu(""); }}><Scissors size={14} /> {preparingArtifactId === artifact.id ? "Preparing…" : "PDF tools"}</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "workspace"); setOpenActionMenu(""); }}><Sparkles size={14} /> AI tools</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "chat"); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
+                    <label className="action-menu-select"><FolderOpen size={14} /><select aria-label={`Collection for ${artifact.filename}`} value={artifact.collection_id ?? ""} onChange={(event) => assignArtifactCollection(artifact, event.target.value || null)}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
                     <button className="danger" onClick={() => { removeWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
                   </nav></>}
                 </div>
@@ -1707,10 +2232,12 @@ function WorkspaceApp() {
             const ready = document.status === "ready";
             return <article className="document-card" key={document.id}>
               <label className="workspace-document-select" title={`Select ${document.filename}`}><input type="checkbox" checked={selectedFileKeys.includes(`document:${document.id}`)} onChange={(event) => setSelectedFileKeys((current) => event.target.checked ? [...current, `document:${document.id}`] : current.filter((key) => key !== `document:${document.id}`))} /></label>
-              <DocumentCardPreview document={document} token={token} onOpen={() => { setViewerPage(1); setViewer(document); }} />
+              <DocumentCardPreview document={document} token={token} onOpen={() => { setViewerPage(1); setViewerSearch(""); setViewer(document); }} />
               <div className="document-info">
-                <strong>{document.filename}</strong>
+                <strong>{document.display_title || document.filename}</strong>
+                {document.display_title && <small className="document-original-name">{document.filename}</small>}
                 <span>{(document.size_bytes / 1024 / 1024).toFixed(1)} MB · PDF · {new Date(document.created_at).toLocaleDateString()}</span>
+                {!!document.tags.length && <div className="document-tags">{document.tags.map((tag) => <i key={tag}>{tag}</i>)}</div>}
                 <div className={`phase-status ${ready ? "ready" : document.status === "failed" ? "failed" : ""}`}>
                   {ready ? <Check size={13} /> : <RefreshCw size={13} className="spin" />}
                   {ready ? `Uploaded · Ready · ${document.page_count ?? "—"} ${document.page_count === 1 ? "page" : "pages"}` : document.status.replaceAll("_", " ")}
@@ -1719,14 +2246,17 @@ function WorkspaceApp() {
                 {(document.error_message || job?.error_message) && <small className="document-error">{document.error_message || job?.error_message}</small>}
               </div>
               <div className="document-actions">
+                {ready && <div className="document-quick-actions"><button title="Summarize" aria-label={`Summarize ${document.filename}`} onClick={() => setAIDocument(document)}><Sparkles size={14} /></button><button title="Ask AI" aria-label={`Ask AI about ${document.filename}`} onClick={() => openDocumentChat(document)}><MessageCircle size={14} /></button></div>}
                 <button className="more-actions-button" aria-label={`More actions for ${document.filename}`} title="More actions" onClick={() => setOpenActionMenu((current) => current === `document:${document.id}` ? "" : `document:${document.id}`)}><MoreVertical size={17} /></button>
                 {openActionMenu === `document:${document.id}` && <><button className="action-menu-backdrop" aria-label="Close actions menu" onClick={() => setOpenActionMenu("")} /><nav className="file-action-menu" aria-label={`Actions for ${document.filename}`}>
-                  <button disabled={!ready} onClick={() => { setViewerPage(1); setViewer(document); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
+                  <button disabled={!ready} onClick={() => { setViewerPage(1); setViewerSearch(""); setViewer(document); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
                   <button onClick={() => { renameDocument(document); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
                   {document.status === "failed" && <button onClick={() => { retryDocument(document); setOpenActionMenu(""); }}><RefreshCw size={14} /> Retry processing</button>}
                   <button disabled={!ready} onClick={() => { setPDFToolsDocument(document); setPDFToolsOpen(true); setOpenActionMenu(""); }}><Scissors size={14} /> PDF tools</button>
                   <button disabled={!ready} onClick={() => { setAIDocument(document); setOpenActionMenu(""); }}><Sparkles size={14} /> AI tools</button>
                   <button disabled={!ready || busy} onClick={() => { openDocumentChat(document); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
+                  <button disabled={!ready || busy} onClick={() => { generateDocumentMetadata(document); setOpenActionMenu(""); }}><Tag size={14} /> Generate title & tags</button>
+                  <label className="action-menu-select"><FolderOpen size={14} /><select aria-label={`Collection for ${document.filename}`} value={document.collection_id ?? ""} onChange={(event) => assignDocumentCollection(document, event.target.value || null)}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
                   <button className="danger" onClick={() => { removeDocument(document); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
                 </nav></>}
               </div>
@@ -1735,7 +2265,7 @@ function WorkspaceApp() {
           {!workspaceItems.length && <div className="empty-workspace">{typeFilter === "images" ? <FileImage size={34} /> : <Upload size={34} />}<h2>No documents found</h2><p>{query ? "Try another search or filter." : typeFilter === "images" ? "Image conversion results will appear here. Source images remain temporary unless saved as an output." : "Upload a PDF or create a converted file to get started."}</p></div>}
         </div>
       </section>
-      {viewer && <ArtifactViewer key={viewer.id} document={viewer} token={token} initialPage={viewerPage} onHistory={() => {
+      {viewer && <PdfViewer key={`${viewer.id}-${viewerPage}-${viewerSearch}`} document={viewer} token={token} initialPage={viewerPage} initialSearch={viewerSearch} onHistory={() => {
         setHistoryDocumentFilter(viewer); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => setViewer(null)} />}
       {artifactViewer && <ArtifactViewer key={artifactViewer.id} artifact={artifactViewer} token={token} onClose={() => setArtifactViewer(null)} />}
@@ -1748,12 +2278,12 @@ function WorkspaceApp() {
         </form>
       </div>}
       {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onPreview={() => {
-        setViewerPage(1); setViewer(chatDocument);
+        setViewerPage(1); setViewerSearch(""); setViewer(chatDocument);
       }} onHistory={() => {
         setHistoryDocumentFilter(chatDocument); setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => { setChatDocument(null); setActiveConversation(null); }} onCitation={(citation) => {
         const cited = documents.find((item) => item.id === citation.document_id);
-        if (cited) { setViewerPage(citation.page_number); setViewer(cited); }
+        if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
       }} />}
       {historyOpen && <ConversationHistory conversations={conversations} documents={documents} busy={historyBusy} documentFilter={historyDocumentFilter} onRefresh={async () => { await loadConversations(); }} onClose={() => setHistoryOpen(false)} onOpen={(conversation, document) => {
         setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(documents.filter((item) => conversation.document_ids.includes(item.id))); setChatDocument(document);
@@ -1763,11 +2293,11 @@ function WorkspaceApp() {
       }} />}
       {aiDocument && <AIWorkspace document={aiDocument} documents={documents.filter((item) => item.status === "ready")} token={token} compareMode={false} onClose={() => setAIDocument(null)} onPage={(documentId, page) => {
         const selected = documents.find((item) => item.id === documentId);
-        if (selected) { setViewerPage(page); setViewer(selected); }
+        if (selected) { setViewerPage(page); setViewerSearch(""); setViewer(selected); }
       }} />}
       {compareOpen && <AIWorkspace document={null} documents={documents.filter((item) => item.status === "ready")} token={token} compareMode onClose={() => setCompareOpen(false)} onPage={(documentId, page) => {
         const selected = documents.find((item) => item.id === documentId);
-        if (selected) { setViewerPage(page); setViewer(selected); }
+        if (selected) { setViewerPage(page); setViewerSearch(""); setViewer(selected); }
       }} />}
       {pdfToolsOpen && <PDFToolsWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} initialDocument={pdfToolsDocument} onClose={() => {
         setPDFToolsOpen(false);
@@ -1780,12 +2310,20 @@ function WorkspaceApp() {
         localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
       }} onClose={() => setAccountOpen(false)} />}
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
-      {copilotOpen && <CopilotWorkspace documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setCopilotOpen(false)} />}
     </main>
   );
 }
 
 function LandingPage({ onOpen }: { onOpen: () => void }) {
+  const [landingPrompt, setLandingPrompt] = useState("");
+
+  function submitLandingPrompt(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!landingPrompt.trim()) return;
+    sessionStorage.setItem("insightpdf-pending-prompt", landingPrompt.trim());
+    onOpen();
+  }
+
   return (
     <main className="landing-page">
       <header className="landing-nav">
@@ -1802,7 +2340,28 @@ function LandingPage({ onOpen }: { onOpen: () => void }) {
         </div>
         <h1>Understand any PDF.<br />Without the busywork.</h1>
         <p>Read, search, summarize, compare, and transform your documents in one focused workspace.</p>
-        <button className="landing-primary" onClick={onOpen}>Open InsightPDF <span>→</span></button>
+        <form className="landing-chat" onSubmit={submitLandingPrompt}>
+          <div className="landing-chat-heading">
+            <span><Sparkles size={16} /></span>
+            <div><strong>Ask InsightPDF</strong><small>Sign in to send your question</small></div>
+          </div>
+          <div className="landing-chat-composer">
+            <input
+              aria-label="Ask InsightPDF"
+              value={landingPrompt}
+              onChange={(event) => setLandingPrompt(event.target.value)}
+              placeholder="Ask anything about your PDF…"
+            />
+            <button type="submit" aria-label="Send question" disabled={!landingPrompt.trim()}>
+              <Send size={18} />
+            </button>
+          </div>
+          <div className="landing-chat-suggestions">
+            {["Summarize this document", "Find the key risks", "Compare two PDFs"].map((prompt) =>
+              <button key={prompt} type="button" onClick={() => setLandingPrompt(prompt)}>{prompt}</button>
+            )}
+          </div>
+        </form>
         <div className="landing-demo" aria-label="InsightPDF example">
           <div className="landing-demo-top">
             <span><i /> annual-report.pdf</span>

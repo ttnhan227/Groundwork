@@ -6,20 +6,20 @@ async function signInDemo(page: Page) {
   await page.getByLabel("Email").fill("demo@insightpdf.dev");
   await page.getByLabel("Password").fill("DemoPassword123!");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Your Documents" })).toBeVisible();
-  await expect(page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What can I help you understand?" })).toBeVisible();
 }
 
 test("recruiter can sign in, inspect seeded documents, and open the PDF viewer", async ({ page }) => {
   await signInDemo(page);
-  await expect(page.getByText("scanned-project-notes.pdf")).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: /Documents/ }).click();
+  await expect(page.locator(".document-card").filter({ hasText: "scanned-project-notes.pdf" })).toBeVisible();
   await page.getByRole("button", { name: "Processing jobs" }).click();
   await expect(page.getByRole("dialog", { name: "Processing jobs" })).toBeVisible();
   await page.locator(".jobs-panel header").getByRole("button", { name: "Close processing jobs" }).click();
   const card = page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" });
   await card.getByRole("button", { name: "Open employee-handbook-v1.pdf" }).click();
   await expect(page.getByRole("dialog", { name: "Preview employee-handbook-v1.pdf" })).toBeVisible();
-  await expect(page.locator(".artifact-viewer iframe")).toBeVisible();
+  await expect(page.locator(".pdf-page-surface canvas")).toBeVisible({ timeout: 30_000 });
 });
 
 test("new user can register, upload a real PDF, and wait for indexing", async ({ page, request }) => {
@@ -43,13 +43,14 @@ test("new user can register, upload a real PDF, and wait for indexing", async ({
   await page.getByLabel("Email").fill(`playwright-${suffix}@example.com`);
   await page.getByLabel("Password").fill("PlaywrightPassword!42");
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("heading", { name: "Your Documents" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What can I help you understand?" })).toBeVisible();
 
   await page.locator('input[type="file"][accept*="pdf"]').setInputFiles({
     name: "playwright-upload.pdf",
     mimeType: "application/pdf",
     buffer: sourcePdf,
   });
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: /Documents/ }).click();
   const uploaded = page.locator(".document-card").filter({ hasText: "playwright-upload.pdf" });
   await expect(uploaded).toBeVisible();
   await expect(uploaded.getByText("ready")).toBeVisible({ timeout: 120_000 });
@@ -72,6 +73,7 @@ test("recruiter can run a background PDF operation and download its result", asy
 test("live AI flow returns citations and a cached summary", async ({ page }) => {
   test.skip(!process.env.RUN_LIVE_AI_E2E, "Set RUN_LIVE_AI_E2E=1 when a funded LLM is configured");
   await signInDemo(page);
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: /Documents/ }).click();
   const card = page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" });
   await card.getByRole("button", { name: "More actions for employee-handbook-v1.pdf" }).click();
   await page.getByRole("navigation", { name: "Actions for employee-handbook-v1.pdf" }).getByRole("button", { name: "Ask AI" }).click();

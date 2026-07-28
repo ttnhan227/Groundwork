@@ -80,8 +80,8 @@ test("includes Phase 6 dashboard, account, admin, and optional demo access", asy
   assert.match(page, /\/profile\/stats/);
   assert.match(page, /\/profile\/password/);
   assert.match(page, /\/admin\/users/);
-  assert.match(page, /Search your documents/);
-  assert.match(page, /Your Documents/);
+  assert.match(page, /Search titles, filenames, and tags/);
+  assert.match(page, /What can I help you understand\?/);
   assert.match(page, /Save source images to workspace/);
   assert.match(page, /VITE_DEMO_ENABLED/);
   assert.match(page, /Open the demo workspace/);
@@ -89,6 +89,50 @@ test("includes Phase 6 dashboard, account, admin, and optional demo access", asy
   assert.match(page, /openDemoWorkspace/);
   assert.match(page, /retryDocument/);
   assert.match(css, /\.dashboard-cards/);
+  assert.match(css, /\.hub-sidebar/);
+  assert.match(css, /\.hub-conversation/);
+  assert.match(css, /\.hub-quick-tools/);
   assert.match(css, /\.account-panel/);
   assert.match(css, /\.admin-users/);
+});
+
+test("includes the Version 2.5 AI-first workspace experience", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  for (const value of [
+    "Drop a PDF here to begin",
+    "starterPrompts",
+    "followUpPrompts",
+    "Export conversation",
+    "Search within document",
+    "Generate title & tags",
+    "/collections",
+    "Recent activity",
+    "Message InsightPDF AI",
+    "Keyboard shortcuts",
+  ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(css, /\.ai-upload-dropzone/);
+  assert.match(css, /\.collection-bar/);
+  assert.doesNotMatch(css, /\[data-theme="dark"\]/);
+  assert.doesNotMatch(page, /Toggle dark mode/);
+  assert.match(css, /prefers-reduced-motion/);
+});
+
+test("streams chat tokens and highlights cited PDF text", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /messages\/stream/);
+  assert.match(page, /Accept: "text\/event-stream"/);
+  assert.match(page, /response\.body\.getReader\(\)/);
+  assert.match(page, /event === "token"/);
+  assert.match(page, /event === "complete"/);
+  assert.match(page, /getTextContent\(\)/);
+  assert.match(page, /pdf-highlight-layer/);
+  assert.match(page, /initialSearch=\{viewerSearch\}/);
+  assert.match(css, /\.pdf-highlight-layer mark/);
+  assert.match(css, /citation-pulse/);
 });
