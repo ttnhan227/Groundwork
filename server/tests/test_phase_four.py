@@ -7,6 +7,7 @@ from app.ai_features import (
     ComparisonPayload,
     ExtractionPayload,
     QuizPayload,
+    ReportPayload,
     SummaryPayload,
     TranslationPayload,
     _cache_key,
@@ -44,6 +45,15 @@ def test_phase_four_structured_payloads_validate_page_references() -> None:
         "changed_sections": [{"description": "Deadline changed", "left_pages": [1], "right_pages": [2]}],
         "similarity_percent": 82.5,
     })
+    report = ReportPayload.model_validate({
+        "title": "Annual report analysis", "document_type": "Financial report",
+        "purpose": "Report annual performance", "executive_summary": "Revenue increased.",
+        "metrics": [{"label": "Revenue", "value": "$48.2M", "change": "18.4%", "trend": "up",
+                     "context": "FY25 revenue", "page_references": [reference]}],
+        "findings": [], "risks": [], "entities": [], "timeline": [],
+        "missing_information": [], "next_actions": [],
+    })
+    assert report.metrics[0].value == "$48.2M"
 
 
 def test_comparison_never_calls_unreadable_image_document_identical() -> None:

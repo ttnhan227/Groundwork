@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
+
+async function readSourceTree(directory = new URL("../src/", import.meta.url)) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const contents = await Promise.all(entries.map((entry) => {
+    const target = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directory);
+    return entry.isDirectory()
+      ? readSourceTree(target)
+      : /\.(?:ts|tsx)$/.test(entry.name) ? readFile(target, "utf8") : "";
+  }));
+  return contents.join("\n");
+}
 
 test("builds the InsightPDF static application shell", async () => {
   const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
@@ -11,7 +22,7 @@ test("builds the InsightPDF static application shell", async () => {
 
 test("includes Phase 3 chat and citation navigation", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /\/conversations/);
@@ -48,7 +59,7 @@ test("includes Phase 3 chat and citation navigation", async () => {
 
 test("includes Phase 4 document intelligence tools", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /AI tools/);
@@ -65,7 +76,7 @@ test("includes Phase 4 document intelligence tools", async () => {
 
 test("includes the complete Phase 5 PDF tools workspace", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   for (const label of ["Merge", "Split", "Extract pages", "Delete pages", "Rotate", "PDF to images", "Images to PDF", "Watermark"]) {
@@ -79,7 +90,7 @@ test("includes the complete Phase 5 PDF tools workspace", async () => {
 
 test("includes Phase 6 dashboard, account, and admin access", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /\/profile\/stats/);
@@ -101,16 +112,15 @@ test("includes Phase 6 dashboard, account, and admin access", async () => {
 
 test("includes the Version 2.5 AI-first workspace experience", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   for (const value of [
-    "Drop a PDF here to begin",
+    "Drop a PDF or image here to begin",
     "starterPrompts",
     "followUpPrompts",
     "Export conversation",
     "Search within document",
-    "Generate title & tags",
     "/collections",
     "Recent activity",
     "Message InsightPDF AI",
@@ -125,7 +135,7 @@ test("includes the Version 2.5 AI-first workspace experience", async () => {
 
 test("streams chat tokens and highlights cited PDF text", async () => {
   const [page, css] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   assert.match(page, /messages\/stream/);

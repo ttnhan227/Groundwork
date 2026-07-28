@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import fitz
 from io import BytesIO
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -27,6 +28,34 @@ def safe_filename(name: str) -> str:
     basename = name.replace("\\", "/").split("/")[-1]
     value = re.sub(r"[^a-zA-Z0-9._ -]", "_", basename).strip(" .")
     return value[:180] or "document.pdf"
+
+
+IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+MAX_IMAGE_PIXELS = 40_000_000
+
+
+def image_to_pdf(data: bytes) -> bytes:
+    """Validate and normalize a supported image into a one-page PDF."""
+    try:
+        with Image.open(BytesIO(data)) as source:
+            if source.format not in IMAGE_FORMATS:
+                raise ValueError("Only PNG, JPEG, and WebP images are accepted")
+            if source.width * source.height > MAX_IMAGE_PIXELS:
+                raise ValueError("Image dimensions are too large")
+            source.load()
+            image = ImageOps.exif_transpose(source)
+            if image.mode in {"RGBA", "LA"} or "transparency" in image.info:
+                rgba = image.convert("RGBA")
+                normalized = Image.new("RGB", rgba.size, "white")
+                normalized.paste(rgba, mask=rgba.getchannel("A"))
+            else:
+                normalized = image.convert("RGB")
+            output = BytesIO()
+            normalized.save(output, format="PDF", resolution=150.0, quality=92)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ValueError("The file is not a valid supported image") from exc
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -246,14 +275,26 @@ async def upload_document(
     document_count = await session.scalar(select(func.count(Document.id)).where(Document.owner_id == user.id))
     if (document_count or 0) >= settings.max_documents_per_user:
         raise HTTPException(status_code=422, detail=f"Document limit reached ({settings.max_documents_per_user})")
-    filename = safe_filename(file.filename or "document.pdf")
-    if not filename.lower().endswith(".pdf") or file.content_type != "application/pdf":
-        raise HTTPException(status_code=415, detail="Only PDF files are accepted")
+    original_filename = safe_filename(file.filename or "document.pdf")
+    suffix = original_filename.lower().rsplit(".", 1)[-1] if "." in original_filename else ""
+    is_pdf = suffix == "pdf" and file.content_type == "application/pdf"
+    is_image = suffix in {"png", "jpg", "jpeg", "webp"} and file.content_type in IMAGE_CONTENT_TYPES
+    if not is_pdf and not is_image:
+        raise HTTPException(status_code=415, detail="Only PDF, PNG, JPEG, and WebP files are accepted")
     data = await file.read(settings.max_file_size_mb * 1024 * 1024 + 1)
     if len(data) > settings.max_file_size_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_file_size_mb} MB")
-    if not data.startswith(b"%PDF-"):
+    if is_pdf and not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=422, detail="The file is not a valid PDF")
+    display_title = None
+    filename = original_filename
+    if is_image:
+        try:
+            data = await run_in_threadpool(image_to_pdf, data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        filename = f"{original_filename.rsplit('.', 1)[0]}.pdf"
+        display_title = original_filename
     document_id = uuid.uuid4()
     object_key = f"{user.id}/{document_id}/{filename}"
     storage = ObjectStorage()
@@ -268,6 +309,7 @@ async def upload_document(
         object_key=object_key,
         content_type="application/pdf",
         size_bytes=len(data),
+        display_title=display_title,
     )
     session.add(document)
     job = ProcessingJob(

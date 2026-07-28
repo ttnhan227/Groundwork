@@ -38,6 +38,15 @@ THEMES = {
     "warm": {"navy": "382B2A", "accent": "D86A4A", "soft": "FBF1EA"},
 }
 
+PRESENTATION_TEMPLATES = {
+    "startup-pitch": {"theme": "modern", "layout": "modern", "brief": "Build a startup pitch deck: problem, solution, market, product, traction, business model, go-to-market, and next step."},
+    "quarterly-review": {"theme": "executive", "layout": "compact", "brief": "Build a quarterly business review: executive summary, KPI scorecard, wins, misses, drivers, outlook, and decisions."},
+    "strategy-roadmap": {"theme": "minimal", "layout": "editorial", "brief": "Build a strategy roadmap: context, strategic pillars, initiatives, phased timeline, dependencies, risks, and owners."},
+    "product-launch": {"theme": "warm", "layout": "modern", "brief": "Build a product launch story: customer need, product promise, key capabilities, positioning, launch plan, channels, and success measures."},
+    "data-report": {"theme": "modern", "layout": "compact", "brief": "Build a data-led report: headline findings, KPI snapshots, trends, comparisons, implications, and recommended actions."},
+    "client-proposal": {"theme": "minimal", "layout": "formal", "brief": "Build a client proposal: understanding, proposed approach, workstreams, deliverables, timeline, proof, and next steps."},
+}
+
 
 def _plain_text(value) -> str:
     text = str(value)
@@ -52,6 +61,7 @@ class CreateRequest(BaseModel):
     theme: str = Field(default="minimal", pattern="^(minimal|executive|modern|warm)$")
     title: str | None = Field(default=None, max_length=160)
     source_document_id: uuid.UUID | None = None
+    template_id: str | None = Field(default=None, max_length=50)
 
 
 class GeneratedSection(BaseModel):
@@ -133,7 +143,7 @@ def _content(prompt: str, source: str) -> tuple[str, list[tuple[str, str]]]:
 async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
     settings = get_settings()
     if not settings.llm_api_key:
-        raise HTTPException(status_code=503, detail="Mistral generation is not configured")
+        raise HTTPException(status_code=503, detail="InsightPDF document generation is not configured")
     format_name = {"docx": "Word document", "pdf": "PDF report", "pptx": "PowerPoint presentation"}[payload.output_format]
     source_rule = (
         "Use the supplied source text as evidence. Do not invent figures, names, dates, or claims that are absent from it."
@@ -177,7 +187,7 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
             response.raise_for_status()
             raw = response.json()["choices"][0]["message"]["content"].strip()
     except (httpx.HTTPError, KeyError, IndexError) as exc:
-        raise HTTPException(status_code=502, detail="Mistral could not generate this document") from exc
+        raise HTTPException(status_code=502, detail="InsightPDF could not generate this document") from exc
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
     try:
         value = json.loads(raw)
@@ -203,7 +213,7 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
                 value["table"] = None
         result = GeneratedContent.model_validate(value)
     except (json.JSONDecodeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail="Mistral returned an invalid document structure") from exc
+        raise HTTPException(status_code=502, detail="InsightPDF returned an invalid document structure") from exc
     return result
 
 
@@ -509,7 +519,7 @@ def _pptx_preview_slides(plan: GeneratedContent) -> list[dict[str, str]]:
     return slides
 
 
-def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
+def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: bytes | None = None) -> bytes:
     slide_data = _pptx_preview_slides(plan)
     sections = [(item["title"], item["body"]) for item in slide_data[1:]]
     deck = Presentation()
@@ -542,10 +552,15 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     title_slide.background.fill.solid()
     title_slide.background.fill.fore_color.rgb = navy
     title_data = slide_data[0]
+    if hero_image:
+        try:
+            title_slide.shapes.add_picture(BytesIO(hero_image), PptxInches(8.7), PptxInches(0), width=PptxInches(4.633), height=PptxInches(7.5))
+        except Exception:
+            hero_image = None
     text(title_slide, title_data["eyebrow"], .85, .72, 5, .3, 14, accent, True)
-    text(title_slide, title_data["title"], .85, 1.65, 11.25, 2.25, 50, PptxRGBColor(255, 255, 255), True,
+    text(title_slide, title_data["title"], .85, 1.65, 7.35 if hero_image else 11.25, 2.25, 50, PptxRGBColor(255, 255, 255), True,
          vertical=MSO_ANCHOR.MIDDLE)
-    text(title_slide, title_data["body"], .85, 5.55, 9.5, .85, 19, PptxRGBColor(190, 200, 218))
+    text(title_slide, title_data["body"], .85, 5.55, 7.15 if hero_image else 9.5, .85, 19, PptxRGBColor(190, 200, 218))
     for index, (heading, body) in enumerate(sections, 1):
         slide = deck.slides.add_slide(deck.slide_layouts[6])
         slide.background.fill.solid()
@@ -597,11 +612,17 @@ async def create_file(
             select(DocumentPage).where(DocumentPage.document_id == payload.source_document_id).order_by(DocumentPage.page_number)
         ))
         source_text = " ".join(page.text for page in pages)[:24_000]
-    plan = await _ai_content(payload, source_text)
+    template = PRESENTATION_TEMPLATES.get(payload.template_id or "")
+    content_request = payload
+    if payload.output_format == "pptx" and template:
+        content_request = payload.model_copy(update={"prompt": f"{template['brief']}\n\nTOPIC AND REQUIREMENTS:\n{payload.prompt}"})
+    plan = await _ai_content(content_request, source_text)
     await record_ai_usage(user, f"create_{payload.output_format}", session, cached=False)
-    theme = THEMES[payload.theme]
-    builders = {"docx": _docx_dynamic, "pdf": _pdf_dynamic, "pptx": _pptx_dynamic}
-    data = builders[payload.output_format](plan, theme)
+    selected_theme = template["theme"] if payload.output_format == "pptx" and template else payload.theme
+    if payload.output_format == "pptx" and template:
+        plan.layout = template["layout"]
+    theme = THEMES[selected_theme]
+    data = _pptx_dynamic(plan, theme) if payload.output_format == "pptx" else {"docx": _docx_dynamic, "pdf": _pdf_dynamic}[payload.output_format](plan, theme)
     filename = safe_filename(re.sub(r"[^a-zA-Z0-9 -]", "", plan.title).strip().replace(" ", "-").lower()[:70] or "insight-document")
     filename = f"{filename}.{payload.output_format}"
     content_types = {
@@ -625,7 +646,8 @@ async def create_file(
         size_bytes=len(data),
         parameters={
             "prompt": payload.prompt,
-            "theme": payload.theme,
+            "theme": selected_theme,
+            "template_id": payload.template_id,
             "source_document_id": str(payload.source_document_id) if payload.source_document_id else None,
             "provider": "mistral",
             "model": get_settings().llm_model,

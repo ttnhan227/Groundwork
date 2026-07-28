@@ -44,6 +44,54 @@ class SummaryPayload(BaseModel):
     page_references: list[PageReference] = []
 
 
+class ReportMetric(BaseModel):
+    label: str
+    value: str
+    change: str = ""
+    trend: str = "neutral"
+    context: str = ""
+    page_references: list[PageReference] = []
+
+
+class ReportFinding(BaseModel):
+    title: str
+    detail: str
+    importance: str = "medium"
+    page_references: list[PageReference] = []
+
+
+class ReportRisk(BaseModel):
+    title: str
+    detail: str
+    severity: str = "medium"
+    page_references: list[PageReference] = []
+
+
+class ReportEntity(BaseModel):
+    name: str
+    role: str
+
+
+class ReportEvent(BaseModel):
+    date: str
+    event: str
+    page_references: list[PageReference] = []
+
+
+class ReportPayload(BaseModel):
+    title: str
+    document_type: str
+    purpose: str
+    executive_summary: str
+    metrics: list[ReportMetric] = []
+    findings: list[ReportFinding] = []
+    risks: list[ReportRisk] = []
+    entities: list[ReportEntity] = []
+    timeline: list[ReportEvent] = []
+    missing_information: list[str] = []
+    next_actions: list[str] = []
+
+
 class QuizQuestion(BaseModel):
     question: str
     options: list[str] = Field(min_length=2, max_length=6)
@@ -291,6 +339,44 @@ async def summarize(
     return await _cached_or_generate(
         AIFeature.SUMMARY, [document], payload.model_dump(), SummaryPayload,
         instruction, _context([(document, pages)]), user, session,
+    )
+
+
+@router.post("/documents/{document_id}/report", response_model=AIResultResponse)
+async def analyze_report(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AIResultResponse:
+    document = await _ready_document(document_id, user, session)
+    pages = await _pages(document, session)
+    reference = '{"document_id": UUID, "document_name": string, "page_number": integer}'
+    instruction = (
+        "Create a decision-ready document analysis. Adapt the analysis to the actual document type: "
+        "for financial documents emphasize KPIs and trends; for contracts emphasize parties, obligations, "
+        "deadlines, and risks; for research emphasize methods, findings, and limitations. Never fill a section "
+        "with invented or generic content; use an empty list when the source has no evidence. Keep metrics as "
+        "the exact value found in the source. Rank findings and risks by importance. Return "
+        '{"title": string, "document_type": string, "purpose": string, "executive_summary": string, '
+        '"metrics": [{"label": string, "value": string, "change": string, "trend": "up|down|neutral", '
+        '"context": string, "page_references": [' + reference + ']}], '
+        '"findings": [{"title": string, "detail": string, "importance": "high|medium|low", '
+        '"page_references": [' + reference + ']}], '
+        '"risks": [{"title": string, "detail": string, "severity": "high|medium|low", '
+        '"page_references": [' + reference + ']}], '
+        '"entities": [{"name": string, "role": string}], '
+        '"timeline": [{"date": string, "event": string, "page_references": [' + reference + ']}], '
+        '"missing_information": [string], "next_actions": [string]}.'
+    )
+    return await _cached_or_generate(
+        AIFeature.SUMMARY,
+        [document],
+        {"style": "decision_report_v1"},
+        ReportPayload,
+        instruction,
+        _context([(document, pages)]),
+        user,
+        session,
     )
 
 

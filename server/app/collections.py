@@ -1,16 +1,13 @@
-import json
 import uuid
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
 from app.documents import owned_document
-from app.models import Collection, Document, DocumentPage, GeneratedArtifact, User
+from app.models import Collection, Document, GeneratedArtifact, User
 from app.schemas import (
     CollectionCreate,
     CollectionResponse,
@@ -18,7 +15,6 @@ from app.schemas import (
     DocumentMetadataUpdate,
     DocumentResponse,
 )
-from app.usage import record_ai_usage
 
 router = APIRouter(tags=["Version 2.5 workspace"])
 
@@ -128,56 +124,3 @@ async def update_artifact_collection(
     await session.commit()
     return {"id": str(artifact.id), "collection_id": str(artifact.collection_id) if artifact.collection_id else None}
 
-
-@router.post("/documents/{document_id}/generate-metadata", response_model=DocumentResponse)
-async def generate_document_metadata(
-    document_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
-) -> Document:
-    document = await owned_document(document_id, user, session)
-    pages = list(await session.scalars(
-        select(DocumentPage)
-        .where(DocumentPage.document_id == document.id)
-        .order_by(DocumentPage.page_number)
-        .limit(8)
-    ))
-    context = "\n\n".join(page.text for page in pages)[:16_000].strip()
-    if not context:
-        raise HTTPException(status_code=409, detail="The document has no indexed text for metadata generation")
-    settings = get_settings()
-    if not settings.llm_api_key:
-        raise HTTPException(status_code=503, detail="LLM_API_KEY is not configured")
-    await record_ai_usage(user, "document_metadata", session)
-    try:
-        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-            response = await client.post(
-                f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-                json={
-                    "model": settings.llm_model,
-                    "temperature": 0.1,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "Create concise library metadata using only the supplied document text. "
-                                "Return JSON with title (max 90 characters) and tags (3-6 short lowercase strings)."
-                            ),
-                        },
-                        {"role": "user", "content": context},
-                    ],
-                },
-            )
-        response.raise_for_status()
-        value = json.loads(response.json()["choices"][0]["message"]["content"])
-    except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=502, detail="The language model could not generate document metadata") from exc
-    title = str(value.get("title", "")).strip()[:180]
-    tags = [str(tag).strip().lower()[:40] for tag in value.get("tags", []) if str(tag).strip()][:6]
-    document.display_title = title or document.filename.rsplit(".", 1)[0]
-    document.tags = list(dict.fromkeys(tags))
-    await session.commit()
-    await session.refresh(document)
-    return document

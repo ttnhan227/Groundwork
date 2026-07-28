@@ -1,4 +1,8 @@
-from app.documents import safe_filename, unique_archive_name
+from io import BytesIO
+
+from PIL import Image
+
+from app.documents import image_to_pdf, safe_filename, unique_archive_name
 from app.pdf_tools import _render_file_card
 from app.security import hash_password, verify_password
 from app.storage import ObjectStorage
@@ -25,6 +29,15 @@ def test_archive_filenames_are_unique() -> None:
 def test_generated_file_card_is_a_png_preview() -> None:
     preview = _render_file_card("notes.md", "text/markdown", "Quarterly findings")
     assert preview.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_uploaded_image_is_normalized_to_pdf() -> None:
+    source = BytesIO()
+    Image.new("RGBA", (120, 80), (40, 90, 180, 128)).save(source, format="PNG")
+
+    result = image_to_pdf(source.getvalue())
+
+    assert result.startswith(b"%PDF-")
 
 
 def test_storage_facade_accepts_replaceable_backend() -> None:
