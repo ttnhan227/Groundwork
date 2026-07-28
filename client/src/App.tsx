@@ -926,11 +926,12 @@ function IntegratedChatHub({
 }
 
 function HomeChat({
-  token, onChanged, onOpenDocuments,
+  token, onChanged, onOpenDocuments, onUploadFile,
 }: {
   token: string;
   onChanged: () => void;
   onOpenDocuments: () => void;
+  onUploadFile: (file: File) => Promise<void>;
 }) {
   const [conversationId, setConversationId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -940,6 +941,7 @@ function HomeChat({
     return pendingPrompt;
   });
   const [busy, setBusy] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState("");
 
   async function ensureConversation() {
@@ -1033,12 +1035,29 @@ function HomeChat({
     </div>
     {error && <div className="chat-error">{error}</div>}
     <form onSubmit={(event) => { event.preventDefault(); sendQuestion(draft); }}>
+      <label className={`home-chat-attach ${attaching ? "busy" : ""}`} title="Upload a PDF" aria-label="Upload a PDF">
+        {attaching ? <RefreshCw className="spin" size={17} /> : <Upload size={17} />}
+        <input type="file" accept=".pdf,application/pdf" disabled={busy || attaching} onChange={async (event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          setAttaching(true);
+          setError("");
+          try {
+            await onUploadFile(file);
+          } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Upload failed");
+          } finally {
+            setAttaching(false);
+            event.target.value = "";
+          }
+        }} />
+      </label>
       <textarea aria-label="Message InsightPDF AI" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message InsightPDF AI…" rows={1} disabled={busy} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
       }} />
       <button aria-label="Send message" disabled={busy || !draft.trim()}><Send size={18} /></button>
     </form>
-    <small>General AI chat does not read your documents. Use Ask AI to chat with selected files.</small>
+    <small>Ask anything, attach a new PDF, or choose Chat with documents for grounded answers with citations.</small>
   </section>;
 }
 
@@ -1591,7 +1610,13 @@ function CopilotWorkspace({ documents, token, onClose }: { documents: DocumentIt
   </div>;
 }
 
-function WorkspaceApp() {
+function WorkspaceApp({
+  pendingUpload,
+  onPendingUploadHandled,
+}: {
+  pendingUpload: File | null;
+  onPendingUploadHandled: () => void;
+}) {
   const [initialAuth] = useState<AuthResult | null>(() => {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem("insightpdf-auth");
@@ -1735,8 +1760,14 @@ function WorkspaceApp() {
       loadWorkspaceArtifacts(initialAuth.access_token).catch(() => undefined);
       loadCollections(initialAuth.access_token).catch(() => undefined);
       api<Conversation[]>("/conversations", initialAuth.access_token).then(setConversations).catch(() => undefined);
+      if (pendingUpload) {
+        onPendingUploadHandled();
+        upload(pendingUpload, initialAuth.access_token);
+      }
     }, 0);
     return () => window.clearTimeout(timer);
+  // Initial authentication is immutable for this mounted workspace.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAuth, loadCollections, loadDocuments, loadStats, loadWorkspaceArtifacts]);
 
   useEffect(() => {
@@ -1785,6 +1816,11 @@ function WorkspaceApp() {
         loadDocuments(result.access_token), loadStats(result.access_token), loadWorkspaceArtifacts(result.access_token),
         loadCollections(result.access_token), api<Conversation[]>("/conversations", result.access_token).then(setConversations),
       ]);
+      if (pendingUpload) {
+        const file = pendingUpload;
+        onPendingUploadHandled();
+        await upload(file, result.access_token);
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
     finally { setBusy(false); }
   }
@@ -1798,8 +1834,8 @@ function WorkspaceApp() {
     });
   }
 
-  async function upload(file?: File) {
-    if (!file || !token) return;
+  async function upload(file?: File, accessToken = token) {
+    if (!file || !accessToken) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setError("Drop a PDF file. Other formats can be converted from PDF tools.");
       return;
@@ -1807,8 +1843,8 @@ function WorkspaceApp() {
     setBusy(true); setError("");
     const data = new FormData(); data.append("file", file);
     try {
-      await api("/documents", token, { method: "POST", body: data });
-      await Promise.all([loadDocuments(token), loadStats(token)]);
+      await api("/documents", accessToken, { method: "POST", body: data });
+      await Promise.all([loadDocuments(accessToken), loadStats(accessToken)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Upload failed"); }
     finally { setBusy(false); }
   }
@@ -2044,6 +2080,10 @@ function WorkspaceApp() {
         <p className="eyebrow">AI-powered PDF workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Upload PDFs, extract text, and process scanned pages securely.</p>
+        {pendingUpload && <div className="pending-upload-note">
+          <FileText size={16} />
+          <span><strong>{pendingUpload.name}</strong><small>Ready to upload securely after you sign in.</small></span>
+        </div>}
         <form onSubmit={authForm.handleSubmit(authenticate)}>
           {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
           <label>Email<input {...authForm.register("email")} type="email" required /></label>
@@ -2082,8 +2122,7 @@ function WorkspaceApp() {
           <button className={hubView === "home" ? "active" : ""} onClick={() => setHubView("home")}><LayoutDashboard size={18} /><span>Home</span></button>
           <button className={hubView === "documents" ? "active" : ""} onClick={() => setHubView("documents")}><FolderOpen size={18} /><span>Documents</span><i>{documents.length + workspaceArtifacts.length}</i></button>
           <span className="hub-nav-label">AI workspace</span>
-          <button className={hubView === "chat" ? "active" : ""} disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><BrainCircuit size={18} /><span>Ask AI</span></button>
-          <button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><MessageCircle size={18} /><span>Multi-document</span></button>
+          <button className={hubView === "chat" ? "active" : ""} disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><BrainCircuit size={18} /><span>Document chat</span></button>
           <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={18} /><span>Compare</span></button>
           <span className="hub-nav-label">Tools</span>
           <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>PDF tools</span></button>
@@ -2096,14 +2135,22 @@ function WorkspaceApp() {
         </div>
       </aside>
       <header className="hub-topbar">
-        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "chat" ? "Ask AI" : "Documents"}</strong><small>{hubView === "home" ? "Ask, create, and organize" : hubView === "chat" ? "Chat with one or multiple documents" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
+        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "chat" ? "Document chat" : "Documents"}</strong><small>{hubView === "home" ? "Ask, attach, and create" : hubView === "chat" ? "Grounded answers from one or multiple documents" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
         <button title="Keyboard shortcuts: / search, U upload" aria-label="Keyboard shortcuts"><Keyboard size={17} /></button>
         <button onClick={() => setJobsOpen(true)} aria-label="Processing jobs"><RefreshCw size={17} /></button>
         <label className={`hub-upload ${busy ? "disabled" : ""}`}><Upload size={16} /> Upload<input ref={uploadInputRef} type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
       </header>
       <section className="workspace-content hub-content">
         {hubView === "home" ? <div className="hub-home">
-          <HomeChat token={token} onChanged={() => loadConversations().catch(() => undefined)} onOpenDocuments={() => setHubView("chat")} />
+          <HomeChat
+            token={token}
+            onChanged={() => loadConversations().catch(() => undefined)}
+            onOpenDocuments={() => setHubView("chat")}
+            onUploadFile={async (file) => {
+              await upload(file);
+              setHubView("documents");
+            }}
+          />
           <section className="hub-conversation">
             <div className="hub-ai-brand"><span className="hub-brand-mark"><FileText size={20} /></span><strong>Insight<span>PDF</span> <i>AI</i></strong></div>
             <h1>What can I help you understand?</h1>
@@ -2314,7 +2361,13 @@ function WorkspaceApp() {
   );
 }
 
-function LandingPage({ onOpen }: { onOpen: () => void }) {
+function LandingPage({
+  onOpen,
+  onUpload,
+}: {
+  onOpen: () => void;
+  onUpload: (file: File) => void;
+}) {
   const [landingPrompt, setLandingPrompt] = useState("");
 
   function submitLandingPrompt(event: FormEvent<HTMLFormElement>) {
@@ -2361,18 +2414,50 @@ function LandingPage({ onOpen }: { onOpen: () => void }) {
               <button key={prompt} type="button" onClick={() => setLandingPrompt(prompt)}>{prompt}</button>
             )}
           </div>
+          <label className="landing-upload">
+            <Upload size={16} />
+            <span><strong>Upload a PDF</strong><small>You’ll sign in before the upload starts</small></span>
+            <i>Choose file</i>
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onUpload(file);
+              }}
+            />
+          </label>
         </form>
         <div className="landing-demo" aria-label="InsightPDF example">
           <div className="landing-demo-top">
             <span><i /> annual-report.pdf</span>
-            <small>42 pages</small>
+            <small>Example report · 42 pages</small>
           </div>
           <div className="landing-question">Summarize the key financial changes</div>
           <div className="landing-answer">
             <Sparkles size={18} />
-            <p>Revenue increased while operating costs declined, improving the company&apos;s margin across the year.</p>
+            <div>
+              <div className="landing-answer-heading">
+                <strong>Financial performance improved materially in FY2025</strong>
+                <span>3 sources</span>
+              </div>
+              <div className="landing-metrics">
+                <article><small>Revenue</small><strong>$48.2M</strong><em>↑ 18.4%</em></article>
+                <article><small>Operating costs</small><strong>$31.6M</strong><em className="positive">↓ 6.8%</em></article>
+                <article><small>Operating margin</small><strong>24.1%</strong><em>↑ 7.2 pts</em></article>
+              </div>
+              <ul className="landing-insights">
+                <li>Enterprise subscriptions contributed <strong>$11.4M</strong> of new revenue, making them the primary growth driver.</li>
+                <li>Vendor consolidation reduced annual infrastructure and support expenses by <strong>$2.3M</strong>.</li>
+                <li>Operating cash flow increased from <strong>$8.9M to $14.7M</strong>, strengthening liquidity.</li>
+              </ul>
+            </div>
           </div>
-          <div className="landing-citations"><span>Page 12</span><span>Page 27</span><span>Page 31</span></div>
+          <div className="landing-citations">
+            <span><b>Revenue growth</b>Page 12</span>
+            <span><b>Cost reduction</b>Page 27</span>
+            <span><b>Cash flow</b>Page 31</span>
+          </div>
         </div>
       </section>
 
@@ -2394,6 +2479,7 @@ export default function Home() {
   const [appOpen, setAppOpen] = useState(
     () => new URLSearchParams(window.location.search).has("app"),
   );
+  const [pendingUpload, setPendingUpload] = useState<File | null>(null);
 
   useEffect(() => {
     const syncRoute = () => setAppOpen(new URLSearchParams(window.location.search).has("app"));
@@ -2407,5 +2493,7 @@ export default function Home() {
     window.scrollTo({ top: 0 });
   }
 
-  return appOpen ? <WorkspaceApp /> : <LandingPage onOpen={openApp} />;
+  return appOpen
+    ? <WorkspaceApp pendingUpload={pendingUpload} onPendingUploadHandled={() => setPendingUpload(null)} />
+    : <LandingPage onOpen={openApp} onUpload={(file) => { setPendingUpload(file); openApp(); }} />;
 }
