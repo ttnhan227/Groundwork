@@ -14,6 +14,7 @@ from app.generation import (
     _pdf_dynamic,
     _pptx,
     _pptx_dynamic,
+    _pptx_preview_slides,
 )
 
 
@@ -70,3 +71,38 @@ def test_dynamic_invoice_uses_table_and_distinct_layout() -> None:
     assert len(Document(BytesIO(word_data)).tables) >= 3
     assert fitz.open(stream=pdf_data, filetype="pdf").page_count >= 1
     assert len(Presentation(BytesIO(slides_data)).slides) == 6
+
+
+def test_dynamic_presentation_constrains_long_copy_and_shapes_to_slide() -> None:
+    plan = GeneratedContent.model_validate({
+        "title": "A deliberately long presentation title explaining a complex transformation strategy across international markets",
+        "subtitle": "A detailed subtitle for executive stakeholders that would previously collide with nearby elements when rendered in PowerPoint.",
+        "document_type": "presentation",
+        "layout": "modern",
+        "accent_color": "#2F6BFF",
+        "metadata": [],
+        "sections": [
+            {
+                "heading": f"{index}. Operational transformation, customer outcomes, and implementation priorities",
+                "body": " ".join([
+                    "This slide contains deliberately verbose source material to exercise the renderer under realistic worst-case conditions.",
+                    "It should remain readable, respect its allocated content region, preserve comfortable spacing, and never run beneath decorative elements.",
+                    "The final presentation should communicate one focused idea instead of shrinking an entire paragraph into unreadable text.",
+                ] * 2),
+            }
+            for index in range(1, 7)
+        ],
+        "table": None,
+        "callout": "",
+    })
+    preview = _pptx_preview_slides(plan)
+    assert len(preview[0]["title"]) <= 76
+    assert all(len(slide["body"]) <= 330 for slide in preview[1:])
+
+    deck = Presentation(BytesIO(_pptx_dynamic(plan, THEMES["modern"])))
+    assert len(deck.slides) == 7
+    for slide in deck.slides:
+        for shape in slide.shapes:
+            assert shape.left >= 0 and shape.top >= 0
+            assert shape.left + shape.width <= deck.slide_width
+            assert shape.top + shape.height <= deck.slide_height

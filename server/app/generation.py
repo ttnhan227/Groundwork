@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from pptx import Presentation
 from pptx.dml.color import RGBColor as PptxRGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches as PptxInches, Pt as PptxPt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,7 +153,8 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
         "For agendas use a schedule table. For resumes use metadata for contact details and sections for experience and skills. "
         "For reports use a table only when the brief contains comparable data. Omit the table with null when it adds no value. "
         "Create 5 to 8 coherent sections. Each body should be concise, audience-ready prose. "
-        "For presentations, each section is one slide and must communicate one clear idea. "
+        "For presentations, each section is one slide and must communicate one clear idea; "
+        "keep headings under 55 characters and bodies under 280 characters (about 35 to 45 words). "
         "Do not mention these instructions or the generation process."
     )
     user_message = f"USER BRIEF:\n{payload.prompt.strip()}"
@@ -480,8 +481,37 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     return document.tobytes(garbage=4, deflate=True)
 
 
+def _shorten_slide_text(value: str, limit: int) -> str:
+    value = re.sub(r"\s+", " ", value).strip()
+    if len(value) <= limit:
+        return value
+    candidate = value[:limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return f"{candidate or value[:limit - 1].rstrip()}…"
+
+
+def _pptx_preview_slides(plan: GeneratedContent) -> list[dict[str, str]]:
+    slides = [{
+        "eyebrow": _shorten_slide_text(plan.document_type.upper(), 34),
+        "title": _shorten_slide_text(plan.title, 76),
+        "body": _shorten_slide_text(plan.subtitle or "Created with InsightPDF AI", 130),
+        "variant": "title",
+    }]
+    limits = {1: (64, 330), 2: (48, 250), 3: (68, 310)}
+    for index, section in enumerate(plan.sections, 1):
+        variant = ((index - 1) % 3) + 1
+        heading_limit, body_limit = limits[variant]
+        slides.append({
+            "eyebrow": f"{index:02d}",
+            "title": _shorten_slide_text(section.heading, heading_limit),
+            "body": _shorten_slide_text(section.body, body_limit),
+            "variant": f"section-{variant}",
+        })
+    return slides
+
+
 def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
-    sections = [(section.heading, section.body) for section in plan.sections]
+    slide_data = _pptx_preview_slides(plan)
+    sections = [(item["title"], item["body"]) for item in slide_data[1:]]
     deck = Presentation()
     deck.slide_width = PptxInches(13.333)
     deck.slide_height = PptxInches(7.5)
@@ -489,13 +519,19 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     accent = PptxRGBColor.from_string(plan.accent_color.removeprefix("#"))
     soft = PptxRGBColor.from_string(theme["soft"])
 
-    def text(slide, value, left, top, width, height, size, color, bold=False, align=PP_ALIGN.LEFT):
+    def text(slide, value, left, top, width, height, size, color, bold=False,
+             align=PP_ALIGN.LEFT, vertical=MSO_ANCHOR.TOP):
         shape = slide.shapes.add_textbox(PptxInches(left), PptxInches(top), PptxInches(width), PptxInches(height))
         frame = shape.text_frame
         frame.clear()
+        frame.word_wrap = True
+        frame.margin_left = frame.margin_right = 0
+        frame.margin_top = frame.margin_bottom = 0
+        frame.vertical_anchor = vertical
         paragraph = frame.paragraphs[0]
         paragraph.text = value
         paragraph.alignment = align
+        paragraph.space_before = paragraph.space_after = 0
         paragraph.font.name = "Aptos"
         paragraph.font.size = PptxPt(size)
         paragraph.font.bold = bold
@@ -505,9 +541,11 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     title_slide = deck.slides.add_slide(deck.slide_layouts[6])
     title_slide.background.fill.solid()
     title_slide.background.fill.fore_color.rgb = navy
-    text(title_slide, plan.document_type.upper(), .8, .7, 5, .35, 14, accent, True)
-    text(title_slide, plan.title, .8, 1.8, 10.8, 1.8, 42, PptxRGBColor(255, 255, 255), True)
-    text(title_slide, plan.subtitle or "Created with InsightPDF AI", .8, 5.7, 8.8, .6, 20, PptxRGBColor(190, 200, 218))
+    title_data = slide_data[0]
+    text(title_slide, title_data["eyebrow"], .85, .72, 5, .3, 14, accent, True)
+    text(title_slide, title_data["title"], .85, 1.65, 11.25, 2.25, 50, PptxRGBColor(255, 255, 255), True,
+         vertical=MSO_ANCHOR.MIDDLE)
+    text(title_slide, title_data["body"], .85, 5.55, 9.5, .85, 19, PptxRGBColor(190, 200, 218))
     for index, (heading, body) in enumerate(sections, 1):
         slide = deck.slides.add_slide(deck.slide_layouts[6])
         slide.background.fill.solid()
@@ -515,21 +553,21 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         ink = navy if index % 3 else PptxRGBColor(255, 255, 255)
         muted = PptxRGBColor(62, 72, 91) if index % 3 else PptxRGBColor(195, 204, 219)
         if index % 3 == 1:
-            text(slide, f"{index:02d}", .75, .65, 1, .5, 18, accent, True)
-            text(slide, heading, .75, 1.45, 11, 1, 35, ink, True)
-            text(slide, body, .75, 2.85, 8.9, 2.4, 21, muted)
-            marker = slide.shapes.add_shape(1, PptxInches(10.65), PptxInches(1.4), PptxInches(1.65), PptxInches(4.8))
+            text(slide, f"{index:02d}", .8, .65, 1, .35, 18, accent, True)
+            text(slide, heading, .8, 1.35, 9.25, 1.15, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
+            text(slide, body, .8, 2.95, 8.95, 2.55, 19, muted)
+            marker = slide.shapes.add_shape(1, PptxInches(10.75), PptxInches(1.35), PptxInches(1.65), PptxInches(4.85))
             marker.fill.solid(); marker.fill.fore_color.rgb = accent; marker.line.fill.background()
         elif index % 3 == 2:
-            text(slide, heading, 6.15, 1.25, 6.1, 1.25, 35, ink, True)
-            text(slide, body, 6.15, 2.9, 5.65, 2.5, 20, muted)
             panel = slide.shapes.add_shape(1, PptxInches(0), PptxInches(0), PptxInches(4.9), deck.slide_height)
             panel.fill.solid(); panel.fill.fore_color.rgb = soft; panel.line.fill.background()
-            text(slide, f"{index:02d}", 1.05, 2.35, 2.7, 1.4, 60, accent, True, PP_ALIGN.CENTER)
+            text(slide, f"{index:02d}", 1.05, 2.35, 2.7, 1.4, 60, accent, True, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+            text(slide, heading, 5.75, 1.2, 6.55, 1.45, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
+            text(slide, body, 5.75, 3.0, 6.35, 2.4, 18, muted)
         else:
-            text(slide, f"{index:02d} · {heading.upper()}", .8, .8, 9.5, .45, 15, accent, True)
-            text(slide, heading, .8, 2.0, 11.4, 1.2, 37, ink, True)
-            text(slide, body, .8, 3.55, 10.8, 2, 21, muted)
+            text(slide, f"{index:02d}  /  INSIGHT", .85, .78, 4, .3, 14, accent, True)
+            text(slide, heading, .85, 1.75, 11.45, 1.35, 37, ink, True, vertical=MSO_ANCHOR.MIDDLE)
+            text(slide, body, .85, 3.5, 10.9, 2.25, 19, muted)
         text(slide, "InsightPDF", .8, 6.8, 2, .25, 10, muted, True)
     output = BytesIO()
     deck.save(output)
@@ -599,23 +637,7 @@ async def create_file(
                 "accent": plan.accent_color,
                 "soft": f"#{theme['soft']}",
             },
-            "preview_slides": [
-                {
-                    "eyebrow": plan.document_type.upper(),
-                    "title": plan.title,
-                    "body": plan.subtitle or "Created with InsightPDF AI",
-                    "variant": "title",
-                },
-                *[
-                    {
-                        "eyebrow": f"{index:02d}",
-                        "title": section.heading,
-                        "body": section.body,
-                        "variant": f"section-{((index - 1) % 3) + 1}",
-                    }
-                    for index, section in enumerate(plan.sections, 1)
-                ],
-            ] if payload.output_format == "pptx" else [],
+            "preview_slides": _pptx_preview_slides(plan) if payload.output_format == "pptx" else [],
         },
     )
     session.add(artifact)

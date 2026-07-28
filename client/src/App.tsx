@@ -12,7 +12,7 @@ const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
 
 function BrandMark({ className = "" }: { className?: string }) {
-  return <img className={`brand-symbol ${className}`.trim()} src="/favicon.ico" alt="" aria-hidden="true" />;
+  return <span className={`brand-symbol ${className}`.trim()} aria-hidden="true"><img src="/logo.png" alt="" /></span>;
 }
 
 type DocumentItem = {
@@ -751,30 +751,15 @@ export function ChatPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
-  const documentIdKey = documentIds.join(",");
   const starterPrompts = documentIds.length > 1
     ? ["What do these documents have in common?", "Summarize the key differences", "List important dates across all files"]
     : ["Summarize this document", "What are the key points?", "List important dates and action items"];
   const followUpPrompts = ["Explain that more simply", "What should I pay attention to?", "Turn this into an action checklist"];
 
   async function beginNewConversation() {
-    setBusy(true);
     setError("");
     setMessages([]);
     setConversationId("");
-    try {
-      const result = await api<{ id: string }>("/conversations", token, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: `Chat about ${documentLabel}`, document_ids: documentIds }),
-      });
-      setConversationId(result.id);
-      onChanged();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not start a new conversation");
-    } finally {
-      setBusy(false);
-    }
   }
 
   useEffect(() => {
@@ -785,19 +770,8 @@ export function ChatPanel({
     setError("");
   }, [conversation]);
 
-  // documentIdKey tracks changes without depending on the caller's array identity.
-  useEffect(() => {
-    if (conversation) return;
-    api<{ id: string }>("/conversations", token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: `Chat about ${documentLabel}`, document_ids: documentIds }),
-    }).then((result) => { setConversationId(result.id); onChanged(); }).catch((reason) => setError(reason.message));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation, document.id, document.filename, documentIdKey, documentLabel, token]);
-
   async function askQuestion(question: string) {
-    if (!conversationId || busy) return;
+    if (busy) return;
     question = question.trim();
     if (!question) return;
     setDraft("");
@@ -808,7 +782,17 @@ export function ChatPanel({
     ]);
     setBusy(true); setError("");
     try {
-      const response = await authenticatedFetch(`${API}/conversations/${conversationId}/messages/stream`, token, {
+      let id = conversationId;
+      if (!id) {
+        const created = await api<{ id: string }>("/conversations", token, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: `Chat about ${documentLabel}`, document_ids: documentIds }),
+        });
+        id = created.id;
+        setConversationId(id);
+      }
+      const response = await authenticatedFetch(`${API}/conversations/${id}/messages/stream`, token, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -897,12 +881,12 @@ export function ChatPanel({
       {!busy && messages.at(-1)?.role === "assistant" && <div className="follow-up-prompts"><span>Continue with</span>{followUpPrompts.map((prompt) => <button key={prompt} onClick={() => askQuestion(prompt)}>{prompt}</button>)}</div>}
     </div>
     {error && <div className="chat-error">{error}</div>}
-    <form onSubmit={(event) => { event.preventDefault(); askQuestion(draft); }}><div className="chat-input"><textarea name="question" aria-label="Question" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a follow-up question…" rows={1} disabled={!conversationId || busy} onKeyDown={(event) => {
+    <form onSubmit={(event) => { event.preventDefault(); askQuestion(draft); }}><div className="chat-input"><textarea name="question" aria-label="Question" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a follow-up question…" rows={1} disabled={busy} onKeyDown={(event) => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         event.currentTarget.form?.requestSubmit();
       }
-    }} /><small>Enter to send · Shift+Enter for a new line</small></div><button aria-label="Send" disabled={!conversationId || busy}><Send size={17} /></button></form>
+    }} /><small>Enter to send · Shift+Enter for a new line</small></div><button aria-label="Send" disabled={busy || !draft.trim()}><Send size={17} /></button></form>
   </aside>;
 }
 
@@ -1061,7 +1045,6 @@ function HomeChat({
 
   return <section className="home-chat">
     <header>
-      <div className="hub-ai-brand"><BrandMark className="hub-brand-mark" /><strong>Insight<span>PDF</span></strong></div>
       <div className="home-chat-header-actions"><button onClick={onHistory}><History size={15} /> History</button>{!!messages.length && <button onClick={newChat}><MessageCircle size={15} /> New chat</button>}</div>
     </header>
     <div className="home-chat-messages">
@@ -1204,34 +1187,20 @@ function ConversationHistory({
 }
 
 function MultiDocumentChat({
-  documents, token, onCreated, onClose,
+  documents, onSelected, onClose,
 }: {
   documents: DocumentItem[];
-  token: string;
-  onCreated: (conversation: Conversation, selected: DocumentItem[]) => void;
+  onSelected: (selected: DocumentItem[]) => void;
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (selected.length < 2) { setError("Select at least two ready PDFs."); return; }
-    setBusy(true); setError("");
     const chosen = documents.filter((document) => selected.includes(document.id));
-    try {
-      const conversation = await api<Conversation>("/conversations", token, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: String(new FormData(event.currentTarget).get("title") ?? "").trim() || `Compare ${chosen.length} PDFs`,
-          document_ids: selected,
-        }),
-      });
-      onCreated(conversation, chosen);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not create conversation"); }
-    finally { setBusy(false); }
+    onSelected(chosen);
   }
 
   return <div className="multi-chat-wrap" role="dialog" aria-modal="true" aria-label="Ask multiple PDFs">
@@ -1242,7 +1211,6 @@ function MultiDocumentChat({
       <p className="eyebrow">Cross-document chat</p>
       <h2>Ask across documents</h2>
       <p>Select two or more indexed sources. Answers retrieve and cite the most relevant pages across them.</p>
-      <label className="multi-title">Conversation name<input name="title" placeholder="e.g. Compare résumé versions" maxLength={160} /></label>
       <div className="multi-doc-list">
         {documents.map((document) => <label key={document.id} className={selected.includes(document.id) ? "selected" : ""}>
           <input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} />
@@ -1250,7 +1218,7 @@ function MultiDocumentChat({
         </label>)}
       </div>
       {error && <div className="form-error">{error}</div>}
-      <button className="multi-submit" disabled={busy || selected.length < 2}><MessageCircle size={16} /> {busy ? "Creating…" : `Start chat with ${selected.length || 0} documents`}</button>
+      <button className="multi-submit" disabled={selected.length < 2}><MessageCircle size={16} /> Attach {selected.length || 0} documents</button>
     </form>
   </div>;
 }
@@ -1761,9 +1729,11 @@ function PresentationStudio({ documents, artifacts, token, onCreated }: { docume
 function WorkspaceApp({
   pendingUpload,
   onPendingUploadHandled,
+  onExit,
 }: {
   pendingUpload: File | null;
   onPendingUploadHandled: () => void;
+  onExit: () => void;
 }) {
   const [initialAuth] = useState<AuthResult | null>(() => {
     if (typeof window === "undefined") return null;
@@ -1999,6 +1969,35 @@ function WorkspaceApp({
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not create collection"); }
   }
 
+  async function renameCollection(collection: Collection) {
+    const name = window.prompt("Rename collection", collection.name)?.trim();
+    if (!name || name === collection.name) return;
+    try {
+      const updated = await api<Collection>(`/collections/${collection.id}`, token, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color: collection.color }),
+      });
+      setCollections((current) => current
+        .map((item) => item.id === updated.id ? updated : item)
+        .sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not rename collection"); }
+  }
+
+  async function removeCollection(collection: Collection) {
+    if (!window.confirm(`Delete the collection "${collection.name}"? Files will be kept and moved to Unfiled.`)) return;
+    try {
+      await api(`/collections/${collection.id}`, token, { method: "DELETE" });
+      setCollections((current) => current.filter((item) => item.id !== collection.id));
+      setDocuments((current) => current.map((item) =>
+        item.collection_id === collection.id ? { ...item, collection_id: null } : item
+      ));
+      setWorkspaceArtifacts((current) => current.map((item) =>
+        item.collection_id === collection.id ? { ...item, collection_id: null } : item
+      ));
+      if (collectionFilter === collection.id) setCollectionFilter("all");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete collection"); }
+  }
+
   async function assignDocumentCollection(document: DocumentItem, collectionId: string | null) {
     try {
       const updated = await api<DocumentItem>(`/documents/${document.id}/metadata`, token, {
@@ -2033,6 +2032,7 @@ function WorkspaceApp({
   function signOut() {
     localStorage.removeItem("insightpdf-auth");
     setToken(""); setUser(null); setDocuments([]); setWorkspaceArtifacts([]); setCollections([]); setConversations([]); setArtifactViewer(null); setRenameTarget(null);
+    onExit();
   }
 
   function renameDocument(document: DocumentItem) {
@@ -2211,7 +2211,7 @@ function WorkspaceApp({
   if (!token || !user) return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand auth-brand-login"><img src="/logo.png" alt="InsightPDF" /></div>
+        <div className="auth-brand auth-brand-login"><BrandMark /><strong>Insight<b>PDF</b></strong></div>
         <p className="eyebrow">AI-powered document workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Understand source files and create polished Word, PDF, and PowerPoint outputs securely.</p>
@@ -2236,6 +2236,7 @@ function WorkspaceApp({
         {(REGISTRATION_ENABLED || mode === "register") && <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
           {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
         </button>}
+        <button className="auth-back-home" onClick={onExit}>← Back to home</button>
       </section>
     </main>
   );
@@ -2247,15 +2248,14 @@ function WorkspaceApp({
       <aside className="hub-sidebar">
         <div className="hub-brand">
           <BrandMark className="hub-brand-mark" />
-          <strong>Insight<span>PDF</span></strong>
+          <strong>Insight<span>PDF</span><small className="hub-beta">Beta</small></strong>
           <button aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
         <nav aria-label="Workspace navigation">
           <button className={hubView === "home" ? "active" : ""} onClick={() => setHubView("home")}><LayoutDashboard size={18} /><span>Home</span></button>
           <button className={hubView === "documents" ? "active" : ""} onClick={() => setHubView("documents")}><FolderOpen size={18} /><span>Documents</span><i>{documents.length + workspaceArtifacts.length}</i></button>
           <button className={hubView === "presentations" ? "active" : ""} onClick={() => setHubView("presentations")}><Presentation size={18} /><span>Presentations</span></button>
-          <span className="hub-nav-label">AI workspace</span>
-          <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={18} /><span>Compare</span></button>
+          <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><GitCompareArrows size={18} /><span>Compare</span></button>
           <span className="hub-nav-label">Tools</span>
           <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>Document tools</span></button>
           <button onClick={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}><History size={18} /><span>Chat history</span></button>
@@ -2347,7 +2347,13 @@ function WorkspaceApp({
           <FolderOpen size={16} />
           <button className={collectionFilter === "all" ? "active" : ""} onClick={() => setCollectionFilter("all")}>All documents</button>
           <button className={collectionFilter === "none" ? "active" : ""} onClick={() => setCollectionFilter("none")}>Unfiled</button>
-          {collections.map((collection) => <button className={collectionFilter === collection.id ? "active" : ""} key={collection.id} onClick={() => setCollectionFilter(collection.id)}><i style={{ background: collection.color }} />{collection.name}</button>)}
+          {collections.map((collection) => <div className={`collection-chip ${collectionFilter === collection.id ? "active" : ""}`} key={collection.id}>
+            <button className="collection-filter-button" onClick={() => setCollectionFilter(collection.id)}><i style={{ background: collection.color }} />{collection.name}</button>
+            {collectionFilter === collection.id && <span className="collection-chip-actions">
+              <button aria-label={`Rename collection ${collection.name}`} title="Rename collection" onClick={() => renameCollection(collection)}><Pencil size={12} /></button>
+              <button className="danger" aria-label={`Delete collection ${collection.name}`} title="Delete collection" onClick={() => removeCollection(collection)}><Trash2 size={12} /></button>
+            </span>}
+          </div>)}
           <form onSubmit={createCollection}><FolderPlus size={14} /><input aria-label="New collection name" value={newCollectionName} onChange={(event) => setNewCollectionName(event.target.value)} placeholder="New collection" /><button disabled={!newCollectionName.trim()}>Add</button></form>
         </div>
         <div className="document-type-tabs" role="tablist" aria-label="Document types">
@@ -2380,7 +2386,7 @@ function WorkspaceApp({
           {workspaceItems.map((entry) => {
             if (entry.kind === "artifact") {
               const artifact = entry.item;
-              return <article className="document-card generated-document-card" key={`artifact-${artifact.id}`}>
+              return <article className={`document-card generated-document-card ${openActionMenu === `artifact:${artifact.id}` ? "menu-open" : ""}`} key={`artifact-${artifact.id}`}>
                 <label className="workspace-document-select" title={`Select ${artifact.filename}`}><input type="checkbox" checked={selectedFileKeys.includes(`artifact:${artifact.id}`)} onChange={(event) => setSelectedFileKeys((current) => event.target.checked ? [...current, `artifact:${artifact.id}`] : current.filter((key) => key !== `artifact:${artifact.id}`))} /></label>
                 <ArtifactCardPreview artifact={artifact} token={token} onOpen={() => setArtifactViewer(artifact)} />
                 <div className="document-info">
@@ -2398,9 +2404,8 @@ function WorkspaceApp({
                     <button onClick={() => { renameWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
                     <button onClick={() => { downloadArtifact(artifact, token).catch((reason) => setError(reason.message)); setOpenActionMenu(""); }}><Download size={14} /> Download</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactPDFTools(artifact); setOpenActionMenu(""); }}><Scissors size={14} /> {preparingArtifactId === artifact.id ? "Preparing…" : "PDF tools"}</button>
-                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "workspace"); setOpenActionMenu(""); }}><ScanText size={14} /> Document tools</button>
-                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "chat"); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
-                    <label className="action-menu-select"><FolderOpen size={14} /><select aria-label={`Collection for ${artifact.filename}`} value={artifact.collection_id ?? ""} onChange={(event) => assignArtifactCollection(artifact, event.target.value || null)}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
+                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "chat"); setOpenActionMenu(""); }}><MessageCircle size={14} /> Open in AI</button>
+                    <label className="action-menu-select"><FolderOpen size={14} /><span>Move to</span><select aria-label={`Move ${artifact.filename} to collection`} value={artifact.collection_id ?? ""} onChange={(event) => { assignArtifactCollection(artifact, event.target.value || null); setOpenActionMenu(""); }}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
                     <button className="danger" onClick={() => { removeWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
                   </nav></>}
                 </div>
@@ -2409,7 +2414,7 @@ function WorkspaceApp({
             const document = entry.item;
             const job = jobs[document.id];
             const ready = document.status === "ready";
-            return <article className="document-card" key={document.id}>
+            return <article className={`document-card ${openActionMenu === `document:${document.id}` ? "menu-open" : ""}`} key={document.id}>
               <label className="workspace-document-select" title={`Select ${document.filename}`}><input type="checkbox" checked={selectedFileKeys.includes(`document:${document.id}`)} onChange={(event) => setSelectedFileKeys((current) => event.target.checked ? [...current, `document:${document.id}`] : current.filter((key) => key !== `document:${document.id}`))} /></label>
               <DocumentCardPreview document={document} token={token} onOpen={() => { setViewerPage(1); setViewerSearch(""); setViewer(document); }} />
               <div className="document-info">
@@ -2425,17 +2430,15 @@ function WorkspaceApp({
                 {(document.error_message || job?.error_message) && <small className="document-error">{document.error_message || job?.error_message}</small>}
               </div>
               <div className="document-actions">
-                {ready && <div className="document-quick-actions"><button title="Summarize" aria-label={`Summarize ${document.filename}`} onClick={() => setAIDocument(document)}><AlignLeft size={14} /></button><button title="Ask about document" aria-label={`Ask about ${document.filename}`} onClick={() => openDocumentChat(document)}><MessageCircle size={14} /></button></div>}
                 <button className="more-actions-button" aria-label={`More actions for ${document.filename}`} title="More actions" onClick={() => setOpenActionMenu((current) => current === `document:${document.id}` ? "" : `document:${document.id}`)}><MoreVertical size={17} /></button>
                 {openActionMenu === `document:${document.id}` && <><button className="action-menu-backdrop" aria-label="Close actions menu" onClick={() => setOpenActionMenu("")} /><nav className="file-action-menu" aria-label={`Actions for ${document.filename}`}>
                   <button disabled={!ready} onClick={() => { setViewerPage(1); setViewerSearch(""); setViewer(document); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
                   <button onClick={() => { renameDocument(document); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
                   {document.status === "failed" && <button onClick={() => { retryDocument(document); setOpenActionMenu(""); }}><RefreshCw size={14} /> Retry processing</button>}
                   <button disabled={!ready} onClick={() => { setPDFToolsDocument(document); setPDFToolsOpen(true); setOpenActionMenu(""); }}><Scissors size={14} /> PDF tools</button>
-                  <button disabled={!ready} onClick={() => { setAIDocument(document); setOpenActionMenu(""); }}><ScanText size={14} /> Document tools</button>
-                  <button disabled={!ready || busy} onClick={() => { openDocumentChat(document); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
+                  <button disabled={!ready || busy} onClick={() => { openDocumentChat(document); setOpenActionMenu(""); }}><MessageCircle size={14} /> Open in AI</button>
                   <button disabled={!ready || busy} onClick={() => { generateDocumentMetadata(document); setOpenActionMenu(""); }}><Tag size={14} /> Generate title & tags</button>
-                  <label className="action-menu-select"><FolderOpen size={14} /><select aria-label={`Collection for ${document.filename}`} value={document.collection_id ?? ""} onChange={(event) => assignDocumentCollection(document, event.target.value || null)}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
+                  <label className="action-menu-select"><FolderOpen size={14} /><span>Move to</span><select aria-label={`Move ${document.filename} to collection`} value={document.collection_id ?? ""} onChange={(event) => { assignDocumentCollection(document, event.target.value || null); setOpenActionMenu(""); }}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
                   <button className="danger" onClick={() => { removeDocument(document); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
                 </nav></>}
               </div>
@@ -2458,8 +2461,8 @@ function WorkspaceApp({
         const attached = documents.filter((item) => conversation.document_ids.includes(item.id));
         setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(attached); setHubView("home");
       }} />}
-      {multiChatOpen && <MultiDocumentChat documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setMultiChatOpen(false)} onCreated={(conversation, selected) => {
-        setMultiChatOpen(false); setActiveConversation(conversation); setChatDocuments(selected); setHubView("home"); loadConversations().catch(() => undefined);
+      {multiChatOpen && <MultiDocumentChat documents={documents.filter((item) => item.status === "ready")} onClose={() => setMultiChatOpen(false)} onSelected={(selected) => {
+        setMultiChatOpen(false); setActiveConversation(null); setChatDocuments(selected); setHubView("home");
       }} />}
       {aiDocument && <AIWorkspace document={aiDocument} documents={documents.filter((item) => item.status === "ready")} token={token} compareMode={false} onClose={() => setAIDocument(null)} onPage={(documentId, page) => {
         const selected = documents.find((item) => item.id === documentId);
@@ -2645,7 +2648,13 @@ export default function Home() {
     window.scrollTo({ top: 0 });
   }
 
+  function closeApp() {
+    window.history.pushState({}, "", "/");
+    setAppOpen(false);
+    window.scrollTo({ top: 0 });
+  }
+
   return appOpen
-    ? <WorkspaceApp pendingUpload={pendingUpload} onPendingUploadHandled={() => setPendingUpload(null)} />
+    ? <WorkspaceApp pendingUpload={pendingUpload} onPendingUploadHandled={() => setPendingUpload(null)} onExit={closeApp} />
     : <LandingPage onOpen={openApp} onUpload={(file) => { setPendingUpload(file); openApp(); }} />;
 }

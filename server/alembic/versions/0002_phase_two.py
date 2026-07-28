@@ -10,10 +10,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'EXTRACTING'")
-    op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'OCR_PROCESSING'")
-    op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'INDEXING'")
-    op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'READY'")
+    # PostgreSQL requires newly added enum values to be committed before later
+    # migrations can safely use them in data statements.
+    with op.get_context().autocommit_block():
+        op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'EXTRACTING'")
+        op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'OCR_PROCESSING'")
+        op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'INDEXING'")
+        op.execute("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'READY'")
     job_status = postgresql.ENUM("QUEUED", "RUNNING", "COMPLETED", "FAILED", name="jobstatus", create_type=False)
     job_status.create(op.get_bind())
     op.add_column("documents", sa.Column("page_count", sa.Integer(), nullable=True))
