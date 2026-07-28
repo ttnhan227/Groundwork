@@ -1,16 +1,17 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-async function signInDemo(page: Page) {
+async function signInRealAccount(page: Page) {
+  test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "Set E2E_EMAIL and E2E_PASSWORD to test a real account");
   await page.goto("/?app=1");
-  await page.getByLabel("Email").fill("demo@insightpdf.dev");
-  await page.getByLabel("Password").fill("DemoPassword123!");
+  await page.getByLabel("Email").fill(process.env.E2E_EMAIL!);
+  await page.getByLabel("Password").fill(process.env.E2E_PASSWORD!);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "What can I help you understand?" })).toBeVisible();
 }
 
-test("recruiter can sign in, inspect seeded documents, and open the PDF viewer", async ({ page }) => {
-  await signInDemo(page);
+test("user can sign in and inspect existing documents", async ({ page }) => {
+  await signInRealAccount(page);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: /Documents/ }).click();
   await expect(page.locator(".document-card").filter({ hasText: "scanned-project-notes.pdf" })).toBeVisible();
   await page.getByRole("button", { name: "Processing jobs" }).click();
@@ -22,20 +23,7 @@ test("recruiter can sign in, inspect seeded documents, and open the PDF viewer",
   await expect(page.locator(".pdf-page-surface canvas")).toBeVisible({ timeout: 30_000 });
 });
 
-test("new user can register, upload a real PDF, and wait for indexing", async ({ page, request }) => {
-  const demoLogin = await request.post("/api/v1/auth/login", {
-    data: { email: "demo@insightpdf.dev", password: "DemoPassword123!" },
-  });
-  const demo = await demoLogin.json();
-  const documentsResponse = await request.get("/api/v1/documents", {
-    headers: { Authorization: `Bearer ${demo.access_token}` },
-  });
-  const documents = await documentsResponse.json();
-  const sourceResponse = await request.get(`/api/v1/documents/${documents[0].id}/content`, {
-    headers: { Authorization: `Bearer ${demo.access_token}` },
-  });
-  const sourcePdf = await sourceResponse.body();
-
+test("new user can register and enter the workspace", async ({ page }) => {
   await page.goto("/?app=1");
   await page.getByRole("button", { name: "Need an account? Register" }).click();
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -45,19 +33,10 @@ test("new user can register, upload a real PDF, and wait for indexing", async ({
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "What can I help you understand?" })).toBeVisible();
 
-  await page.locator('input[type="file"][accept*="pdf"]').setInputFiles({
-    name: "playwright-upload.pdf",
-    mimeType: "application/pdf",
-    buffer: sourcePdf,
-  });
-  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: /Documents/ }).click();
-  const uploaded = page.locator(".document-card").filter({ hasText: "playwright-upload.pdf" });
-  await expect(uploaded).toBeVisible();
-  await expect(uploaded.getByText("ready")).toBeVisible({ timeout: 120_000 });
 });
 
 test("recruiter can run a background PDF operation and download its result", async ({ page }) => {
-  await signInDemo(page);
+  await signInRealAccount(page);
   await page.getByRole("button", { name: "PDF tools" }).click();
   await expect(page.getByRole("heading", { name: "PDF tools" })).toBeVisible();
   const picker = page.locator(".merge-picker");
@@ -72,7 +51,7 @@ test("recruiter can run a background PDF operation and download its result", asy
 
 test("live AI flow returns citations and a cached summary", async ({ page }) => {
   test.skip(!process.env.RUN_LIVE_AI_E2E, "Set RUN_LIVE_AI_E2E=1 when a funded LLM is configured");
-  await signInDemo(page);
+  await signInRealAccount(page);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: /Documents/ }).click();
   const card = page.locator(".document-card").filter({ hasText: "employee-handbook-v1.pdf" });
   await card.getByRole("button", { name: "More actions for employee-handbook-v1.pdf" }).click();

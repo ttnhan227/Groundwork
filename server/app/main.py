@@ -10,6 +10,7 @@ from app.chat import router as chat_router
 from app.collections import router as collections_router
 from app.config import get_settings
 from app.documents import router as documents_router
+from app.generation import router as generation_router
 from app.jobs import router as jobs_router
 from app.pdf_tools import router as pdf_tools_router
 from app.users import router as users_router
@@ -33,6 +34,7 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(generation_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(pdf_tools_router, prefix="/api/v1")

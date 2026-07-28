@@ -1,4 +1,4 @@
-"""Verify Phase 6 account, dashboard, document lifecycle, demo, and security behavior."""
+"""Verify Phase 6 registration, dashboard, document lifecycle, and security behavior."""
 
 import io
 import sys
@@ -32,12 +32,6 @@ def pdf() -> bytes:
 
 def main() -> None:
     with httpx.Client(timeout=60) as client:
-        demo = call(client, "POST", "/auth/login", json={
-            "email": "demo@insightpdf.dev", "password": "DemoPassword123!",
-        }).json()
-        demo_documents = call(client, "GET", "/documents", demo["access_token"]).json()
-        assert len(demo_documents) >= 3
-
         suffix = uuid.uuid4().hex[:10]
         auth = call(client, "POST", "/auth/register", json={
             "email": f"phase6-{suffix}@example.com", "password": "OriginalPassword!42", "display_name": "Phase Six User",
@@ -67,7 +61,7 @@ def main() -> None:
             "email": f"phase6-{suffix}@example.com", "password": "UpdatedPassword!42",
         })
         assert login.headers["x-content-type-options"] == "nosniff"
-        print("PASS: demo seed, profile/password, dashboard metrics, document rename/delete, and security headers")
+        print("PASS: real registration, profile/password, dashboard metrics, document rename/delete, and security headers")
 
 
 if __name__ == "__main__":

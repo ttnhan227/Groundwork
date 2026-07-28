@@ -24,7 +24,7 @@ structured AI outputs, and practical PDF tools in one Docker Compose application
 - Durable owner-scoped Celery jobs for AI and PDF operations, progress, errors and retry metadata
 - PDF.js viewer with thumbnails, navigation, zoom, search and citation jumps
 - Dashboard metrics, processing indicators, generated-file history and admin controls
-- Seeded text, scanned and version-comparison PDFs for the public demo
+- Real-account workspaces with private, owner-isolated source and generated files
 
 ## Architecture
 
@@ -82,16 +82,7 @@ Open:
 - API documentation: `http://localhost:8000/docs`
 - MinIO console: `http://localhost:9001`
 
-Demo credentials:
-
-```text
-Email: demo@insightpdf.dev
-Password: DemoPassword123!
-```
-
-The startup seed is idempotent and creates a native-text PDF, a scanned PDF,
-and two handbook versions. Replace or disable example credentials before a
-non-demo deployment.
+Create a real account from the registration screen, then sign in with those credentials.
 
 ## Configuration
 
@@ -104,7 +95,7 @@ All backend configuration is environment-based. `.env.example` documents:
 - local embedding model and dimensions
 - upload, page, document, AI and request limits
 - OCR language and text-density threshold
-- demo and optional admin accounts
+- registration and an optional bootstrap administrator account
 
 The browser normally uses the same-origin `/api/v1` path through Nginx.
 Set `VITE_API_URL` at client build time only when the API is hosted at a
@@ -153,7 +144,7 @@ docker compose exec -T api python scripts/live_phase_six_smoke.py
 ```
 
 These verify real ingestion/indexing, RAG citations, AI caching and structured
-outputs, transformations, protected downloads, demo seeding, document lifecycle,
+outputs, transformations, protected downloads, real-account registration, document lifecycle,
 account changes, dashboard metrics and security headers.
 
 ## API documentation
@@ -205,7 +196,7 @@ quality gate fails CI. Deployment guidance is in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Design decisions and limitations
 
-- The modular monolith keeps the demo operable while preserving extraction boundaries.
+- The modular monolith keeps local development operable while preserving extraction boundaries.
 - Embeddings are local; only answer/generation calls require the configured LLM.
 - Structured results are cached by owner, documents, feature and normalized parameters.
 - Binary multipart inputs are staged privately before background processing and removed afterward.

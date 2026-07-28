@@ -23,12 +23,13 @@ test("includes Phase 3 chat and citation navigation", async () => {
   assert.match(page, /Delete conversation/);
   assert.match(page, /setActiveConversation\(conversation\)/);
   assert.match(page, /Chat history/);
-  assert.match(page, /historyDocumentFilter/);
+  assert.doesNotMatch(page, /historyDocumentFilter/);
   assert.doesNotMatch(page, /> Conversations<\/button>/);
-  assert.match(page, /Document chat history/);
+  assert.match(page, /Workspace chat history/);
   assert.match(page, /Start new conversation/);
   assert.match(page, /openDocumentChat/);
-  assert.match(page, /const latest = saved\.find/);
+  assert.doesNotMatch(page, /const latest = saved\.find/);
+  assert.match(page, /attachedDocuments\.map/);
   assert.match(page, /PdfThumbnail/);
   assert.match(page, /Search PDF/);
   assert.match(page, /Ask multiple PDFs/);
@@ -72,7 +73,7 @@ test("includes the complete Phase 5 PDF tools workspace", async () => {
   assert.match(css, /\.artifact-ready/);
 });
 
-test("includes Phase 6 dashboard, account, admin, and optional demo access", async () => {
+test("includes Phase 6 dashboard, account, and admin access", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
@@ -83,10 +84,8 @@ test("includes Phase 6 dashboard, account, admin, and optional demo access", asy
   assert.match(page, /Search titles, filenames, and tags/);
   assert.match(page, /What can I help you understand\?/);
   assert.match(page, /Save source images to workspace/);
-  assert.match(page, /VITE_DEMO_ENABLED/);
-  assert.match(page, /Open the demo workspace/);
-  assert.match(page, /src="\/logo\.png"/);
-  assert.match(page, /openDemoWorkspace/);
+  assert.match(page, /function BrandMark/);
+  assert.match(css, /\.brand-symbol/);
   assert.match(page, /retryDocument/);
   assert.match(css, /\.dashboard-cards/);
   assert.match(css, /\.hub-sidebar/);

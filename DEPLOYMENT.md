@@ -19,16 +19,17 @@ production decisions include:
 - public HTTPS origins in `CORS_ORIGINS`
 - an OpenAI-compatible `LLM_BASE_URL`, key and model
 - conservative file, page, document, request and daily AI limits
-- whether demo seeding and example credentials remain enabled
+- whether public registration is enabled and an initial administrator is configured
 
 Build the client with `VITE_API_URL` when the API is hosted at a separate
 origin. Keep the default `/api/v1` when frontend and API share the Nginx origin.
-Set `VITE_DEMO_ENABLED=false` in a production client build to hide one-click
-access to the seeded demo account.
 
 For Render, the repository-level `render.yaml` creates the frontend as a Static
 Site with `client` as its root directory and `dist` as its publish directory.
 Set `VITE_API_URL` to the public backend URL ending in `/api/v1`.
+On the separate backend Render service, configure `LLM_API_KEY`,
+`LLM_BASE_URL`, and `LLM_MODEL` with the same Mistral values used locally.
+Chat, document analysis, and DOCX/PDF/PPTX creation all read these variables.
 The static client immediately sends a best-effort request to the backend
 `/health` endpoint on page load. This begins a free-service cold start while the
 visitor is viewing the login screen; warm-up failures stay silent and do not
@@ -67,7 +68,7 @@ docker compose exec -T api python scripts/live_phase_six_smoke.py
 - Monitor failed jobs, queue depth, request latency, AI usage and storage capacity.
 - Rotate LLM, JWT, database and object-storage credentials on exposure.
 - Apply a retention policy to staged objects and generated artifacts.
-- Do not deploy the example demo/admin passwords outside an intentionally public demo.
+- Use a unique, strong bootstrap administrator password and rotate it after provisioning.
 
 ## Rollback
 

@@ -1,5 +1,5 @@
-import { Activity, BrainCircuit, Check, Download, ExternalLink, Eye, FileImage, FileText, FolderOpen, FolderPlus, History, Keyboard, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, PanelLeftClose, PanelLeftOpen, Pencil, RefreshCw, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Tag, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Activity, AlignLeft, Check, Download, ExternalLink, Eye, FileImage, FileOutput, FileText, FolderOpen, FolderPlus, GitCompareArrows, History, Keyboard, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, PanelLeftClose, PanelLeftOpen, Pencil, Presentation, Quote, RefreshCw, ScanText, Scissors, Search, Send, Settings, ShieldCheck, Tag, Trash2, Upload, UserRound, X, ZoomIn, ZoomOut } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useForm } from "react-hook-form";
@@ -9,8 +9,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 
 const API = import.meta.env.VITE_API_URL ?? "/api/v1";
-const DEMO_ENABLED = (import.meta.env.VITE_DEMO_ENABLED ?? "true").toLowerCase() !== "false";
 const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
+
+function BrandMark({ className = "" }: { className?: string }) {
+  return <img className={`brand-symbol ${className}`.trim()} src="/favicon.ico" alt="" aria-hidden="true" />;
+}
 
 type DocumentItem = {
   id: string;
@@ -255,9 +258,9 @@ function AIWorkspace({ document, documents, token, compareMode, onClose, onPage 
     <section className="ai-workspace">
       <header><div><p className="eyebrow">Document intelligence</p><h2>{tool === "compare" ? "Compare PDFs" : document?.filename}</h2></div><button onClick={onClose}><X size={18} /></button></header>
       <div className="ai-tool-tabs">
-        {!compareMode && <><button className={tool === "summary" ? "active" : ""} onClick={() => { setTool("summary"); setResult(null); }}><Sparkles size={15} /> Summarize</button>
+        {!compareMode && <><button className={tool === "summary" ? "active" : ""} onClick={() => { setTool("summary"); setResult(null); }}><AlignLeft size={15} /> Summarize</button>
           <button className={tool === "quiz" ? "active" : ""} onClick={() => { setTool("quiz"); setResult(null); }}><ListChecks size={15} /> Quiz</button>
-          <button className={tool === "extract" ? "active" : ""} onClick={() => { setTool("extract"); setResult(null); }}><BrainCircuit size={15} /> Extract</button>
+          <button className={tool === "extract" ? "active" : ""} onClick={() => { setTool("extract"); setResult(null); }}><ScanText size={15} /> Extract</button>
           <button className={tool === "translate" ? "active" : ""} onClick={() => { setTool("translate"); setResult(null); }}><Languages size={15} /> Translate</button></>}
         {compareMode && <button className="active"><RefreshCw size={15} /> Compare</button>}
       </div>
@@ -269,10 +272,10 @@ function AIWorkspace({ document, documents, token, compareMode, onClose, onPage 
           {tool === "translate" && <><label>Target language<input value={language} onChange={(event) => setLanguage(event.target.value)} /></label><label>Pages <small>Optional, comma-separated</small><input value={pages} onChange={(event) => setPages(event.target.value)} placeholder="1, 3, 5" /></label></>}
           {tool === "compare" && <><label>Original document<select value={left} onChange={(event) => { setLeft(event.target.value); if (event.target.value === right) setRight(""); }}>{documents.map((item) => <option key={item.id} value={item.id}>{item.filename}</option>)}</select></label>
             <label>Compare with<select value={right} onChange={(event) => setRight(event.target.value)}><option value="">Select a different PDF</option>{documents.filter((item) => item.id !== left).map((item) => <option key={item.id} value={item.id}>{item.filename}</option>)}</select></label></>}
-          <button className="run-ai-tool" disabled={busy || (tool === "compare" && (!left || !right))} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <Sparkles size={15} />}{busy ? "Working…" : tool === "compare" ? "Compare documents" : "Generate"}</button>
+          <button className="run-ai-tool" disabled={busy || (tool === "compare" && (!left || !right))} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <FileOutput size={15} />}{busy ? "Working…" : tool === "compare" ? "Compare documents" : "Generate"}</button>
         </div>
         {error && <div className="form-error">{error}</div>}
-        {!result && !busy && <div className="ai-result-empty"><BrainCircuit size={38} /><strong>Ready when you are</strong><span>Choose your options and generate a grounded result from the indexed document text.</span></div>}
+        {!result && !busy && <div className="ai-result-empty"><ScanText size={38} /><strong>Ready when you are</strong><span>Choose your options and generate a grounded result from the indexed document text.</span></div>}
         {busy && <div className="ai-result-empty"><RefreshCw className="spin" size={34} /><strong>InsightPDF is analyzing your documents</strong><span>This can take a few seconds. Repeating the same request will use the saved result.</span></div>}
         {result && <PhaseFourResult value={result} documents={documents} onPage={onPage} />}
       </div>
@@ -404,13 +407,12 @@ function ArtifactCardPreview({ artifact, token, onOpen }: { artifact: Artifact; 
   </button>;
 }
 
-function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSearch = "", onHistory, onClose }: {
+function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSearch = "", onClose }: {
   artifact?: Artifact;
   document?: DocumentItem;
   token: string;
   initialPage?: number;
   initialSearch?: string;
-  onHistory?: () => void;
   onClose: () => void;
 }) {
   const [source, setSource] = useState("");
@@ -477,7 +479,6 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSea
       <header>
         <div><strong>{filename}</strong><small>{description} · {(sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div>
         {isPdf && <form className="artifact-viewer-search" onSubmit={searchOpenPDF}><Search size={14} /><input aria-label="Search within document" value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Search this document" /><button type="submit">Find</button></form>}
-        {onHistory && <button onClick={onHistory}><History size={15} /> History</button>}
         {source && <button onClick={() => window.open(source, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
         {!isPdf && <button onClick={() => artifact ? downloadArtifact(artifact, token).catch(() => undefined) : document ? downloadDocumentFile(document, token).catch(() => undefined) : undefined}><Download size={15} /> Download</button>}
         <button aria-label="Close preview" onClick={onClose}><X size={18} /></button>
@@ -494,7 +495,7 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSea
   </div>;
 }
 
-function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onHistory, onClose }: { document: DocumentItem; token: string; initialPage?: number; initialSearch?: string; onHistory: () => void; onClose: () => void }) {
+function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClose }: { document: DocumentItem; token: string; initialPage?: number; initialSearch?: string; onClose: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [pdfSource, setPdfSource] = useState("");
@@ -661,8 +662,8 @@ function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onHis
         <form className="viewer-search" onSubmit={searchPdf}><Search size={15} /><input name="query" placeholder="Search PDF" aria-label="Search PDF" /><button aria-label="Run search">Search</button></form>
         {activeSearch && citationStatus === "matched" && <span className="citation-locator matched">Source highlighted</span>}
         {activeSearch && citationStatus === "not-found" && <span className="citation-locator">Source page opened · exact text highlight unavailable</span>}
-        {pdfSource && <button onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
-        <button className="viewer-history" onClick={onHistory}><History size={17} /> Chat history</button>
+        <button onClick={() => downloadDocumentFile(document, token)}><Download size={15} /> Download</button>
+        {pdfSource && <button onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> New tab</button>}
         <button className="viewer-close" aria-label="Close viewer" onClick={onClose}><X size={20} /></button>
       </div>
       <div className="viewer-body">
@@ -847,12 +848,12 @@ function ChatPanel({
   }
 
   return <aside className={`chat-panel ${embedded ? "embedded" : ""}`}>
-    <header><span className="chat-brand"><FileText size={18} /></span><div><strong>Ask InsightPDF</strong><small>{documentLabel}</small></div><button title="Export conversation" aria-label="Export conversation" onClick={exportConversation}><Download size={16} /></button><button className="new-chat-button" title="Start new conversation" onClick={beginNewConversation}><MessageCircle size={15} /><span>New chat</span></button><button aria-label="Document chat history" title="Chat history" onClick={onHistory}><History size={17} /></button>{!embedded && <button aria-label="Close chat" onClick={onClose}><X size={18} /></button>}</header>
+    <header><span className="chat-brand"><FileText size={18} /></span><div><strong>Ask InsightPDF</strong><small>{documentLabel}</small></div><button title="Export conversation" aria-label="Export conversation" onClick={exportConversation}><Download size={16} /></button><button className="new-chat-button" title="Start new conversation" onClick={beginNewConversation}><MessageCircle size={15} /><span>New chat</span></button><button aria-label="Workspace chat history" title="Workspace chat history" onClick={onHistory}><History size={17} /></button>{!embedded && <button aria-label="Close chat" onClick={onClose}><X size={18} /></button>}</header>
     <DocumentMiniPreview document={document} token={token} onOpen={onPreview} />
     <div className="chat-messages">
       {!messages.length && <div className="chat-empty"><MessageCircle size={30} /><strong>Ask about this PDF</strong><span>Answers are grounded in indexed pages and include source citations.</span><div className="suggested-prompts">{starterPrompts.map((prompt) => <button key={prompt} onClick={() => askQuestion(prompt)}>{prompt}</button>)}</div></div>}
       {messages.map((message, index) => <div className={`chat-message ${message.role}`} key={index}>
-        {message.role === "assistant" ? <><div className="assistant-label"><Sparkles size={13} /> InsightPDF</div><FormattedAnswer content={message.content} /></> : <p>{message.content}</p>}
+        {message.role === "assistant" ? <><div className="assistant-label"><BrandMark /> InsightPDF</div><FormattedAnswer content={message.content} /></> : <p>{message.content}</p>}
         {!!message.citations?.length && <div className="citation-list"><span className="citation-heading">Sources</span>{message.citations.map((citation, citationIndex) => <button key={citationIndex} onClick={() => onCitation(citation)}>
           <b>{citation.document_name}</b><em>Page {citation.page_number}</em><span>{citation.snippet}</span>
         </button>)}</div>}
@@ -926,12 +927,14 @@ function IntegratedChatHub({
 }
 
 function HomeChat({
-  token, onChanged, onOpenDocuments, onUploadFile,
+  token, documents, onChanged, onOpenDocuments, onUploadFile, onArtifactCreated,
 }: {
   token: string;
+  documents: DocumentItem[];
   onChanged: () => void;
   onOpenDocuments: () => void;
   onUploadFile: (file: File) => Promise<void>;
+  onArtifactCreated: (artifact: Artifact) => void;
 }) {
   const [conversationId, setConversationId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -943,6 +946,10 @@ function HomeChat({
   const [busy, setBusy] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState("");
+  const [createFormat, setCreateFormat] = useState<"chat" | "docx" | "pdf" | "pptx">("chat");
+  const [createTheme, setCreateTheme] = useState("minimal");
+  const [sourceId, setSourceId] = useState("");
+  const [createdArtifacts, setCreatedArtifacts] = useState<Artifact[]>([]);
 
   async function ensureConversation() {
     if (conversationId) return conversationId;
@@ -959,6 +966,27 @@ function HomeChat({
   async function sendQuestion(value: string) {
     const question = value.trim();
     if (!question || busy) return;
+    if (createFormat !== "chat") {
+      setDraft("");
+      setMessages((current) => [...current, { role: "user", content: question }]);
+      setBusy(true);
+      setError("");
+      try {
+        const artifact = await api<Artifact>("/create", token, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: question, output_format: createFormat, theme: createTheme, source_document_id: sourceId || null }),
+        });
+        setCreatedArtifacts((current) => [artifact, ...current]);
+        setMessages((current) => [...current, { role: "assistant", content: `Created **${artifact.filename}** as a **${String(artifact.parameters.document_type ?? "document")}** with a ${String(artifact.parameters.layout ?? createTheme)} layout. It is saved in your workspace and ready to download.` }]);
+        onArtifactCreated(artifact);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Could not create the file");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setDraft("");
     setMessages((current) => [...current, { role: "user", content: question }, { role: "assistant", content: "" }]);
     setBusy(true);
@@ -1017,23 +1045,44 @@ function HomeChat({
 
   return <section className="home-chat">
     <header>
-      <div className="hub-ai-brand"><span className="hub-brand-mark"><FileText size={20} /></span><strong>Insight<span>PDF</span> <i>AI</i></strong></div>
+      <div className="hub-ai-brand"><BrandMark className="hub-brand-mark" /><strong>Insight<span>PDF</span></strong></div>
       {!!messages.length && <button onClick={newChat}><MessageCircle size={15} /> New chat</button>}
     </header>
     <div className="home-chat-messages">
       {!messages.length && <div className="home-chat-empty">
-        <span className="home-chat-logo"><FileText size={27} /></span>
+        <BrandMark className="home-chat-logo" />
         <h1>What can I help you with?</h1>
         <p>Chat with InsightPDF AI, or switch to document chat when you need answers grounded in your files.</p>
         <button onClick={onOpenDocuments}><FolderOpen size={15} /> Chat with documents</button>
       </div>}
       {messages.map((message, index) => <article className={message.role} key={index}>
-        {message.role === "assistant" && <span><Sparkles size={14} /></span>}
+        {message.role === "assistant" && <span><BrandMark /></span>}
         <div>{message.role === "assistant" ? <FormattedAnswer content={message.content} /> : <p>{message.content}</p>}</div>
       </article>)}
-      {busy && <div className="home-chat-thinking"><RefreshCw className="spin" size={14} /> InsightPDF is thinking…</div>}
+      {createdArtifacts.map((artifact) => <article className="home-created-file" key={artifact.id}>
+        <span>{artifact.filename.endsWith(".pptx") ? <Presentation size={18} /> : <FileText size={18} />}</span>
+        <div><strong>{artifact.filename}</strong><small>{artifact.filename.split(".").pop()?.toUpperCase()} · {String(artifact.parameters.document_type ?? "document")} · {String(artifact.parameters.layout ?? createTheme)} layout · {(artifact.size_bytes / 1024).toFixed(1)} KB</small></div>
+        <button onClick={() => downloadArtifact(artifact, token)}><Download size={15} /> Download</button>
+      </article>)}
+      {busy && <div className="home-chat-thinking"><RefreshCw className="spin" size={14} /> {createFormat === "chat" ? "InsightPDF is thinking…" : "Mistral is writing your document…"}</div>}
     </div>
     {error && <div className="chat-error">{error}</div>}
+    <div className="home-create-controls">
+      <div className="home-create-types" aria-label="AI action">
+        <button className={createFormat === "chat" ? "active" : ""} onClick={() => setCreateFormat("chat")}><MessageCircle size={14} /> Ask AI</button>
+        <button className={createFormat === "docx" ? "active" : ""} onClick={() => setCreateFormat("docx")}><FileText size={14} /> Word</button>
+        <button className={createFormat === "pdf" ? "active" : ""} onClick={() => setCreateFormat("pdf")}><FileText size={14} /> PDF</button>
+        <button className={createFormat === "pptx" ? "active" : ""} onClick={() => setCreateFormat("pptx")}><Presentation size={14} /> Slides</button>
+      </div>
+      {createFormat !== "chat" && <div className="home-create-options">
+        <select aria-label="Creation theme" value={createTheme} onChange={(event) => setCreateTheme(event.target.value)}>
+          <option value="minimal">Minimal theme</option><option value="executive">Executive theme</option><option value="modern">Modern theme</option><option value="warm">Warm theme</option>
+        </select>
+        <select aria-label="Source document" value={sourceId} onChange={(event) => setSourceId(event.target.value)}>
+          <option value="">Create from prompt</option>{documents.map((document) => <option key={document.id} value={document.id}>Use {document.filename}</option>)}
+        </select>
+      </div>}
+    </div>
     <form onSubmit={(event) => { event.preventDefault(); sendQuestion(draft); }}>
       <label className={`home-chat-attach ${attaching ? "busy" : ""}`} title="Upload a PDF" aria-label="Upload a PDF">
         {attaching ? <RefreshCw className="spin" size={17} /> : <Upload size={17} />}
@@ -1052,24 +1101,23 @@ function HomeChat({
           }
         }} />
       </label>
-      <textarea aria-label="Message InsightPDF AI" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message InsightPDF AI…" rows={1} disabled={busy} onKeyDown={(event) => {
+      <textarea aria-label="Message InsightPDF AI" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={createFormat === "chat" ? "Message InsightPDF AI…" : `Describe the ${createFormat === "pptx" ? "presentation" : createFormat === "docx" ? "Word document" : "PDF"} you want to create…`} rows={1} disabled={busy} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
       }} />
       <button aria-label="Send message" disabled={busy || !draft.trim()}><Send size={18} /></button>
     </form>
-    <small>Ask anything, attach a new PDF, or choose Chat with documents for grounded answers with citations.</small>
+    <small>{createFormat === "chat" ? "Ask anything, attach a source, or choose a creation format." : `InsightPDF will create and save a real ${createFormat.toUpperCase()} file.`}</small>
   </section>;
 }
 
 function ConversationHistory({
-  conversations, documents, busy, documentFilter, onRefresh, onOpen, onClose,
+  conversations, documents, busy, onRefresh, onOpen, onClose,
 }: {
   conversations: Conversation[];
   documents: DocumentItem[];
   busy: boolean;
-  documentFilter?: DocumentItem | null;
   onRefresh: () => Promise<void>;
-  onOpen: (conversation: Conversation, document: DocumentItem) => void;
+  onOpen: (conversation: Conversation) => void;
   onClose: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -1098,20 +1146,16 @@ function ConversationHistory({
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed"); }
   }
 
-  const visibleConversations = documentFilter
-    ? conversations.filter((conversation) => conversation.document_ids.includes(documentFilter.id))
-    : conversations;
-
   return <div className="history-wrap" role="dialog" aria-modal="true" aria-label="Conversation history">
     <button className="history-backdrop" aria-label="Close conversation history" onClick={onClose} />
     <section className="history-panel">
-      <header><div><p className="eyebrow">{documentFilter ? "Document chats" : "Saved chats"}</p><h2>{documentFilter ? documentFilter.filename : "Conversations"}</h2></div><button aria-label="Close" onClick={onClose}><X size={19} /></button></header>
+      <header><div><p className="eyebrow">Workspace history</p><h2>Conversations</h2></div><button aria-label="Close" onClick={onClose}><X size={19} /></button></header>
       {error && <div className="chat-error">{error}</div>}
       <div className="history-list">
         {busy && <div className="history-empty"><RefreshCw className="spin" size={18} /> Loading conversations…</div>}
-        {!busy && !visibleConversations.length && <div className="history-empty"><History size={30} /><strong>No conversations yet</strong><span>{documentFilter ? "Choose Ask AI to start a chat about this PDF." : "Open a ready PDF and choose Ask AI."}</span></div>}
-        {visibleConversations.map((conversation) => {
-          const document = documents.find((item) => conversation.document_ids.includes(item.id));
+        {!busy && !conversations.length && <div className="history-empty"><History size={30} /><strong>No conversations yet</strong><span>Start a chat and attach one or more documents when you need grounded answers.</span></div>}
+        {conversations.map((conversation) => {
+          const attachedDocuments = documents.filter((item) => conversation.document_ids.includes(item.id));
           return <article className="history-item" key={conversation.id}>
             <div className="history-title">
               {editing === conversation.id
@@ -1119,12 +1163,12 @@ function ConversationHistory({
                     <input name="title" defaultValue={conversation.title} autoFocus maxLength={160} />
                     <button>Save</button>
                   </form>
-                : <><strong>{conversation.title}</strong><span>{conversation.messages.length} messages · {new Date(conversation.updated_at).toLocaleString()}</span></>}
+                : <><strong>{conversation.title}</strong><span>{conversation.messages.length} messages · {attachedDocuments.length ? attachedDocuments.map((item) => item.filename).join(", ") : "No available attachments"} · {new Date(conversation.updated_at).toLocaleString()}</span></>}
             </div>
             <div className="history-actions">
               <button aria-label="Rename conversation" onClick={() => setEditing(conversation.id)}><Pencil size={14} /></button>
               <button aria-label="Delete conversation" onClick={() => remove(conversation)}><Trash2 size={14} /></button>
-              <button disabled={!document} onClick={() => document && onOpen(conversation, document)}>Open</button>
+              <button disabled={!attachedDocuments.length} onClick={() => onOpen(conversation)}>Open</button>
             </div>
           </article>;
         })}
@@ -1168,10 +1212,10 @@ function MultiDocumentChat({
     <button className="history-backdrop" aria-label="Close" onClick={onClose} />
     <form className="multi-chat-panel" onSubmit={create}>
       <button className="modal-x" type="button" aria-label="Close" onClick={onClose}><X size={18} /></button>
-      <span className="multi-chat-icon"><Sparkles size={23} /></span>
+      <span className="multi-chat-icon"><GitCompareArrows size={23} /></span>
       <p className="eyebrow">Cross-document chat</p>
-      <h2>Ask multiple PDFs</h2>
-      <p>Select two or more indexed documents. Answers may retrieve and cite relevant pages from any selected PDF.</p>
+      <h2>Ask across documents</h2>
+      <p>Select two or more indexed sources. Answers retrieve and cite the most relevant pages across them.</p>
       <label className="multi-title">Conversation name<input name="title" placeholder="e.g. Compare résumé versions" maxLength={160} /></label>
       <div className="multi-doc-list">
         {documents.map((document) => <label key={document.id} className={selected.includes(document.id) ? "selected" : ""}>
@@ -1180,7 +1224,7 @@ function MultiDocumentChat({
         </label>)}
       </div>
       {error && <div className="form-error">{error}</div>}
-      <button className="multi-submit" disabled={busy || selected.length < 2}><MessageCircle size={16} /> {busy ? "Creating…" : `Start chat with ${selected.length || 0} PDFs`}</button>
+      <button className="multi-submit" disabled={busy || selected.length < 2}><MessageCircle size={16} /> {busy ? "Creating…" : `Start chat with ${selected.length || 0} documents`}</button>
     </form>
   </div>;
 }
@@ -1327,8 +1371,8 @@ function MyFolder({ documents, token, onDocuments, onClose }: {
     <section className="folder-panel" role="dialog" aria-label="My folder">
       <header><div><p className="eyebrow">File library</p><h2>My folder</h2></div><button aria-label="Close my folder" onClick={onClose}><X size={18} /></button></header>
       <nav>
-        <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}><FileText size={15} /> Uploaded PDFs <span>{documents.length}</span></button>
-        <button className={tab === "generated" ? "active" : ""} onClick={() => setTab("generated")}><Sparkles size={15} /> Generated files <span>{artifacts.length}</span></button>
+        <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}><FileText size={15} /> Source documents <span>{documents.length}</span></button>
+        <button className={tab === "generated" ? "active" : ""} onClick={() => setTab("generated")}><FileOutput size={15} /> Generated files <span>{artifacts.length}</span></button>
       </nav>
       <div className="folder-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search files" /></div>
       {tab === "documents" && visibleDocuments.length > 0 && <div className="folder-bulk-actions">
@@ -1357,7 +1401,7 @@ function MyFolder({ documents, token, onDocuments, onClose }: {
           </div>
         </article>)}
         {tab === "generated" && visibleArtifacts.map((item) => <article className="folder-item no-select" key={item.id}>
-          <div className="folder-file-icon generated"><Sparkles size={18} /></div>
+          <div className="folder-file-icon generated"><FileOutput size={18} /></div>
           <div><strong>{item.filename}</strong><span>{(item.size_bytes / 1024).toFixed(1)} KB · {item.operation.replaceAll("_", " ")} · {new Date(item.created_at).toLocaleDateString()}</span></div>
           <div className="folder-actions">
             <button disabled={busyId === item.id} title="Download" onClick={() => downloadArtifact(item, token).catch((reason) => setError(reason.message))}><Download size={14} /></button>
@@ -1455,7 +1499,7 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   const canRun = !busy && (tool === "merge" ? selected.length >= 2 : tool === "images-to-pdf" ? images.length > 0 : needsWordFile ? Boolean(wordFile) : Boolean(documentId));
 
   return <div className="pdf-tools-wrap"><button className="history-backdrop" aria-label="Close PDF tools" onClick={onClose} />
-    <section className="pdf-tools-panel"><header><div><p className="eyebrow">Phase 5 workspace</p><h2>PDF tools</h2></div><button onClick={onClose}><X size={18} /></button></header>
+    <section className="pdf-tools-panel"><header><div><p className="eyebrow">Document workflows</p><h2>Document tools</h2></div><button onClick={onClose}><X size={18} /></button></header>
       <div className="pdf-tools-layout"><nav>{tools.map(([id, label]) => <button className={tool === id ? "active" : ""} key={id} onClick={() => { setTool(id); setArtifact(null); setError(""); }}>{id.includes("image") ? <FileImage size={15} /> : <Scissors size={15} />}{label}</button>)}</nav>
         <main><div className="tool-heading"><h3>{tools.find(([id]) => id === tool)?.[1]}</h3><p>Outputs are stored securely and available for download.</p></div>
           <div className="tool-form">
@@ -1594,7 +1638,7 @@ function CopilotWorkspace({ documents, token, onClose }: { documents: DocumentIt
         <label>What do you want to do?<textarea value={command} onChange={(event) => setCommand(event.target.value)} minLength={3} required placeholder="Rotate pages 2-3, add page numbers, then compress the PDF strongly" /></label>
         <div className="copilot-examples"><button type="button" onClick={() => setCommand("Compress the PDF with balanced quality")}>Compress</button><button type="button" onClick={() => setCommand("Add page numbers at the bottom")}>Number pages</button><button type="button" onClick={() => setCommand("Summarize the key points")}>Summarize</button></div>
         {error && <div className="form-error">{error}</div>}
-        <button className="copilot-primary" disabled={busy}>{busy ? "Inspecting request…" : "Create safe plan"}<Sparkles size={16} /></button>
+        <button className="copilot-primary" disabled={busy}>{busy ? "Inspecting request…" : "Create safe plan"}<ListChecks size={16} /></button>
       </form>
       {plan && <section className="plan-preview">
         <div className="plan-heading"><div><span>PROPOSED PLAN</span><strong>{plan.steps.length} step{plan.steps.length === 1 ? "" : "s"}</strong></div><b>{plan.estimated_ai_calls ? `${plan.estimated_ai_calls} AI call` : "No AI cost"}</b></div>
@@ -1608,6 +1652,90 @@ function CopilotWorkspace({ documents, token, onClose }: { documents: DocumentIt
       {artifact && <section className="workflow-result"><Check size={24} /><div><strong>Workflow verified</strong><span>{artifact.filename} · {(artifact.size_bytes / 1024).toFixed(1)} KB</span></div><button onClick={() => downloadArtifact(artifact, token).catch((reason) => setError(reason.message))}><Download size={15} /> Download</button></section>}
     </section>
   </div>;
+}
+
+type SlideDraft = { eyebrow: string; title: string; body: string; variant: "title" | "section-1" | "section-2" | "section-3" };
+type SlidePalette = { navy: string; accent: string; soft: string };
+
+function PresentationStudio({ documents, artifacts, token, onCreated }: { documents: DocumentItem[]; artifacts: Artifact[]; token: string; onCreated: (artifact: Artifact) => void }) {
+  const [topic, setTopic] = useState("FY2025 financial performance and growth strategy");
+  const [audience, setAudience] = useState("Executive leadership");
+  const [tone, setTone] = useState("Clear and confident");
+  const [sourceId, setSourceId] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [selectedSlide, setSelectedSlide] = useState(0);
+  const [slides, setSlides] = useState<SlideDraft[]>([]);
+  const [theme, setTheme] = useState("minimal");
+  const [previewTheme, setPreviewTheme] = useState("minimal");
+  const [palette, setPalette] = useState<SlidePalette>({ navy: "#0A183D", accent: "#EF2949", soft: "#F3F5F8" });
+  const [artifact, setArtifact] = useState<Artifact | null>(null);
+  const [error, setError] = useState("");
+
+  async function generateDeck(event: FormEvent) {
+    event.preventDefault();
+    if (!topic.trim()) return;
+    setGenerating(true);
+    setError("");
+    try {
+      const created = await api<Artifact>("/create", token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: `${topic}. Audience: ${audience}. Tone: ${tone}.`, output_format: "pptx", theme, source_document_id: sourceId || null }),
+      });
+      const generatedSlides = Array.isArray(created.parameters.preview_slides)
+        ? created.parameters.preview_slides as SlideDraft[]
+        : [];
+      const generatedPalette = created.parameters.preview_palette as SlidePalette | undefined;
+      if (!generatedSlides.length) throw new Error("The presentation was created, but its preview data is missing.");
+      setSlides(generatedSlides);
+      if (generatedPalette?.navy && generatedPalette?.accent && generatedPalette?.soft) setPalette(generatedPalette);
+      setPreviewTheme(String(created.parameters.theme ?? theme));
+      setSelectedSlide(0);
+      setArtifact(created);
+      onCreated(created);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not generate the presentation");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const activeSlide = slides[selectedSlide];
+  return <section className="presentation-studio">
+    <header className="presentation-heading">
+      <div><span className="presentation-kicker"><Presentation size={15} /> AI presentations</span><h1>Turn your work into a clear story</h1><p>Create a polished slide draft from a topic or ground it in one of your documents.</p></div>
+      <span className="presentation-format">16:9 · {previewTheme[0].toUpperCase() + previewTheme.slice(1)}</span>
+    </header>
+    <div className="presentation-layout">
+      <form className="presentation-builder" onSubmit={generateDeck}>
+        <div className="presentation-builder-title"><Presentation size={18} /><div><strong>Create a presentation</strong><small>Describe the outcome, not every slide.</small></div></div>
+        <label>What should the deck communicate?<textarea value={topic} onChange={(event) => setTopic(event.target.value)} rows={4} /></label>
+        <label>Use a source document<select value={sourceId} onChange={(event) => setSourceId(event.target.value)}><option value="">No source · start from the prompt</option>{documents.map((document) => <option key={document.id} value={document.id}>{document.filename}</option>)}</select></label>
+        <div className="presentation-options">
+          <label>Audience<select value={audience} onChange={(event) => setAudience(event.target.value)}><option>Executive leadership</option><option>Clients and partners</option><option>Internal team</option><option>Investors</option></select></label>
+          <label>Tone<select value={tone} onChange={(event) => setTone(event.target.value)}><option>Clear and confident</option><option>Concise and analytical</option><option>Persuasive</option><option>Educational</option></select></label>
+        </div>
+        <label>Theme<select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="minimal">Minimal</option><option value="executive">Executive</option><option value="modern">Modern</option><option value="warm">Warm</option></select></label>
+        {error && <div className="form-error">{error}</div>}
+        <button className="generate-deck" disabled={generating || !topic.trim()}>{generating ? <><RefreshCw className="spin" size={17} /> Building your story…</> : <><Presentation size={17} /> Generate presentation</>}</button>
+        <p className="presentation-note">Generates a real editable PowerPoint file and saves it to your workspace.</p>
+      </form>
+      <section className={`deck-preview ${slides.length ? "has-slides" : ""}`}>
+        {!activeSlide ? <div className="deck-empty"><span><Presentation size={28} /></span><strong>Your deck will appear here</strong><p>Generate a draft to review its narrative, structure, and key metrics before exporting.</p><div><i /><i /><i /></div></div> : <>
+          <div className="slide-stage"><div
+            className={`generated-slide ${activeSlide.variant}`}
+            style={{ "--slide-navy": palette.navy, "--slide-accent": palette.accent, "--slide-soft": palette.soft } as CSSProperties}
+          ><span>{activeSlide.eyebrow}</span><h2>{activeSlide.title}</h2><p>{activeSlide.body}</p>{activeSlide.variant === "section-1" && <i className="slide-marker" />}{activeSlide.variant === "section-2" && <i className="slide-panel"><b>{activeSlide.eyebrow}</b></i>}<footer><b>InsightPDF</b><i>{String(selectedSlide + 1).padStart(2, "0")}</i></footer></div></div>
+          <div className="slide-strip" aria-label="Generated slides">{slides.map((slide, index) => <button type="button" key={slide.eyebrow} className={selectedSlide === index ? "active" : ""} onClick={() => setSelectedSlide(index)}><span>{index + 1}</span><strong>{slide.title}</strong></button>)}</div>
+          <div className="deck-actions"><span><Check size={15} /> {slides.length} slides generated</span><button disabled={!artifact} onClick={() => artifact && downloadArtifact(artifact, token)}><Download size={15} /> Download PPTX</button></div>
+        </>}
+      </section>
+    </div>
+    {!!artifacts.filter((item) => item.filename.toLowerCase().endsWith(".pptx")).length && <section className="saved-presentations">
+      <header><div><strong>Saved presentations</strong><span>PowerPoint files created in your workspace</span></div></header>
+      <div>{artifacts.filter((item) => item.filename.toLowerCase().endsWith(".pptx")).map((item) => <article key={item.id}><span><Presentation size={18} /></span><div><strong>{item.filename}</strong><small>{String(item.parameters.theme ?? "minimal")} theme · {(item.size_bytes / 1024).toFixed(1)} KB</small></div><button onClick={() => downloadArtifact(item, token)}><Download size={15} /> Download</button></article>)}</div>
+    </section>}
+  </section>;
 }
 
 function WorkspaceApp({
@@ -1641,7 +1769,6 @@ function WorkspaceApp({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyBusy, setHistoryBusy] = useState(false);
-  const [historyDocumentFilter, setHistoryDocumentFilter] = useState<DocumentItem | null>(null);
   const [multiChatOpen, setMultiChatOpen] = useState(false);
   const [aiDocument, setAIDocument] = useState<DocumentItem | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -1654,7 +1781,7 @@ function WorkspaceApp({
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [newCollectionName, setNewCollectionName] = useState("");
   const [draggingUpload, setDraggingUpload] = useState(false);
-  const [hubView, setHubView] = useState<"home" | "chat" | "documents">("home");
+  const [hubView, setHubView] = useState<"home" | "chat" | "documents" | "presentations">("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "pdfs" | "converted" | "images">("all");
@@ -1736,20 +1863,10 @@ function WorkspaceApp({
     finally { setHistoryBusy(false); }
   }, [token]);
 
-  async function openDocumentChat(document: DocumentItem) {
-    setBusy(true);
-    setError("");
-    try {
-      const saved = await loadConversations();
-      const latest = saved.find((conversation) => conversation.document_ids.includes(document.id)) ?? null;
-      setActiveConversation(latest);
-      setChatDocuments([document]);
-      setChatDocument(document);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not load document conversations");
-    } finally {
-      setBusy(false);
-    }
+  function openDocumentChat(document: DocumentItem) {
+    setActiveConversation(null);
+    setChatDocuments([document]);
+    setChatDocument(document);
   }
 
   useEffect(() => {
@@ -1823,15 +1940,6 @@ function WorkspaceApp({
       }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
     finally { setBusy(false); }
-  }
-
-  async function openDemoWorkspace() {
-    setMode("login");
-    await authenticate({
-      email: "demo@insightpdf.dev",
-      password: "DemoPassword123!",
-      display_name: "",
-    });
   }
 
   async function upload(file?: File, accessToken = token) {
@@ -2077,9 +2185,9 @@ function WorkspaceApp({
     <main className="auth-page">
       <section className="auth-card">
         <div className="auth-brand auth-brand-login"><img src="/logo.png" alt="InsightPDF" /></div>
-        <p className="eyebrow">AI-powered PDF workspace</p>
+        <p className="eyebrow">AI-powered document workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
-        <p>Upload PDFs, extract text, and process scanned pages securely.</p>
+        <p>Understand source files and create polished Word, PDF, and PowerPoint outputs securely.</p>
         {pendingUpload && <div className="pending-upload-note">
           <FileText size={16} />
           <span><strong>{pendingUpload.name}</strong><small>Ready to upload securely after you sign in.</small></span>
@@ -2101,9 +2209,6 @@ function WorkspaceApp({
         {(REGISTRATION_ENABLED || mode === "register") && <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
           {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
         </button>}
-        {DEMO_ENABLED && mode === "login" && <button className="demo-link" type="button" onClick={openDemoWorkspace} disabled={busy}>
-          <Sparkles size={14} /> {busy ? "Opening demo workspace…" : "Just exploring? Open the demo workspace"}
-        </button>}
       </section>
     </main>
   );
@@ -2114,19 +2219,20 @@ function WorkspaceApp({
     <main className={`workspace-page hub-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} data-hub-view={hubView}>
       <aside className="hub-sidebar">
         <div className="hub-brand">
-          <span className="hub-brand-mark"><FileText size={19} /></span>
+          <BrandMark className="hub-brand-mark" />
           <strong>Insight<span>PDF</span></strong>
           <button aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
         <nav aria-label="Workspace navigation">
           <button className={hubView === "home" ? "active" : ""} onClick={() => setHubView("home")}><LayoutDashboard size={18} /><span>Home</span></button>
           <button className={hubView === "documents" ? "active" : ""} onClick={() => setHubView("documents")}><FolderOpen size={18} /><span>Documents</span><i>{documents.length + workspaceArtifacts.length}</i></button>
+          <button className={hubView === "presentations" ? "active" : ""} onClick={() => setHubView("presentations")}><Presentation size={18} /><span>Presentations</span></button>
           <span className="hub-nav-label">AI workspace</span>
-          <button className={hubView === "chat" ? "active" : ""} disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><BrainCircuit size={18} /><span>Document chat</span></button>
+          <button className={hubView === "chat" ? "active" : ""} disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><Quote size={18} /><span>Document chat</span></button>
           <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={18} /><span>Compare</span></button>
           <span className="hub-nav-label">Tools</span>
-          <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>PDF tools</span></button>
-          <button onClick={() => { setHistoryDocumentFilter(null); setHistoryOpen(true); loadConversations().catch(() => undefined); }}><History size={18} /><span>Chat history</span></button>
+          <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>Document tools</span></button>
+          <button onClick={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}><History size={18} /><span>Chat history</span></button>
           <button onClick={() => setJobsOpen(true)}><RefreshCw size={18} /><span>Processing</span></button>
         </nav>
         <div className="hub-sidebar-footer">
@@ -2135,7 +2241,7 @@ function WorkspaceApp({
         </div>
       </aside>
       <header className="hub-topbar">
-        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "chat" ? "Document chat" : "Documents"}</strong><small>{hubView === "home" ? "Ask, attach, and create" : hubView === "chat" ? "Grounded answers from one or multiple documents" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
+        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "chat" ? "Document chat" : hubView === "presentations" ? "Presentations" : "Documents"}</strong><small>{hubView === "home" ? "Ask, attach, and create" : hubView === "chat" ? "Grounded answers from one or multiple documents" : hubView === "presentations" ? "Generate a slide story from an idea or document" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
         <button title="Keyboard shortcuts: / search, U upload" aria-label="Keyboard shortcuts"><Keyboard size={17} /></button>
         <button onClick={() => setJobsOpen(true)} aria-label="Processing jobs"><RefreshCw size={17} /></button>
         <label className={`hub-upload ${busy ? "disabled" : ""}`}><Upload size={16} /> Upload<input ref={uploadInputRef} type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
@@ -2144,7 +2250,9 @@ function WorkspaceApp({
         {hubView === "home" ? <div className="hub-home">
           <HomeChat
             token={token}
+            documents={readyDocuments}
             onChanged={() => loadConversations().catch(() => undefined)}
+            onArtifactCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }}
             onOpenDocuments={() => setHubView("chat")}
             onUploadFile={async (file) => {
               await upload(file);
@@ -2164,15 +2272,15 @@ function WorkspaceApp({
             <header><div><strong>Quick tools</strong><span>Open a specialized workflow</span></div></header>
             <div>
               <button disabled={!readyDocuments.length} onClick={() => setHubView("chat")}><span><MessageCircle size={19} /></span><strong>Ask documents</strong><small>Grounded answers with citations</small></button>
-              <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}><span><Sparkles size={19} /></span><strong>Summarize</strong><small>Turn long files into key points</small></button>
+              <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}><span><AlignLeft size={19} /></span><strong>Summarize</strong><small>Turn long files into key points</small></button>
               <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><span><RefreshCw size={19} /></span><strong>Compare</strong><small>Find changes and differences</small></button>
-              <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><span><Scissors size={19} /></span><strong>PDF tools</strong><small>Convert, merge, split, and edit</small></button>
+              <button onClick={() => setHubView("presentations")}><span><Presentation size={19} /></span><strong>Create slides</strong><small>Generate a presentation draft</small></button>
             </div>
           </section>
           <div className="hub-home-grid">
             <section className="hub-recent">
               <header><div><strong>Recent</strong><span>Your latest work</span></div><button onClick={() => setHubView("documents")}>View all</button></header>
-              <div>{recentActivity.slice(0, 5).map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={16} /> : item.icon === "artifact" ? <Sparkles size={16} /> : <FileText size={16} />}<span><strong>{item.title}</strong><small>{item.detail}</small></span><time>{new Date(item.date).toLocaleDateString()}</time></article>)}</div>
+              <div>{recentActivity.slice(0, 5).map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={16} /> : item.icon === "artifact" ? <FileOutput size={16} /> : <FileText size={16} />}<span><strong>{item.title}</strong><small>{item.detail}</small></span><time>{new Date(item.date).toLocaleDateString()}</time></article>)}</div>
             </section>
             <section className="hub-overview">
               <header><strong>Workspace</strong><span>At a glance</span></header>
@@ -2184,20 +2292,20 @@ function WorkspaceApp({
           documents={readyDocuments}
           token={token}
           onChanged={() => { loadConversations().catch(() => undefined); }}
-          onHistory={() => { setHistoryDocumentFilter(null); setHistoryOpen(true); loadConversations().catch(() => undefined); }}
+          onHistory={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}
           onPreview={(document) => { setViewerPage(1); setViewerSearch(""); setViewer(document); }}
           onCitation={(citation) => {
             const cited = documents.find((item) => item.id === citation.document_id);
             if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
           }}
-        /> : <header className="documents-heading"><div><h1>Your documents</h1><p>Upload, organize, preview, and use AI with every file.</p></div></header>}
+        /> : hubView === "presentations" ? <PresentationStudio documents={readyDocuments} artifacts={workspaceArtifacts} token={token} onCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }} /> : <header className="documents-heading"><div><h1>Your documents</h1><p>Upload, organize, preview, and use AI with PDFs, Word files, and presentations.</p></div></header>}
         <div className="workspace-title">
           <div><p className="eyebrow">AI-first document workspace</p><h1>What do you want to understand?</h1><p>Upload a PDF, ask grounded questions, compare versions, or transform it into something useful.</p></div>
           <div className="workspace-actions">
-            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setHubView("chat")}><BrainCircuit size={16} /> Ask documents</button>
+            <button className="copilot-launch" disabled={!documents.some((item) => item.status === "ready")} onClick={() => setHubView("chat")}><Quote size={16} /> Ask documents</button>
             <button disabled={!documents.some((item) => item.status === "ready")} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={16} /> PDF tools</button>
             <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setCompareOpen(true)}><RefreshCw size={16} /> Compare PDFs</button>
-            <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setMultiChatOpen(true)}><Sparkles size={16} /> Ask multiple PDFs</button>
+            <button disabled={documents.filter((item) => item.status === "ready").length < 2} onClick={() => setMultiChatOpen(true)}><GitCompareArrows size={16} /> Ask multiple PDFs</button>
             <label className={`real-upload ${busy ? "disabled" : ""}`}><Upload size={17} /> Upload PDF<input type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
           </div>
         </div>
@@ -2206,11 +2314,11 @@ function WorkspaceApp({
         }}>
           {busy ? <RefreshCw className="spin" size={25} /> : <Upload size={25} />}
           <span><strong>{busy ? "Uploading and preparing your document…" : "Drop a PDF here to begin"}</strong><small>or click to browse · U opens the file picker</small></span>
-          <Sparkles size={19} />
+          <FileOutput size={19} />
         </button>
         {error && <div className="form-error">{error}</div>}
-        <div className="dashboard-cards">{stats && <><article><LayoutDashboard size={17} /><div><strong>{documents.length + workspaceArtifacts.length}</strong><span>All files</span></div></article><article><FileText size={17} /><div><strong>{stats.page_count}</strong><span>Pages indexed</span></div></article><article><Sparkles size={17} /><div><strong>{stats.ai_requests}</strong><span>AI requests</span></div></article><article><Download size={17} /><div><strong>{stats.generated_files}</strong><span>Generated files</span></div></article></>}</div>
-        {!!recentActivity.length && <section className="recent-activity"><header><Activity size={16} /><div><strong>Recent activity</strong><span>Your latest documents, results, and conversations</span></div></header><div>{recentActivity.map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={15} /> : item.icon === "artifact" ? <Sparkles size={15} /> : <FileText size={15} />}<span><strong>{item.title}</strong><small>{item.detail} · {new Date(item.date).toLocaleDateString()}</small></span></article>)}</div></section>}
+        <div className="dashboard-cards">{stats && <><article><LayoutDashboard size={17} /><div><strong>{documents.length + workspaceArtifacts.length}</strong><span>All files</span></div></article><article><FileText size={17} /><div><strong>{stats.page_count}</strong><span>Pages indexed</span></div></article><article><Quote size={17} /><div><strong>{stats.ai_requests}</strong><span>Document requests</span></div></article><article><Download size={17} /><div><strong>{stats.generated_files}</strong><span>Generated files</span></div></article></>}</div>
+        {!!recentActivity.length && <section className="recent-activity"><header><Activity size={16} /><div><strong>Recent activity</strong><span>Your latest documents, results, and conversations</span></div></header><div>{recentActivity.map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={15} /> : item.icon === "artifact" ? <FileOutput size={15} /> : <FileText size={15} />}<span><strong>{item.title}</strong><small>{item.detail} · {new Date(item.date).toLocaleDateString()}</small></span></article>)}</div></section>}
         <div className="collection-bar">
           <FolderOpen size={16} />
           <button className={collectionFilter === "all" ? "active" : ""} onClick={() => setCollectionFilter("all")}>All documents</button>
@@ -2220,8 +2328,8 @@ function WorkspaceApp({
         </div>
         <div className="document-type-tabs" role="tablist" aria-label="Document types">
           <button role="tab" aria-selected={typeFilter === "all"} className={typeFilter === "all" ? "active" : ""} onClick={() => setTypeFilter("all")}>All <span>{documents.length + workspaceArtifacts.length}</span></button>
-          <button role="tab" aria-selected={typeFilter === "pdfs"} className={typeFilter === "pdfs" ? "active" : ""} onClick={() => setTypeFilter("pdfs")}>Uploaded PDFs <span>{documents.length}</span></button>
-          <button role="tab" aria-selected={typeFilter === "converted"} className={typeFilter === "converted" ? "active" : ""} onClick={() => setTypeFilter("converted")}>Converted <span>{workspaceArtifacts.filter((item) => !isImageArtifact(item)).length}</span></button>
+          <button role="tab" aria-selected={typeFilter === "pdfs"} className={typeFilter === "pdfs" ? "active" : ""} onClick={() => setTypeFilter("pdfs")}>Source files <span>{documents.length}</span></button>
+          <button role="tab" aria-selected={typeFilter === "converted"} className={typeFilter === "converted" ? "active" : ""} onClick={() => setTypeFilter("converted")}>Created files <span>{workspaceArtifacts.filter((item) => !isImageArtifact(item)).length}</span></button>
           <button role="tab" aria-selected={typeFilter === "images"} className={typeFilter === "images" ? "active" : ""} onClick={() => setTypeFilter("images")}>Images <span>{workspaceArtifacts.filter(isImageArtifact).length}</span></button>
         </div>
         <div className="document-filters">
@@ -2266,7 +2374,7 @@ function WorkspaceApp({
                     <button onClick={() => { renameWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
                     <button onClick={() => { downloadArtifact(artifact, token).catch((reason) => setError(reason.message)); setOpenActionMenu(""); }}><Download size={14} /> Download</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactPDFTools(artifact); setOpenActionMenu(""); }}><Scissors size={14} /> {preparingArtifactId === artifact.id ? "Preparing…" : "PDF tools"}</button>
-                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "workspace"); setOpenActionMenu(""); }}><Sparkles size={14} /> AI tools</button>
+                    <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "workspace"); setOpenActionMenu(""); }}><ScanText size={14} /> Document tools</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "chat"); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
                     <label className="action-menu-select"><FolderOpen size={14} /><select aria-label={`Collection for ${artifact.filename}`} value={artifact.collection_id ?? ""} onChange={(event) => assignArtifactCollection(artifact, event.target.value || null)}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
                     <button className="danger" onClick={() => { removeWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Trash2 size={14} /> Delete</button>
@@ -2293,14 +2401,14 @@ function WorkspaceApp({
                 {(document.error_message || job?.error_message) && <small className="document-error">{document.error_message || job?.error_message}</small>}
               </div>
               <div className="document-actions">
-                {ready && <div className="document-quick-actions"><button title="Summarize" aria-label={`Summarize ${document.filename}`} onClick={() => setAIDocument(document)}><Sparkles size={14} /></button><button title="Ask AI" aria-label={`Ask AI about ${document.filename}`} onClick={() => openDocumentChat(document)}><MessageCircle size={14} /></button></div>}
+                {ready && <div className="document-quick-actions"><button title="Summarize" aria-label={`Summarize ${document.filename}`} onClick={() => setAIDocument(document)}><AlignLeft size={14} /></button><button title="Ask about document" aria-label={`Ask about ${document.filename}`} onClick={() => openDocumentChat(document)}><MessageCircle size={14} /></button></div>}
                 <button className="more-actions-button" aria-label={`More actions for ${document.filename}`} title="More actions" onClick={() => setOpenActionMenu((current) => current === `document:${document.id}` ? "" : `document:${document.id}`)}><MoreVertical size={17} /></button>
                 {openActionMenu === `document:${document.id}` && <><button className="action-menu-backdrop" aria-label="Close actions menu" onClick={() => setOpenActionMenu("")} /><nav className="file-action-menu" aria-label={`Actions for ${document.filename}`}>
                   <button disabled={!ready} onClick={() => { setViewerPage(1); setViewerSearch(""); setViewer(document); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
                   <button onClick={() => { renameDocument(document); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
                   {document.status === "failed" && <button onClick={() => { retryDocument(document); setOpenActionMenu(""); }}><RefreshCw size={14} /> Retry processing</button>}
                   <button disabled={!ready} onClick={() => { setPDFToolsDocument(document); setPDFToolsOpen(true); setOpenActionMenu(""); }}><Scissors size={14} /> PDF tools</button>
-                  <button disabled={!ready} onClick={() => { setAIDocument(document); setOpenActionMenu(""); }}><Sparkles size={14} /> AI tools</button>
+                  <button disabled={!ready} onClick={() => { setAIDocument(document); setOpenActionMenu(""); }}><ScanText size={14} /> Document tools</button>
                   <button disabled={!ready || busy} onClick={() => { openDocumentChat(document); setOpenActionMenu(""); }}><MessageCircle size={14} /> Ask AI</button>
                   <button disabled={!ready || busy} onClick={() => { generateDocumentMetadata(document); setOpenActionMenu(""); }}><Tag size={14} /> Generate title & tags</button>
                   <label className="action-menu-select"><FolderOpen size={14} /><select aria-label={`Collection for ${document.filename}`} value={document.collection_id ?? ""} onChange={(event) => assignDocumentCollection(document, event.target.value || null)}><option value="">Unfiled</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
@@ -2312,9 +2420,7 @@ function WorkspaceApp({
           {!workspaceItems.length && <div className="empty-workspace">{typeFilter === "images" ? <FileImage size={34} /> : <Upload size={34} />}<h2>No documents found</h2><p>{query ? "Try another search or filter." : typeFilter === "images" ? "Image conversion results will appear here. Source images remain temporary unless saved as an output." : "Upload a PDF or create a converted file to get started."}</p></div>}
         </div>
       </section>
-      {viewer && <PdfViewer key={`${viewer.id}-${viewerPage}-${viewerSearch}`} document={viewer} token={token} initialPage={viewerPage} initialSearch={viewerSearch} onHistory={() => {
-        setHistoryDocumentFilter(viewer); setHistoryOpen(true); loadConversations().catch(() => undefined);
-      }} onClose={() => setViewer(null)} />}
+      {viewer && <PdfViewer key={`${viewer.id}-${viewerPage}-${viewerSearch}`} document={viewer} token={token} initialPage={viewerPage} initialSearch={viewerSearch} onClose={() => setViewer(null)} />}
       {artifactViewer && <ArtifactViewer key={artifactViewer.id} artifact={artifactViewer} token={token} onClose={() => setArtifactViewer(null)} />}
       {renameTarget && <div className="rename-dialog-wrap">
         <button className="history-backdrop" aria-label="Cancel rename" onClick={() => setRenameTarget(null)} />
@@ -2327,13 +2433,14 @@ function WorkspaceApp({
       {chatDocument && <ChatPanel document={chatDocument} documentIds={(activeConversation?.document_ids ?? chatDocuments.map((item) => item.id))} documentLabel={chatDocuments.length > 1 ? `${chatDocuments.length} selected PDFs` : chatDocument.filename} token={token} conversation={activeConversation} onChanged={async () => { await loadConversations(); }} onPreview={() => {
         setViewerPage(1); setViewerSearch(""); setViewer(chatDocument);
       }} onHistory={() => {
-        setHistoryDocumentFilter(chatDocument); setHistoryOpen(true); loadConversations().catch(() => undefined);
+        setHistoryOpen(true); loadConversations().catch(() => undefined);
       }} onClose={() => { setChatDocument(null); setActiveConversation(null); }} onCitation={(citation) => {
         const cited = documents.find((item) => item.id === citation.document_id);
         if (cited) { setViewerPage(citation.page_number); setViewerSearch(citation.snippet); setViewer(cited); }
       }} />}
-      {historyOpen && <ConversationHistory conversations={conversations} documents={documents} busy={historyBusy} documentFilter={historyDocumentFilter} onRefresh={async () => { await loadConversations(); }} onClose={() => setHistoryOpen(false)} onOpen={(conversation, document) => {
-        setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(documents.filter((item) => conversation.document_ids.includes(item.id))); setChatDocument(document);
+      {historyOpen && <ConversationHistory conversations={conversations} documents={documents} busy={historyBusy} onRefresh={async () => { await loadConversations(); }} onClose={() => setHistoryOpen(false)} onOpen={(conversation) => {
+        const attached = documents.filter((item) => conversation.document_ids.includes(item.id));
+        setHistoryOpen(false); setViewer(null); setActiveConversation(conversation); setChatDocuments(attached); setChatDocument(attached[0] ?? null);
       }} />}
       {multiChatOpen && <MultiDocumentChat documents={documents.filter((item) => item.status === "ready")} token={token} onClose={() => setMultiChatOpen(false)} onCreated={(conversation, selected) => {
         setMultiChatOpen(false); setActiveConversation(conversation); setChatDocuments(selected); setChatDocument(selected[0]); loadConversations().catch(() => undefined);
@@ -2381,42 +2488,40 @@ function LandingPage({
     <main className="landing-page">
       <header className="landing-nav">
         <a className="landing-brand" href="/" aria-label="InsightPDF home">
-          <img src="/favicon.ico" alt="" />
+          <BrandMark />
           <span>Insight<b>PDF</b></span>
         </a>
-        <button className="landing-nav-cta" onClick={onOpen}>Open app <span>→</span></button>
+        <div className="landing-nav-actions"><span>Private workspace · beta</span><button className="landing-nav-cta" onClick={onOpen}>Sign in <span>→</span></button></div>
       </header>
 
       <section className="landing-hero">
-        <div className="landing-mark" aria-hidden="true">
-          <img src="/favicon.ico" alt="" />
-        </div>
-        <h1>Understand any PDF.<br />Without the busywork.</h1>
-        <p>Read, search, summarize, compare, and transform your documents in one focused workspace.</p>
+        <p className="landing-kicker">A working document workspace—not a product mockup</p>
+        <h1>Read the source.<br /><em>Make the next thing.</em></h1>
+        <p>Upload a document, ask questions against its actual pages, and turn the result into a PDF, Word file, or presentation.</p>
         <form className="landing-chat" onSubmit={submitLandingPrompt}>
           <div className="landing-chat-heading">
-            <span><Sparkles size={16} /></span>
-            <div><strong>Ask InsightPDF</strong><small>Sign in to send your question</small></div>
+            <BrandMark />
+            <div><strong>Start with a question</strong><small>Your request continues after you sign in</small></div>
           </div>
           <div className="landing-chat-composer">
             <input
               aria-label="Ask InsightPDF"
               value={landingPrompt}
               onChange={(event) => setLandingPrompt(event.target.value)}
-              placeholder="Ask anything about your PDF…"
+              placeholder="Ask or describe a document to create…"
             />
             <button type="submit" aria-label="Send question" disabled={!landingPrompt.trim()}>
               <Send size={18} />
             </button>
           </div>
           <div className="landing-chat-suggestions">
-            {["Summarize this document", "Find the key risks", "Compare two PDFs"].map((prompt) =>
+            {["Summarize this document", "Create an executive report", "Generate a presentation"].map((prompt) =>
               <button key={prompt} type="button" onClick={() => setLandingPrompt(prompt)}>{prompt}</button>
             )}
           </div>
           <label className="landing-upload">
             <Upload size={16} />
-            <span><strong>Upload a PDF</strong><small>You’ll sign in before the upload starts</small></span>
+            <span><strong>Attach a PDF</strong><small>The file is not uploaded until after sign-in</small></span>
             <i>Choose file</i>
             <input
               type="file"
@@ -2428,48 +2533,79 @@ function LandingPage({
             />
           </label>
         </form>
-        <div className="landing-demo" aria-label="InsightPDF example">
+        <div className="landing-demo" aria-label="Product example using fictional sample data">
           <div className="landing-demo-top">
-            <span><i /> annual-report.pdf</span>
-            <small>Example report · 42 pages</small>
+            <span><i /> annual-report.pdf <b>Sample data</b></span>
+            <small>Fictional report · 42 pages · 1.8 MB</small>
           </div>
-          <div className="landing-question">Summarize the key financial changes</div>
-          <div className="landing-answer">
-            <Sparkles size={18} />
-            <div>
-              <div className="landing-answer-heading">
-                <strong>Financial performance improved materially in FY2025</strong>
-                <span>3 sources</span>
+          <div className="landing-demo-body">
+            <section className="landing-document-preview" aria-label="Attached annual report preview">
+              <div className="landing-document-page">
+                <header><i>EXAMPLE COMPANY</i><span>ANNUAL REPORT 2025</span></header>
+                <p>Building durable growth through recurring revenue and disciplined operations.</p>
+                <div className="landing-document-kpis">
+                  <article><small>FY25 revenue</small><strong>$48.2M</strong></article>
+                  <article><small>Operating margin</small><strong>24.1%</strong></article>
+                </div>
+                <div className="landing-document-chart">
+                  <span style={{ height: "38%" }}><i>2022</i></span>
+                  <span style={{ height: "51%" }}><i>2023</i></span>
+                  <span style={{ height: "67%" }}><i>2024</i></span>
+                  <span className="active" style={{ height: "88%" }}><i>2025</i></span>
+                </div>
+                <div className="landing-document-highlight"><b>+18.4%</b><span>year-over-year revenue growth</span></div>
+                <footer><span>Fictional sample document</span><b>12</b></footer>
               </div>
-              <div className="landing-metrics">
-                <article><small>Revenue</small><strong>$48.2M</strong><em>↑ 18.4%</em></article>
-                <article><small>Operating costs</small><strong>$31.6M</strong><em className="positive">↓ 6.8%</em></article>
-                <article><small>Operating margin</small><strong>24.1%</strong><em>↑ 7.2 pts</em></article>
+              <div className="landing-document-controls"><span>−</span><b>Page 12 of 42</b><span>+</span></div>
+            </section>
+            <section className="landing-demo-chat">
+              <div className="landing-chat-context"><FileText size={14} /><span><strong>annual-report.pdf</strong><small>Attached to this conversation</small></span><Check size={14} /></div>
+              <div className="landing-question">Summarize the key financial changes</div>
+              <div className="landing-answer">
+                <Quote size={18} />
+                <div>
+                  <div className="landing-answer-heading">
+                    <strong>Financial performance improved materially in FY2025</strong>
+                    <span>3 sources</span>
+                  </div>
+                  <div className="landing-metrics">
+                    <article><small>Revenue</small><strong>$48.2M</strong><em>↑ 18.4%</em></article>
+                    <article><small>Operating costs</small><strong>$31.6M</strong><em className="positive">↓ 6.8%</em></article>
+                    <article><small>Operating margin</small><strong>24.1%</strong><em>↑ 7.2 pts</em></article>
+                  </div>
+                  <ul className="landing-insights">
+                    <li>Enterprise subscriptions contributed <strong>$11.4M</strong> of new revenue, making them the primary growth driver.</li>
+                    <li>Vendor consolidation reduced annual infrastructure and support expenses by <strong>$2.3M</strong>.</li>
+                    <li>Operating cash flow increased from <strong>$8.9M to $14.7M</strong>, strengthening liquidity.</li>
+                  </ul>
+                </div>
               </div>
-              <ul className="landing-insights">
-                <li>Enterprise subscriptions contributed <strong>$11.4M</strong> of new revenue, making them the primary growth driver.</li>
-                <li>Vendor consolidation reduced annual infrastructure and support expenses by <strong>$2.3M</strong>.</li>
-                <li>Operating cash flow increased from <strong>$8.9M to $14.7M</strong>, strengthening liquidity.</li>
-              </ul>
-            </div>
-          </div>
-          <div className="landing-citations">
-            <span><b>Revenue growth</b>Page 12</span>
-            <span><b>Cost reduction</b>Page 27</span>
-            <span><b>Cash flow</b>Page 31</span>
+              <div className="landing-citations">
+                <span><b>Revenue growth</b>Page 12</span>
+                <span><b>Cost reduction</b>Page 27</span>
+                <span><b>Cash flow</b>Page 31</span>
+              </div>
+            </section>
           </div>
         </div>
       </section>
 
       <section className="landing-features" aria-label="Features">
-        <article><strong>Ask your documents</strong><p>Get clear answers grounded in page-level citations.</p></article>
-        <article><strong>Work with PDFs</strong><p>Merge, split, convert, translate, and compare in one place.</p></article>
-        <article><strong>Your files stay private</strong><p>Authenticated access and private object storage by default.</p></article>
+        <article><span>01</span><strong>Answers point back to pages</strong><p>Open any citation and inspect the source instead of taking generated text on faith.</p></article>
+        <article><span>02</span><strong>Files are real outputs</strong><p>Download generated PDF, DOCX, and PPTX files—not screenshots pretending to be documents.</p></article>
+        <article><span>03</span><strong>Nothing uploads anonymously</strong><p>Authentication happens first. Files then enter a private, owner-isolated workspace.</p></article>
+      </section>
+
+      <section className="landing-disclosure">
+        <div><span>What is real</span><h2>The interface above mirrors the working app.</h2></div>
+        <p>The annual report and financial figures are clearly marked fictional sample data. We do not publish invented testimonials, customer logos, review scores, or user counts.</p>
+        <button onClick={onOpen}>Open the workspace <span>→</span></button>
       </section>
 
       <footer className="landing-footer">
         <span>InsightPDF</span>
-        <button onClick={onOpen}>Get started →</button>
+        <span>Document questions, generation, and conversion</span>
+        <button onClick={onOpen}>Create an account →</button>
       </footer>
     </main>
   );
