@@ -32,6 +32,7 @@ export type AuthResult = {
     email: string;
     role: "user" | "admin";
     is_active: boolean;
+    google_linked: boolean;
   };
 };
 
@@ -118,6 +119,17 @@ export type Artifact = {
   created_at: string;
 };
 
+export type ArtifactVersion = {
+  id: string;
+  artifact_id: string;
+  version_number: number;
+  content_type: string;
+  size_bytes: number;
+  change_prompt: string | null;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+};
+
 export type Collection = { id: string; name: string; color: string; created_at: string };
 
 export type WorkflowPlan = {
@@ -136,6 +148,30 @@ export type WorkflowPlan = {
     confirmation_required: boolean;
     verification: string;
   }>;
+};
+
+export type PersistedWorkflow = {
+  id: string;
+  status: string;
+  confirmation_required: boolean;
+  job_id: string | null;
+  steps: Array<{
+    id: string;
+    position: number;
+    capability: string;
+    title: string;
+    parameters: Record<string, unknown>;
+    risk: string;
+    verification: string;
+    status: string;
+  }>;
+};
+
+export type ConversationCommand = {
+  message_id: string;
+  planner_run_id: string;
+  workflow: PersistedWorkflow;
+  job: Job | null;
 };
 
 export type Stats = {

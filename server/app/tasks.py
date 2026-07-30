@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -8,7 +9,19 @@ from sqlalchemy import delete, select
 from app.celery_app import celery_app
 from app.config import get_settings
 from app.database import SessionLocal
-from app.models import Document, DocumentChunk, DocumentPage, DocumentStatus, JobStatus, ProcessingJob, User
+from app.models import (
+    Document,
+    DocumentChunk,
+    DocumentPage,
+    DocumentStatus,
+    JobStatus,
+    ProcessingJob,
+    ToolExecution,
+    User,
+    WorkflowEvent,
+    WorkflowRun,
+    WorkflowStepRun,
+)
 from app.processing import ExtractedPage, extract_pages, requires_ocr
 from app.rag import chunk_pages, embed_texts
 from app.storage import ObjectStorage
@@ -25,6 +38,29 @@ async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
         job.status = JobStatus.RUNNING
         job.progress = 5
         job.started_at = datetime.now(timezone.utc)
+        persisted_workflow = await session.scalar(
+            select(WorkflowRun).where(WorkflowRun.job_id == job.id)
+        )
+        if persisted_workflow:
+            persisted_workflow.status = "running"
+            session.add(WorkflowEvent(
+                workflow_id=persisted_workflow.id,
+                event_type="workflow.started",
+                payload={"job_id": str(job.id)},
+            ))
+            persisted_steps = list(await session.scalars(
+                select(WorkflowStepRun).where(
+                    WorkflowStepRun.workflow_id == persisted_workflow.id
+                )
+            ))
+            for persisted_step in persisted_steps:
+                persisted_step.status = "running"
+                execution = await session.scalar(
+                    select(ToolExecution).where(ToolExecution.step_id == persisted_step.id)
+                )
+                if execution:
+                    execution.status = "running"
+                    execution.started_at = datetime.now(timezone.utc)
         await session.commit()
         return document.object_key
 
@@ -156,8 +192,19 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         parameters = dict(job.parameters)
         operation = job.operation
 
-        from app.ai_features import compare, extract_information, quiz, summarize, translate
-        from app.pdf_operations import add_page_numbers, compress_pdf, images_to_pdf, watermark_pdf
+        from app.ai_features import (
+            compare,
+            extract_information,
+            quiz,
+            summarize,
+            translate,
+        )
+        from app.pdf_operations import (
+            add_page_numbers,
+            compress_pdf,
+            images_to_pdf,
+            watermark_pdf,
+        )
         from app.pdf_tools import (
             _ready_document,
             _store,
@@ -172,8 +219,8 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             ComparisonRequest,
             ExtractionRequest,
             MergeRequest,
-            PDFToImagesRequest,
             PageOperationRequest,
+            PDFToImagesRequest,
             QuizRequest,
             RotateRequest,
             SplitRequest,
@@ -331,6 +378,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             result_kind = "artifact"
         elif operation == "workflow":
             import fitz
+
             from app.pdf_operations import delete_pages, rotate_pages, select_pages
 
             document = await _ready_document(uuid.UUID(document_id), user, session)
@@ -340,6 +388,20 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             report_steps = []
             workflow_steps = parameters.pop("steps")
             for index, step in enumerate(workflow_steps, 1):
+                persisted_step = (
+                    await session.get(WorkflowStepRun, uuid.UUID(step["id"]))
+                    if parameters.get("workflow_run_id") and step.get("id")
+                    else None
+                )
+                execution = await session.scalar(
+                    select(ToolExecution).where(ToolExecution.step_id == persisted_step.id)
+                ) if persisted_step else None
+                if persisted_step:
+                    persisted_step.status = "running"
+                if execution:
+                    execution.status = "running"
+                    execution.started_at = datetime.now(timezone.utc)
+                await session.commit()
                 tool = step["tool"]
                 values = dict(step["parameters"])
                 values.pop("document_id", None)
@@ -373,6 +435,12 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                     })
                 finally:
                     check.close()
+                if persisted_step:
+                    persisted_step.status = "completed"
+                if execution:
+                    execution.status = "completed"
+                    execution.outputs = {"page_count": report_steps[-1]["page_count"]}
+                    execution.completed_at = datetime.now(timezone.utc)
                 job.progress = min(90, 10 + round(index / len(workflow_steps) * 75))
                 await session.commit()
             final_pdf = fitz.open(stream=data, filetype="pdf")
@@ -445,11 +513,49 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             raise ValueError(f"Unsupported operation: {operation}")
 
         await session.refresh(job)
+        workflow = await session.scalar(select(WorkflowRun).where(WorkflowRun.job_id == job.id))
+        if workflow and result_kind == "ai_result":
+            payload = result.result
+            title = str(payload.get("title") or operation.replace("_", " ").title())
+            primary = str(payload.get("content") or payload.get("summary") or payload.get("overview") or "")
+            markdown = f"# {title}\n\n{primary}\n\n```json\n{json.dumps(payload, indent=2, ensure_ascii=False)}\n```\n"
+            result = await _store(
+                f"ai_{operation}",
+                f"{operation.replace('_', '-')}.md",
+                markdown.encode("utf-8"),
+                "text/markdown; charset=utf-8",
+                {"ai_result_id": str(result.id), "source": "conversation_workflow"},
+                user,
+                session,
+            )
+            result_kind = "artifact"
         job.status = JobStatus.COMPLETED
         job.progress = 100
         job.completed_at = datetime.now(timezone.utc)
         job.result_kind = result_kind
         job.result_id = result.id
+        if workflow:
+            workflow.status = "completed"
+            session.add(WorkflowEvent(
+                workflow_id=workflow.id,
+                event_type="workflow.completed",
+                payload={"result_kind": result_kind, "result_id": str(result.id)},
+            ))
+            completed_steps = list(await session.scalars(
+                select(WorkflowStepRun).where(WorkflowStepRun.workflow_id == workflow.id)
+            ))
+            for completed_step in completed_steps:
+                completed_step.status = "completed"
+                execution = await session.scalar(
+                    select(ToolExecution).where(ToolExecution.step_id == completed_step.id)
+                )
+                if execution:
+                    execution.status = "completed"
+                    execution.outputs = {
+                        "result_kind": result_kind,
+                        "result_id": str(result.id),
+                    }
+                    execution.completed_at = datetime.now(timezone.utc)
         await session.commit()
 
 
@@ -462,6 +568,28 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
         job.error_message = message[:2000]
         job.retry_count = retries
         job.completed_at = datetime.now(timezone.utc)
+        workflow = await session.scalar(select(WorkflowRun).where(WorkflowRun.job_id == job.id))
+        if workflow:
+            workflow.status = "failed"
+            session.add(WorkflowEvent(
+                workflow_id=workflow.id,
+                event_type="workflow.failed",
+                payload={"message": message[:500]},
+            ))
+            failed_step = await session.scalar(
+                select(WorkflowStepRun)
+                .where(WorkflowStepRun.workflow_id == workflow.id, WorkflowStepRun.status == "running")
+                .order_by(WorkflowStepRun.position)
+            )
+            if failed_step:
+                failed_step.status = "failed"
+                execution = await session.scalar(
+                    select(ToolExecution).where(ToolExecution.step_id == failed_step.id)
+                )
+                if execution:
+                    execution.status = "failed"
+                    execution.error_message = message[:2000]
+                    execution.completed_at = datetime.now(timezone.utc)
         await session.commit()
 
 

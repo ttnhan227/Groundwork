@@ -7,14 +7,24 @@ import fitz
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
-from app.models import Citation, Conversation, Document, DocumentChunk, DocumentStatus, Message, MessageRole, User
+from app.models import (
+    Citation,
+    Conversation,
+    ConversationResource,
+    Document,
+    DocumentChunk,
+    DocumentStatus,
+    Message,
+    MessageRole,
+    User,
+)
 from app.rag import (
     answer_declines_context,
     build_retrieval_query,
@@ -142,6 +152,16 @@ async def create_conversation(
         raise HTTPException(status_code=422, detail="Every selected document must be owned by you and ready")
     conversation = Conversation(owner_id=user.id, title=payload.title.strip(), documents=documents)
     session.add(conversation)
+    await session.flush()
+    session.add_all([
+        ConversationResource(
+            conversation_id=conversation.id,
+            resource_type="document",
+            resource_id=document.id,
+            role="context",
+        )
+        for document in documents
+    ])
     await session.commit()
     return serialize(await owned_conversation(conversation.id, user, session))
 
@@ -167,6 +187,21 @@ async def update_conversation(
         if len(documents) != len(set(payload.document_ids)):
             raise HTTPException(status_code=422, detail="Every selected document must be owned by you and ready")
         conversation.documents = documents
+        await session.execute(
+            delete(ConversationResource).where(
+                ConversationResource.conversation_id == conversation.id,
+                ConversationResource.resource_type == "document",
+            )
+        )
+        session.add_all([
+            ConversationResource(
+                conversation_id=conversation.id,
+                resource_type="document",
+                resource_id=document.id,
+                role="context",
+            )
+            for document in documents
+        ])
     await session.commit()
     return serialize(await owned_conversation(conversation_id, user, session))
 

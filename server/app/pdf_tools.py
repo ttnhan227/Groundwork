@@ -3,17 +3,34 @@ import zipfile
 from io import BytesIO
 
 import fitz
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from PIL import Image, ImageDraw, ImageOps
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.database import get_session
 from app.dependencies import current_user
 from app.documents import owned_document, safe_filename
-from app.models import Document, DocumentStatus, GeneratedArtifact, JobStatus, ProcessingJob, User
+from app.models import (
+    ArtifactVersion,
+    Document,
+    DocumentStatus,
+    GeneratedArtifact,
+    JobStatus,
+    ProcessingJob,
+    User,
+)
 from app.pdf_operations import (
     delete_pages,
     images_to_pdf,
@@ -25,12 +42,14 @@ from app.pdf_operations import (
     watermark_pdf,
 )
 from app.schemas import (
-    ArtifactResponse,
     ArtifactRenameRequest,
+    ArtifactResponse,
+    ArtifactVersionResponse,
+    ArtifactVersionRestoreRequest,
     DocumentResponse,
     MergeRequest,
-    PDFToImagesRequest,
     PageOperationRequest,
+    PDFToImagesRequest,
     RotateRequest,
     SplitRequest,
 )
@@ -210,6 +229,14 @@ async def _store(
         object_key=key, content_type=content_type, size_bytes=len(data), parameters=parameters,
     )
     session.add(artifact)
+    session.add(ArtifactVersion(
+        artifact_id=identifier,
+        version_number=1,
+        object_key=key,
+        content_type=content_type,
+        size_bytes=len(data),
+        metadata_json={"operation": operation},
+    ))
     await session.commit()
     await session.refresh(artifact)
     return artifact
@@ -270,6 +297,89 @@ async def get_artifact(
     session: AsyncSession = Depends(get_session),
 ) -> GeneratedArtifact:
     return await _owned_artifact(artifact_id, user, session)
+
+
+@router.get(
+    "/artifacts/{artifact_id}/versions",
+    response_model=list[ArtifactVersionResponse],
+)
+async def list_artifact_versions(
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ArtifactVersion]:
+    await _owned_artifact(artifact_id, user, session)
+    return list(await session.scalars(
+        select(ArtifactVersion)
+        .where(ArtifactVersion.artifact_id == artifact_id)
+        .order_by(ArtifactVersion.version_number.desc())
+    ))
+
+
+@router.post(
+    "/artifacts/{artifact_id}/versions/restore",
+    response_model=ArtifactVersionResponse,
+)
+async def restore_artifact_version(
+    artifact_id: uuid.UUID,
+    payload: ArtifactVersionRestoreRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ArtifactVersion:
+    artifact = await _owned_artifact(artifact_id, user, session)
+    source = await session.scalar(
+        select(ArtifactVersion).where(
+            ArtifactVersion.id == payload.version_id,
+            ArtifactVersion.artifact_id == artifact_id,
+        )
+    )
+    if source is None:
+        raise HTTPException(status_code=404, detail="Artifact version not found")
+    latest = await session.scalar(
+        select(func.max(ArtifactVersion.version_number)).where(
+            ArtifactVersion.artifact_id == artifact_id
+        )
+    )
+    restored = ArtifactVersion(
+        artifact_id=artifact_id,
+        version_number=(latest or 0) + 1,
+        object_key=source.object_key,
+        content_type=source.content_type,
+        size_bytes=source.size_bytes,
+        change_prompt=f"Restored version {source.version_number}",
+        metadata_json={
+            **source.metadata_json,
+            "restored_from_version": source.version_number,
+        },
+    )
+    artifact.object_key = source.object_key
+    artifact.content_type = source.content_type
+    artifact.size_bytes = source.size_bytes
+    session.add(restored)
+    await session.commit()
+    await session.refresh(restored)
+    return restored
+
+
+@router.post("/artifacts/{artifact_id}/duplicate", response_model=ArtifactResponse, status_code=201)
+async def duplicate_artifact(
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> GeneratedArtifact:
+    artifact = await _owned_artifact(artifact_id, user, session)
+    data = ObjectStorage().download(artifact.object_key)
+    stem, dot, extension = artifact.filename.rpartition(".")
+    filename = f"{stem or artifact.filename}-copy{dot}{extension}" if dot else f"{artifact.filename}-copy"
+    return await _store(
+        "duplicate",
+        filename,
+        data,
+        artifact.content_type,
+        {**artifact.parameters, "duplicated_from": str(artifact.id)},
+        user,
+        session,
+    )
 
 
 @router.post("/artifacts/{artifact_id}/index", response_model=DocumentResponse)

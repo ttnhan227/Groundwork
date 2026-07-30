@@ -17,6 +17,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=100, max_length=10000)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -28,6 +32,7 @@ class UserResponse(BaseModel):
     display_name: str
     role: UserRole
     is_active: bool
+    google_linked: bool
     created_at: datetime
 
 
@@ -165,6 +170,47 @@ class WorkflowPlanResponse(BaseModel):
     estimated_ai_calls: int
 
 
+class ConversationCommandRequest(BaseModel):
+    client_message_id: uuid.UUID
+    command: str = Field(min_length=3, max_length=2000)
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+
+
+class PersistedWorkflowStep(BaseModel):
+    id: uuid.UUID
+    position: int
+    capability: str
+    title: str
+    parameters: dict
+    risk: str
+    verification: str
+    status: str
+
+
+class PersistedWorkflowResponse(BaseModel):
+    id: uuid.UUID
+    status: str
+    confirmation_required: bool
+    job_id: uuid.UUID | None
+    steps: list[PersistedWorkflowStep]
+
+
+class ConversationCommandResponse(BaseModel):
+    message_id: uuid.UUID
+    planner_run_id: uuid.UUID
+    workflow: PersistedWorkflowResponse
+    job: ProcessingJobResponse | None = None
+
+
+class WorkflowEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    workflow_id: uuid.UUID
+    event_type: str
+    payload: dict
+    created_at: datetime
+
+
 class ConversationCreate(BaseModel):
     title: str = Field(default="New conversation", min_length=1, max_length=160)
     document_ids: list[uuid.UUID] = Field(default_factory=list)
@@ -173,6 +219,35 @@ class ConversationCreate(BaseModel):
 class ConversationUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=160)
     document_ids: list[uuid.UUID] | None = Field(default=None, max_length=20)
+
+
+class ConversationResourceCreate(BaseModel):
+    resource_type: str = Field(pattern="^(document|artifact)$")
+    resource_id: uuid.UUID
+    role: str = Field(default="context", pattern="^(context|source|output)$")
+
+
+class ConversationResourceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    resource_type: str
+    resource_id: uuid.UUID
+    role: str
+    created_at: datetime
+
+
+class WorkspaceMemoryUpsert(BaseModel):
+    value: str = Field(min_length=1, max_length=2000)
+
+
+class WorkspaceMemoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    key: str
+    value: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class CitationResponse(BaseModel):
@@ -288,6 +363,22 @@ class ArtifactResponse(BaseModel):
 
 class ArtifactRenameRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
+
+
+class ArtifactVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    artifact_id: uuid.UUID
+    version_number: int
+    content_type: str
+    size_bytes: int
+    change_prompt: str | None
+    metadata_json: dict
+    created_at: datetime
+
+
+class ArtifactVersionRestoreRequest(BaseModel):
+    version_id: uuid.UUID
 
 
 class ProfileUpdateRequest(BaseModel):

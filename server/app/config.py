@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     daily_upload_limit_per_user: int = 10
     global_daily_upload_limit: int = 100
     registration_enabled: bool = True
+    google_client_id: str = ""
     admin_email: str = ""
     admin_password: str = ""
     cors_origins: str = "http://localhost:5173,http://localhost:3000,http://localhost:8080"

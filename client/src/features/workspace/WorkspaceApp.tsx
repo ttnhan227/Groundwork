@@ -5,7 +5,7 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { AdminUser, AIResult, Artifact, AuthResult, ChatMessage, Citation, Collection, Conversation, DocumentItem, DocumentReport, Job, Stats, WorkflowPlan } from "../../types";
+import type { AdminUser, AIResult, Artifact, ArtifactVersion, AuthResult, ChatMessage, Citation, Collection, Conversation, ConversationCommand, DocumentItem, DocumentReport, Job, PersistedWorkflow, Stats, WorkflowPlan } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
 import { FormattedAnswer } from "../../components/common/FormattedAnswer";
 import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch, downloadTextFile, expireSession, queueOperation, waitForJob } from "../../api/client";
@@ -13,6 +13,72 @@ import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch,
 const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 
 const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
+
+type GoogleCredentialResponse = { credential: string };
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void;
+          renderButton: (element: HTMLElement, options: Record<string, string | number>) => void;
+        };
+      };
+    };
+  }
+}
+
+function GoogleSignInButton({ disabled, onCredential, onError }: {
+  disabled: boolean;
+  onCredential: (credential: string) => void;
+  onError: (message: string) => void;
+}) {
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || disabled) return;
+    let cancelled = false;
+    const render = () => {
+      if (cancelled || !buttonRef.current || !window.google) return;
+      buttonRef.current.replaceChildren();
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (response) => onCredential(response.credential),
+      });
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "rectangular",
+        width: Math.min(360, buttonRef.current.clientWidth || 360),
+      });
+    };
+
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      if (window.google) render();
+      else existing.addEventListener("load", render, { once: true });
+      return () => { cancelled = true; existing.removeEventListener("load", render); };
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = render;
+    script.onerror = () => onError("Google sign-in could not be loaded. Check your connection and try again.");
+    document.head.appendChild(script);
+    return () => { cancelled = true; };
+  }, [disabled, onCredential, onError]);
+
+  if (!GOOGLE_CLIENT_ID) {
+    return <button className="auth-google-disabled" type="button" disabled title="Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in">Google sign-in is not configured</button>;
+  }
+  return <div className={`auth-google-button ${disabled ? "disabled" : ""}`} ref={buttonRef} aria-label="Continue with Google" />;
+}
 const DOCUMENT_UPLOAD_ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp";
 const DOCUMENT_UPLOAD_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp"]);
 
@@ -121,7 +187,7 @@ function AIWorkspace({ document, documents, token, compareMode, onClose, onPage 
 
   return <div className="ai-workspace-wrap"><button className="history-backdrop" aria-label="Close AI tools" onClick={onClose} />
     <section className="ai-workspace">
-      <header><div><p className="eyebrow">Document intelligence</p><h2>{tool === "compare" ? "Compare PDFs" : document?.filename}</h2></div><button onClick={onClose}><X size={18} /></button></header>
+      <header><div><p className="eyebrow">Document intelligence</p><h2>{tool === "compare" ? "Compare PDFs" : document?.filename}</h2></div><button aria-label="Close document intelligence" onClick={onClose}><X size={18} /></button></header>
       <div className="ai-tool-tabs">
         {!compareMode && <><button className={tool === "summary" ? "active" : ""} onClick={() => { setTool("summary"); setResult(null); }}><AlignLeft size={15} /> Summarize</button>
           <button className={tool === "quiz" ? "active" : ""} onClick={() => { setTool("quiz"); setResult(null); }}><ListChecks size={15} /> Quiz</button>
@@ -279,6 +345,8 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSea
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [documentSearch, setDocumentSearch] = useState(initialSearch);
+  const [versions, setVersions] = useState<ArtifactVersion[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const filename = artifact?.filename ?? document?.filename ?? "Document";
   const contentType = artifact?.content_type ?? "application/pdf";
   const sizeBytes = artifact?.size_bytes ?? document?.size_bytes ?? 0;
@@ -332,16 +400,37 @@ function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSea
     setSource(`${base}#${parameters.toString()}`);
   }
 
+  async function openVersions() {
+    if (!artifact) return;
+    setVersionsOpen((current) => !current);
+    if (!versions.length) {
+      setVersions(await api<ArtifactVersion[]>(`/pdf-tools/artifacts/${artifact.id}/versions`, token));
+    }
+  }
+
+  async function restoreVersion(version: ArtifactVersion) {
+    if (!artifact) return;
+    const restored = await api<ArtifactVersion>(`/pdf-tools/artifacts/${artifact.id}/versions/restore`, token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version_id: version.id }),
+    });
+    setVersions((current) => [restored, ...current]);
+    setVersionsOpen(false);
+  }
+
   return <div className="artifact-viewer-wrap">
     <button className="history-backdrop" aria-label="Close file preview" onClick={onClose} />
     <section className="artifact-viewer" role="dialog" aria-modal="true" aria-label={`Preview ${filename}`}>
       <header>
         <div><strong>{filename}</strong><small>{description} · {(sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div>
         {isPdf && <form className="artifact-viewer-search" onSubmit={searchOpenPDF}><Search size={14} /><input aria-label="Search within document" value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Search this document" /><button type="submit">Find</button></form>}
+        {artifact && <button onClick={() => openVersions().catch((reason) => setError(reason.message))}><History size={15} /> Versions</button>}
         {source && <button onClick={() => window.open(source, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
         {!isPdf && <button onClick={() => artifact ? downloadArtifact(artifact, token).catch(() => undefined) : document ? downloadDocumentFile(document, token).catch(() => undefined) : undefined}><Download size={15} /> Download</button>}
         <button aria-label="Close preview" onClick={onClose}><X size={18} /></button>
       </header>
+      {versionsOpen && <aside className="artifact-version-popover"><header><strong>Version history</strong><span>{versions.length} versions</span></header>{versions.map((version) => <article key={version.id}><div><strong>Version {version.version_number}</strong><small>{version.change_prompt || "File created"} · {new Date(version.created_at).toLocaleString()}</small></div>{version.version_number !== versions[0]?.version_number && <button onClick={() => restoreVersion(version).catch((reason) => setError(reason.message))}>Restore</button>}</article>)}</aside>}
       <main className={isPdf ? "pdf" : isImage ? "image" : isText ? "text" : "generated"}>
         {loading && <div className="artifact-viewer-loading"><RefreshCw className="spin" size={22} /><strong>Opening preview…</strong></div>}
         {error && <div className="artifact-viewer-loading"><FileText size={28} /><strong>{error}</strong><span>Download the file to view it in its native application.</span></div>}
@@ -744,6 +833,7 @@ function HomeChat({
   const [reportTab, setReportTab] = useState<"report" | "conversation">("report");
   const [report, setReport] = useState<DocumentReport | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [activeWorkflow, setActiveWorkflow] = useState<PersistedWorkflow | null>(null);
   useEffect(() => {
     if (!conversation) return;
     // Restore the complete global conversation, including every attached document.
@@ -769,6 +859,38 @@ function HomeChat({
   async function sendQuestion(value: string) {
     const question = value.trim();
     if (!question || busy) return;
+    const isToolCommand = selectedIds.length > 0 && /\b(delete|remove|extract|keep only|rotate|compress|smaller|reduce file size|watermark|page numbers?|number the pages?|summari[sz]e|summary|quiz|flashcards?|study guide|translate|compare|differences?|merge|combine|convert to word|docx)\b/i.test(question);
+    if (isToolCommand) {
+      setDraft("");
+      setMessages((current) => [...current, { role: "user", content: question }]);
+      setBusy(true);
+      setError("");
+      try {
+        const id = await ensureConversation();
+        const command = await api<ConversationCommand>(`/workflows/conversations/${id}/commands`, token, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_message_id: crypto.randomUUID(),
+            command: question,
+            document_ids: selectedIds,
+          }),
+        });
+        setActiveWorkflow(command.workflow);
+        if (command.workflow.confirmation_required) {
+          setMessages((current) => [...current, {
+            role: "assistant",
+            content: "I prepared a safe execution plan. Review the steps below and confirm before I modify a copy of your document.",
+          }]);
+        } else if (command.job) await finishWorkflow(command.workflow, command.job);
+        onChanged();
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Could not execute the document workflow");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (createFormat !== "chat") {
       setDraft("");
       setMessages((current) => [...current, { role: "user", content: question }]);
@@ -836,6 +958,55 @@ function HomeChat({
       setError(reason instanceof Error ? reason.message : "Could not answer");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function finishWorkflow(workflow: PersistedWorkflow, job: Job) {
+    const completed = await waitForJob(job, token);
+    setActiveWorkflow({ ...workflow, status: "completed", steps: workflow.steps.map((step) => ({ ...step, status: "completed" })) });
+    if (completed.result_kind === "artifact") {
+      const artifact = await api<Artifact>(`/pdf-tools/artifacts/${completed.result_id}`, token);
+      setCreatedArtifacts((current) => [artifact, ...current]);
+      onArtifactCreated(artifact);
+      setMessages((current) => [...current, {
+        role: "assistant",
+        content: `Done — I ran **${workflow.steps.map((step) => step.title).join(" → ")}**, verified the output, and saved **${artifact.filename}** as a created file.`,
+      }]);
+      return;
+    }
+    const result = await api<AIResult>(`/ai/results/${completed.result_id}`, token);
+    const body = String(result.result.content ?? result.result.summary ?? result.result.overview ?? "");
+    setMessages((current) => [...current, {
+      role: "assistant",
+      content: body || `Completed **${workflow.steps.map((step) => step.title).join(" → ")}**.\n\n${JSON.stringify(result.result, null, 2)}`,
+    }]);
+  }
+
+  async function confirmActiveWorkflow() {
+    if (!activeWorkflow || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const command = await api<ConversationCommand>(`/workflows/${activeWorkflow.id}/confirm`, token, { method: "POST" });
+      setActiveWorkflow(command.workflow);
+      if (!command.job) throw new Error("The confirmed workflow did not start");
+      await finishWorkflow(command.workflow, command.job);
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not execute the workflow");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelActiveWorkflow() {
+    if (!activeWorkflow) return;
+    try {
+      const cancelled = await api<PersistedWorkflow>(`/workflows/${activeWorkflow.id}/cancel`, token, { method: "POST" });
+      setActiveWorkflow(cancelled);
+      setMessages((current) => [...current, { role: "assistant", content: "The workflow was cancelled. No source document was changed." }]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not cancel the workflow");
     }
   }
 
@@ -985,11 +1156,17 @@ function HomeChat({
     <aside className="agent-panel">
       <header><BrandMark /><div><strong>InsightPDF agent</strong><small>{reportBusy || busy ? "Working now" : selectedIds.length ? `${selectedIds.length} source${selectedIds.length === 1 ? "" : "s"} connected` : "Ask anything or attach a source"}</small></div><div className="agent-header-actions">{selectedIds.length === 1 && <button disabled={reportBusy} onClick={analyzeDocument}>{reportBusy ? <RefreshCw className="spin" size={13} /> : <LayoutDashboard size={13} />}{report ? "Refresh report" : "Build report"}</button>}{!!messages.length && <button aria-label="New chat" title="New chat" onClick={newChat}><RefreshCw size={13} /></button>}</div><span className={reportBusy || busy ? "active" : ""} /></header>
       <div className="agent-chat-thread">
-        {!messages.length && <div className="agent-chat-welcome"><BrandMark /><strong>What would you like to understand?</strong><p>{selectedIds.length ? "Ask about your sources, or build a detailed report when you need a structured output." : "Ask a general question, or select a document from the source panel for grounded analysis."}</p><div>{(selectedIds.length ? ["Summarize the key findings", "What needs my attention?", "Create an action plan"] : ["What can you help me do?", "Create an executive brief"]).map((prompt) => <button key={prompt} onClick={() => setDraft(prompt)}>{prompt}</button>)}</div></div>}
+        {!messages.length && <div className="agent-chat-welcome"><span className="agent-demo-badge"><Sparkles size={12} /> AI document workspace</span><BrandMark /><strong>Turn documents into decisions.</strong><p>{selectedIds.length ? "Ask about your sources, uncover risks, or build a cited report in seconds." : "Connect a source to summarize, compare, verify, and create polished outputs from one workspace."}</p><div>{(selectedIds.length ? ["Surface the key findings", "What needs my attention?", "Create an action plan"] : ["Show me what InsightPDF can do", "Create an executive brief"]).map((prompt) => <button key={prompt} onClick={() => setDraft(prompt)}>{prompt}</button>)}</div><small className="agent-capability-line"><ShieldCheck size={12} /> Page-level citations <i /> <ScanText size={12} /> OCR ready <i /> <FileOutput size={12} /> Export to PDF, Word &amp; Slides</small></div>}
         {messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}>
           {message.role === "assistant" && <BrandMark />}
           <div>{message.role === "assistant" ? <FormattedAnswer content={message.content} /> : <p>{message.content}</p>}</div>
         </article>)}
+        {activeWorkflow && <section className={`conversation-workflow-card ${activeWorkflow.status}`}>
+          <header><span><Sparkles size={14} /> Execution plan</span><b>{activeWorkflow.status.replaceAll("_", " ")}</b></header>
+          <ol>{activeWorkflow.steps.map((step) => <li key={step.id}><span>{step.status === "completed" ? <Check size={13} /> : <span>{step.position}</span>}</span><div><strong>{step.title}</strong><small>{step.verification.replaceAll("_", " ")} verification · {step.risk} risk</small></div></li>)}</ol>
+          {activeWorkflow.status === "awaiting_confirmation" && <div className="workflow-confirm"><small>The source file is preserved. A new file will be created.</small><button disabled={busy} onClick={confirmActiveWorkflow}><ShieldCheck size={14} /> Confirm and run</button></div>}
+          {["queued", "running"].includes(activeWorkflow.status) && <div className="workflow-confirm"><small>Execution is durable and can resume if you leave this chat.</small><button className="workflow-cancel" onClick={cancelActiveWorkflow}><X size={14} /> Cancel</button></div>}
+        </section>}
         {busy && <div className="agent-chat-working"><RefreshCw className="spin" size={12} /> InsightPDF is working…</div>}
       </div>
       <div className="agent-activity"><p className="eyebrow">Activity</p>
@@ -1455,7 +1632,7 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   const canRun = !busy && (tool === "merge" ? selected.length >= 2 : tool === "images-to-pdf" ? images.length > 0 : needsWordFile ? Boolean(wordFile) : Boolean(documentId));
 
   return <div className="pdf-tools-wrap"><button className="history-backdrop" aria-label="Close PDF tools" onClick={onClose} />
-    <section className="pdf-tools-panel"><header><div><p className="eyebrow">Document workflows</p><h2>Document tools</h2></div><button onClick={onClose}><X size={18} /></button></header>
+    <section className="pdf-tools-panel"><header><div><p className="eyebrow">Document workflows</p><h2>Document tools</h2></div><button aria-label="Close document tools" onClick={onClose}><X size={18} /></button></header>
       <div className="pdf-tools-layout"><nav>{tools.map(([id, label]) => <button className={tool === id ? "active" : ""} key={id} onClick={() => { setTool(id); setArtifact(null); setError(""); }}>{id.includes("image") ? <FileImage size={15} /> : <Scissors size={15} />}{label}</button>)}</nav>
         <main><div className="tool-heading"><h3>{tools.find(([id]) => id === tool)?.[1]}</h3><p>Outputs are stored securely and available for download.</p></div>
           <div className="tool-form">
@@ -1480,13 +1657,18 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   </div>;
 }
 
-function AccountPanel({ user, token, stats, onUser, onClose }: {
-  user: AuthResult["user"]; token: string; stats: Stats | null; onUser: (user: AuthResult["user"]) => void; onClose: () => void;
+function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }: {
+  user: AuthResult["user"]; token: string; stats: Stats | null; onUser: (user: AuthResult["user"]) => void; onClose: () => void; onSignOut: () => void;
 }) {
   const [tab, setTab] = useState<"profile" | "admin">("profile");
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const onUserRef = useRef(onUser);
+  useEffect(() => { onUserRef.current = onUser; }, [onUser]);
+  useEffect(() => {
+    api<AuthResult["user"]>("/auth/me", token).then((updated) => onUserRef.current(updated)).catch((reason) => setError(reason.message));
+  }, [token]);
   useEffect(() => {
     if (tab === "admin" && user.role === "admin") api<AdminUser[]>("/admin/users", token).then(setAdmins).catch((reason) => setError(reason.message));
   }, [tab, token, user.role]);
@@ -1511,14 +1693,15 @@ function AccountPanel({ user, token, stats, onUser, onClose }: {
     setAdmins((current) => current.map((value) => value.id === item.id ? { ...value, is_active: updated.is_active } : value));
   }
   return <div className="account-wrap"><button className="history-backdrop" aria-label="Close profile" onClick={onClose} /><section className="account-panel">
-    <header><div><p className="eyebrow">Account workspace</p><h2>{user.display_name}</h2></div><button onClick={onClose}><X size={18} /></button></header>
+    <header><div><p className="eyebrow">Account workspace</p><h2>{user.display_name}</h2></div><button aria-label="Close account settings" onClick={onClose}><X size={18} /></button></header>
     {user.role === "admin" && <nav><button className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}><UserRound size={15} /> Profile</button><button className={tab === "admin" ? "active" : ""} onClick={() => setTab("admin")}><ShieldCheck size={15} /> Admin</button></nav>}
     <main>{error && <div className="form-error">{error}</div>}{message && <div className="success-note">{message}</div>}
       {tab === "profile" ? <><div className="account-stats">{stats && <><article><strong>{stats.document_count}</strong><span>Documents</span></article><article><strong>{stats.page_count}</strong><span>Pages</span></article><article><strong>{(stats.storage_bytes / 1024 / 1024).toFixed(1)} MB</strong><span>Storage</span></article><article><strong>{stats.ai_requests}</strong><span>AI requests</span></article><article><strong>{stats.generated_files}</strong><span>Generated</span></article><article className={stats.failed_jobs ? "warn" : ""}><strong>{stats.failed_jobs}</strong><span>Failed jobs</span></article></>}</div>
+        <section className={`account-identity-status ${user.google_linked ? "linked" : "unlinked"}`}><span>{user.google_linked ? <CheckCircle2 size={19} /> : <AlertTriangle size={19} />}</span><div><strong>Google account</strong><small>{user.google_linked ? `Linked to ${user.email}` : "Not linked"}</small></div><b>{user.google_linked ? "Linked" : "Not linked"}</b></section>
         <div className="profile-forms"><form onSubmit={updateProfile}><h3>Profile</h3><label>Email<input value={user.email} disabled /></label><label>Display name<input name="display_name" defaultValue={user.display_name} minLength={2} required /></label><button>Save profile</button></form>
           <form onSubmit={changePassword}><h3>Change password</h3><label>Current password<input name="current_password" type="password" required /></label><label>New password<input name="new_password" type="password" minLength={8} required /></label><button>Update password</button></form></div></>
         : <div className="admin-users"><h3>User management</h3>{admins.map((item) => <article key={item.id}><div><strong>{item.display_name}</strong><span>{item.email} · {item.role}</span></div><small>{item.document_count} docs · {item.ai_requests} AI</small><button className={item.is_active ? "" : "enable"} onClick={() => toggleAccount(item)}>{item.is_active ? "Disable" : "Enable"}</button></article>)}</div>}
-    </main></section></div>;
+    </main><footer className="account-footer"><button onClick={onSignOut}><LogOut size={15} /> Sign out of InsightPDF</button></footer></section></div>;
 }
 
 function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void }) {
@@ -1613,6 +1796,7 @@ function CopilotWorkspace({ documents, token, onClose }: { documents: DocumentIt
 type SlideDraft = { eyebrow: string; title: string; body: string; variant: "title" | "section-1" | "section-2" | "section-3" };
 type SlidePalette = { navy: string; accent: string; soft: string };
 type CreationTemplate = { id: string; name: string; description: string; category: string; preview: string; starter: string };
+type DesignFormat = "pdf" | "docx" | "pptx";
 const PRESENTATION_TEMPLATES: CreationTemplate[] = [
   { id: "startup-pitch", name: "Startup Pitch Deck", description: "Problem, solution, market, traction, and ask", category: "Business", preview: "pitch", starter: "Create an investor pitch for " },
   { id: "quarterly-review", name: "Quarterly Business Review", description: "KPIs, wins, misses, outlook, and decisions", category: "Business", preview: "review", starter: "Create a quarterly review covering " },
@@ -1620,6 +1804,14 @@ const PRESENTATION_TEMPLATES: CreationTemplate[] = [
   { id: "product-launch", name: "Product Launch", description: "Positioning, capabilities, launch plan, and metrics", category: "Product", preview: "launch", starter: "Create a product launch presentation for " },
   { id: "data-report", name: "Data & Insights Report", description: "Findings, trends, comparisons, and recommendations", category: "Data", preview: "data", starter: "Create a data-led presentation about " },
   { id: "client-proposal", name: "Client Proposal", description: "Approach, scope, timeline, proof, and next steps", category: "Business", preview: "proposal", starter: "Create a client proposal for " },
+];
+const DOCUMENT_TEMPLATES: CreationTemplate[] = [
+  { id: "executive-report", name: "Executive Report", description: "Summary, evidence, findings, and recommendations", category: "Reports", preview: "review", starter: "Design an executive report about " },
+  { id: "client-proposal-document", name: "Client Proposal", description: "Goals, approach, scope, timeline, and pricing", category: "Business", preview: "proposal", starter: "Design a persuasive client proposal for " },
+  { id: "company-policy", name: "Company Policy", description: "Purpose, scope, rules, responsibilities, and review", category: "Operations", preview: "roadmap", starter: "Design a clear company policy for " },
+  { id: "professional-resume", name: "Professional Resume", description: "Profile, experience, achievements, and skills", category: "Personal", preview: "data", starter: "Design a professional resume for " },
+  { id: "business-letter", name: "Business Letter", description: "A polished formal letter for any business purpose", category: "Business", preview: "pitch", starter: "Design a formal business letter about " },
+  { id: "meeting-agenda", name: "Meeting Agenda", description: "Objectives, topics, timing, owners, and next steps", category: "Operations", preview: "launch", starter: "Design a structured meeting agenda for " },
 ];
 function TemplateGallery({ templates, selected, onUse }: { templates: CreationTemplate[]; selected: string; onUse: (template: CreationTemplate) => void }) {
   const [category, setCategory] = useState("All");
@@ -1636,22 +1828,36 @@ function TemplateGallery({ templates, selected, onUse }: { templates: CreationTe
   </section>;
 }
 
-function PresentationStudio({ documents, artifacts, token, onCreated }: { documents: DocumentItem[]; artifacts: Artifact[]; token: string; onCreated: (artifact: Artifact) => void }) {
-  const [topic, setTopic] = useState("FY2025 financial performance and growth strategy");
+function DesignStudio({ documents, artifacts, token, onCreated }: { documents: DocumentItem[]; artifacts: Artifact[]; token: string; onCreated: (artifact: Artifact) => void }) {
+  const [topic, setTopic] = useState("");
   const [audience, setAudience] = useState("Executive leadership");
   const [tone, setTone] = useState("Clear and confident");
+  const [outputFormat, setOutputFormat] = useState<DesignFormat>("pdf");
   const [sourceId, setSourceId] = useState("");
   const [generating, setGenerating] = useState(false);
   const [selectedSlide, setSelectedSlide] = useState(0);
   const [slides, setSlides] = useState<SlideDraft[]>([]);
-  const [theme, setTheme] = useState("minimal");
+  const [theme] = useState("minimal");
   const [templateId, setTemplateId] = useState("");
   const [previewTheme, setPreviewTheme] = useState("minimal");
   const [palette, setPalette] = useState<SlidePalette>({ navy: "#0A183D", accent: "#EF2949", soft: "#F3F5F8" });
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [error, setError] = useState("");
 
-  async function generateDeck(event: FormEvent) {
+  const isPresentation = outputFormat === "pptx";
+  const templates = isPresentation ? PRESENTATION_TEMPLATES : DOCUMENT_TEMPLATES;
+  const outputLabel = outputFormat === "pptx" ? "presentation" : outputFormat === "docx" ? "Word document" : "PDF document";
+
+  function changeFormat(format: DesignFormat) {
+    setOutputFormat(format);
+    setTemplateId("");
+    setTopic("");
+    setSlides([]);
+    setArtifact(null);
+    setError("");
+  }
+
+  async function generateDesign(event: FormEvent) {
     event.preventDefault();
     if (!topic.trim()) return;
     setGenerating(true);
@@ -1660,13 +1866,13 @@ function PresentationStudio({ documents, artifacts, token, onCreated }: { docume
       const created = await api<Artifact>("/create", token, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: `${topic}. Audience: ${audience}. Tone: ${tone}.`, output_format: "pptx", theme, template_id: templateId, source_document_id: sourceId || null }),
+          body: JSON.stringify({ prompt: `${topic}. Audience: ${audience}. Tone: ${tone}.`, output_format: outputFormat, theme, template_id: isPresentation ? templateId : null, source_document_id: sourceId || null }),
       });
       const generatedSlides = Array.isArray(created.parameters.preview_slides)
         ? created.parameters.preview_slides as SlideDraft[]
         : [];
       const generatedPalette = created.parameters.preview_palette as SlidePalette | undefined;
-      if (!generatedSlides.length) throw new Error("The presentation was created, but its preview data is missing.");
+      if (isPresentation && !generatedSlides.length) throw new Error("The presentation was created, but its preview data is missing.");
       setSlides(generatedSlides);
       if (generatedPalette?.navy && generatedPalette?.accent && generatedPalette?.soft) setPalette(generatedPalette);
       setPreviewTheme(String(created.parameters.theme ?? theme));
@@ -1674,7 +1880,7 @@ function PresentationStudio({ documents, artifacts, token, onCreated }: { docume
       setArtifact(created);
       onCreated(created);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not generate the presentation");
+      setError(reason instanceof Error ? reason.message : `Could not generate the ${outputLabel}`);
     } finally {
       setGenerating(false);
     }
@@ -1683,26 +1889,31 @@ function PresentationStudio({ documents, artifacts, token, onCreated }: { docume
   const activeSlide = slides[selectedSlide];
   return <section className="presentation-studio">
     <header className="presentation-heading">
-      <div><span className="presentation-kicker"><Presentation size={15} /> AI presentations</span><h1>Turn your work into a clear story</h1><p>Create a polished slide draft from a topic or ground it in one of your documents.</p></div>
-      <span className="presentation-format">16:9 · {previewTheme[0].toUpperCase() + previewTheme.slice(1)}</span>
+      <div><span className="presentation-kicker"><Sparkles size={15} /> AI document design</span><h1>Design anything you need</h1><p>Create a polished PDF, editable Word document, or presentation from a brief or an existing source.</p></div>
+      <span className="presentation-format">{isPresentation ? `16:9 · ${previewTheme[0].toUpperCase() + previewTheme.slice(1)}` : outputFormat.toUpperCase()}</span>
     </header>
-    {!templateId ? <TemplateGallery templates={PRESENTATION_TEMPLATES} selected={templateId} onUse={(template) => { setTemplateId(template.id); setTopic(template.starter); }} /> : <div className="presentation-layout">
-      <form className="presentation-builder" onSubmit={generateDeck}>
+    <nav className="template-filters creation-format-switch" aria-label="Output format">
+      <button type="button" className={outputFormat === "pdf" ? "active" : ""} onClick={() => changeFormat("pdf")}><FileText size={14} /> PDF</button>
+      <button type="button" className={outputFormat === "docx" ? "active" : ""} onClick={() => changeFormat("docx")}><FileOutput size={14} /> Word</button>
+      <button type="button" className={outputFormat === "pptx" ? "active" : ""} onClick={() => changeFormat("pptx")}><Presentation size={14} /> Slides</button>
+    </nav>
+    {!templateId ? <TemplateGallery key={outputFormat} templates={templates} selected={templateId} onUse={(template) => { setTemplateId(template.id); setTopic(template.starter); }} /> : <div className="presentation-layout">
+      <form className="presentation-builder" onSubmit={generateDesign}>
         <button type="button" className="change-template" onClick={() => setTemplateId("")}>← Change template</button>
-        <div className="selected-template-summary"><span className={`template-thumbnail template-${PRESENTATION_TEMPLATES.find((item) => item.id === templateId)?.preview}`}><span /><i /><b /></span><div><small>SELECTED TEMPLATE</small><strong>{PRESENTATION_TEMPLATES.find((item) => item.id === templateId)?.name}</strong></div></div>
-        <div className="presentation-builder-title"><Presentation size={18} /><div><strong>Create a presentation</strong><small>Describe the outcome, not every slide.</small></div></div>
-        <label>What should the deck communicate?<textarea value={topic} onChange={(event) => setTopic(event.target.value)} rows={4} /></label>
+        <div className="selected-template-summary"><span className={`template-thumbnail template-${templates.find((item) => item.id === templateId)?.preview}`}><span /><i /><b /></span><div><small>SELECTED TEMPLATE</small><strong>{templates.find((item) => item.id === templateId)?.name}</strong></div></div>
+        <div className="presentation-builder-title"><Sparkles size={18} /><div><strong>Design a {outputLabel}</strong><small>Describe the result you want. AI will structure and style it.</small></div></div>
+        <label>What should it communicate?<textarea value={topic} onChange={(event) => setTopic(event.target.value)} rows={4} /></label>
         <label>Use a source document<select value={sourceId} onChange={(event) => setSourceId(event.target.value)}><option value="">No source · start from the prompt</option>{documents.map((document) => <option key={document.id} value={document.id}>{document.filename}</option>)}</select></label>
         <div className="presentation-options">
           <label>Audience<select value={audience} onChange={(event) => setAudience(event.target.value)}><option>Executive leadership</option><option>Clients and partners</option><option>Internal team</option><option>Investors</option></select></label>
           <label>Tone<select value={tone} onChange={(event) => setTone(event.target.value)}><option>Clear and confident</option><option>Concise and analytical</option><option>Persuasive</option><option>Educational</option></select></label>
         </div>
         {error && <div className="form-error">{error}</div>}
-        <button className="generate-deck" disabled={generating || !topic.trim()}>{generating ? <><RefreshCw className="spin" size={17} /> Building your story…</> : <><Presentation size={17} /> Generate presentation</>}</button>
-        <p className="presentation-note">Generates a real editable PowerPoint file and saves it to your workspace.</p>
+        <button className="generate-deck" disabled={generating || !topic.trim()}>{generating ? <><RefreshCw className="spin" size={17} /> Designing your document…</> : <><Sparkles size={17} /> Design {outputLabel}</>}</button>
+        <p className="presentation-note">Generates a real {outputFormat === "pdf" ? "PDF" : "editable"} file and saves it to your workspace.</p>
       </form>
       <section className={`deck-preview ${slides.length ? "has-slides" : ""}`}>
-        {!activeSlide ? <div className="deck-empty"><span><Presentation size={28} /></span><strong>Your deck will appear here</strong><p>Generate a draft to review its narrative, structure, and key metrics before exporting.</p><div><i /><i /><i /></div></div> : <>
+        {!activeSlide ? <div className="deck-empty"><span>{isPresentation ? <Presentation size={28} /> : <FileText size={28} />}</span><strong>{artifact ? `${artifact.filename} is ready` : `Your ${outputLabel} will appear here`}</strong><p>{artifact ? "The finished file has been saved to your workspace and is ready to download." : "AI will turn your brief into a structured, polished document."}</p>{artifact ? <button type="button" onClick={() => downloadArtifact(artifact, token)}><Download size={15} /> Download {outputFormat.toUpperCase()}</button> : <div><i /><i /><i /></div>}</div> : <>
           <div className="slide-stage"><div
             className={`generated-slide ${activeSlide.variant}`}
             style={{ "--slide-navy": palette.navy, "--slide-accent": palette.accent, "--slide-soft": palette.soft } as CSSProperties}
@@ -1712,9 +1923,9 @@ function PresentationStudio({ documents, artifacts, token, onCreated }: { docume
         </>}
       </section>
     </div>}
-    {!!artifacts.filter((item) => item.filename.toLowerCase().endsWith(".pptx")).length && <section className="saved-presentations">
-      <header><div><strong>Saved presentations</strong><span>PowerPoint files created in your workspace</span></div></header>
-      <div>{artifacts.filter((item) => item.filename.toLowerCase().endsWith(".pptx")).map((item) => <article key={item.id}><span><Presentation size={18} /></span><div><strong>{item.filename}</strong><small>{String(item.parameters.theme ?? "minimal")} theme · {(item.size_bytes / 1024).toFixed(1)} KB</small></div><button onClick={() => downloadArtifact(item, token)}><Download size={15} /> Download</button></article>)}</div>
+    {!!artifacts.length && <section className="saved-presentations">
+      <header><div><strong>Recently designed</strong><span>Documents created in your workspace</span></div></header>
+      <div>{artifacts.slice(0, 8).map((item) => <article key={item.id}><span>{item.filename.toLowerCase().endsWith(".pptx") ? <Presentation size={18} /> : <FileText size={18} />}</span><div><strong>{item.filename}</strong><small>{item.filename.split(".").pop()?.toUpperCase()} · {(item.size_bytes / 1024).toFixed(1)} KB</small></div><button onClick={() => downloadArtifact(item, token)}><Download size={15} /> Download</button></article>)}</div>
     </section>}
   </section>;
 }
@@ -1748,6 +1959,7 @@ export function WorkspaceApp({
   const [viewerSearch, setViewerSearch] = useState("");
   const [chatDocuments, setChatDocuments] = useState<DocumentItem[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [newChatNonce, setNewChatNonce] = useState(0);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyBusy, setHistoryBusy] = useState(false);
@@ -1900,6 +2112,38 @@ export function WorkspaceApp({
     return () => window.removeEventListener("keydown", keyboardShortcuts);
   }, []);
 
+  async function completeAuthentication(result: AuthResult) {
+    localStorage.setItem("insightpdf-auth", JSON.stringify(result));
+    setToken(result.access_token);
+    setUser(result.user);
+    await Promise.all([
+      loadDocuments(result.access_token), loadStats(result.access_token), loadWorkspaceArtifacts(result.access_token),
+      loadCollections(result.access_token), api<Conversation[]>("/conversations", result.access_token).then(setConversations),
+    ]);
+    if (pendingUpload) {
+      const file = pendingUpload;
+      onPendingUploadHandled();
+      await upload(file, result.access_token);
+    }
+  }
+
+  async function authenticateGoogle(credential: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<AuthResult>("/auth/google", undefined, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+      await completeAuthentication(result);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Google sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function authenticate(values: AuthFields) {
     setBusy(true); setError("");
     if (mode === "register" && !values.display_name?.trim()) {
@@ -1917,17 +2161,7 @@ export function WorkspaceApp({
           ...(mode === "register" ? { display_name: values.display_name } : {}),
         }),
       });
-      localStorage.setItem("insightpdf-auth", JSON.stringify(result));
-      setToken(result.access_token); setUser(result.user);
-      await Promise.all([
-        loadDocuments(result.access_token), loadStats(result.access_token), loadWorkspaceArtifacts(result.access_token),
-        loadCollections(result.access_token), api<Conversation[]>("/conversations", result.access_token).then(setConversations),
-      ]);
-      if (pendingUpload) {
-        const file = pendingUpload;
-        onPendingUploadHandled();
-        await upload(file, result.access_token);
-      }
+      await completeAuthentication(result);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
     finally { setBusy(false); }
   }
@@ -2086,6 +2320,15 @@ export function WorkspaceApp({
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed"); }
   }
 
+  async function duplicateWorkspaceArtifact(artifact: Artifact) {
+    try {
+      const duplicate = await api<Artifact>(`/pdf-tools/artifacts/${artifact.id}/duplicate`, token, { method: "POST" });
+      setWorkspaceArtifacts((current) => [duplicate, ...current]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not duplicate file");
+    }
+  }
+
   async function ensureArtifactDocument(artifact: Artifact): Promise<DocumentItem> {
     setPreparingArtifactId(artifact.id);
     setError("");
@@ -2155,6 +2398,10 @@ export function WorkspaceApp({
   const isImageArtifact = (artifact: Artifact) =>
     artifact.content_type.startsWith("image/") || artifact.operation === "pdf_to_images";
   const artifactDocumentIds = new Set(workspaceArtifacts.flatMap((artifact) => artifact.linked_document_id ? [artifact.linked_document_id] : []));
+  const sourceFileCount = documents.filter((document) => !artifactDocumentIds.has(document.id)).length;
+  const createdFileCount = workspaceArtifacts.filter((item) => !isImageArtifact(item)).length;
+  const imageFileCount = workspaceArtifacts.filter(isImageArtifact).length;
+  const workspaceFileCount = sourceFileCount + workspaceArtifacts.length;
   const visibleDocuments = documents.filter((document) =>
     !artifactDocumentIds.has(document.id) &&
     [document.filename, document.display_title ?? "", ...document.tags].join(" ").toLowerCase().includes(query.toLowerCase()) &&
@@ -2204,6 +2451,12 @@ export function WorkspaceApp({
           <FileText size={16} />
           <span><strong>{pendingUpload.name}</strong><small>Ready to upload securely after you sign in.</small></span>
         </div>}
+        <GoogleSignInButton
+          disabled={busy}
+          onCredential={(credential) => { authenticateGoogle(credential).catch(() => undefined); }}
+          onError={setError}
+        />
+        <div className="auth-divider"><span>or continue with email</span></div>
         <form onSubmit={authForm.handleSubmit(authenticate)}>
           {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
           <label>Email<input {...authForm.register("email")} type="email" required /></label>
@@ -2237,15 +2490,14 @@ export function WorkspaceApp({
           <button aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
         <nav aria-label="Workspace navigation">
+          <button className="hub-new-chat" onClick={() => { setActiveConversation(null); setChatDocuments([]); setNewChatNonce((value) => value + 1); setHubView("home"); }}><MessageCircle size={18} /><span>New chat</span></button>
+          <span className="hub-nav-label">Your work</span>
+          <button aria-label="Chat history" className={hubView === "home" ? "active" : ""} onClick={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}><History size={18} /><span>Chats</span><i>{conversations.length}</i></button>
+          <button className={hubView === "documents" ? "active" : ""} onClick={() => { setTypeFilter("all"); setHubView("documents"); }}><FolderOpen size={18} /><span>Files</span><i>{workspaceFileCount}</i></button>
+          <button className={hubView === "presentations" ? "active" : ""} onClick={() => setHubView("presentations")}><Sparkles size={18} /><span>Design</span></button>
           <span className="hub-nav-label">Workspace</span>
-          <button className={hubView === "home" ? "active" : ""} onClick={() => setHubView("home")}><LayoutDashboard size={18} /><span>Home</span></button>
-          <button className={hubView === "documents" ? "active" : ""} onClick={() => setHubView("documents")}><FolderOpen size={18} /><span>Documents</span><i>{documents.length + workspaceArtifacts.length}</i></button>
-          <button className={hubView === "presentations" ? "active" : ""} onClick={() => setHubView("presentations")}><Presentation size={18} /><span>Presentations</span></button>
-          <span className="hub-nav-label">Tools</span>
-          <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><GitCompareArrows size={18} /><span>Compare</span></button>
-          <button disabled={!readyDocuments.length} onClick={() => { setPDFToolsDocument(null); setPDFToolsOpen(true); }}><Scissors size={18} /><span>Document tools</span></button>
-          <button onClick={() => { setHistoryOpen(true); loadConversations().catch(() => undefined); }}><History size={18} /><span>Chat history</span></button>
-          <button onClick={() => setJobsOpen(true)}><RefreshCw size={18} /><span>Processing</span></button>
+          <button onClick={() => setJobsOpen(true)}><Activity size={18} /><span>Activity</span></button>
+          <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><Settings size={18} /><span>Settings</span></button>
         </nav>
         <div className="hub-sidebar-footer">
           <button onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }}><UserRound size={17} /><span className="hub-user"><strong>{user.display_name}</strong><small>{user.email}</small></span><Settings size={14} /></button>
@@ -2253,15 +2505,16 @@ export function WorkspaceApp({
         </div>
       </aside>
       <header className="hub-topbar">
-        <div><strong>{hubView === "home" ? "AI workspace" : hubView === "presentations" ? "Presentations" : "Documents"}</strong><small>{hubView === "home" ? "Ask, attach documents, and create" : hubView === "presentations" ? "Choose a template and generate a slide story" : `${documents.length + workspaceArtifacts.length} files in your workspace`}</small></div>
+        <div><strong>{hubView === "home" ? (activeConversation?.title ?? "New chat") : hubView === "presentations" ? "Design a document" : "Files"}</strong><small>{hubView === "home" ? "Ask, transform, and create with your documents" : hubView === "presentations" ? "Create polished PDFs, Word documents, and presentations" : `${workspaceFileCount} files in your workspace`}</small></div>
         <button title="Keyboard shortcuts: / search, U upload" aria-label="Keyboard shortcuts"><Keyboard size={17} /></button>
         <button onClick={() => setJobsOpen(true)} aria-label="Processing jobs"><RefreshCw size={17} /></button>
+        <button className="hub-mobile-account" onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }} aria-label="Account settings"><UserRound size={17} /></button>
         <label className={`hub-upload ${busy ? "disabled" : ""}`}><Upload size={16} /> Upload<input ref={uploadInputRef} type="file" accept={DOCUMENT_UPLOAD_ACCEPT} disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
       </header>
       <section className="workspace-content hub-content">
         {hubView === "home" ? <div className="hub-home">
           <HomeChat
-            key={`${activeConversation?.id ?? "new"}:${chatDocuments.map((item) => item.id).join(",")}`}
+            key={`${activeConversation?.id ?? `new-${newChatNonce}`}:${chatDocuments.map((item) => item.id).join(",")}`}
             token={token}
             documents={readyDocuments}
             conversation={activeConversation}
@@ -2294,7 +2547,7 @@ export function WorkspaceApp({
               <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && openDocumentChat(readyDocuments[0])}><span><MessageCircle size={19} /></span><strong>Ask documents</strong><small>Attach files in the main chat</small></button>
               <button disabled={!readyDocuments.length} onClick={() => readyDocuments[0] && setAIDocument(readyDocuments[0])}><span><AlignLeft size={19} /></span><strong>Summarize</strong><small>Turn long files into key points</small></button>
               <button disabled={readyDocuments.length < 2} onClick={() => setCompareOpen(true)}><span><RefreshCw size={19} /></span><strong>Compare</strong><small>Find changes and differences</small></button>
-              <button onClick={() => setHubView("presentations")}><span><Presentation size={19} /></span><strong>Create slides</strong><small>Generate a presentation draft</small></button>
+              <button onClick={() => setHubView("presentations")}><span><Sparkles size={19} /></span><strong>Design a document</strong><small>Create PDF, Word, or slides</small></button>
             </div>
           </section>
           <div className="hub-home-grid">
@@ -2305,10 +2558,10 @@ export function WorkspaceApp({
             <section className="hub-overview">
               <header><strong>Workspace</strong><span>At a glance</span></header>
               <div><article><strong>{documents.length + workspaceArtifacts.length}</strong><span>Files</span></article><article><strong>{stats?.page_count ?? 0}</strong><span>Pages</span></article><article><strong>{stats?.ai_requests ?? 0}</strong><span>AI requests</span></article></div>
-              <button onClick={() => setHubView("documents")}><FolderOpen size={15} /> Open documents</button>
+              <button onClick={() => { setTypeFilter("all"); setHubView("documents"); }}><FolderOpen size={15} /> Open files</button>
             </section>
           </div>
-        </div> : hubView === "presentations" ? <PresentationStudio documents={readyDocuments} artifacts={workspaceArtifacts} token={token} onCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }} /> : <header className="documents-heading"><div><h1>Your documents</h1><p>Upload PDFs or images, organize files, preview sources, and create new outputs.</p></div></header>}
+        </div> : hubView === "presentations" ? <DesignStudio documents={readyDocuments} artifacts={workspaceArtifacts} token={token} onCreated={(artifact) => { setWorkspaceArtifacts((current) => [artifact, ...current.filter((item) => item.id !== artifact.id)]); loadStats(token).catch(() => undefined); }} /> : <header className="documents-heading"><div><span>YOUR KNOWLEDGE BASE</span><h1>Everything you work with, in one place.</h1><p>Organize sources, preview evidence, and turn documents into polished outputs.</p></div><aside><strong>{workspaceFileCount}</strong><small>workspace files</small></aside></header>}
         <div className="workspace-title">
           <div><p className="eyebrow">AI-first document workspace</p><h1>What do you want to understand?</h1><p>Upload a PDF or image, ask grounded questions, compare versions, or transform it into something useful.</p></div>
           <div className="workspace-actions">
@@ -2331,7 +2584,7 @@ export function WorkspaceApp({
         {!!recentActivity.length && <section className="recent-activity"><header><Activity size={16} /><div><strong>Recent activity</strong><span>Your latest documents, results, and conversations</span></div></header><div>{recentActivity.map((item) => <article key={item.id}>{item.icon === "chat" ? <MessageCircle size={15} /> : item.icon === "artifact" ? <FileOutput size={15} /> : <FileText size={15} />}<span><strong>{item.title}</strong><small>{item.detail} · {new Date(item.date).toLocaleDateString()}</small></span></article>)}</div></section>}
         <div className="collection-bar">
           <FolderOpen size={16} />
-          <button className={collectionFilter === "all" ? "active" : ""} onClick={() => setCollectionFilter("all")}>All documents</button>
+          <button className={collectionFilter === "all" ? "active" : ""} onClick={() => setCollectionFilter("all")}>All files</button>
           <button className={collectionFilter === "none" ? "active" : ""} onClick={() => setCollectionFilter("none")}>Unfiled</button>
           {collections.map((collection) => <div className={`collection-chip ${collectionFilter === collection.id ? "active" : ""}`} key={collection.id}>
             <button className="collection-filter-button" onClick={() => setCollectionFilter(collection.id)}><i style={{ background: collection.color }} />{collection.name}</button>
@@ -2343,10 +2596,10 @@ export function WorkspaceApp({
           <form onSubmit={createCollection}><FolderPlus size={14} /><input aria-label="New collection name" value={newCollectionName} onChange={(event) => setNewCollectionName(event.target.value)} placeholder="New collection" /><button disabled={!newCollectionName.trim()}>Add</button></form>
         </div>
         <div className="document-type-tabs" role="tablist" aria-label="Document types">
-          <button role="tab" aria-selected={typeFilter === "all"} className={typeFilter === "all" ? "active" : ""} onClick={() => setTypeFilter("all")}>All <span>{documents.length + workspaceArtifacts.length}</span></button>
-          <button role="tab" aria-selected={typeFilter === "pdfs"} className={typeFilter === "pdfs" ? "active" : ""} onClick={() => setTypeFilter("pdfs")}>Source files <span>{documents.length}</span></button>
-          <button role="tab" aria-selected={typeFilter === "converted"} className={typeFilter === "converted" ? "active" : ""} onClick={() => setTypeFilter("converted")}>Created files <span>{workspaceArtifacts.filter((item) => !isImageArtifact(item)).length}</span></button>
-          <button role="tab" aria-selected={typeFilter === "images"} className={typeFilter === "images" ? "active" : ""} onClick={() => setTypeFilter("images")}>Images <span>{workspaceArtifacts.filter(isImageArtifact).length}</span></button>
+          <button role="tab" aria-selected={typeFilter === "all"} className={typeFilter === "all" ? "active" : ""} onClick={() => setTypeFilter("all")}>All <span>{workspaceFileCount}</span></button>
+          <button role="tab" aria-selected={typeFilter === "pdfs"} className={typeFilter === "pdfs" ? "active" : ""} onClick={() => setTypeFilter("pdfs")}>Source files <span>{sourceFileCount}</span></button>
+          <button role="tab" aria-selected={typeFilter === "converted"} className={typeFilter === "converted" ? "active" : ""} onClick={() => setTypeFilter("converted")}>Created files <span>{createdFileCount}</span></button>
+          <button role="tab" aria-selected={typeFilter === "images"} className={typeFilter === "images" ? "active" : ""} onClick={() => setTypeFilter("images")}>Images <span>{imageFileCount}</span></button>
         </div>
         <div className="document-filters">
           <label><Search size={15} /><input ref={workspaceSearchRef} aria-label="Search documents" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, filenames, and tags · /" /></label>
@@ -2387,7 +2640,8 @@ export function WorkspaceApp({
                   <button className="more-actions-button" aria-label={`More actions for ${artifact.filename}`} title="More actions" onClick={() => setOpenActionMenu((current) => current === `artifact:${artifact.id}` ? "" : `artifact:${artifact.id}`)}><MoreVertical size={17} /></button>
                   {openActionMenu === `artifact:${artifact.id}` && <><button className="action-menu-backdrop" aria-label="Close actions menu" onClick={() => setOpenActionMenu("")} /><nav className="file-action-menu" aria-label={`Actions for ${artifact.filename}`}>
                     <button onClick={() => { setArtifactViewer(artifact); setOpenActionMenu(""); }}><Eye size={14} /> Preview</button>
-                    <button onClick={() => { renameWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
+                  <button onClick={() => { renameWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><Pencil size={14} /> Rename</button>
+                  <button onClick={() => { duplicateWorkspaceArtifact(artifact); setOpenActionMenu(""); }}><FileOutput size={14} /> Duplicate</button>
                     <button onClick={() => { downloadArtifact(artifact, token).catch((reason) => setError(reason.message)); setOpenActionMenu(""); }}><Download size={14} /> Download</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactPDFTools(artifact); setOpenActionMenu(""); }}><Scissors size={14} /> {preparingArtifactId === artifact.id ? "Preparing…" : "PDF tools"}</button>
                     <button disabled={preparingArtifactId === artifact.id} onClick={() => { openArtifactAI(artifact, "chat"); setOpenActionMenu(""); }}><MessageCircle size={14} /> Open in AI</button>
@@ -2464,7 +2718,7 @@ export function WorkspaceApp({
         setUser(updated);
         const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "{}");
         localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
-      }} onClose={() => setAccountOpen(false)} />}
+      }} onClose={() => setAccountOpen(false)} onSignOut={signOut} />}
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
     </main>
   );

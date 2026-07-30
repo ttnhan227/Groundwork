@@ -13,6 +13,7 @@ class ToolDefinition:
     cost: str = "deterministic"
     confirmation: str = "none"
     verification: str = "pdf_integrity"
+    version: str = "1"
 
 
 TOOLS = (
@@ -37,6 +38,21 @@ TOOLS = (
     ToolDefinition("summary", "Summarize", "AI", "Create a grounded document summary.",
                    {"type": "object", "properties": {"style": {"enum": ["short", "detailed", "key_points", "action_items"]}}, "required": ["document_id"]},
                    cost="ai", verification="schema"),
+    ToolDefinition("quiz", "Create quiz", "AI", "Generate a grounded study quiz.",
+                   {"type": "object", "properties": {"question_count": {"type": "integer", "minimum": 1, "maximum": 20}}, "required": ["document_id"]},
+                   cost="ai", verification="schema"),
+    ToolDefinition("extraction", "Extract information", "AI", "Extract entities, dates, values, deadlines, and action items.",
+                   {"type": "object", "properties": {"categories": {"type": "array", "items": {"type": "string"}}}, "required": ["document_id"]},
+                   cost="ai", verification="schema"),
+    ToolDefinition("translation", "Translate", "AI", "Translate grounded document text.",
+                   {"type": "object", "properties": {"target_language": {"type": "string"}}, "required": ["document_id", "target_language"]},
+                   cost="ai", verification="schema"),
+    ToolDefinition("comparison", "Compare documents", "AI", "Compare two documents and cite material differences.",
+                   {"type": "object", "properties": {}, "required": ["left_document_id", "right_document_id"]},
+                   cost="ai", verification="schema"),
+    ToolDefinition("merge", "Merge documents", "Organize", "Combine documents into one PDF.",
+                   {"type": "object", "properties": {"document_ids": {"type": "array", "items": {"type": "string"}}}, "required": ["document_ids"]},
+                   verification="page_count"),
 )
 
 TOOL_BY_NAME = {tool.name: tool for tool in TOOLS}

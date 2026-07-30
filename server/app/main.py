@@ -15,6 +15,7 @@ from app.jobs import router as jobs_router
 from app.pdf_tools import router as pdf_tools_router
 from app.users import router as users_router
 from app.workflows import router as workflows_router
+from app.workspace import router as workspace_router
 from app.logging_config import configure_logging
 from app.middleware import RateLimitMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
 
@@ -42,6 +43,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(collections_router, prefix="/api/v1")
+app.include_router(workspace_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

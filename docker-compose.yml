@@ -83,7 +83,10 @@ services:
     restart: unless-stopped
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     depends_on:
       api:
         condition: service_healthy

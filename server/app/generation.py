@@ -12,19 +12,20 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
 from pptx import Presentation
 from pptx.dml.color import RGBColor as PptxRGBColor
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.util import Inches as PptxInches, Pt as PptxPt
+from pptx.util import Inches as PptxInches
+from pptx.util import Pt as PptxPt
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
 from app.config import get_settings
+from app.database import get_session
 from app.dependencies import current_user
 from app.documents import owned_document, safe_filename
-from app.models import DocumentPage, GeneratedArtifact, User
+from app.models import ArtifactVersion, DocumentPage, GeneratedArtifact, User
 from app.schemas import ArtifactResponse
 from app.storage import ObjectStorage
 from app.usage import record_ai_usage
@@ -663,6 +664,15 @@ async def create_file(
         },
     )
     session.add(artifact)
+    session.add(ArtifactVersion(
+        artifact_id=identifier,
+        version_number=1,
+        object_key=key,
+        content_type=content_types[payload.output_format],
+        size_bytes=len(data),
+        change_prompt=payload.prompt,
+        metadata_json={"operation": artifact.operation, "theme": selected_theme},
+    ))
     await session.commit()
     await session.refresh(artifact)
     return artifact
