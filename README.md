@@ -1,245 +1,133 @@
-# InsightPDF 2
+# InsightPDF
 
-InsightPDF 2 is an AI document copilot and PDF workspace for uploading, understanding,
-comparing, organizing, and transforming PDF documents. It combines asynchronous
-document processing, retrieval-augmented generation, OCR, private object storage,
-structured AI outputs, and practical PDF tools in one Docker Compose application.
+InsightPDF is an AI workspace for understanding and transforming documents. Upload a PDF, ask questions with page-level citations, generate structured insights, or turn natural-language requests into reviewable document workflows.
 
-## Features
+## What it does
 
-- Versioned document-tool registry and natural-language, review-before-run workflow plans
-- PDF compression presets and configurable page numbering with deterministic output verification
-- Registration, email/password and Google login, rotating hashed refresh tokens, logout, profile and password management
-- Owner-isolated PDF upload, rename, search, filtering, deletion and authenticated downloads
-- Asynchronous PyMuPDF extraction, Tesseract OCR fallback, chunking and hosted embeddings
-- PostgreSQL/pgvector retrieval across one or more selected documents
-- Conversational RAG with stored conversations, follow-ups, snippets and clickable page citations
-- Cached short/detailed summaries, key points, action items, quizzes and translations
-- Schema-validated information extraction and deterministic-plus-semantic document comparison
-- Merge, split, rotate, delete/extract pages, PDF-to-images and images-to-PDF
-- Background DOCX-to-PDF, PDF-to-DOCX, and DOCX-to-Markdown conversion
-- Text/image watermarks with page, position, opacity and rotation controls
-- Durable owner-scoped Celery jobs for AI and PDF operations, progress, errors and retry metadata
-- PDF.js viewer with thumbnails, navigation, zoom, search and citation jumps
-- Dashboard metrics, processing indicators, generated-file history and admin controls
-- Real-account workspaces with private, owner-isolated source and generated files
+- Chat with one or more PDFs using retrieval-augmented generation
+- Generate summaries, reports, quizzes, translations, comparisons, and structured data
+- Run OCR on scanned documents and keep answers grounded in source pages
+- Create DOCX, PDF, and PowerPoint files from source material
+- Merge, split, rotate, compress, watermark, convert, and reorganize PDFs
+- Plan multi-step operations from prompts such as “remove page 7, add page numbers, then compress”
+- Keep documents, conversations, generated files, and AI results private to each account
+- Process ingestion and long-running operations asynchronously with Celery
 
 ## Architecture
 
 ```text
-Browser
-  |
-  v
-Nginx :8080
-  |-- /             -> React/Vite client
-  `-- /api/v1       -> FastAPI
-                        |-- PostgreSQL + pgvector
-                        |-- MinIO through a replaceable storage interface
-                        |-- Redis rate limits and Celery broker/backend
-                        |-- Celery ingestion and operation workers
-                        `-- Mistral/OpenAI-compatible embedding and generation API
+Browser → Nginx → React client
+                → FastAPI
+                   ├─ PostgreSQL + pgvector
+                   ├─ Redis + Celery
+                   ├─ MinIO object storage
+                   └─ Mistral/OpenAI-compatible AI API
 ```
 
-The application is a modular monolith: HTTP routes, schemas, persistence,
-security, retrieval, AI services, PDF operations, storage, and tasks have
-separate modules while sharing one deployment boundary. See
-[ARCHITECTURE.md](ARCHITECTURE.md).
+The project runs as one Docker Compose stack with PostgreSQL, pgvector, Redis, MinIO, FastAPI, Celery, React, and Nginx. See [ARCHITECTURE.md](ARCHITECTURE.md) for implementation details.
 
-## Why these technologies
+## Run locally
 
-- **FastAPI** provides typed asynchronous APIs, dependency injection and OpenAPI documentation.
-- **Celery and Redis** keep OCR, indexing, AI generation and transformations outside request workers.
-- **PostgreSQL and pgvector** keep relational ownership data and vector retrieval in one transactional store.
-- **MinIO** gives the local and portfolio deployments private S3-compatible object storage.
-- **Hosted embeddings** use the configured OpenAI-compatible API by default; an optional
-  Sentence Transformers dependency file supports local embeddings.
-- **Tesseract** handles scanned pages only when native text is below the configured threshold.
-- **RAG** grounds model responses in owner-authorized document chunks and preserves page citations.
-- **PDF.js** renders private authenticated PDFs without exposing object-storage URLs.
-
-## Stack
-
-React 19, TypeScript, Vite, Tailwind CSS, PDF.js, Google Identity Services,
-Vitest, Playwright,
-FastAPI, Pydantic, SQLAlchemy 2, Alembic, PostgreSQL 16, pgvector, Celery,
-Redis, MinIO, PyMuPDF, pypdf, Pillow, Tesseract, LibreOffice and Nginx.
-
-## Quick start
-
-Requirements: Docker Desktop with Docker Compose. Node.js 22+ is required only
-for running frontend tooling directly on the host.
+Requirements: Docker Desktop with Docker Compose.
 
 ```bash
 cp .env.example .env
-# PowerShell equivalent: Copy-Item .env.example .env
-# Replace JWT_SECRET.
-# Set LLM_API_KEY, LLM_BASE_URL and LLM_MODEL.
+# PowerShell: Copy-Item .env.example .env
+```
+
+Set a strong `JWT_SECRET`, then configure the AI provider:
+
+```dotenv
+LLM_API_KEY=your-api-key
+LLM_BASE_URL=https://api.mistral.ai/v1
+LLM_MODEL=mistral-small-latest
+```
+
+Build and start the application:
+
+```bash
 docker compose up --build -d
 docker compose ps
 ```
 
 Open:
 
-- Application: `http://localhost:8080`
-- API documentation: `http://localhost:8000/docs`
-- MinIO console: `http://localhost:9001`
+- App: http://localhost:8080
+- API docs: http://localhost:8000/docs
+- MinIO console: http://localhost:9001
 
-Create a real account from the registration screen, then sign in with those credentials.
-Google sign-in is optional; configure it as described below.
+The API automatically applies database migrations and seeds required data during startup.
 
-### Google sign-in
+## Google sign-in
 
-Create a Google OAuth 2.0 **Web application** client and add the local origins
-you use, normally `http://localhost:8080` and `http://localhost:3000`, to its
-authorized JavaScript origins. Put the same client ID in both settings:
+Google login is optional. Create a Google OAuth 2.0 **Web application** client and authorize these local JavaScript origins:
+
+```text
+http://localhost:8080
+http://localhost:3000
+```
+
+Use the same client ID for the frontend and backend:
 
 ```dotenv
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
-`GOOGLE_CLIENT_ID` is used by the API to validate token signature, issuer,
-audience and timestamps. `VITE_GOOGLE_CLIENT_ID` is embedded into the client
-image at build time, so rebuild the client after changing it:
+The frontend value is embedded at build time. Rebuild after changing it:
 
 ```bash
 docker compose up --build -d client nginx
 ```
 
-## Configuration
+The backend verifies Google’s signature, issuer, audience, timestamps, and verified-email claim. A small clock-skew tolerance prevents valid tokens from failing when Docker’s VM clock differs by a few seconds.
 
-All backend configuration is environment-based. `.env.example` documents:
+## AI configuration
 
-- application environment and CORS origins
-- PostgreSQL, Redis and MinIO connections
-- JWT secret and access/refresh lifetimes
-- LLM key, base URL, model and timeout
-- embedding provider, model and dimensions (hosted API by default)
-- upload, page, document, AI and request limits
-- OCR language and text-density threshold
-- registration, Google Identity Services and an optional bootstrap administrator account
+Hosted embeddings are enabled by default:
 
-The browser normally uses the same-origin `/api/v1` path through Nginx.
-The client Dockerfile accepts `VITE_API_URL` as a build argument when the API
-is hosted at a different public origin. The local Compose stack uses the
-default same-origin path.
-
-## Database migrations
-
-The API container upgrades automatically at startup. Manual commands:
-
-```bash
-docker compose exec api alembic current
-docker compose exec api alembic upgrade head
-docker compose exec api alembic downgrade -1
+```dotenv
+EMBEDDING_PROVIDER=api
+EMBEDDING_MODEL=mistral-embed
+EMBEDDING_DIMENSIONS=1024
 ```
 
-Create a migration during development:
+Local embeddings are also supported through `server/requirements-local-embeddings.txt` with `EMBEDDING_PROVIDER=local`.
 
-```bash
-docker compose exec api alembic revision --autogenerate -m "describe change"
-```
+Other limits, OCR settings, storage connections, registration controls, and optional administrator credentials are documented in [.env.example](.env.example).
 
-## Verification
+## Verify
 
-Backend tests:
+Backend:
 
 ```bash
 docker compose exec -T api python -m pytest -q
 ```
 
-Frontend lint, TypeScript/build, rendered checks, Vitest and Playwright (requires Node.js 22+):
+Frontend requires Node.js 22+:
 
 ```bash
 cd client
+npm ci
 npm run lint
 npm test
 npm run test:e2e
 ```
 
-Live stack workflows:
+Check the running stack:
 
 ```bash
-docker compose exec -T api python scripts/live_phase_three_smoke.py
-docker compose exec -T api python scripts/live_phase_four_smoke.py
-docker compose exec -T api python scripts/live_phase_five_smoke.py
-docker compose exec -T api python scripts/live_phase_six_smoke.py
+curl --fail http://localhost:8080/health
+docker compose ps
 ```
 
-These verify real ingestion/indexing, RAG citations, AI caching and structured
-outputs, transformations, protected downloads, real-account registration, document lifecycle,
-account changes, dashboard metrics and security headers.
+## Deployment
 
-## API documentation
+Use strong credentials, HTTPS, private backing services, and coordinated PostgreSQL/object-storage backups in production. See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment and rollback guidance.
 
-FastAPI serves interactive OpenAPI documentation at `/docs`. Route groups cover:
+## Current limitations
 
-- `/api/v1/auth` — registration, password/Google login, refresh, logout and current user
-- `/api/v1/documents` — upload, lifecycle, pages, jobs and private content
-- `/api/v1/conversations` — multi-document conversations and cited answers
-- `/api/v1/ai` — structured document intelligence and stored results
-- `/api/v1/pdf-tools` — generated artifacts and direct compatibility endpoints
-- `/api/v1/create` — DOCX, PDF and PowerPoint generation
-- `/api/v1/jobs` and `/api/v1/workflows` — durable operations, plans, polling and retries
-- `/api/v1/collections` and `/api/v1/workspace` — organization, resources and memory
-- `/api/v1/profile` and `/api/v1/admin` — account, usage and administration
-
-Errors use validated HTTP status codes. Unexpected production errors return:
-
-```json
-{
-  "error": {
-    "code": "INTERNAL_ERROR",
-    "message": "An unexpected error occurred.",
-    "details": {}
-  }
-}
-```
-
-## Security and reliability
-
-- Extension, MIME, signature, size, page-count and image validation
-- Owner checks on documents, chunks, conversations, AI results, jobs and artifacts
-- Argon2 password hashing and short-lived signed JWT access tokens
-- Hashed refresh tokens with rotation, revocation and account-status enforcement
-- Redis request limiting and configurable daily non-cached AI limits
-- Private MinIO objects and authenticated streaming downloads
-- Safe generated filenames, UUID keys and cleanup of staged temporary uploads
-- CORS, CSP, frame, referrer, content-type and permissions headers
-- Prompt-injection boundary instructions and Pydantic validation of model JSON
-- Structured JSON request/error logs with request IDs
-- Safe retry metadata and explicit retry endpoints for failed work
-
-This project demonstrates production-oriented design. It does not claim GDPR,
-ISO, legal, regulatory or enterprise security certification.
-
-## CI/CD
-
-GitHub Actions runs backend Ruff checks and pytest, frontend ESLint/build/tests,
-the Playwright Docker workflow, and API/worker/client image builds. Any failed
-quality gate fails CI. Deployment guidance is in [DEPLOYMENT.md](DEPLOYMENT.md).
-
-## Design decisions and limitations
-
-- The modular monolith keeps local development operable while preserving extraction boundaries.
-- Embeddings and answer/generation calls use the configured API by default. Local
-  embeddings require `server/requirements-local-embeddings.txt` and
-  `EMBEDDING_PROVIDER=local`.
-- Structured results are cached by owner, documents, feature and normalized parameters.
-- Binary multipart inputs are staged privately before background processing and removed afterward.
-- Translation returns text/Markdown rather than attempting full PDF layout preservation.
-- PDF-to-DOCX produces editable text and embedded images, but complex columns,
-  typography and positioned layouts can require manual cleanup.
-- The application intentionally excludes arbitrary existing-PDF text editing,
-  signature-request compliance, billing and mobile apps.
-- Additional OCR languages require installing the corresponding Tesseract language pack.
-
-## Future improvements
-
-Potential next steps for expanding the document platform include:
-
-- Dedicated worker queues and autoscaling policies per workload type
-- Cancellation and server-sent progress events for long-running jobs
-- S3/Azure implementations behind the storage contract
-- Hybrid lexical/vector retrieval and reranking
-- Organization workspaces, audit retention and configurable data lifecycle policies
+- Complex PDF-to-DOCX layouts may need manual cleanup.
+- Translation returns text or Markdown rather than preserving the original PDF layout.
+- Additional OCR languages require their matching Tesseract language packs.
+- The project does not claim regulatory or enterprise-security certification.
