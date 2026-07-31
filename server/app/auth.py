@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -17,6 +18,7 @@ from app.schemas import GoogleLoginRequest, LoginRequest, RefreshRequest, Regist
 from app.security import create_access_token, create_refresh_token, hash_password, hash_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 
 def verify_google_credential(credential: str, client_id: str) -> dict:
@@ -27,8 +29,14 @@ def verify_google_credential(credential: str, client_id: str) -> dict:
             credential,
             google_requests.Request(),
             client_id,
+            clock_skew_in_seconds=10,
         )
     except (ValueError, GoogleAuthError) as error:
+        logger.warning(
+            "google_credential_verification_failed: %s: %s",
+            type(error).__name__,
+            error,
+        )
         raise HTTPException(status_code=401, detail="Invalid Google credential") from error
     if not claims.get("sub") or not claims.get("email") or claims.get("email_verified") is not True:
         raise HTTPException(status_code=401, detail="Google account email is not verified")

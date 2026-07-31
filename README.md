@@ -5,15 +5,13 @@ comparing, organizing, and transforming PDF documents. It combines asynchronous
 document processing, retrieval-augmented generation, OCR, private object storage,
 structured AI outputs, and practical PDF tools in one Docker Compose application.
 
-![InsightPDF dashboard](docs/screenshots/dashboard.png)
-
 ## Features
 
 - Versioned document-tool registry and natural-language, review-before-run workflow plans
 - PDF compression presets and configurable page numbering with deterministic output verification
-- Registration, login, rotating hashed refresh tokens, logout, profile and password management
+- Registration, email/password and Google login, rotating hashed refresh tokens, logout, profile and password management
 - Owner-isolated PDF upload, rename, search, filtering, deletion and authenticated downloads
-- Asynchronous PyMuPDF extraction, Tesseract OCR fallback, chunking and local embeddings
+- Asynchronous PyMuPDF extraction, Tesseract OCR fallback, chunking and hosted embeddings
 - PostgreSQL/pgvector retrieval across one or more selected documents
 - Conversational RAG with stored conversations, follow-ups, snippets and clickable page citations
 - Cached short/detailed summaries, key points, action items, quizzes and translations
@@ -39,7 +37,7 @@ Nginx :8080
                         |-- MinIO through a replaceable storage interface
                         |-- Redis rate limits and Celery broker/backend
                         |-- Celery ingestion and operation workers
-                        `-- OpenAI-compatible LLM API
+                        `-- Mistral/OpenAI-compatible embedding and generation API
 ```
 
 The application is a modular monolith: HTTP routes, schemas, persistence,
@@ -53,24 +51,28 @@ separate modules while sharing one deployment boundary. See
 - **Celery and Redis** keep OCR, indexing, AI generation and transformations outside request workers.
 - **PostgreSQL and pgvector** keep relational ownership data and vector retrieval in one transactional store.
 - **MinIO** gives the local and portfolio deployments private S3-compatible object storage.
-- **Sentence Transformers** generates embeddings locally without a paid embedding API.
+- **Hosted embeddings** use the configured OpenAI-compatible API by default; an optional
+  Sentence Transformers dependency file supports local embeddings.
 - **Tesseract** handles scanned pages only when native text is below the configured threshold.
 - **RAG** grounds model responses in owner-authorized document chunks and preserves page citations.
 - **PDF.js** renders private authenticated PDFs without exposing object-storage URLs.
 
 ## Stack
 
-React 19, TypeScript, Vite, Tailwind CSS, PDF.js, Vitest, Playwright,
+React 19, TypeScript, Vite, Tailwind CSS, PDF.js, Google Identity Services,
+Vitest, Playwright,
 FastAPI, Pydantic, SQLAlchemy 2, Alembic, PostgreSQL 16, pgvector, Celery,
-Redis, MinIO, Sentence Transformers, PyMuPDF, pypdf, Pillow, Tesseract and Nginx.
+Redis, MinIO, PyMuPDF, pypdf, Pillow, Tesseract, LibreOffice and Nginx.
 
 ## Quick start
 
-Requirements: Docker Desktop with Docker Compose.
+Requirements: Docker Desktop with Docker Compose. Node.js 22+ is required only
+for running frontend tooling directly on the host.
 
 ```bash
 cp .env.example .env
-# Replace JWT_SECRET and storage/database credentials.
+# PowerShell equivalent: Copy-Item .env.example .env
+# Replace JWT_SECRET.
 # Set LLM_API_KEY, LLM_BASE_URL and LLM_MODEL.
 docker compose up --build -d
 docker compose ps
@@ -83,6 +85,26 @@ Open:
 - MinIO console: `http://localhost:9001`
 
 Create a real account from the registration screen, then sign in with those credentials.
+Google sign-in is optional; configure it as described below.
+
+### Google sign-in
+
+Create a Google OAuth 2.0 **Web application** client and add the local origins
+you use, normally `http://localhost:8080` and `http://localhost:3000`, to its
+authorized JavaScript origins. Put the same client ID in both settings:
+
+```dotenv
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+```
+
+`GOOGLE_CLIENT_ID` is used by the API to validate token signature, issuer,
+audience and timestamps. `VITE_GOOGLE_CLIENT_ID` is embedded into the client
+image at build time, so rebuild the client after changing it:
+
+```bash
+docker compose up --build -d client nginx
+```
 
 ## Configuration
 
@@ -92,14 +114,15 @@ All backend configuration is environment-based. `.env.example` documents:
 - PostgreSQL, Redis and MinIO connections
 - JWT secret and access/refresh lifetimes
 - LLM key, base URL, model and timeout
-- local embedding model and dimensions
+- embedding provider, model and dimensions (hosted API by default)
 - upload, page, document, AI and request limits
 - OCR language and text-density threshold
-- registration and an optional bootstrap administrator account
+- registration, Google Identity Services and an optional bootstrap administrator account
 
 The browser normally uses the same-origin `/api/v1` path through Nginx.
-Set `VITE_API_URL` at client build time only when the API is hosted at a
-different public origin.
+The client Dockerfile accepts `VITE_API_URL` as a build argument when the API
+is hosted at a different public origin. The local Compose stack uses the
+default same-origin path.
 
 ## Database migrations
 
@@ -125,7 +148,7 @@ Backend tests:
 docker compose exec -T api python -m pytest -q
 ```
 
-Frontend lint, build, rendered checks and Vitest:
+Frontend lint, TypeScript/build, rendered checks, Vitest and Playwright (requires Node.js 22+):
 
 ```bash
 cd client
@@ -151,12 +174,14 @@ account changes, dashboard metrics and security headers.
 
 FastAPI serves interactive OpenAPI documentation at `/docs`. Route groups cover:
 
-- `/api/v1/auth` — registration, login, refresh, logout and current user
+- `/api/v1/auth` — registration, password/Google login, refresh, logout and current user
 - `/api/v1/documents` — upload, lifecycle, pages, jobs and private content
 - `/api/v1/conversations` — multi-document conversations and cited answers
 - `/api/v1/ai` — structured document intelligence and stored results
 - `/api/v1/pdf-tools` — generated artifacts and direct compatibility endpoints
-- `/api/v1/jobs` — durable operation submission, polling and retries
+- `/api/v1/create` — DOCX, PDF and PowerPoint generation
+- `/api/v1/jobs` and `/api/v1/workflows` — durable operations, plans, polling and retries
+- `/api/v1/collections` and `/api/v1/workspace` — organization, resources and memory
 - `/api/v1/profile` and `/api/v1/admin` — account, usage and administration
 
 Errors use validated HTTP status codes. Unexpected production errors return:
@@ -197,7 +222,9 @@ quality gate fails CI. Deployment guidance is in [DEPLOYMENT.md](DEPLOYMENT.md).
 ## Design decisions and limitations
 
 - The modular monolith keeps local development operable while preserving extraction boundaries.
-- Embeddings are local; only answer/generation calls require the configured LLM.
+- Embeddings and answer/generation calls use the configured API by default. Local
+  embeddings require `server/requirements-local-embeddings.txt` and
+  `EMBEDDING_PROVIDER=local`.
 - Structured results are cached by owner, documents, feature and normalized parameters.
 - Binary multipart inputs are staged privately before background processing and removed afterward.
 - Translation returns text/Markdown rather than attempting full PDF layout preservation.
@@ -209,11 +236,7 @@ quality gate fails CI. Deployment guidance is in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Future improvements
 
-The complete product plan is documented in the
-[Version 2 roadmap](docs/VERSION_2_ROADMAP.md). It expands InsightPDF into an AI
-document copilot that can inspect files, plan and verify multi-tool workflows,
-and drive a general document platform with compression, editing, conversion,
-redaction, forms, signing, batch automation, and sharing.
+Potential next steps for expanding the document platform include:
 
 - Dedicated worker queues and autoscaling policies per workload type
 - Cancellation and server-sent progress events for long-running jobs
