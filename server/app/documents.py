@@ -1,5 +1,7 @@
 import re
+import hashlib
 import tempfile
+import textwrap
 import uuid
 import zipfile
 from datetime import UTC, datetime
@@ -7,6 +9,7 @@ from datetime import UTC, datetime
 import fitz
 from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
+from pptx import Presentation
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -17,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
+from app.document_conversions import docx_to_markdown, validate_docx
 from app.models import Document, DocumentPage, DocumentStatus, GeneratedArtifact, JobStatus, ProcessingJob, User
 from app.schemas import DocumentArchiveRequest, DocumentPageResponse, DocumentRenameRequest, DocumentResponse, ProcessingJobResponse
 from app.storage import ObjectStorage
@@ -33,6 +37,75 @@ def safe_filename(name: str) -> str:
 IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 MAX_IMAGE_PIXELS = 40_000_000
+TEXT_CONTENT_TYPES = {"text/plain", "text/markdown", "text/rtf", "application/rtf"}
+DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+PPTX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+
+def text_to_pdf(text: str, title: str) -> bytes:
+    """Create a readable normalized derivative without claiming native-format fidelity."""
+    cleaned = text.replace("\x00", "").strip()
+    if not cleaned:
+        raise ValueError("The document does not contain readable text")
+    pdf = fitz.open()
+    try:
+        lines: list[str] = []
+        for raw_line in cleaned.splitlines():
+            if not raw_line.strip():
+                lines.append("")
+                continue
+            lines.extend(textwrap.wrap(
+                raw_line,
+                width=88,
+                replace_whitespace=False,
+                drop_whitespace=True,
+                break_long_words=True,
+                break_on_hyphens=False,
+            ) or [""])
+        lines_per_page = 42
+        for offset in range(0, len(lines), lines_per_page):
+            page = pdf.new_page(width=595, height=842)
+            if offset == 0:
+                page.insert_textbox(fitz.Rect(52, 42, 543, 78), title, fontsize=16, fontname="helv", color=(0.08, 0.12, 0.24))
+            top = 92 if offset == 0 else 52
+            page.insert_textbox(
+                fitz.Rect(52, top, 543, 790),
+                "\n".join(lines[offset:offset + lines_per_page]),
+                fontsize=10,
+                fontname="helv",
+                lineheight=1.35,
+                color=(0.12, 0.15, 0.22),
+            )
+        return pdf.tobytes(garbage=4, deflate=True)
+    finally:
+        pdf.close()
+
+
+def source_to_pdf(data: bytes, suffix: str, title: str) -> bytes:
+    if suffix == "docx":
+        validate_docx(data)
+        return text_to_pdf(docx_to_markdown(data).decode("utf-8"), title)
+    if suffix == "pptx":
+        try:
+            presentation = Presentation(BytesIO(data))
+        except Exception as exc:
+            raise ValueError("The uploaded file is not a valid PPTX presentation") from exc
+        slides: list[str] = []
+        for index, slide in enumerate(presentation.slides, start=1):
+            values = [shape.text.strip() for shape in slide.shapes if hasattr(shape, "text") and shape.text.strip()]
+            slides.append(f"Slide {index}\n" + "\n".join(values))
+        return text_to_pdf("\n\n".join(slides), title)
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            text = data.decode("cp1252")
+        except UnicodeDecodeError as exc:
+            raise ValueError("The text encoding is not supported") from exc
+    if suffix == "rtf":
+        text = re.sub(r"\\'[0-9a-fA-F]{2}", " ", text)
+        text = re.sub(r"\\[a-zA-Z]+-?\d* ?|[{}]", "", text)
+    return text_to_pdf(text, title)
 
 
 def image_to_pdf(data: bytes) -> bytes:
@@ -185,6 +258,11 @@ async def delete_document(
         ObjectStorage().remove(document.object_key)
     except Exception:
         pass
+    if document.original_object_key:
+        try:
+            ObjectStorage().remove(document.original_object_key)
+        except Exception:
+            pass
     await session.delete(document)
     await session.commit()
     return Response(status_code=204)
@@ -228,6 +306,24 @@ async def download_document(
     data = ObjectStorage().download(document.object_key)
     disposition = f'inline; filename="{safe_filename(document.filename)}"'
     return StreamingResponse(BytesIO(data), media_type="application/pdf", headers={"Content-Disposition": disposition})
+
+
+@router.get("/{document_id}/original")
+async def download_original_document(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    document = await owned_document(document_id, user, session)
+    key = document.original_object_key or document.object_key
+    filename = document.original_filename or document.filename
+    content_type = document.original_content_type or document.content_type
+    data = ObjectStorage().download(key)
+    return StreamingResponse(
+        BytesIO(data),
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename(filename)}"'},
+    )
 
 
 @router.get("/{document_id}/thumbnail")
@@ -279,15 +375,33 @@ async def upload_document(
     suffix = original_filename.lower().rsplit(".", 1)[-1] if "." in original_filename else ""
     is_pdf = suffix == "pdf" and file.content_type == "application/pdf"
     is_image = suffix in {"png", "jpg", "jpeg", "webp"} and file.content_type in IMAGE_CONTENT_TYPES
-    if not is_pdf and not is_image:
-        raise HTTPException(status_code=415, detail="Only PDF, PNG, JPEG, and WebP files are accepted")
+    generic_upload_types = {None, "", "application/octet-stream", "application/zip"}
+    is_docx = suffix == "docx" and file.content_type in {DOCX_CONTENT_TYPE, *generic_upload_types}
+    is_pptx = suffix == "pptx" and file.content_type in {PPTX_CONTENT_TYPE, *generic_upload_types}
+    is_text = suffix in {"txt", "md", "markdown", "rtf"} and file.content_type in {*TEXT_CONTENT_TYPES, *generic_upload_types}
+    if not is_pdf and not is_image and not is_docx and not is_pptx and not is_text:
+        raise HTTPException(status_code=415, detail="Supported sources are PDF, DOCX, PPTX, Markdown, text, RTF, PNG, JPEG, and WebP")
     data = await file.read(settings.max_file_size_mb * 1024 * 1024 + 1)
     if len(data) > settings.max_file_size_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_file_size_mb} MB")
     if is_pdf and not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=422, detail="The file is not a valid PDF")
+    source_sha256 = hashlib.sha256(data).hexdigest()
+    duplicate = await session.scalar(select(Document).where(
+        Document.owner_id == user.id, Document.source_sha256 == source_sha256
+    ))
+    if duplicate is not None:
+        raise HTTPException(status_code=409, detail={"message": "This source is already in your workspace", "document_id": str(duplicate.id)})
+    from app.deliverables import activity, ensure_personal_workspace
+
+    # Resolve the required workspace before adding the document to the session.
+    # ensure_personal_workspace performs a query (and may flush), so calling it
+    # after session.add(document) can attempt to insert a document whose
+    # workspace_id has not been assigned yet.
+    workspace = await ensure_personal_workspace(user, session)
     display_title = None
     filename = original_filename
+    original_data = data
     if is_image:
         try:
             data = await run_in_threadpool(image_to_pdf, data)
@@ -295,23 +409,48 @@ async def upload_document(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         filename = f"{original_filename.rsplit('.', 1)[0]}.pdf"
         display_title = original_filename
+    elif not is_pdf:
+        try:
+            data = await run_in_threadpool(source_to_pdf, data, suffix, original_filename)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        filename = f"{original_filename.rsplit('.', 1)[0]}.pdf"
+        display_title = original_filename
     document_id = uuid.uuid4()
     object_key = f"{user.id}/{document_id}/{filename}"
+    original_object_key = None if is_pdf else f"{user.id}/{document_id}/original/{original_filename}"
     storage = ObjectStorage()
     try:
         storage.upload_pdf(object_key, data)
+        if original_object_key:
+            storage.upload(original_object_key, original_data, file.content_type or "application/octet-stream")
     except Exception as exc:
+        try:
+            storage.remove(object_key)
+        except Exception:
+            pass
+        if original_object_key:
+            try:
+                storage.remove(original_object_key)
+            except Exception:
+                pass
         raise HTTPException(status_code=503, detail="Document storage is temporarily unavailable") from exc
     document = Document(
         id=document_id,
         owner_id=user.id,
+        workspace_id=workspace.id,
         filename=filename,
         object_key=object_key,
         content_type="application/pdf",
         size_bytes=len(data),
         display_title=display_title,
+        original_filename=original_filename if original_object_key else None,
+        original_object_key=original_object_key,
+        original_content_type=file.content_type if original_object_key else None,
+        source_sha256=source_sha256,
     )
     session.add(document)
+    await activity(session, workspace.id, user.id, "source.uploaded", "document", document.id, {"title": display_title or filename})
     job = ProcessingJob(
         document_id=document_id,
         owner_id=user.id,
@@ -355,6 +494,9 @@ async def retry_document(
     document.status = DocumentStatus.UPLOADED
     document.error_message = None
     session.add(job)
+    from app.deliverables import activity, ensure_personal_workspace
+    workspace = await ensure_personal_workspace(user, session)
+    await activity(session, workspace.id, user.id, "source.processing_retried", "document", document.id, {"title": document.display_title or document.filename})
     await session.commit()
     await session.refresh(job)
     from app.tasks import process_document

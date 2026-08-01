@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -58,6 +59,28 @@ async def get_job(
     )
     if job is None:
         raise HTTPException(status_code=404, detail="Background job not found")
+    return job
+
+
+@router.post("/status/{job_id}/cancel", response_model=ProcessingJobResponse)
+async def cancel_job(
+    job_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProcessingJob:
+    job = await get_job(job_id, user, session)
+    if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
+        if job.status == JobStatus.CANCELLED:
+            return job
+        raise HTTPException(status_code=409, detail="This job has already finished")
+    job.status = JobStatus.CANCELLED
+    job.error_message = "Cancelled by user"
+    job.completed_at = datetime.now(timezone.utc)
+    await session.commit()
+    if job.task_id:
+        from app.celery_app import celery_app
+        celery_app.control.revoke(job.task_id, terminate=True, signal="SIGTERM")
+    await session.refresh(job)
     return job
 
 
@@ -264,7 +287,7 @@ async def retry_job(
     failed = await get_job(job_id, user, session)
     if failed.status != JobStatus.FAILED or failed.operation == "document_processing":
         raise HTTPException(status_code=409, detail="Only failed operation jobs can be retried here")
-    if failed.operation in {"docx_to_pdf", "docx_to_markdown"}:
+    if failed.operation in {"docx_to_pdf", "docx_to_markdown", "ai_create"}:
         return await create_job_without_documents(
             failed.operation,
             failed.parameters,

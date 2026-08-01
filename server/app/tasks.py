@@ -106,6 +106,11 @@ async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
         job.status = JobStatus.COMPLETED
         job.progress = 100
         job.completed_at = datetime.now(timezone.utc)
+        user = await session.get(User, document.owner_id)
+        if user is not None:
+            from app.deliverables import activity, ensure_personal_workspace
+            workspace = await ensure_personal_workspace(user, session)
+            await activity(session, workspace.id, user.id, "source.ready", "document", document.id, {"title": document.display_title or document.filename, "page_count": document.page_count})
         await session.commit()
 
 
@@ -131,6 +136,11 @@ async def _fail(document_id: uuid.UUID, message: str, retries: int) -> None:
         if document:
             document.status = DocumentStatus.FAILED
             document.error_message = message[:2000]
+            user = await session.get(User, document.owner_id)
+            if user is not None:
+                from app.deliverables import activity, ensure_personal_workspace
+                workspace = await ensure_personal_workspace(user, session)
+                await activity(session, workspace.id, user.id, "source.failed", "document", document.id, {"title": document.display_title or document.filename, "error": message[:300]})
         if job:
             job.status = JobStatus.FAILED
             job.error_message = message[:2000]
@@ -180,6 +190,8 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         job = await session.get(ProcessingJob, job_id)
         if job is None or job.owner_id is None:
             raise ValueError("Operation job no longer exists")
+        if job.status == JobStatus.CANCELLED:
+            return
         user = await session.get(User, job.owner_id)
         if user is None or not user.is_active:
             raise ValueError("Job owner no longer exists or is disabled")
@@ -229,7 +241,11 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         )
 
         document_id = parameters.pop("document_id", None)
-        if operation == "summary":
+        if operation == "ai_create":
+            from app.generation import CreateRequest, create_file
+            result = await create_file(CreateRequest.model_validate(parameters["request"]), user, session)
+            result_kind = "artifact"
+        elif operation == "summary":
             result = await summarize(uuid.UUID(document_id), SummaryRequest(**parameters), user, session)
             result_kind = "ai_result"
         elif operation == "quiz":
@@ -513,6 +529,8 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             raise ValueError(f"Unsupported operation: {operation}")
 
         await session.refresh(job)
+        if job.status == JobStatus.CANCELLED:
+            return
         workflow = await session.scalar(select(WorkflowRun).where(WorkflowRun.job_id == job.id))
         if workflow and result_kind == "ai_result":
             payload = result.result

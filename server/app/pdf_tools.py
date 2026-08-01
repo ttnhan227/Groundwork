@@ -224,8 +224,10 @@ async def _store(
         ObjectStorage().upload(key, data, content_type)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Generated-file storage is temporarily unavailable") from exc
+    from app.deliverables import ensure_personal_workspace
+    workspace = await ensure_personal_workspace(user, session)
     artifact = GeneratedArtifact(
-        id=identifier, owner_id=user.id, operation=operation, filename=filename,
+        id=identifier, owner_id=user.id, workspace_id=workspace.id, operation=operation, filename=filename,
         object_key=key, content_type=content_type, size_bytes=len(data), parameters=parameters,
     )
     session.add(artifact)
@@ -410,6 +412,7 @@ async def index_artifact(
     document = Document(
         id=document_id,
         owner_id=user.id,
+        workspace_id=artifact.workspace_id,
         filename=safe_filename(filename),
         object_key=object_key,
         content_type="application/pdf",

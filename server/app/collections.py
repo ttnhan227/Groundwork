@@ -48,7 +48,9 @@ async def create_collection(
     )
     if existing:
         raise HTTPException(status_code=409, detail="A collection with this name already exists")
-    collection = Collection(owner_id=user.id, name=payload.name.strip(), color=payload.color)
+    from app.deliverables import ensure_personal_workspace
+    workspace = await ensure_personal_workspace(user, session)
+    collection = Collection(owner_id=user.id, workspace_id=workspace.id, name=payload.name.strip(), color=payload.color)
     session.add(collection)
     await session.commit()
     await session.refresh(collection)

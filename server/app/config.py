@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     vision_model: str = "mistral-small-latest"
     vision_max_pages: int = 6
     llm_timeout_seconds: int = 60
-    ai_daily_request_limit: int = 10
-    ai_global_daily_request_limit: int = 100
+    ai_daily_request_limit: int = 50
+    ai_global_daily_request_limit: int = 500
     request_rate_limit_per_minute: int = 120
     registration_rate_limit_per_hour: int = 5
     ai_rate_limit_per_minute: int = 10

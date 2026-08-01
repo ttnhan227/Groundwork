@@ -13,6 +13,7 @@ from app.schemas import (
     PasswordChangeRequest,
     ProfileUpdateRequest,
     UserResponse,
+    UserPreferences,
     UserStatsResponse,
     UserStatusRequest,
 )
@@ -43,6 +44,22 @@ async def update_profile(payload: ProfileUpdateRequest, user: User = Depends(cur
     await session.commit()
     await session.refresh(user)
     return user
+
+
+@router.get("/profile/preferences", response_model=UserPreferences)
+async def get_preferences(user: User = Depends(current_user)) -> UserPreferences:
+    return UserPreferences.model_validate(user.preferences or {})
+
+
+@router.put("/profile/preferences", response_model=UserPreferences)
+async def update_preferences(
+    payload: UserPreferences,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserPreferences:
+    user.preferences = payload.model_dump()
+    await session.commit()
+    return payload
 
 
 @router.post("/profile/password", status_code=204)

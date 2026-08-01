@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 from functools import lru_cache
-import json
 import math
 import re
 from typing import AsyncIterator, TypeVar
 
-import httpx
-
+from app.ai_orchestration import ai_orchestrator
 from app.config import get_settings
 
 
@@ -166,30 +164,12 @@ def _normalize_embedding(vector: list[float], dimensions: int) -> list[float]:
     return [value / magnitude for value in fitted] if magnitude else fitted
 
 
-def _embedding_payload(texts: list[str]) -> dict:
-    settings = get_settings()
-    return {"model": settings.embedding_model, "input": texts}
-
-
 def _api_embeddings(texts: list[str]) -> list[list[float]]:
     settings = get_settings()
-    if not settings.llm_api_key:
-        raise RuntimeError("LLM_API_KEY is not configured")
-    vectors: list[list[float]] = []
-    with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
-        for start in range(0, len(texts), 64):
-            response = client.post(
-                f"{settings.llm_base_url.rstrip('/')}/embeddings",
-                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-                json=_embedding_payload(texts[start:start + 64]),
-            )
-            response.raise_for_status()
-            items = sorted(response.json()["data"], key=lambda item: item["index"])
-            vectors.extend(
-                _normalize_embedding(item["embedding"], settings.embedding_dimensions)
-                for item in items
-            )
-    return vectors
+    return [
+        _normalize_embedding(vector, settings.embedding_dimensions)
+        for vector in ai_orchestrator.embeddings_sync(texts, operation="document_indexing")
+    ]
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
@@ -213,23 +193,8 @@ async def embed_texts_async(texts: list[str]) -> list[list[float]]:
     settings = get_settings()
     if settings.embedding_provider != "api":
         return embed_texts(texts)
-    if not settings.llm_api_key:
-        raise RuntimeError("LLM_API_KEY is not configured")
-    vectors: list[list[float]] = []
-    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-        for start in range(0, len(texts), 64):
-            response = await client.post(
-                f"{settings.llm_base_url.rstrip('/')}/embeddings",
-                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-                json=_embedding_payload(texts[start:start + 64]),
-            )
-            response.raise_for_status()
-            items = sorted(response.json()["data"], key=lambda item: item["index"])
-            vectors.extend(
-                _normalize_embedding(item["embedding"], settings.embedding_dimensions)
-                for item in items
-            )
-    return vectors
+    vectors = await ai_orchestrator.embeddings(texts, operation="document_retrieval")
+    return [_normalize_embedding(vector, settings.embedding_dimensions) for vector in vectors]
 
 
 def requires_visual_answer(question: str) -> bool:
@@ -250,8 +215,6 @@ async def generate_visual_answer(
     history: list[tuple[str, str]],
 ) -> str:
     settings = get_settings()
-    if not settings.llm_api_key:
-        raise RuntimeError("LLM_API_KEY is not configured")
     content: list[dict] = [{
         "type": "text",
         "text": (
@@ -280,20 +243,13 @@ async def generate_visual_answer(
         ],
         {"role": "user", "content": content},
     ]
-    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-        response = await client.post(
-            f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-            json={"model": settings.vision_model, "temperature": 0.1, "messages": messages},
-        )
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+    return await ai_orchestrator.complete(
+        messages, operation="visual_document_answer", model=settings.vision_model
+    )
 
 
 async def generate_answer(question: str, context: list[str], history: list[tuple[str, str]]) -> str:
     settings = get_settings()
-    if not settings.llm_api_key:
-        raise RuntimeError("LLM_API_KEY is not configured")
     sources = "\n\n".join(f"[Source {index + 1}]\n{text}" for index, text in enumerate(context))
     messages = [
         {
@@ -318,14 +274,9 @@ async def generate_answer(question: str, context: list[str], history: list[tuple
         ],
         {"role": "user", "content": f"PDF sources:\n{sources}\n\nQuestion: {question}"},
     ]
-    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-        response = await client.post(
-            f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-            json={"model": settings.llm_model, "messages": messages, "temperature": 0.1},
-        )
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+    return await ai_orchestrator.complete(
+        messages, operation="grounded_document_answer", model=settings.llm_model
+    )
 
 
 def _text_answer_messages(
@@ -403,27 +354,10 @@ def _general_answer_messages(
 
 
 async def _stream_completion(messages: list[dict], model: str) -> AsyncIterator[str]:
-    settings = get_settings()
-    if not settings.llm_api_key:
-        raise RuntimeError("LLM_API_KEY is not configured")
-    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-        async with client.stream(
-            "POST",
-            f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-            json={"model": model, "messages": messages, "temperature": 0.1, "stream": True},
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if not line.startswith("data:"):
-                    continue
-                payload = line[5:].strip()
-                if not payload or payload == "[DONE]":
-                    continue
-                event = json.loads(payload)
-                content = event.get("choices", [{}])[0].get("delta", {}).get("content")
-                if isinstance(content, str) and content:
-                    yield content
+    async for token in ai_orchestrator.stream(
+        messages, operation="streaming_assistant_answer", model=model
+    ):
+        yield token
 
 
 async def stream_answer(

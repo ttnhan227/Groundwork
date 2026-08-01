@@ -33,7 +33,7 @@ test("includes Phase 3 chat and citation navigation", async () => {
   assert.match(page, /Rename conversation/);
   assert.match(page, /Delete conversation/);
   assert.match(page, /setActiveConversation\(conversation\)/);
-  assert.match(page, /Chat history/);
+  assert.match(page, /Research history/);
   assert.doesNotMatch(page, /historyDocumentFilter/);
   assert.doesNotMatch(page, /> Conversations<\/button>/);
   assert.match(page, /Workspace chat history/);
@@ -50,7 +50,8 @@ test("includes Phase 3 chat and citation navigation", async () => {
   assert.match(page, /AUTH_REFRESHED_EVENT/);
   assert.match(page, /authenticatedFetch/);
   assert.match(page, /\/auth\/refresh/);
-  assert.match(page, /saved\.access_token !== token/);
+  assert.match(page, /tokenExpiresSoon/);
+  assert.match(page, /savedBeforeRequest\.access_token !== token/);
   assert.match(css, /\.chat-panel/);
   assert.match(css, /\.history-panel/);
   assert.match(css, /\.viewer-sidebar/);
@@ -116,7 +117,7 @@ test("includes the Version 2.5 AI-first workspace experience", async () => {
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   for (const value of [
-    "Drop a PDF or image here to begin",
+    "Drop source material here to begin",
     "starterPrompts",
     "followUpPrompts",
     "Export conversation",
@@ -124,13 +125,59 @@ test("includes the Version 2.5 AI-first workspace experience", async () => {
     "/collections",
     "Recent activity",
     "Message InsightPDF AI",
-    "Keyboard shortcuts",
+    "Search workspace",
   ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(css, /\.ai-upload-dropzone/);
   assert.match(css, /\.collection-bar/);
   assert.doesNotMatch(css, /\[data-theme="dark"\]/);
   assert.doesNotMatch(page, /Toggle dark mode/);
   assert.match(css, /prefers-reduced-motion/);
+});
+
+test("centers the product on a source-to-deliverable workflow", async () => {
+  const [page, css] = await Promise.all([
+    readSourceTree(),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  for (const label of [
+    "Research brief workspace",
+    "Add source",
+    "Source library",
+    "Research sources",
+    "Deliverables",
+    "Collect",
+    "Understand",
+    "Review & ship",
+    "Recommended next step",
+  ]) assert.match(page, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(page, /hubView === "overview"/);
+  assert.match(page, /hubView === "research"/);
+  assert.match(page, /className="hub-new-chat"[\s\S]*Add source/);
+  assert.match(css, /\.workflow-overview/);
+  assert.match(css, /\.workflow-stages/);
+  assert.match(css, /\.source-readiness/);
+});
+
+test("implements native editing, review, search, and activity modules", async () => {
+  const [page, css] = await Promise.all([
+    readSourceTree(),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  for (const value of [
+    "/workspaces",
+    "/native-documents/",
+    "Create reviewable revision",
+    "Immutable history",
+    "Search the complete workspace",
+    "Activity timeline",
+    "Download original",
+    "Reload latest",
+  ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(page, /currentRevision/);
+  assert.match(page, /setTimeout\(\(\) => \{ save\(\)/);
+  assert.match(css, /\.native-editor/);
+  assert.match(css, /\.workspace-search-results/);
+  assert.match(css, /\.suggestion-card/);
 });
 
 test("streams chat tokens and highlights cited PDF text", async () => {
@@ -148,4 +195,44 @@ test("streams chat tokens and highlights cited PDF text", async () => {
   assert.match(page, /initialSearch=\{viewerSearch\}/);
   assert.match(css, /\.pdf-highlight-layer mark/);
   assert.match(css, /citation-pulse/);
+});
+
+test("implements the durable context-aware generation workflow", async () => {
+  const [page, css] = await Promise.all([
+    readSourceTree(),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  for (const value of [
+    "/create/jobs",
+    "Cancel generation",
+    "conversation_id: conversation?.id",
+    "CommandPalette",
+    "Workspace preferences",
+    "Undo (Ctrl/Cmd+Z)",
+  ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(page, /LegacyDesignStudio/);
+  assert.match(css, /\.command-palette/);
+  assert.match(css, /data-reduced-motion/);
+});
+
+test("guides a new user to a strictly verified export", async () => {
+  const [page, css] = await Promise.all([
+    readSourceTree(),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  for (const value of [
+    "Try the 2-minute demo",
+    "Ready-to-send workflow",
+    "Extract requirements",
+    "Draft complete report",
+    "Improve one section",
+    "Export is locked",
+    "Before and current",
+    "Open highlighted source",
+  ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(page, /include_audit=/);
+  assert.match(css, /\.first-run-welcome/);
+  assert.match(css, /\.readiness-guide/);
+  assert.match(css, /\.evidence-snippet/);
+  assert.match(css, /\.version-comparison/);
 });

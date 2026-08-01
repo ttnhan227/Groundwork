@@ -115,7 +115,9 @@ async def upsert_memory(
         )
     )
     if memory is None:
-        memory = WorkspaceMemory(owner_id=user.id, key=clean_key, value=payload.value)
+        from app.deliverables import ensure_personal_workspace
+        workspace = await ensure_personal_workspace(user, session)
+        memory = WorkspaceMemory(owner_id=user.id, workspace_id=workspace.id, key=clean_key, value=payload.value)
         session.add(memory)
     else:
         memory.value = payload.value

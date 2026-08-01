@@ -4,13 +4,13 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.chat import owned_conversation
+from app.ai_orchestration import AIProviderError, ai_orchestrator
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
@@ -264,29 +264,18 @@ async def plan_command(
         "fewest steps and do not invent missing page numbers or target languages."
     )
     try:
-        async with httpx.AsyncClient(
-            timeout=settings.llm_timeout_seconds,
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-        ) as client:
-            response = await client.post(
-                f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-                json={
-                    "model": settings.llm_model,
-                    "temperature": 0,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": json.dumps({
-                            "command": command,
-                            "document_ids": [str(item) for item in document_ids],
-                            "catalog": catalog,
-                        })},
-                    ],
-                },
-            )
-            response.raise_for_status()
-            raw = response.json()["choices"][0]["message"]["content"]
-        proposal = json.loads(raw)
+        proposal = await ai_orchestrator.complete_json(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps({
+                    "command": command,
+                    "document_ids": [str(item) for item in document_ids],
+                    "catalog": catalog,
+                })},
+            ],
+            operation="workflow_planning",
+            temperature=0,
+        )
         proposed_steps = proposal.get("steps", [])
         if not isinstance(proposed_steps, list) or not 1 <= len(proposed_steps) <= 8:
             raise ValueError("Planner returned an invalid step count")
@@ -324,7 +313,7 @@ async def plan_command(
         if len(steps) > 1 and any(step.tool in non_chainable for step in steps):
             raise ValueError("Planner proposed a currently unsupported mixed workflow")
         return steps, f"llm:{settings.llm_model}"
-    except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+    except (AIProviderError, KeyError, TypeError, ValueError, json.JSONDecodeError):
         return build_plan_for_documents(command, document_ids), "rules-v2-fallback"
 
 

@@ -31,32 +31,15 @@ def test_chunking_rejects_invalid_overlap() -> None:
 
 
 def test_hosted_embeddings_are_batched_sorted_and_normalized() -> None:
-    response = MagicMock()
-    response.raise_for_status.return_value = None
-    response.json.return_value = {
-        "data": [
-            {"index": 1, "embedding": [0.0, 2.0]},
-            {"index": 0, "embedding": [3.0, 4.0]},
-        ]
-    }
-    client = MagicMock()
-    client.__enter__.return_value.post.return_value = response
     with (
         patch("app.rag.get_settings") as settings,
-        patch("app.rag.httpx.Client", return_value=client),
+        patch("app.rag.ai_orchestrator.embeddings_sync", return_value=[[3.0, 4.0], [0.0, 2.0]]) as embeddings,
     ):
         settings.return_value.embedding_provider = "api"
-        settings.return_value.embedding_model = "mistral-embed"
         settings.return_value.embedding_dimensions = 3
-        settings.return_value.llm_api_key = "test"
-        settings.return_value.llm_base_url = "https://api.example/v1"
-        settings.return_value.llm_timeout_seconds = 10
         vectors = embed_texts(["first", "second"])
     assert vectors == [[0.6, 0.8, 0.0], [0.0, 1.0, 0.0]]
-    assert client.__enter__.return_value.post.call_args.kwargs["json"] == {
-        "model": "mistral-embed",
-        "input": ["first", "second"],
-    }
+    embeddings.assert_called_once_with(["first", "second"], operation="document_indexing")
 
 
 def test_citations_use_referenced_sources_and_collapse_duplicate_pages() -> None:
@@ -125,22 +108,15 @@ def test_source_says_phrase_is_rewritten_as_document_language() -> None:
 
 @pytest.mark.asyncio
 async def test_llm_prompt_is_grounded_and_includes_history() -> None:
-    response = MagicMock()
-    response.raise_for_status.return_value = None
-    response.json.return_value = {"choices": [{"message": {"content": "Grounded answer [Source 1]"}}]}
-    client = AsyncMock()
-    client.__aenter__.return_value.post.return_value = response
+    completion = AsyncMock(return_value="Grounded answer [Source 1]")
     with (
         patch("app.rag.get_settings") as settings,
-        patch("app.rag.httpx.AsyncClient", return_value=client),
+        patch("app.rag.ai_orchestrator.complete", completion),
     ):
-        settings.return_value.llm_api_key = "test"
-        settings.return_value.llm_base_url = "https://llm.example/v1"
         settings.return_value.llm_model = "test-model"
-        settings.return_value.llm_timeout_seconds = 10
         answer = await generate_answer("What changed?", ["The total is 42."], [("user", "Earlier question")])
     assert answer == "Grounded answer [Source 1]"
-    request = client.__aenter__.return_value.post.call_args.kwargs["json"]
-    assert "Answer only from" in request["messages"][0]["content"]
-    assert request["messages"][1]["content"] == "Earlier question"
-    assert "The total is 42." in request["messages"][-1]["content"]
+    messages = completion.await_args.args[0]
+    assert "Answer only from" in messages[0]["content"]
+    assert messages[1]["content"] == "Earlier question"
+    assert "The total is 42." in messages[-1]["content"]

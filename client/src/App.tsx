@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { LandingPage, WorkspaceApp } from "./features/workspace/WorkspaceApp";
+import { LandingPage } from "./features/landing/LandingPage";
+import { WorkspaceApp } from "./features/workspace/WorkspaceApp";
 
 export default function App() {
   const [appOpen, setAppOpen] = useState(

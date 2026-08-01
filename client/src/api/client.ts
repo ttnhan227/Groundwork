@@ -6,6 +6,16 @@ export const AUTH_REFRESHED_EVENT = "insightpdf-auth-refreshed";
 
 let refreshPromise: Promise<AuthResult> | null = null;
 
+function tokenExpiresSoon(token: string): boolean {
+  try {
+    const value = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(value.padEnd(Math.ceil(value.length / 4) * 4, "="))) as { exp?: number };
+    return typeof payload.exp === "number" && payload.exp * 1000 <= Date.now() + 15_000;
+  } catch {
+    return false;
+  }
+}
+
 export function expireSession() {
   localStorage.removeItem("insightpdf-auth");
   window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
@@ -43,10 +53,15 @@ export async function authenticatedFetch(input: RequestInfo | URL, token: string
     headers.set("Authorization", `Bearer ${accessToken}`);
     return fetch(input, { ...init, headers });
   };
-  let response = await send(token);
+  const savedBeforeRequest = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+  let activeToken = savedBeforeRequest?.access_token && savedBeforeRequest.access_token !== token && !tokenExpiresSoon(savedBeforeRequest.access_token)
+    ? savedBeforeRequest.access_token
+    : token;
+  if (tokenExpiresSoon(activeToken)) activeToken = (await refreshSession()).access_token;
+  let response = await send(activeToken);
   if (response.status !== 401) return response;
   const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
-  const refreshed = saved?.access_token && saved.access_token !== token ? saved : await refreshSession();
+  const refreshed = saved?.access_token && saved.access_token !== activeToken && !tokenExpiresSoon(saved.access_token) ? saved : await refreshSession();
   response = await send(refreshed.access_token);
   if (response.status === 401) expireSession();
   return response;
@@ -58,7 +73,8 @@ export async function api<T>(path: string, token?: string, init?: RequestInit): 
     : await fetch(`${API}${path}`, init);
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(body?.detail ?? body?.error?.message ?? "Request failed");
+    const detail = typeof body?.detail === "string" ? body.detail : body?.detail?.message;
+    throw new Error(detail ?? body?.error?.message ?? "Request failed");
   }
   return response.status === 204 ? (undefined as T) : response.json();
 }
@@ -72,15 +88,23 @@ export function downloadTextFile(filename: string, content: string, contentType 
   URL.revokeObjectURL(url);
 }
 
-export async function waitForJob(job: Job, token: string): Promise<Job> {
+export async function waitForJob(
+  job: Job,
+  token: string,
+  options: { onProgress?: (job: Job) => void; signal?: AbortSignal } = {},
+): Promise<Job> {
   if (!job.id) throw new Error("The server did not return a job ID");
   const deadline = Date.now() + 180_000;
   let current = job;
-  while (!["completed", "failed"].includes(current.status)) {
+  options.onProgress?.(current);
+  while (!["completed", "failed", "cancelled"].includes(current.status)) {
+    if (options.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     if (Date.now() >= deadline) throw new Error("The operation is still running. Check Processing jobs shortly.");
     await new Promise((resolve) => window.setTimeout(resolve, 900));
     current = await api<Job>(`/jobs/status/${job.id}`, token);
+    options.onProgress?.(current);
   }
+  if (current.status === "cancelled") throw new Error("Generation was cancelled");
   if (current.status === "failed") throw new Error(current.error_message ?? "Background operation failed");
   if (!current.result_id) throw new Error("The job completed without a result");
   return current;

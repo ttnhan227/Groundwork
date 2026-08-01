@@ -4,7 +4,6 @@ import uuid
 from collections.abc import AsyncIterator
 
 import fitz
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
@@ -150,7 +149,9 @@ async def create_conversation(
     ))
     if len(documents) != len(set(payload.document_ids)):
         raise HTTPException(status_code=422, detail="Every selected document must be owned by you and ready")
-    conversation = Conversation(owner_id=user.id, title=payload.title.strip(), documents=documents)
+    from app.deliverables import ensure_personal_workspace
+    workspace = await ensure_personal_workspace(user, session)
+    conversation = Conversation(owner_id=user.id, workspace_id=workspace.id, title=payload.title.strip(), documents=documents)
     session.add(conversation)
     await session.flush()
     session.add_all([
@@ -271,7 +272,7 @@ async def ask_question(
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except (httpx.HTTPError, KeyError, IndexError) as exc:
+    except (KeyError, IndexError) as exc:
         raise HTTPException(status_code=502, detail="The configured language model is unavailable") from exc
     cited_chunks = cited_sources(raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number))
     cited_visuals = cited_sources(raw_answer, visual_sources, lambda item: (item[0].id, item[1]))
@@ -454,7 +455,7 @@ async def stream_question(
                     citation.model_dump(mode="json") for citation in response_citations
                 ],
             })
-        except (RuntimeError, httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as exc:
+        except (RuntimeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             await session.rollback()
             yield _sse("error", {"message": (
                 str(exc) if isinstance(exc, RuntimeError)

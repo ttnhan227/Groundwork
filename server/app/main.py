@@ -10,6 +10,7 @@ from app.chat import router as chat_router
 from app.collections import router as collections_router
 from app.config import get_settings
 from app.documents import router as documents_router
+from app.deliverables import router as deliverables_router
 from app.generation import router as generation_router
 from app.jobs import router as jobs_router
 from app.pdf_tools import router as pdf_tools_router
@@ -44,6 +45,7 @@ app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(collections_router, prefix="/api/v1")
 app.include_router(workspace_router, prefix="/api/v1")
+app.include_router(deliverables_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

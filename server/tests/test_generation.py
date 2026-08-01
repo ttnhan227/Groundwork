@@ -5,7 +5,9 @@ from docx import Document
 from pptx import Presentation
 
 from app.generation import (
+    CREATION_TEMPLATES,
     THEMES,
+    CreateRequest,
     GeneratedContent,
     _content,
     _docx,
@@ -15,6 +17,9 @@ from app.generation import (
     _pptx,
     _pptx_dynamic,
     _pptx_preview_slides,
+    _document_preview_pages,
+    _guard_unsupported_metrics,
+    _native_blocks,
 )
 
 
@@ -106,3 +111,75 @@ def test_dynamic_presentation_constrains_long_copy_and_shapes_to_slide() -> None
             assert shape.left >= 0 and shape.top >= 0
             assert shape.left + shape.width <= deck.slide_width
             assert shape.top + shape.height <= deck.slide_height
+
+
+def test_real_template_catalog_and_context_request_cover_document_workflows() -> None:
+    assert len(CREATION_TEMPLATES) >= 20
+    for template_id in ("annual-report", "client-proposal-document", "nda", "architecture-design", "research-paper", "quarterly-review"):
+        template = CREATION_TEMPLATES[template_id]
+        assert len(template["brief"]) > 80
+        assert template["layout"] in {"business", "editorial", "compact", "formal", "modern"}
+    request = CreateRequest.model_validate({
+        "prompt": "Create the QBR",
+        "output_format": "pdf",
+        "template_id": "quarterly-business-review",
+        "source_document_ids": ["9e501e55-352f-4c55-afcf-9412672413f4"],
+        "conversation_id": "306c6a02-81d6-437f-991e-4f655f1648ce",
+        "workspace_context": "Research finding: retention fell in enterprise accounts.",
+        "template_answers": {"period": "Q2 2026", "decisions": "Approve retention program"},
+    })
+    assert request.workspace_context.startswith("Research finding")
+    assert str(request.conversation_id) == "306c6a02-81d6-437f-991e-4f655f1648ce"
+    assert request.template_answers["period"] == "Q2 2026"
+
+
+def test_document_preview_and_native_draft_share_the_generated_structure() -> None:
+    plan = GeneratedContent.model_validate({
+        "title": "Q2 Business Review",
+        "subtitle": "Performance, risks, and decisions",
+        "document_type": "report",
+        "layout": "compact",
+        "accent_color": "#5B5CE2",
+        "metadata": [{"label": "Period", "value": "Q2 2026"}],
+        "sections": [
+            {"heading": f"Section {index}", "body": "Specific evidence-backed operating content for executive review."}
+            for index in range(1, 7)
+        ],
+        "table": {"headers": ["Metric", "Actual", "Plan"], "rows": [["Retention", "92%", "95%"]]},
+        "callout": "Decision required: fund the enterprise retention program.",
+    })
+    pages = _document_preview_pages(plan)
+    blocks = _native_blocks(plan)
+    assert pages[0]["kind"] == "cover"
+    assert any(page["kind"] == "table" for page in pages)
+    assert len([page for page in pages if page["kind"] == "sections"]) == 3
+    assert any(block["type"] == "heading" and block["text"] == "Section 1" for block in blocks)
+    assert any("Retention" in block["text"] for block in blocks)
+
+
+def test_unsupported_generated_metrics_are_marked_for_verification() -> None:
+    plan = GeneratedContent.model_validate({
+        "title": "Q2 review",
+        "subtitle": "Performance update",
+        "document_type": "report",
+        "layout": "compact",
+        "accent_color": "#5B5CE2",
+        "metadata": [],
+        "sections": [{"heading": "Performance", "body": "Retention improved by 22% and the 12-week rollout is complete."}],
+        "table": {"headers": ["Metric", "Result"], "rows": [["Retention", "22%"]]},
+        "callout": "Approve the verified $75,000 budget.",
+    })
+    guarded = _guard_unsupported_metrics(plan, "The approved budget is $75,000. The rollout lasted 12 weeks.")
+    assert "22%" not in guarded.sections[0].body
+    assert guarded.sections[0].body.count("[confirm metric]") == 1
+    assert "[confirm claim]" in guarded.sections[0].body
+    assert "12-week" in guarded.sections[0].body
+    assert guarded.table.rows[0][1] == "[confirm metric]"
+    assert "$75,000" in guarded.callout
+
+    verified = GeneratedContent.model_validate({
+        "title": "Release update", "subtitle": "", "document_type": "report", "layout": "compact",
+        "accent_color": "#5B5CE2", "metadata": [],
+        "sections": [{"heading": "Release", "body": "We launched the beta program."}], "table": None, "callout": "",
+    })
+    assert "[confirm claim]" not in _guard_unsupported_metrics(verified, "We launched the beta program in June.").sections[0].body
