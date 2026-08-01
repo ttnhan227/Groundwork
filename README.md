@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="client/public/logo.png" alt="InsightPDF" width="220" />
+</p>
+
 # InsightPDF
 
 InsightPDF is an AI workspace for turning briefs and source files into verified, export-ready documents.

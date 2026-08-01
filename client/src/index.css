@@ -4280,7 +4280,6 @@ button:not(:disabled):active,
 }
 .ai-landing-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ai-ink); text-decoration: none; }
 .ai-landing-brand .brand-symbol { width: 34px; height: 34px; overflow: hidden; border-radius: 10px; box-shadow: 0 8px 18px rgba(17, 24, 43, .12); }
-.ai-landing-brand .brand-symbol img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .ai-landing-brand > span { font-size: 17px; font-weight: 800; letter-spacing: -.035em; }
 .ai-landing-nav nav { display: flex; align-items: center; gap: 26px; }
 .ai-landing-nav nav > a { color: #5e677b; font-size: 12px; font-weight: 650; text-decoration: none; }
@@ -4389,7 +4388,6 @@ button:not(:disabled):active,
 .ai-product-body > aside { padding: 15px 10px; display: flex; flex-direction: column; gap: 5px; color: #9ba4b6; background: #151e34; }
 .ai-preview-brand { margin: 1px 4px 15px; display: flex; align-items: center; gap: 7px; color: #fff; }
 .ai-preview-brand .brand-symbol { width: 25px; height: 25px; overflow: hidden; border-radius: 7px; }
-.ai-preview-brand .brand-symbol img { width: 100%; height: 100%; object-fit: cover; }
 .ai-preview-brand strong { font-size: 10px; }
 .ai-product-body > aside > small { margin: 0 6px 6px; color: #6d7891; font-size: 6px; font-weight: 850; letter-spacing: .12em; }
 .ai-product-body > aside > span { min-height: 34px; padding: 0 8px; display: flex; align-items: center; gap: 7px; border-radius: 7px; font-size: 8px; font-weight: 650; }
