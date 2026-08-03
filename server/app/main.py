@@ -19,6 +19,7 @@ from app.workflows import router as workflows_router
 from app.workspace import router as workspace_router
 from app.logging_config import configure_logging
 from app.middleware import RateLimitMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
+from app.notifications import router as notifications_router
 
 configure_logging()
 logger = logging.getLogger("insightpdf.errors")
@@ -46,6 +47,7 @@ app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(collections_router, prefix="/api/v1")
 app.include_router(workspace_router, prefix="/api/v1")
 app.include_router(deliverables_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

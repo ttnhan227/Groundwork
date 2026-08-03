@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="client/public/logo.png" alt="InsightPDF" width="220" />
+  <img src="client/public/readme-logo.png" alt="InsightPDF" width="420" />
 </p>
 
 # InsightPDF

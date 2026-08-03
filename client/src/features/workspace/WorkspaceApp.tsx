@@ -1,4 +1,4 @@
-import { Activity, AlignLeft, AlertTriangle, ArrowRight, BarChart3, Check, CheckCircle2, ChevronRight, Clock3, Download, ExternalLink, Eye, FileImage, FileOutput, FileText, FolderOpen, FolderPlus, GitCompareArrows, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, PanelLeftClose, PanelLeftOpen, Pencil, PlayCircle, Presentation, Quote, RefreshCw, ScanText, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, Users, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Activity, AlignLeft, AlertTriangle, ArrowRight, BarChart3, Bell, Check, CheckCircle2, ChevronRight, Clock3, Download, ExternalLink, Eye, FileImage, FileOutput, FileText, FolderOpen, FolderPlus, GitCompareArrows, History, Languages, LayoutDashboard, ListChecks, LogOut, MessageCircle, MoreVertical, PanelLeftClose, PanelLeftOpen, Pencil, PlayCircle, Presentation, Quote, RefreshCw, ScanText, Scissors, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Upload, UserRound, Users, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -12,6 +12,9 @@ import { NativeWorkspace } from "../deliverables/NativeWorkspace";
 import { DocumentStudio } from "./DocumentStudio";
 import { CommandPalette, type WorkspaceCommand } from "./CommandPalette";
 import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch, downloadTextFile, expireSession, queueOperation, waitForJob } from "../../api/client";
+import { AccountPanel as AccountSettingsPanel } from "../account/AccountPanel";
+import { NotificationCenter } from "../account/NotificationCenter";
+import { applyPreferences, storedPreferences, type UserPreferences } from "../account/preferences";
 
 const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 
@@ -19,19 +22,6 @@ const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
 
 type GoogleCredentialResponse = { credential: string };
-type UserPreferences = { compact_sidebar: boolean; reduced_motion: boolean; default_export_format: "pdf" | "docx" | "markdown" };
-const DEFAULT_PREFERENCES: UserPreferences = { compact_sidebar: false, reduced_motion: false, default_export_format: "pdf" };
-
-function storedPreferences(): UserPreferences {
-  try { return { ...DEFAULT_PREFERENCES, ...JSON.parse(localStorage.getItem("insightpdf-preferences") ?? "{}") }; }
-  catch { return DEFAULT_PREFERENCES; }
-}
-function applyPreferences(preferences: UserPreferences) {
-  localStorage.setItem("insightpdf-preferences", JSON.stringify(preferences));
-  document.documentElement.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
-  window.dispatchEvent(new CustomEvent<UserPreferences>("insightpdf-preferences-changed", { detail: preferences }));
-}
-
 declare global {
   interface Window {
     google?: {
@@ -1682,6 +1672,8 @@ function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { doc
   </div>;
 }
 
+// Kept temporarily for compatibility with older workspace snapshots while the full settings panel is loaded above.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }: {
   user: AuthResult["user"]; token: string; stats: Stats | null; onUser: (user: AuthResult["user"]) => void; onClose: () => void; onSignOut: () => void;
 }) {
@@ -1877,6 +1869,8 @@ export function WorkspaceApp({
   const [pdfToolsDocument, setPDFToolsDocument] = useState<DocumentItem | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationUnread, setNotificationUnread] = useState(0);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
@@ -1906,10 +1900,16 @@ export function WorkspaceApp({
   });
 
   useEffect(() => {
-    document.documentElement.removeAttribute("data-theme");
-    localStorage.removeItem("insightpdf-theme");
-    document.documentElement.toggleAttribute("data-reduced-motion", storedPreferences().reduced_motion);
+    applyPreferences(storedPreferences());
   }, []);
+
+  useEffect(() => {
+    if (!token || !user) return;
+    const loadUnread = () => api<{ unread: number }>("/notifications/unread-count", token).then((value) => setNotificationUnread(value.unread)).catch(() => undefined);
+    loadUnread();
+    const timer = window.setInterval(loadUnread, 10_000);
+    return () => window.clearInterval(timer);
+  }, [token, user]);
 
   useEffect(() => {
     const update = (event: Event) => {
@@ -1939,6 +1939,8 @@ export function WorkspaceApp({
       setCompareOpen(false);
       setPDFToolsOpen(false);
       setAccountOpen(false);
+      setNotificationsOpen(false);
+      setNotificationUnread(0);
       setError("Your session expired. Please log in again.");
     }
     function handleRefreshedSession(event: Event) {
@@ -2195,7 +2197,7 @@ export function WorkspaceApp({
 
   function signOut() {
     localStorage.removeItem("insightpdf-auth");
-    setToken(""); setUser(null); setDocuments([]); setWorkspaceArtifacts([]); setCollections([]); setConversations([]); setArtifactViewer(null); setRenameTarget(null);
+    setToken(""); setUser(null); setDocuments([]); setWorkspaceArtifacts([]); setCollections([]); setConversations([]); setArtifactViewer(null); setRenameTarget(null); setNotificationsOpen(false); setNotificationUnread(0);
     onExit();
   }
 
@@ -2456,6 +2458,7 @@ export function WorkspaceApp({
         <div><strong>{hubView === "overview" ? "Research brief workspace" : hubView === "research" ? (activeConversation?.title ?? "Research sources") : hubView === "deliverables" ? (workspaceSection === "search" ? "Workspace search" : workspaceSection === "activity" ? "Activity timeline" : "Deliverables") : "Source library"}</strong><small>{hubView === "overview" ? "Collect evidence, synthesize findings, and ship a reviewed deliverable" : hubView === "research" ? "Answers stay grounded in the sources you select" : hubView === "deliverables" ? "Create, review, version, and export your final work" : `${sourceFileCount} source files · ${readyDocuments.length} ready`}</small></div>
         <button className="hub-global-search" title="Open command palette" aria-label="Open command palette" onClick={() => setCommandPaletteOpen(true)}><Search size={16} /><span>Search or jump anywhere</span><kbd>⌘K</kbd></button>
         <button className="hub-processing-button" onClick={() => setJobsOpen(true)} aria-label="Processing jobs" title="Processing jobs"><RefreshCw size={16} /></button>
+        <button className="hub-notification-button" onClick={() => setNotificationsOpen(true)} aria-label={`Notifications${notificationUnread ? `, ${notificationUnread} unread` : ""}`} title="Notifications"><Bell size={17} />{notificationUnread > 0 && <b>{notificationUnread > 99 ? "99+" : notificationUnread}</b>}</button>
         <button className="hub-mobile-account" onClick={() => { setAccountOpen(true); loadStats(token).catch(() => undefined); }} aria-label="Account settings"><UserRound size={16} /><span>{user.display_name}</span></button>
         <label className={`hub-upload ${busy ? "disabled" : ""}`}><Upload size={16} /> Upload<input ref={uploadInputRef} type="file" accept={DOCUMENT_UPLOAD_ACCEPT} disabled={busy} onChange={(event) => upload(event.target.files?.[0])} /></label>
       </header>
@@ -2700,11 +2703,17 @@ export function WorkspaceApp({
         loadWorkspaceArtifacts(token).catch(() => undefined);
         loadStats(token).catch(() => undefined);
       }} />}
-      {accountOpen && <AccountPanel user={user} token={token} stats={stats} onUser={(updated) => {
+      {accountOpen && <AccountSettingsPanel user={user} token={token} stats={stats} onUser={(updated) => {
         setUser(updated);
         const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "{}");
         localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
       }} onClose={() => setAccountOpen(false)} onSignOut={signOut} />}
+      {notificationsOpen && <NotificationCenter token={token} onClose={() => setNotificationsOpen(false)} onUnread={setNotificationUnread} onNavigate={(action) => {
+        if (action === "processing") setJobsOpen(true);
+        else if (action === "deliverables") { setWorkspaceSection("deliverables"); setHubView("deliverables"); }
+        else if (action === "sources" || action === "documents") { setTypeFilter("pdfs"); setHubView("documents"); }
+        setNotificationsOpen(false);
+      }} />}
       {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
       {commandPaletteOpen && <CommandPalette commands={workspaceCommands} onClose={() => setCommandPaletteOpen(false)} />}
     </main>

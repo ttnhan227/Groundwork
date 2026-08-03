@@ -129,9 +129,26 @@ test("includes the Version 2.5 AI-first workspace experience", async () => {
   ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(css, /\.ai-upload-dropzone/);
   assert.match(css, /\.collection-bar/);
-  assert.doesNotMatch(css, /\[data-theme="dark"\]/);
+  assert.match(css, /\[data-theme="dark"\]/);
   assert.doesNotMatch(page, /Toggle dark mode/);
   assert.match(css, /prefers-reduced-motion/);
+});
+
+test("includes complete account settings and durable notifications", async () => {
+  const [page, css] = await Promise.all([
+    readSourceTree(),
+    readFile(new URL("../src/index.css", import.meta.url), "utf8"),
+  ]);
+  for (const value of [
+    "Profile", "Security", "Document Defaults", "Notifications",
+    "Privacy & Data", "Usage", "Team", "Admin", "/profile/sessions",
+    "/profile/data-export", "/profile/usage", "/notifications/read-all",
+    "Activity center", "Live now", "Needs attention",
+  ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(css, /\.account-settings-nav/);
+  assert.match(css, /\.notification-panel/);
+  assert.match(css, /\.settings-toggle/);
+  assert.match(css, /data-interface-size/);
 });
 
 test("centers the product on a source-to-deliverable workflow", async () => {

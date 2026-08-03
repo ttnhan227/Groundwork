@@ -574,6 +574,22 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                         "result_id": str(result.id),
                     }
                     execution.completed_at = datetime.now(timezone.utc)
+        from app.notifications import notify_user
+        from app.schemas import UserPreferences
+        preferences = UserPreferences.model_validate(user.preferences or {})
+        if preferences.notify_processing_completed:
+            await notify_user(
+                session,
+                user.id,
+                "job.completed",
+                f"{operation.replace('_', ' ').title()} is ready",
+                "Your background task finished successfully. Open the result when you are ready.",
+                severity="success",
+                action="deliverables" if result_kind == "artifact" else "processing",
+                subject_type=result_kind,
+                subject_id=result.id,
+                metadata={"job_id": str(job.id), "operation": operation},
+            )
         await session.commit()
 
 
@@ -608,6 +624,25 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
                     execution.status = "failed"
                     execution.error_message = message[:2000]
                     execution.completed_at = datetime.now(timezone.utc)
+        if job.owner_id is not None:
+            owner = await session.get(User, job.owner_id)
+            if owner is not None:
+                from app.notifications import notify_user
+                from app.schemas import UserPreferences
+                preferences = UserPreferences.model_validate(owner.preferences or {})
+                if preferences.notify_processing_failed:
+                    await notify_user(
+                        session,
+                        owner.id,
+                        "job.failed",
+                        f"{job.operation.replace('_', ' ').title()} failed",
+                        message[:500] or "The background task could not be completed.",
+                        severity="error",
+                        action="processing",
+                        subject_type="job",
+                        subject_id=job.id,
+                        metadata={"job_id": str(job.id), "operation": job.operation},
+                    )
         await session.commit()
 
 

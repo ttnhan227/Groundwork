@@ -48,6 +48,10 @@ from app.schemas import (
     SuggestionCreateRequest,
     SuggestionDecisionRequest,
     SuggestionResponse,
+    UserPreferences,
+    WorkspaceMemberInviteRequest,
+    WorkspaceMemberResponse,
+    WorkspaceMemberRoleRequest,
     WorkspaceResponse,
     WorkspaceSearchResult,
     WorkspaceUpdateRequest,
@@ -287,6 +291,45 @@ async def activity(
         payload=payload or {},
     ))
 
+    notification_rules = {
+        "source.ready": ("notify_processing_completed", "Source is ready", "Your source finished processing and can now be used by AI.", "success", "sources"),
+        "source.failed": ("notify_processing_failed", "Source processing failed", "A source could not be processed. Open processing details to see what happened.", "error", "processing"),
+        "deliverable.created": ("notify_processing_completed", "Deliverable created", "Your new deliverable is ready for drafting.", "success", "deliverables"),
+        "deliverable.exported": ("notify_processing_completed", "Export is ready", "Your deliverable export finished successfully.", "success", "deliverables"),
+        "deliverable.reviewed": ("notify_reviews", "AI review finished", "The review findings are ready for you to inspect.", "info", "deliverables"),
+        "comment.created": ("notify_comments", "New document comment", "A teammate added a comment to a deliverable.", "info", "deliverables"),
+    }
+    rule = notification_rules.get(event_type)
+    if rule:
+        from app.notifications import notify_user
+
+        preference_name, title, message, severity, action = rule
+        member_users = (await session.execute(
+            select(User).join(WorkspaceMember, WorkspaceMember.user_id == User.id).where(
+                WorkspaceMember.workspace_id == workspace_id,
+                User.is_active.is_(True),
+            )
+        )).scalars().all()
+        for recipient in member_users:
+            if event_type == "comment.created" and recipient.id == user_id:
+                continue
+            preferences = UserPreferences.model_validate(recipient.preferences or {})
+            if not getattr(preferences, preference_name):
+                continue
+            await notify_user(
+                session,
+                recipient.id,
+                event_type,
+                title,
+                message,
+                severity=severity,
+                action=action,
+                workspace_id=workspace_id,
+                subject_type=subject_type,
+                subject_id=subject_id,
+                metadata=payload or {},
+            )
+
 
 @router.get("/workspaces", response_model=list[WorkspaceResponse])
 async def list_workspaces(
@@ -315,6 +358,120 @@ async def update_workspace(
     await session.commit()
     await session.refresh(workspace)
     return workspace_response(workspace, member.role)
+
+
+def workspace_member_response(member: WorkspaceMember, member_user: User) -> WorkspaceMemberResponse:
+    return WorkspaceMemberResponse(
+        id=member.id,
+        user_id=member.user_id,
+        email=member_user.email,
+        display_name=member_user.display_name,
+        role=member.role,
+        created_at=member.created_at,
+    )
+
+
+@router.get("/workspaces/{workspace_id}/members", response_model=list[WorkspaceMemberResponse])
+async def list_workspace_members(
+    workspace_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[WorkspaceMemberResponse]:
+    await workspace_access(workspace_id, user, session)
+    rows = (await session.execute(
+        select(WorkspaceMember, User)
+        .join(User, User.id == WorkspaceMember.user_id)
+        .where(WorkspaceMember.workspace_id == workspace_id)
+        .order_by(WorkspaceMember.created_at)
+    )).all()
+    return [workspace_member_response(member, member_user) for member, member_user in rows]
+
+
+@router.post("/workspaces/{workspace_id}/members", response_model=WorkspaceMemberResponse, status_code=201)
+async def invite_workspace_member(
+    workspace_id: uuid.UUID,
+    payload: WorkspaceMemberInviteRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> WorkspaceMemberResponse:
+    workspace, _ = await workspace_access(workspace_id, user, session, {"owner"})
+    invited_user = await session.scalar(select(User).where(User.email == str(payload.email).lower()))
+    if invited_user is None or not invited_user.is_active:
+        raise HTTPException(status_code=404, detail="No active InsightPDF account uses that email")
+    existing = await session.scalar(select(WorkspaceMember).where(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == invited_user.id,
+    ))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="That user is already a workspace member")
+    member = WorkspaceMember(workspace_id=workspace_id, user_id=invited_user.id, role=payload.role)
+    workspace.kind = "team"
+    session.add(member)
+    await session.flush()
+    from app.notifications import notify_user
+    await notify_user(
+        session,
+        invited_user.id,
+        "workspace.invited",
+        "You joined a workspace",
+        f'{user.display_name} added you to "{workspace.name}" as {payload.role}.',
+        severity="success",
+        action="documents",
+        workspace_id=workspace.id,
+        subject_type="workspace",
+        subject_id=workspace.id,
+    )
+    await activity(session, workspace.id, user.id, "workspace.member_added", "workspace", workspace.id, {
+        "member_id": str(invited_user.id), "role": payload.role,
+    })
+    await session.commit()
+    await session.refresh(member)
+    return workspace_member_response(member, invited_user)
+
+
+@router.patch("/workspaces/{workspace_id}/members/{member_id}", response_model=WorkspaceMemberResponse)
+async def update_workspace_member(
+    workspace_id: uuid.UUID,
+    member_id: uuid.UUID,
+    payload: WorkspaceMemberRoleRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> WorkspaceMemberResponse:
+    await workspace_access(workspace_id, user, session, {"owner"})
+    row = (await session.execute(
+        select(WorkspaceMember, User)
+        .join(User, User.id == WorkspaceMember.user_id)
+        .where(WorkspaceMember.id == member_id, WorkspaceMember.workspace_id == workspace_id)
+    )).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Workspace member not found")
+    member, member_user = row
+    if member.role == "owner":
+        raise HTTPException(status_code=422, detail="The workspace owner role cannot be changed")
+    member.role = payload.role
+    await session.commit()
+    await session.refresh(member)
+    return workspace_member_response(member, member_user)
+
+
+@router.delete("/workspaces/{workspace_id}/members/{member_id}", status_code=204)
+async def remove_workspace_member(
+    workspace_id: uuid.UUID,
+    member_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    await workspace_access(workspace_id, user, session, {"owner"})
+    member = await session.scalar(select(WorkspaceMember).where(
+        WorkspaceMember.id == member_id, WorkspaceMember.workspace_id == workspace_id,
+    ))
+    if member is None:
+        raise HTTPException(status_code=404, detail="Workspace member not found")
+    if member.role == "owner":
+        raise HTTPException(status_code=422, detail="The workspace owner cannot be removed")
+    await session.delete(member)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @router.get("/workspaces/{workspace_id}/native-documents", response_model=list[NativeDocumentResponse])

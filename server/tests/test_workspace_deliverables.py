@@ -125,6 +125,10 @@ def test_verified_deliverable_migration_follows_current_head() -> None:
     assert '"linked_sections"' in guided
     assert '"claim_type"' in guided
 
+    account = Path(__file__).parents[1].joinpath("alembic", "versions", "0021_account_notifications.py").read_text(encoding="utf-8")
+    assert 'down_revision = "0020_guided_verification"' in account
+    assert '"notifications"' in account
+
 
 def test_readiness_requires_a_draft_and_completed_verification() -> None:
     source = Path(__file__).parents[1].joinpath("app", "deliverables.py").read_text(encoding="utf-8")
