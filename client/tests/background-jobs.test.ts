@@ -5,8 +5,8 @@ async function readImplementation() {
   const files = await Promise.all([
     readFile(new URL("../src/api/client.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/features/workspace/WorkspaceApp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/workspace/NotebookWorkspace.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/workspace/NotebookLibrary.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/workspace/ResearchWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/workspace/WorkspaceLibrary.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/features/workspace/CommandPalette.tsx", import.meta.url), "utf8"),
   ]);
   return files.join("\n");
@@ -26,8 +26,8 @@ describe("background operation client", () => {
 
   test("queues agent streaming execution and cancellation", async () => {
     const source = await readImplementation();
-    expect(source).toContain("streamNotebookAgent");
-    expect(source).toContain("/notebook/agent/execute");
+    expect(source).toContain("streamWorkspaceAgent");
+    expect(source).toContain("/workspaces/agent/execute");
     expect(source).toContain("abortControllerRef.current");
     expect(source).toContain("Cancel");
   });

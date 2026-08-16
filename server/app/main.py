@@ -14,11 +14,11 @@ from app.controllers import (
     documents_router,
     generation_router,
     jobs_router,
-    notebook_agent_router,
     notifications_router,
     pdf_tools_router,
     users_router,
     workflows_router,
+    workspace_agent_router,
     workspace_router,
 )
 from app.middlewares import (
@@ -64,7 +64,7 @@ app.include_router(collections_router, prefix="/api/v1")
 app.include_router(workspace_router, prefix="/api/v1")
 app.include_router(deliverables_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
-app.include_router(notebook_agent_router, prefix="/api/v1")
+app.include_router(workspace_agent_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

@@ -1,6 +1,6 @@
 import uuid
 
-from app.notebook_agent import NotebookAgentRequest, _classify_intent, _content_to_blocks, _sse_event
+from app.workspace_agent import WorkspaceAgentRequest, _classify_intent, _content_to_blocks, _sse_event
 
 
 def test_classify_intent_identifies_artifact_generation() -> None:
@@ -49,8 +49,8 @@ def test_sse_event_formatting() -> None:
     assert event_str.endswith("\n\n")
 
 
-def test_notebook_agent_request_validation() -> None:
-    req = NotebookAgentRequest(
+def test_workspace_agent_request_validation() -> None:
+    req = WorkspaceAgentRequest(
         workspace_id=uuid.uuid4(),
         prompt="Create a technical proposal",
         source_document_ids=[uuid.uuid4()],

@@ -1,4 +1,4 @@
 export * from "./CommandPalette";
-export * from "./NotebookLibrary";
-export * from "./NotebookWorkspace";
+export * from "./WorkspaceLibrary";
+export * from "./ResearchWorkspace";
 export * from "./WorkspaceApp";

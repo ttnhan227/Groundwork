@@ -53,8 +53,8 @@ def test_dual_routes_registered_in_fastapi() -> None:
 
 
 def test_schema_instantiations() -> None:
-    ws_req = WorkspaceCreateRequest(name="My Project Notebook", kind="personal")
-    assert ws_req.name == "My Project Notebook"
+    ws_req = WorkspaceCreateRequest(name="My Research Project", kind="personal")
+    assert ws_req.name == "My Research Project"
     assert ws_req.kind == "personal"
 
     blocks_req = NativeDocumentBlocksRequest(blocks=[

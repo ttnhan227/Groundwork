@@ -45,14 +45,18 @@ export type AgentTaskStep = {
   status: "pending" | "in_progress" | "completed";
 };
 
-export type NotebookNote = {
+export type WorkspaceNote = {
   id: string;
   key: string;
   value: string;
   created_at?: string;
 };
 
-export type NotebookAgentEvent = {
+export type WorkspaceAgentEvent = {
   event: "status" | "token" | "citation" | "artifact" | "verification" | "complete" | "error";
   data: unknown;
 };
+
+// Backward-compatibility aliases
+export type NotebookNote = WorkspaceNote;
+export type NotebookAgentEvent = WorkspaceAgentEvent;

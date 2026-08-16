@@ -1478,6 +1478,63 @@ button, input, select, textarea {
   cursor: pointer;
 }
 
+.modal-dropzone {
+  margin-top: 0;
+  padding: 16px 18px;
+  background: var(--bg-subtle);
+  border-width: 1.5px;
+}
+.modal-dropzone .dropzone-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.modal-form-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 4px 0;
+}
+.modal-form-divider::before,
+.modal-form-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border-default);
+}
+.modal-form-divider span {
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.library-drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(37, 99, 235, 0.08);
+  backdrop-filter: blur(3px);
+  border: 3px dashed var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--accent);
+  pointer-events: auto;
+}
+.library-drag-overlay strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.library-drag-overlay span {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
 /* Modals */
 .modal-backdrop, .history-backdrop, .command-palette-backdrop {
   position: fixed;

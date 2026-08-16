@@ -16,7 +16,7 @@ class WorkspaceResponse(BaseModel):
 
 
 class WorkspaceCreateRequest(BaseModel):
-    name: str = Field(default="New notebook", min_length=1, max_length=120)
+    name: str = Field(default="New workspace", min_length=1, max_length=120)
     kind: str = Field(default="personal", pattern="^(personal|team)$")
 
 

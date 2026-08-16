@@ -32,13 +32,13 @@ import type {
   ChatMessage,
   Citation,
   AgentTaskStep,
-  NotebookNote,
+  WorkspaceNote,
   AuthResult,
 } from "../../types";
-import { API, api, streamNotebookAgent, downloadTextFile, authenticatedFetch } from "../../api/client";
+import { API, api, streamWorkspaceAgent, downloadTextFile, authenticatedFetch } from "../../api/client";
 import { BrandMark } from "../../components/common/BrandMark";
 
-interface NotebookWorkspaceProps {
+export interface ResearchWorkspaceProps {
   auth: AuthResult;
   workspace: Workspace;
   documents: DocumentItem[];
@@ -53,7 +53,9 @@ interface NotebookWorkspaceProps {
   onOpenViewer?: (docId: string, pageNumber?: number) => void;
 }
 
-export function NotebookWorkspace({
+export type NotebookWorkspaceProps = ResearchWorkspaceProps;
+
+export function ResearchWorkspace({
   auth,
   workspace,
   documents,
@@ -66,7 +68,7 @@ export function NotebookWorkspace({
   onOpenAccount,
   onToggleTheme,
   onOpenViewer,
-}: NotebookWorkspaceProps) {
+}: ResearchWorkspaceProps) {
   // Sources state
   const workspaceSources = useMemo(() => {
     return documents.filter((d) => d.workspace_id === workspace.id);
@@ -116,7 +118,7 @@ export function NotebookWorkspace({
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   // Notes state
-  const [notes, setNotes] = useState<NotebookNote[]>([]);
+  const [notes, setNotes] = useState<WorkspaceNote[]>([]);
   const [newNoteInput, setNewNoteInput] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
 
@@ -134,7 +136,7 @@ export function NotebookWorkspace({
           }
         }
 
-        const loadedNotes = await api<NotebookNote[]>(
+        const loadedNotes = await api<WorkspaceNote[]>(
           `/workspaces/${workspace.id}/memories`,
           auth.access_token,
         ).catch(() => []);
@@ -233,7 +235,7 @@ export function NotebookWorkspace({
     const citationsAccumulator: Citation[] = [];
 
     try {
-      await streamNotebookAgent(
+      await streamWorkspaceAgent(
         {
           workspace_id: workspace.id,
           prompt: textToSend,
@@ -386,7 +388,7 @@ export function NotebookWorkspace({
     if (!newNoteInput.trim() || isAddingNote) return;
     setIsAddingNote(true);
     try {
-      const newNote = await api<NotebookNote>(`/workspaces/${workspace.id}/memories`, auth.access_token, {
+      const newNote = await api<WorkspaceNote>(`/workspaces/${workspace.id}/memories`, auth.access_token, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "note", value: newNoteInput.trim() }),
@@ -419,13 +421,13 @@ export function NotebookWorkspace({
   ];
 
   return (
-    <div className="notebook-workspace-3col">
+    <div className="notebook-workspace-3col research-workspace-3col">
       {/* Top Header Bar */}
       <header className="notebook-workspace-topbar">
         <div className="topbar-left">
-          <button className="btn-back-library" onClick={onBackToLibrary} title="Back to Notebook Library">
+          <button className="btn-back-library" onClick={onBackToLibrary} title="Back to Workspace Library">
             <ArrowLeft size={15} />
-            <span>Notebooks</span>
+            <span>Workspaces</span>
           </button>
           <div className="topbar-divider" />
           <div className="topbar-workspace-meta">
@@ -602,7 +604,7 @@ export function NotebookWorkspace({
               <div className="sources-empty-box">
                 <FileText size={28} className="empty-icon" />
                 <strong>No sources added</strong>
-                <small>Upload a PDF, Word doc, or brief to ground this notebook.</small>
+                <small>Upload a PDF, Word doc, or brief to ground this workspace.</small>
               </div>
             )}
           </div>
@@ -997,7 +999,7 @@ export function NotebookWorkspace({
             </div>
           )}
 
-          {/* Tab 3: Notebook Notes */}
+          {/* Tab 3: Workspace Notes */}
           {rightPanelTab === "notes" && (
             <div className="studio-panel-content">
               <form onSubmit={handleAddNote} className="notes-create-form">
@@ -1033,3 +1035,6 @@ export function NotebookWorkspace({
     </div>
   );
 }
+
+// Backward-compatibility alias
+export const NotebookWorkspace = ResearchWorkspace;

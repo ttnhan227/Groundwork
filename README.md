@@ -8,7 +8,7 @@ InsightPDF is a workspace for ingesting source documents (PDFs, Office files, im
 
 ## Features
 
-- **Notebook Workspace**: Conversational research interface with multi-step reasoning, source citations tied to exact pages, and direct deliverable drafting.
+- **Research Workspaces**: Conversational research interface with multi-step reasoning, source citations tied to exact pages, and direct deliverable drafting.
 - **Document Ingestion & RAG**: Text extraction and OCR across PDF, DOCX, PPTX, XLSX, and images. Semantic search powered by PostgreSQL and pgvector.
 - **Generation & Verification**: Export to Markdown, PDF, Word (.docx), and PowerPoint (.pptx) with automated checks for missing requirements and unsupported claims.
 - **PDF Tools**: In-browser tools to merge, split, rotate, compress, watermark, convert, and reorder PDF pages.

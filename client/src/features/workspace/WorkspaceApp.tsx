@@ -12,8 +12,8 @@ import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch,
 import { AccountPanel as AccountSettingsPanel } from "../account/AccountPanel";
 import { NotificationCenter } from "../account/NotificationCenter";
 import { applyPreferences, storedPreferences, type UserPreferences } from "../account/preferences";
-import { NotebookLibrary } from "./NotebookLibrary";
-import { NotebookWorkspace } from "./NotebookWorkspace";
+import { WorkspaceLibrary } from "./WorkspaceLibrary";
+import { ResearchWorkspace } from "./ResearchWorkspace";
 
 const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
@@ -635,7 +635,7 @@ export function WorkspaceApp({
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [nativeDocs, setNativeDocs] = useState<NativeDocument[]>([]);
-  const [notebookView, setNotebookView] = useState<"library" | "workspace">("library");
+  const [workspaceView, setWorkspaceView] = useState<"library" | "workspace">("library");
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">(() =>
     document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light",
   );
@@ -736,7 +736,7 @@ export function WorkspaceApp({
     }
   }
 
-  async function handleCreateNotebook(name: string, template?: string): Promise<string | null> {
+  async function handleCreateWorkspace(name: string, template?: string): Promise<string | null> {
     try {
       const newWs = await api<Workspace>("/workspaces", token, {
         method: "POST",
@@ -745,29 +745,29 @@ export function WorkspaceApp({
       });
       setWorkspaces((prev) => [newWs, ...prev]);
       setActiveWorkspaceId(newWs.id);
-      setNotebookView("workspace");
+      setWorkspaceView("workspace");
       return newWs.id;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Could not create notebook");
+      setError(err instanceof Error ? err.message : "Could not create workspace");
       return null;
     }
   }
 
-  async function handleDeleteNotebook(wsId: string): Promise<void> {
-    if (!window.confirm("Delete this notebook? All attached deliverables and sources will be unlinked.")) return;
+  async function handleDeleteWorkspace(wsId: string): Promise<void> {
+    if (!window.confirm("Delete this workspace? All attached deliverables and sources will be unlinked.")) return;
     try {
       await api(`/workspaces/${wsId}`, token, { method: "DELETE" });
       setWorkspaces((prev) => prev.filter((w) => w.id !== wsId));
       if (activeWorkspaceId === wsId) {
         setActiveWorkspaceId(null);
-        setNotebookView("library");
+        setWorkspaceView("library");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete notebook");
+      setError(err instanceof Error ? err.message : "Failed to delete workspace");
     }
   }
 
-  async function handleRenameNotebook(wsId: string, newName: string): Promise<void> {
+  async function handleRenameWorkspace(wsId: string, newName: string): Promise<void> {
     try {
       const updated = await api<Workspace>(`/workspaces/${wsId}`, token, {
         method: "PATCH",
@@ -776,11 +776,11 @@ export function WorkspaceApp({
       });
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to rename notebook");
+      setError(err instanceof Error ? err.message : "Failed to rename workspace");
     }
   }
 
-  async function handleUploadNotebookDocument(file: File, wsId: string): Promise<DocumentItem | null> {
+  async function handleUploadWorkspaceDocument(file: File, wsId: string): Promise<DocumentItem | null> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("workspace_id", wsId);
@@ -819,19 +819,19 @@ export function WorkspaceApp({
       ]).catch(() => undefined);
       if (pendingUpload) {
         onPendingUploadHandled();
-        handleCreateNotebook(pendingUpload.name.replace(/\.[^/.]+$/, "")).then((wsId) => {
+        handleCreateWorkspace(pendingUpload.name.replace(/\.[^/.]+$/, "")).then((wsId) => {
           if (wsId) {
-            handleUploadNotebookDocument(pendingUpload, wsId);
+            handleUploadWorkspaceDocument(pendingUpload, wsId);
           }
         });
       }
       const pendingPrompt = sessionStorage.getItem("insightpdf-pending-prompt");
       if (pendingPrompt) {
         sessionStorage.removeItem("insightpdf-pending-prompt");
-        handleCreateNotebook(pendingPrompt.slice(0, 30) || "Research Notebook").then((wsId) => {
+        handleCreateWorkspace(pendingPrompt.slice(0, 30) || "Research Workspace").then((wsId) => {
           if (wsId) {
             setActiveWorkspaceId(wsId);
-            setNotebookView("workspace");
+            setWorkspaceView("workspace");
           }
         });
       }
@@ -858,7 +858,7 @@ export function WorkspaceApp({
   }, []);
 
   const workspaceCommands: WorkspaceCommand[] = user ? [
-    { id: "library", label: "Open Notebook Library", detail: "Browse all research notebooks", icon: <FileText size={16} />, run: () => setNotebookView("library") },
+    { id: "library", label: "Open Workspace Library", detail: "Browse all research workspaces", icon: <FileText size={16} />, run: () => setWorkspaceView("library") },
     { id: "pdf-tools", label: "Open PDF tools", detail: "Merge, split, rotate, convert, or watermark", icon: <Scissors size={16} />, run: () => setPDFToolsOpen(true) },
     { id: "jobs", label: "View processing jobs", detail: "Inspect progress, retry failures, or cancel work", icon: <Activity size={16} />, run: () => setJobsOpen(true) },
     { id: "settings", label: "Open account settings", detail: "Profile, security, preferences, and usage", icon: <BrandMark />, run: () => setAccountOpen(true) },
@@ -973,16 +973,16 @@ export function WorkspaceApp({
 
   return (
     <div className="insightpdf-app-root h-screen w-screen overflow-hidden">
-      {notebookView === "workspace" && activeWorkspace ? (
-        <NotebookWorkspace
+      {workspaceView === "workspace" && activeWorkspace ? (
+        <ResearchWorkspace
           auth={{ access_token: token, refresh_token: "", user }}
           workspace={activeWorkspace}
           documents={documents}
           nativeDocs={nativeDocs}
           activeTheme={activeTheme}
-          onBackToLibrary={() => setNotebookView("library")}
+          onBackToLibrary={() => setWorkspaceView("library")}
           onUploadDocument={async (file, wsId) => {
-            return handleUploadNotebookDocument(file, wsId);
+            return handleUploadWorkspaceDocument(file, wsId);
           }}
           onDeleteDocument={async (docId) => {
             const doc = documents.find((d) => d.id === docId);
@@ -1001,23 +1001,23 @@ export function WorkspaceApp({
           }}
         />
       ) : (
-        <NotebookLibrary
+        <WorkspaceLibrary
           auth={{ access_token: token, refresh_token: "", user }}
           workspaces={workspaces}
           documents={documents}
           nativeDocs={nativeDocs}
           activeTheme={activeTheme}
-          onSelectNotebook={(wsId) => {
+          onSelectWorkspace={(wsId) => {
             setActiveWorkspaceId(wsId);
-            setNotebookView("workspace");
+            setWorkspaceView("workspace");
           }}
-          onCreateNotebook={handleCreateNotebook}
-          onDeleteNotebook={handleDeleteNotebook}
-          onRenameNotebook={handleRenameNotebook}
-          onUploadToNewNotebook={async (file) => {
-            const wsId = await handleCreateNotebook(file.name.replace(/\.[^/.]+$/, ""));
+          onCreateWorkspace={handleCreateWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
+          onRenameWorkspace={handleRenameWorkspace}
+          onUploadToNewWorkspace={async (file) => {
+            const wsId = await handleCreateWorkspace(file.name.replace(/\.[^/.]+$/, ""));
             if (wsId) {
-              await handleUploadNotebookDocument(file, wsId);
+              await handleUploadWorkspaceDocument(file, wsId);
             }
           }}
           onOpenAccount={() => setAccountOpen(true)}
@@ -1029,12 +1029,12 @@ export function WorkspaceApp({
             );
             if (existingDemo) {
               setActiveWorkspaceId(existingDemo.id);
-              setNotebookView("workspace");
+              setWorkspaceView("workspace");
             } else {
-              const demoWsId = await handleCreateNotebook("Technical Proposal & Audit Demo", "proposal");
+              const demoWsId = await handleCreateWorkspace("Technical Proposal & Audit Demo", "proposal");
               if (demoWsId) {
                 setActiveWorkspaceId(demoWsId);
-                setNotebookView("workspace");
+                setWorkspaceView("workspace");
               }
             }
           }}

@@ -120,7 +120,7 @@ export async function queueOperation(operation: string, parameters: Record<strin
   return waitForJob(job, token);
 }
 
-export type NotebookAgentCallbacks = {
+export type WorkspaceAgentCallbacks = {
   onStatus?: (step: { step: string; label: string }) => void;
   onToken?: (text: string) => void;
   onCitation?: (citation: Citation) => void;
@@ -130,7 +130,9 @@ export type NotebookAgentCallbacks = {
   onError?: (error: string) => void;
 };
 
-export async function streamNotebookAgent(
+export type NotebookAgentCallbacks = WorkspaceAgentCallbacks;
+
+export async function streamWorkspaceAgent(
   payload: {
     workspace_id: string;
     prompt: string;
@@ -140,14 +142,22 @@ export async function streamNotebookAgent(
     action_type?: string;
   },
   token: string,
-  callbacks: NotebookAgentCallbacks,
+  callbacks: WorkspaceAgentCallbacks,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await authenticatedFetch(`${API}/notebook/agent/execute`, token, {
+  const response = await authenticatedFetch(`${API}/workspaces/agent/execute`, token, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal,
+  }).catch(async () => {
+    // Fallback to legacy endpoint if proxy routes differently
+    return authenticatedFetch(`${API}/notebook/agent/execute`, token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -193,3 +203,5 @@ export async function streamNotebookAgent(
     }
   }
 }
+
+export const streamNotebookAgent = streamWorkspaceAgent;

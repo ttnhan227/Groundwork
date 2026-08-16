@@ -104,13 +104,13 @@ test("includes complete account settings and durable notifications", async () =>
   assert.match(css, /data-interface-size/);
 });
 
-test("centers the product on the NotebookLM-style agentic workflow", async () => {
+test("centers the product on the Research Workspace agentic workflow", async () => {
   const [page, css] = await Promise.all([
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /Notebook Library/);
-  assert.match(page, /New Notebook/);
+  assert.match(page, /Research Workspaces/);
+  assert.match(page, /New Workspace/);
   assert.match(page, /Recommended Workflows/);
   assert.match(page, /Technical Proposal/);
   assert.match(page, /Sources/);
@@ -138,8 +138,8 @@ test("streams agent tokens and highlights cited PDF text", async () => {
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /streamNotebookAgent/);
-  assert.match(page, /\/notebook\/agent\/execute/);
+  assert.match(page, /streamWorkspaceAgent/);
+  assert.match(page, /\/workspaces\/agent\/execute/);
   assert.match(page, /pdf-highlight-layer/);
   assert.match(page, /initialSearch=\{viewerSearch\}/);
   assert.match(css, /\.pdf-highlight-layer mark/);

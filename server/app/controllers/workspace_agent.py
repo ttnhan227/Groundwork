@@ -1,4 +1,4 @@
-"""Notebook-level agentic orchestration service and endpoints.
+"""Workspace-level agentic orchestration service and endpoints.
 
 Provides source-grounded reasoning, multi-step document generation,
 conversational artifact refinement, Whole-Document Verification,
@@ -65,16 +65,20 @@ from app.rag import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["Notebook agent"])
+router = APIRouter(tags=["Workspace agent"])
 
 
-class NotebookAgentRequest(BaseModel):
+class WorkspaceAgentRequest(BaseModel):
     workspace_id: uuid.UUID
     prompt: str = Field(min_length=1, max_length=8000)
     source_document_ids: list[uuid.UUID] = Field(default_factory=list)
     conversation_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     action_type: str | None = None  # "chat" | "report" | "proposal" | "presentation" | "summary" | "technical_doc" | "verify" | "edit" | "note"
+
+
+# Backward-compatibility alias
+NotebookAgentRequest = WorkspaceAgentRequest
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> str:
@@ -130,10 +134,12 @@ def _classify_intent(prompt: str, action_type: str | None) -> str:
     return "grounded_qa"
 
 
+@router.post("/workspaces/agent/execute")
+@router.post("/workspace/agent/execute")
 @router.post("/notebook/agent/execute")
 @router.post("/notebook-agent/execute")
-async def execute_notebook_agent(
-    payload: NotebookAgentRequest,
+async def execute_workspace_agent(
+    payload: WorkspaceAgentRequest,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
@@ -151,7 +157,7 @@ async def execute_notebook_agent(
             .where(Conversation.id == payload.conversation_id, Conversation.workspace_id == workspace.id)
         )
     if conversation is None:
-        title = payload.prompt[:50].strip() or "Notebook conversation"
+        title = payload.prompt[:50].strip() or "Workspace conversation"
         conversation = Conversation(
             owner_id=user.id,
             workspace_id=workspace.id,
@@ -212,7 +218,7 @@ async def execute_notebook_agent(
                     yield chunk
 
         except Exception as exc:
-            logger.exception("notebook_agent_error: %s", exc)
+            logger.exception("workspace_agent_error: %s", exc)
             yield _sse_event("error", {"message": str(exc) or "An error occurred during agent execution."})
 
     return StreamingResponse(
@@ -226,15 +232,19 @@ async def execute_notebook_agent(
     )
 
 
+# Backward-compatibility alias
+execute_notebook_agent = execute_workspace_agent
+
+
 async def _orchestrate_artifact_generation(
     workspace: Workspace,
     conversation: Conversation,
     sources: list[Document],
-    payload: NotebookAgentRequest,
+    payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
-    yield _sse_event("status", {"step": "analyzing_sources", "label": f"Analyzing {len(sources)} source(s) in notebook..."})
+    yield _sse_event("status", {"step": "analyzing_sources", "label": f"Analyzing {len(sources)} source(s) in workspace..."})
 
     # Build source text
     source_pages = list(await session.scalars(
@@ -268,7 +278,7 @@ async def _orchestrate_artifact_generation(
     try:
         title_res = await ai_orchestrator.complete(
             [{"role": "user", "content": f"Return ONLY a title (under 80 characters, no quotes) for: {payload.prompt}"}],
-            operation="notebook_agent.title",
+            operation="workspace_agent.title",
             temperature=0.2,
         )
         artifact_title = title_res.strip().strip('"')[:120] or f"Verified {doc_type.title()}"
@@ -293,7 +303,7 @@ async def _orchestrate_artifact_generation(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        operation="notebook_agent.draft",
+        operation="workspace_agent.draft",
         temperature=0.2,
     )
 
@@ -424,7 +434,7 @@ async def _orchestrate_artifact_modification(
     workspace: Workspace,
     conversation: Conversation,
     sources: list[Document],
-    payload: NotebookAgentRequest,
+    payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
@@ -441,7 +451,7 @@ async def _orchestrate_artifact_modification(
         )
 
     if target_artifact is None:
-        yield _sse_event("token", {"text": "No artifact found in this notebook to modify. Please ask me to generate one first."})
+        yield _sse_event("token", {"text": "No artifact found in this workspace to modify. Please ask me to generate one first."})
         yield _sse_event("complete", {"conversation_id": str(conversation.id)})
         return
 
@@ -464,7 +474,7 @@ async def _orchestrate_artifact_modification(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        operation="notebook_agent.modify_draft",
+        operation="workspace_agent.modify_draft",
         temperature=0.2,
     )
 
@@ -514,7 +524,7 @@ async def _orchestrate_artifact_verification(
     workspace: Workspace,
     conversation: Conversation,
     sources: list[Document],
-    payload: NotebookAgentRequest,
+    payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
@@ -531,7 +541,7 @@ async def _orchestrate_artifact_verification(
         )
 
     if target_artifact is None:
-        yield _sse_event("token", {"text": "No deliverable found in this notebook to verify. Upload sources and ask me to generate a deliverable first."})
+        yield _sse_event("token", {"text": "No deliverable found in this workspace to verify. Upload sources and ask me to generate a deliverable first."})
         yield _sse_event("complete", {"conversation_id": str(conversation.id)})
         return
 
@@ -600,11 +610,11 @@ async def _orchestrate_artifact_verification(
 async def _orchestrate_create_note(
     workspace: Workspace,
     conversation: Conversation,
-    payload: NotebookAgentRequest,
+    payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
-    yield _sse_event("status", {"step": "analyzing_sources", "label": "Saving notebook note..."})
+    yield _sse_event("status", {"step": "analyzing_sources", "label": "Saving workspace note..."})
 
     note_text = payload.prompt.removeprefix("note:").removeprefix("save note:").strip()
     key = f"note_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
@@ -617,7 +627,7 @@ async def _orchestrate_create_note(
     )
     session.add(memory)
 
-    reply_text = f"Saved note to your notebook:\n\n> {note_text}"
+    reply_text = f"Saved note to your workspace:\n\n> {note_text}"
     asst_msg = Message(
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
@@ -637,7 +647,7 @@ async def _orchestrate_grounded_qa(
     workspace: Workspace,
     conversation: Conversation,
     sources: list[Document],
-    payload: NotebookAgentRequest,
+    payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
@@ -652,7 +662,7 @@ async def _orchestrate_grounded_qa(
             payload.prompt,
             [{"role": m.role.value, "content": m.content} for m in conversation.messages[-4:]],
         )
-        embeddings = await embed_texts_async([query_text], operation="notebook_agent.embed_query")
+        embeddings = await embed_texts_async([query_text], operation="workspace_agent.embed_query")
         if embeddings:
             vector = embeddings[0]
             stmt = (

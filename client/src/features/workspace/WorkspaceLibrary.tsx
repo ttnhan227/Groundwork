@@ -23,43 +23,60 @@ import {
 import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
 
-interface NotebookLibraryProps {
+interface WorkspaceLibraryProps {
   auth: AuthResult;
   workspaces: Workspace[];
   documents: DocumentItem[];
   nativeDocs: NativeDocument[];
   activeTheme: "light" | "dark";
-  onSelectNotebook: (workspaceId: string) => void;
-  onCreateNotebook: (name: string, template?: string) => Promise<string | null>;
-  onDeleteNotebook: (workspaceId: string) => Promise<void>;
-  onRenameNotebook: (workspaceId: string, newName: string) => Promise<void>;
-  onUploadToNewNotebook: (file: File) => Promise<void>;
+  onSelectWorkspace: (workspaceId: string) => void;
+  onCreateWorkspace: (name: string, template?: string) => Promise<string | null>;
+  onDeleteWorkspace: (workspaceId: string) => Promise<void>;
+  onRenameWorkspace: (workspaceId: string, newName: string) => Promise<void>;
+  onUploadToNewWorkspace: (file: File) => Promise<void>;
   onOpenAccount: () => void;
   onToggleTheme: () => void;
   onOpenPdfTools?: () => void;
   onOpenTwoMinuteDemo?: () => void;
+  // Backward-compatibility props
+  onSelectNotebook?: (workspaceId: string) => void;
+  onCreateNotebook?: (name: string, template?: string) => Promise<string | null>;
+  onDeleteNotebook?: (workspaceId: string) => Promise<void>;
+  onRenameNotebook?: (workspaceId: string, newName: string) => Promise<void>;
+  onUploadToNewNotebook?: (file: File) => Promise<void>;
 }
 
-export function NotebookLibrary({
+export function WorkspaceLibrary({
   auth,
   workspaces,
   documents,
   nativeDocs,
   activeTheme,
+  onSelectWorkspace,
+  onCreateWorkspace,
+  onDeleteWorkspace,
+  onRenameWorkspace,
+  onUploadToNewWorkspace,
+  onOpenAccount,
+  onToggleTheme,
+  onOpenPdfTools,
+  onOpenTwoMinuteDemo,
   onSelectNotebook,
   onCreateNotebook,
   onDeleteNotebook,
   onRenameNotebook,
   onUploadToNewNotebook,
-  onOpenAccount,
-  onToggleTheme,
-  onOpenPdfTools,
-  onOpenTwoMinuteDemo,
-}: NotebookLibraryProps) {
+}: WorkspaceLibraryProps) {
+  const selectWorkspace = onSelectWorkspace || onSelectNotebook || (() => {});
+  const createWorkspace = onCreateWorkspace || onCreateNotebook || (async () => null);
+  const deleteWorkspace = onDeleteWorkspace || onDeleteNotebook || (async () => {});
+  const renameWorkspace = onRenameWorkspace || onRenameNotebook || (async () => {});
+  const uploadToNewWorkspace = onUploadToNewWorkspace || onUploadToNewNotebook || (async () => {});
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newNotebookName, setNewNotebookName] = useState("");
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string>("proposal");
   const [isCreating, setIsCreating] = useState(false);
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
@@ -94,7 +111,7 @@ export function NotebookLibrary({
     },
     {
       id: "blank",
-      title: "Blank Notebook",
+      title: "Blank Workspace",
       icon: BookOpen,
       description: "Start fresh with an empty workspace and ground queries on your custom files.",
       color: "var(--text-primary)",
@@ -138,13 +155,13 @@ export function NotebookLibrary({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!newNotebookName.trim() || isCreating) return;
+    if (!newWorkspaceName.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      const id = await onCreateNotebook(newNotebookName.trim(), selectedTemplate);
+      const id = await createWorkspace(newWorkspaceName.trim(), selectedTemplate);
       setIsCreateOpen(false);
-      setNewNotebookName("");
-      if (id) onSelectNotebook(id);
+      setNewWorkspaceName("");
+      if (id) selectWorkspace(id);
     } finally {
       setIsCreating(false);
     }
@@ -155,7 +172,7 @@ export function NotebookLibrary({
       setEditingWorkspaceId(null);
       return;
     }
-    await onRenameNotebook(wsId, renameValue.trim());
+    await renameWorkspace(wsId, renameValue.trim());
     setEditingWorkspaceId(null);
     setRenameValue("");
   }
@@ -165,14 +182,38 @@ export function NotebookLibrary({
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      onUploadToNewNotebook(files[0]);
+      uploadToNewWorkspace(files[0]);
     }
   }
 
   return (
-    <div className="notebook-library-container">
+    <div
+      className="notebook-library-container workspace-library-container"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.relatedTarget || (e.relatedTarget as HTMLElement).nodeName === "HTML") {
+          setIsDragging(false);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        handleFileDrop(e);
+      }}
+    >
+      {/* Full-Page Drag Overlay */}
+      {isDragging && !isCreateOpen && (
+        <div className="library-drag-overlay">
+          <Upload size={36} />
+          <strong>Drop file here to start new workspace</strong>
+          <span>We'll automatically initialize and index your document</span>
+        </div>
+      )}
+
       {/* Top Navbar */}
-      <header className="notebook-nav">
+      <header className="notebook-nav workspace-nav">
         <div className="notebook-brand-link">
           <BrandMark />
           <strong>Insight<span>PDF</span></strong>
@@ -184,10 +225,10 @@ export function NotebookLibrary({
           <Search size={15} />
           <input
             type="text"
-            placeholder="Search notebooks..."
+            placeholder="Search workspaces..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search notebooks"
+            aria-label="Search workspaces"
           />
           <kbd>⌘K</kbd>
         </div>
@@ -216,12 +257,13 @@ export function NotebookLibrary({
             className="btn-primary-gradient"
             onClick={() => {
               setSelectedTemplate("proposal");
-              setNewNotebookName("");
+              setNewWorkspaceName("");
               setIsCreateOpen(true);
             }}
+            title="Create New Workspace"
           >
             <Plus size={15} />
-            <span>New Notebook</span>
+            <span>New Workspace</span>
           </button>
 
           <button
@@ -253,7 +295,7 @@ export function NotebookLibrary({
                   className="notebook-template-card"
                   onClick={() => {
                     setSelectedTemplate(tmpl.id);
-                    setNewNotebookName(tmpl.title);
+                    setNewWorkspaceName(tmpl.title);
                     setIsCreateOpen(true);
                   }}
                   role="button"
@@ -262,7 +304,7 @@ export function NotebookLibrary({
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       setSelectedTemplate(tmpl.id);
-                      setNewNotebookName(tmpl.title);
+                      setNewWorkspaceName(tmpl.title);
                       setIsCreateOpen(true);
                     }
                   }}
@@ -278,11 +320,11 @@ export function NotebookLibrary({
           </div>
         </section>
 
-        {/* Notebook Library List Section */}
+        {/* Workspace Library List Section */}
         <section className="notebook-list-section">
           <div className="notebook-section-header">
             <div className="notebook-header-title">
-              <h2>Notebook Library ({filteredWorkspaces.length})</h2>
+              <h2>Research Workspaces ({filteredWorkspaces.length})</h2>
               <span className="notebook-header-meta">
                 {documents.length} source file{documents.length === 1 ? "" : "s"} indexed across {workspaces.length} workspace{workspaces.length === 1 ? "" : "s"}
               </span>
@@ -293,7 +335,7 @@ export function NotebookLibrary({
                 className={filterCategory === "all" ? "active" : ""}
                 onClick={() => setFilterCategory("all")}
               >
-                All Notebooks
+                All Workspaces
               </button>
               <button
                 className={filterCategory === "proposals" ? "active" : ""}
@@ -310,15 +352,15 @@ export function NotebookLibrary({
             </div>
           </div>
 
-          {/* Notebook Cards Grid */}
+          {/* Workspace Cards Grid */}
           {filteredWorkspaces.length > 0 ? (
-            <div className="notebook-grid">
+            <div className="notebook-grid workspace-grid">
               {filteredWorkspaces.map((ws) => {
                 const stats = workspaceStats[ws.id] || { sourcesCount: 0, deliverablesCount: 0, hasVerified: false };
                 const isEditing = editingWorkspaceId === ws.id;
 
                 return (
-                  <div key={ws.id} className="notebook-card">
+                  <div key={ws.id} className="notebook-card workspace-card">
                     <div className="notebook-card-header">
                       <div className="notebook-card-info">
                         <div className="notebook-card-icon">
@@ -343,7 +385,7 @@ export function NotebookLibrary({
                           ) : (
                             <div
                               className="notebook-card-title"
-                              onClick={() => onSelectNotebook(ws.id)}
+                              onClick={() => selectWorkspace(ws.id)}
                               title={ws.name}
                             >
                               {ws.name}
@@ -362,7 +404,7 @@ export function NotebookLibrary({
                             e.stopPropagation();
                             setActiveDropdownId(activeDropdownId === ws.id ? null : ws.id);
                           }}
-                          aria-label="Notebook options"
+                          aria-label="Workspace options"
                         >
                           <MoreVertical size={15} />
                         </button>
@@ -385,7 +427,7 @@ export function NotebookLibrary({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setActiveDropdownId(null);
-                                onDeleteNotebook(ws.id);
+                                deleteWorkspace(ws.id);
                               }}
                             >
                               <Trash2 size={13} />
@@ -410,7 +452,7 @@ export function NotebookLibrary({
                     </div>
 
                     {/* Footer / Open Button */}
-                    <div className="notebook-card-footer" onClick={() => onSelectNotebook(ws.id)}>
+                    <div className="notebook-card-footer" onClick={() => selectWorkspace(ws.id)}>
                       <span>Open research workspace</span>
                       <ArrowRight size={14} />
                     </div>
@@ -421,119 +463,134 @@ export function NotebookLibrary({
           ) : (
             <div className="notebook-empty-state">
               <FolderPlus size={36} className="empty-icon" />
-              <h3>{searchQuery ? "No matching notebooks found" : "No notebooks created yet"}</h3>
+              <h3>{searchQuery ? "No matching workspaces found" : "No research workspaces created yet"}</h3>
               <p>
                 {searchQuery
-                  ? "Try adjusting your search terms or view all notebooks."
-                  : "Create your first notebook to organize sources, ask grounded questions, and draft verified documents."}
+                  ? "Try adjusting your search terms or view all workspaces."
+                  : "Create your first workspace to organize source documents, ask grounded questions, and draft verified deliverables."}
               </p>
               <button
                 className="btn-primary-gradient"
                 onClick={() => {
-                  setNewNotebookName("");
+                  setNewWorkspaceName("");
                   setSelectedTemplate("proposal");
                   setIsCreateOpen(true);
                 }}
               >
                 <Plus size={15} />
-                <span>Create New Notebook</span>
+                <span>Create New Workspace</span>
               </button>
             </div>
           )}
-
-          {/* Dotted Drag & Drop File Target */}
-          <div
-            className={`notebook-dropzone ${isDragging ? "dragging" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleFileDrop}
-          >
-            <Upload size={22} className="dropzone-icon" />
-            <div className="dropzone-text">
-              <strong>Drop file here to start new notebook</strong>
-              <span>PDF, Word, or Markdown files create an instant grounded workspace</span>
-            </div>
-            <label className="btn-dropzone-browse">
-              Browse file
-              <input
-                type="file"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onUploadToNewNotebook(f);
-                }}
-              />
-            </label>
-          </div>
         </section>
       </main>
 
-      {/* Create Notebook Modal Dialog */}
+      {/* Create Workspace Modal Dialog */}
       {isCreateOpen && (
         <div className="modal-backdrop" onClick={() => setIsCreateOpen(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="create-notebook-title">
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="create-workspace-title">
             <header className="modal-header">
               <div>
                 <p className="modal-eyebrow">Workspace Setup</p>
-                <h3 id="create-notebook-title">Create Research Notebook</h3>
+                <h3 id="create-workspace-title">Create Research Workspace</h3>
               </div>
               <button className="btn-modal-close" onClick={() => setIsCreateOpen(false)} aria-label="Close dialog">
                 <X size={16} />
               </button>
             </header>
 
-            <form onSubmit={handleCreate} className="modal-form">
-              <label className="form-field">
-                <span>Notebook Name</span>
-                <input
-                  type="text"
-                  placeholder="e.g. Technical Proposal & Security Audit"
-                  value={newNotebookName}
-                  onChange={(e) => setNewNotebookName(e.target.value)}
-                  autoFocus
-                  required
-                />
-              </label>
-
-              <div className="form-field">
-                <span>Starter Template</span>
-                <div className="template-selection-grid">
-                  {TEMPLATES.map((tmpl) => (
-                    <label
-                      key={tmpl.id}
-                      className={`template-option ${selectedTemplate === tmpl.id ? "selected" : ""}`}
-                    >
-                      <input
-                        type="radio"
-                        name="template"
-                        value={tmpl.id}
-                        checked={selectedTemplate === tmpl.id}
-                        onChange={() => setSelectedTemplate(tmpl.id)}
-                      />
-                      <div>
-                        <strong>{tmpl.title}</strong>
-                        <small>{tmpl.description}</small>
-                      </div>
-                    </label>
-                  ))}
+            <div className="modal-form">
+              {/* Option A: Drop / Select Document to Start */}
+              <div
+                className={`notebook-dropzone modal-dropzone ${isDragging ? "dragging" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  handleFileDrop(e);
+                  setIsCreateOpen(false);
+                }}
+              >
+                <Upload size={18} className="dropzone-icon" />
+                <div className="dropzone-text">
+                  <strong>Drop file here to start new workspace</strong>
+                  <span>Upload PDF, Word, or Markdown to automatically name & ground workspace</span>
                 </div>
+                <label className="btn-dropzone-browse">
+                  Browse file
+                  <input
+                    type="file"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setIsCreateOpen(false);
+                        uploadToNewWorkspace(f);
+                      }
+                    }}
+                  />
+                </label>
               </div>
 
-              <footer className="modal-footer">
-                <button type="button" className="btn-secondary-white" onClick={() => setIsCreateOpen(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary-gradient" disabled={!newNotebookName.trim() || isCreating}>
-                  {isCreating ? "Creating…" : "Create Notebook"}
-                </button>
-              </footer>
-            </form>
+              <div className="modal-form-divider">
+                <span>or configure manually</span>
+              </div>
+
+              <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <label className="form-field">
+                  <span>Workspace Name</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. Technical Proposal & Security Audit"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </label>
+
+                <div className="form-field">
+                  <span>Starter Template</span>
+                  <div className="template-selection-grid">
+                    {TEMPLATES.map((tmpl) => (
+                      <label
+                        key={tmpl.id}
+                        className={`template-option ${selectedTemplate === tmpl.id ? "selected" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name="template"
+                          value={tmpl.id}
+                          checked={selectedTemplate === tmpl.id}
+                          onChange={() => setSelectedTemplate(tmpl.id)}
+                        />
+                        <div>
+                          <strong>{tmpl.title}</strong>
+                          <small>{tmpl.description}</small>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <footer className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                  <button type="button" className="btn-secondary-white" onClick={() => setIsCreateOpen(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary-gradient" disabled={!newWorkspaceName.trim() || isCreating}>
+                    {isCreating ? "Creating…" : "Create Workspace"}
+                  </button>
+                </footer>
+              </form>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// Backward-compatibility alias
+export const NotebookLibrary = WorkspaceLibrary;

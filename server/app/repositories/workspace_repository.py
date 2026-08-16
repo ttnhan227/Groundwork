@@ -1,4 +1,4 @@
-"""Workspace (Notebook project) data repository."""
+"""Workspace data repository."""
 
 from __future__ import annotations
 

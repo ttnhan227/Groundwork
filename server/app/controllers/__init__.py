@@ -8,12 +8,15 @@ from app.controllers.deliverables import router as deliverables_router
 from app.controllers.documents import router as documents_router
 from app.controllers.generation import router as generation_router
 from app.controllers.jobs import router as jobs_router
-from app.controllers.notebook_agent import router as notebook_agent_router
 from app.controllers.notifications import router as notifications_router
 from app.controllers.pdf_tools import router as pdf_tools_router
 from app.controllers.users import router as users_router
 from app.controllers.workflows import router as workflows_router
 from app.controllers.workspace import router as workspace_router
+from app.controllers.workspace_agent import router as workspace_agent_router
+
+# Backward compatibility alias
+notebook_agent_router = workspace_agent_router
 
 __all__ = [
     "ai_router",
@@ -29,5 +32,6 @@ __all__ = [
     "pdf_tools_router",
     "users_router",
     "workflows_router",
+    "workspace_agent_router",
     "workspace_router",
 ]

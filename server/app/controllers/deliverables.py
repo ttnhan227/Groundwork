@@ -353,7 +353,7 @@ async def create_workspace(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> WorkspaceResponse:
-    name = payload.name.strip() if payload.name and payload.name.strip() else "Untitled Notebook"
+    name = payload.name.strip() if payload.name and payload.name.strip() else "Untitled Workspace"
     workspace = Workspace(
         owner_id=user.id,
         name=name,
