@@ -286,7 +286,7 @@ async def _orchestrate_artifact_generation(
         artifact_title = f"Verified {doc_type.title()}"
 
     system_prompt = (
-        f"You are InsightPDF AI, generating an export-ready, verified {doc_type}.\n"
+        f"You are Groundwork AI, generating an export-ready, verified {doc_type}.\n"
         "Draft a complete, thorough document using Markdown headings (# Heading), paragraphs, and bullet points.\n"
         "Ground every key claim, metric, and finding directly in the provided sources with explicit source citations like [Source: filename.pdf, p. 1].\n"
         "Do not invent facts or numbers. If information is missing from the sources, explicitly mark it as [Missing from brief / Needs client confirmation].\n"
@@ -460,7 +460,7 @@ async def _orchestrate_artifact_modification(
     yield _sse_event("status", {"step": "drafting", "label": f"Applying updates to '{target_artifact.title}'..."})
 
     system_prompt = (
-        "You are InsightPDF AI editing an existing deliverable.\n"
+        "You are Groundwork AI editing an existing deliverable.\n"
         "Apply the user's requested changes faithfully, preserving overall structure and citations where appropriate.\n"
         "Output the full updated document in Markdown format (# Heading, paragraphs, bullets).\n"
     )

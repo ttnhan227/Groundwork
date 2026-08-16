@@ -77,7 +77,6 @@ _MODULE_MAPPING = {
     "app.deliverables": "app.controllers.deliverables",
     "app.workspace_agent": "app.controllers.workspace_agent",
     "app.notebook_agent": "app.controllers.workspace_agent",
-    "app.pdf_tools": "app.controllers.pdf_tools",
     "app.jobs": "app.controllers.jobs",
     "app.notifications": "app.controllers.notifications",
     "app.chat": "app.controllers.chat",

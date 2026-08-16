@@ -12,16 +12,13 @@ async function readImplementation() {
   return files.join("\n");
 }
 
-describe("background operation client", () => {
-  test("queues, polls, and resolves stored results", async () => {
+describe("background operation and workspace client", () => {
+  test("queues, polls, and resolves background jobs", async () => {
     const source = await readImplementation();
-    expect(source).toContain('api<Job>("/jobs"');
+    expect(source).toContain('api<Job[]>("/jobs"');
     expect(source).toContain("/jobs/status/");
-    expect(source).toContain("current.result_id");
-    expect(source).toContain("/jobs/images-to-pdf");
-    expect(source).toContain("/jobs/watermark");
-    expect(source).toContain("/jobs/convert-docx");
-    expect(source).toContain('"pdf-to-word": "pdf_to_docx"');
+    expect(source).toContain("ProcessingJobs");
+    expect(source).toContain("queueOperation");
   });
 
   test("queues agent streaming execution and cancellation", async () => {
@@ -29,7 +26,7 @@ describe("background operation client", () => {
     expect(source).toContain("streamWorkspaceAgent");
     expect(source).toContain("/workspaces/agent/execute");
     expect(source).toContain("abortControllerRef.current");
-    expect(source).toContain("Cancel");
+    expect(source).toContain("Stop");
   });
 
   test("provides command navigation and durable workspace preferences", async () => {
@@ -38,14 +35,6 @@ describe("background operation client", () => {
     expect(source).toContain('event.key.toLowerCase() === "k"');
     expect(source).toContain("storedPreferences");
     expect(source).toContain("applyPreferences");
-  });
-
-  test("provides explicit image ordering controls", async () => {
-    const source = await readImplementation();
-    expect(source).toContain('aria-label="Image order"');
-    expect(source).toContain(">Up</button>");
-    expect(source).toContain(">Down</button>");
-    expect(source).toContain(">Remove</button>");
   });
 
   test("implements a grounded-to-verified-deliverable workflow", async () => {

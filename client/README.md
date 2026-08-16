@@ -1,6 +1,6 @@
-# InsightPDF client
+# Groundwork Client
 
-Standard Vite + React single-page application for InsightPDF.
+Standard Vite + React single-page application for Groundwork.
 
 ## Prerequisites
 

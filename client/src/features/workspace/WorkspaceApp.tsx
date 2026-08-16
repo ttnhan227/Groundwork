@@ -1,14 +1,14 @@
-import { Activity, Check, Download, ExternalLink, FileImage, FileText, RefreshCw, Scissors, Search, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Activity, ExternalLink, FileText, RefreshCw, Search, X, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { Artifact, ArtifactVersion, AuthResult, DocumentItem, Job, NativeDocument, Stats, Workspace } from "../../types";
+import type { AuthResult, DocumentItem, Job, NativeDocument, Stats, Workspace } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
 import { CommandPalette, type WorkspaceCommand } from "./CommandPalette";
-import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch, expireSession, queueOperation, waitForJob } from "../../api/client";
+import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch, expireSession, getStoredAuth, setStoredAuth } from "../../api/client";
 import { AccountPanel as AccountSettingsPanel } from "../account/AccountPanel";
 import { NotificationCenter } from "../account/NotificationCenter";
 import { applyPreferences, storedPreferences, type UserPreferences } from "../account/preferences";
@@ -129,117 +129,7 @@ function PdfThumbnail({ pdf, pageNumber, current, onSelect }: { pdf: PDFDocument
   );
 }
 
-function ArtifactViewer({ artifact, document, token, initialPage = 1, initialSearch = "", onClose }: {
-  artifact?: Artifact;
-  document?: DocumentItem;
-  token: string;
-  initialPage?: number;
-  initialSearch?: string;
-  onClose: () => void;
-}) {
-  const [source, setSource] = useState("");
-  const [textPreview, setTextPreview] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [documentSearch, setDocumentSearch] = useState(initialSearch);
-  const [versions, setVersions] = useState<ArtifactVersion[]>([]);
-  const [versionsOpen, setVersionsOpen] = useState(false);
-  const filename = artifact?.filename ?? document?.filename ?? "Document";
-  const contentType = artifact?.content_type ?? "application/pdf";
-  const sizeBytes = artifact?.size_bytes ?? document?.size_bytes ?? 0;
-  const description = artifact?.operation.replaceAll("_", " ") ?? `${document?.page_count ?? "—"} pages`;
-  const isPdf = contentType === "application/pdf" || filename.toLowerCase().endsWith(".pdf");
-  const isImage = contentType.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(filename);
-  const isText = contentType.startsWith("text/") || /\.(md|txt)$/i.test(filename);
 
-  useEffect(() => {
-    let objectUrl = "";
-    let cancelled = false;
-    const endpoint = document
-      ? `${API}/documents/${document.id}/content`
-      : isPdf || isImage || isText
-        ? `${API}/pdf-tools/artifacts/${artifact!.id}/download`
-        : `${API}/pdf-tools/artifacts/${artifact!.id}/thumbnail`;
-    authenticatedFetch(endpoint, token).then(async (response) => {
-      if (!response.ok) throw new Error("Preview unavailable");
-      if (isText) {
-        const blob = await response.blob();
-        const value = await blob.text();
-        objectUrl = URL.createObjectURL(blob);
-        if (!cancelled) {
-          setTextPreview(value);
-          setSource(objectUrl);
-        }
-      } else {
-        objectUrl = URL.createObjectURL(await response.blob());
-        if (!cancelled) {
-          const parameters = new URLSearchParams();
-          if (initialPage > 1) parameters.set("page", String(initialPage));
-          if (initialSearch.trim()) parameters.set("search", initialSearch.trim().slice(0, 180));
-          setSource(isPdf && parameters.size ? `${objectUrl}#${parameters.toString()}` : objectUrl);
-        }
-      }
-    }).catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Preview unavailable"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [artifact, document, initialPage, initialSearch, isImage, isPdf, isText, token]);
-
-  function searchOpenPDF(event: FormEvent) {
-    event.preventDefault();
-    if (!isPdf || !source || !documentSearch.trim()) return;
-    const base = source.split("#")[0];
-    const parameters = new URLSearchParams();
-    parameters.set("page", String(initialPage));
-    parameters.set("search", documentSearch.trim().slice(0, 180));
-    setSource(`${base}#${parameters.toString()}`);
-  }
-
-  async function openVersions() {
-    if (!artifact) return;
-    setVersionsOpen((current) => !current);
-    if (!versions.length) {
-      setVersions(await api<ArtifactVersion[]>(`/pdf-tools/artifacts/${artifact.id}/versions`, token));
-    }
-  }
-
-  async function restoreVersion(version: ArtifactVersion) {
-    if (!artifact) return;
-    const restored = await api<ArtifactVersion>(`/pdf-tools/artifacts/${artifact.id}/versions/restore`, token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version_id: version.id }),
-    });
-    setVersions((current) => [restored, ...current]);
-    setVersionsOpen(false);
-  }
-
-  return (
-    <div className="artifact-viewer-wrap">
-      <button className="history-backdrop" aria-label="Close file preview" onClick={onClose} />
-      <section className="artifact-viewer" role="dialog" aria-modal="true" aria-label={`Preview ${filename}`}>
-        <header>
-          <div><strong>{filename}</strong><small>{description} · {(sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div>
-          {isPdf && <form className="artifact-viewer-search" onSubmit={searchOpenPDF}><Search size={14} /><input aria-label="Search within document" value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Search this document" /><button type="submit">Find</button></form>}
-          {artifact && <button onClick={() => openVersions().catch((reason) => setError(reason.message))}>Versions</button>}
-          {source && <button onClick={() => window.open(source, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Open in new tab</button>}
-          <button aria-label="Close preview" onClick={onClose}><X size={18} /></button>
-        </header>
-        {versionsOpen && <aside className="artifact-version-popover"><header><strong>Version history</strong><span>{versions.length} versions</span></header>{versions.map((version) => <article key={version.id}><div><strong>Version {version.version_number}</strong><small>{version.change_prompt || "File created"} · {new Date(version.created_at).toLocaleString()}</small></div>{version.version_number !== versions[0]?.version_number && <button onClick={() => restoreVersion(version).catch((reason) => setError(reason.message))}>Restore</button>}</article>)}</aside>}
-        <main className={isPdf ? "pdf" : isImage ? "image" : isText ? "text" : "generated"}>
-          {loading && <div className="artifact-viewer-loading"><RefreshCw className="spin" size={22} /><strong>Opening preview…</strong></div>}
-          {error && <div className="artifact-viewer-loading"><FileText size={28} /><strong>{error}</strong><span>Download the file to view it in its native application.</span></div>}
-          {!loading && !error && isPdf && source && <iframe src={source} title={filename} />}
-          {!loading && !error && isImage && source && <img src={source} alt={filename} />}
-          {!loading && !error && isText && <pre>{textPreview}</pre>}
-          {!loading && !error && !isPdf && !isImage && !isText && source && <div className="generated-preview-sheet"><img src={source} alt={`Generated preview of ${filename}`} /><small>Content preview · Download to edit or inspect the original file.</small></div>}
-        </main>
-      </section>
-    </div>
-  );
-}
 
 function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClose }: { document: DocumentItem; token: string; initialPage?: number; initialSearch?: string; onClose: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -438,126 +328,6 @@ function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClo
   );
 }
 
-async function downloadArtifact(artifact: Artifact, token: string) {
-  const response = await authenticatedFetch(`${API}/pdf-tools/artifacts/${artifact.id}/download`, token);
-  if (!response.ok) throw new Error("Could not download generated file");
-  const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = window.document.createElement("a");
-  link.href = url; link.download = artifact.filename; link.click(); URL.revokeObjectURL(url);
-}
-
-function PDFToolsWorkspace({ documents, token, initialDocument, onClose }: { documents: DocumentItem[]; token: string; initialDocument: DocumentItem | null; onClose: () => void }) {
-  const [tool, setTool] = useState("merge");
-  const [documentId, setDocumentId] = useState(initialDocument?.id ?? documents[0]?.id ?? "");
-  const [selected, setSelected] = useState<string[]>(initialDocument ? [initialDocument.id] : []);
-  const [pages, setPages] = useState("1");
-  const [ranges, setRanges] = useState("1");
-  const [degrees, setDegrees] = useState(90);
-  const [splitMode, setSplitMode] = useState("ranges");
-  const [imageFormat, setImageFormat] = useState("png");
-  const [dpi, setDpi] = useState(144);
-  const [images, setImages] = useState<File[]>([]);
-  const [saveSourceImages, setSaveSourceImages] = useState(false);
-  const [wordFile, setWordFile] = useState<File | null>(null);
-  const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
-  const [watermarkImage, setWatermarkImage] = useState<File | null>(null);
-  const [position, setPosition] = useState("center");
-  const [opacity, setOpacity] = useState(0.25);
-  const [artifact, setArtifact] = useState<Artifact | null>(null);
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const pageNumbers = () => pages.split(",").map((item) => Number(item.trim())).filter((item) => Number.isInteger(item) && item > 0);
-
-  useEffect(() => {
-    api<Artifact[]>("/pdf-tools/artifacts", token).then(setArtifacts).catch(() => undefined);
-  }, [token]);
-
-  async function run() {
-    setBusy(true); setError(""); setArtifact(null);
-    try {
-      let generated: Artifact;
-      if (tool === "images-to-pdf") {
-        const data = new FormData(); images.forEach((image) => data.append("files", image));
-        data.append("save_sources", String(saveSourceImages));
-        const queued = await api<Job>("/jobs/images-to-pdf", token, { method: "POST", body: data });
-        const job = await waitForJob(queued, token);
-        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
-      } else if (tool === "word-to-pdf" || tool === "word-to-markdown") {
-        const data = new FormData();
-        if (wordFile) data.append("file", wordFile);
-        data.append("target", tool === "word-to-pdf" ? "pdf" : "markdown");
-        const queued = await api<Job>("/jobs/convert-docx", token, { method: "POST", body: data });
-        const job = await waitForJob(queued, token);
-        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
-      } else if (tool === "watermark" && watermarkImage) {
-        const data = new FormData(); data.append("document_id", documentId); data.append("text", watermarkText);
-        data.append("page_numbers", pages); data.append("position", position); data.append("opacity", String(opacity)); data.append("rotation", "0");
-        if (watermarkImage) data.append("image", watermarkImage);
-        const queued = await api<Job>("/jobs/watermark", token, { method: "POST", body: data });
-        const job = await waitForJob(queued, token);
-        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
-      } else {
-        let body: Record<string, unknown> = { document_id: documentId };
-        if (tool === "merge") body = { document_ids: selected };
-        if (["extract", "delete-pages"].includes(tool)) body.page_numbers = pageNumbers();
-        if (tool === "rotate") body = { ...body, page_numbers: pageNumbers(), degrees };
-        if (tool === "split") body = { ...body, mode: splitMode, ranges: ranges.split(",").map((item) => item.trim()).filter(Boolean), page_numbers: pageNumbers() };
-        if (tool === "pdf-to-images") body = { ...body, page_numbers: pages.trim() ? pageNumbers() : null, format: imageFormat, dpi };
-        if (tool === "watermark") body = { ...body, text: watermarkText, page_numbers: pageNumbers(), position, opacity, rotation: 0 };
-        const operationNames: Record<string, string> = {
-          extract: "extract_pages",
-          "delete-pages": "delete_pages",
-          "pdf-to-images": "pdf_to_images",
-          "pdf-to-word": "pdf_to_docx",
-        };
-        const job = await queueOperation(operationNames[tool] ?? tool, body, token);
-        generated = await api<Artifact>(`/pdf-tools/artifacts/${job.result_id}`, token);
-      }
-      setArtifact(generated); setArtifacts((current) => [generated, ...current.filter((item) => item.id !== generated.id)]);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "PDF operation failed"); }
-    finally { setBusy(false); }
-  }
-
-  const tools = [
-    ["merge", "Merge"], ["split", "Split"], ["extract", "Extract pages"], ["delete-pages", "Delete pages"],
-    ["rotate", "Rotate"], ["pdf-to-images", "PDF to images"], ["images-to-pdf", "Images to PDF"], ["watermark", "Watermark"],
-    ["pdf-to-word", "PDF to Word"], ["word-to-pdf", "Word to PDF"], ["word-to-markdown", "Word to Markdown"],
-  ];
-  const needsWordFile = tool === "word-to-pdf" || tool === "word-to-markdown";
-  const needsDocument = tool !== "merge" && tool !== "images-to-pdf" && !needsWordFile;
-  const canRun = !busy && (tool === "merge" ? selected.length >= 2 : tool === "images-to-pdf" ? images.length > 0 : needsWordFile ? Boolean(wordFile) : Boolean(documentId));
-
-  return (
-    <div className="pdf-tools-wrap">
-      <button className="history-backdrop" aria-label="Close PDF tools" onClick={onClose} />
-      <section className="pdf-tools-panel">
-        <header><div><p className="eyebrow">Document workflows</p><h2>Document tools</h2></div><button aria-label="Close document tools" onClick={onClose}><X size={18} /></button></header>
-        <div className="pdf-tools-layout">
-          <nav>{tools.map(([id, label]) => <button className={tool === id ? "active" : ""} key={id} onClick={() => { setTool(id); setArtifact(null); setError(""); }}>{id.includes("image") ? <FileImage size={15} /> : <Scissors size={15} />}{label}</button>)}</nav>
-          <main>
-            <div className="tool-heading"><h3>{tools.find(([id]) => id === tool)?.[1]}</h3><p>Outputs are stored securely and available for download.</p></div>
-            <div className="tool-form">
-              {needsDocument && <label>PDF<select value={documentId} onChange={(event) => setDocumentId(event.target.value)}>{documents.map((item) => <option key={item.id} value={item.id}>{item.filename} · {item.page_count} pages</option>)}</select></label>}
-              {tool === "merge" && <div className="merge-picker">{documents.map((item) => <label key={item.id} className={selected.includes(item.id) ? "selected" : ""}><input type="checkbox" checked={selected.includes(item.id)} onChange={() => setSelected((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} /><FileText size={16} /><span>{item.filename}</span></label>)}</div>}
-              {["extract", "delete-pages", "rotate"].includes(tool) && <label>Pages <small>Comma-separated, e.g. 1, 3, 5</small><input value={pages} onChange={(event) => setPages(event.target.value)} /></label>}
-              {tool === "rotate" && <label>Rotation<select value={degrees} onChange={(event) => setDegrees(Number(event.target.value))}><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label>}
-              {tool === "split" && <><label>Split mode<select value={splitMode} onChange={(event) => setSplitMode(event.target.value)}><option value="ranges">Page ranges</option><option value="every_page">One PDF per page</option><option value="selected">Selected pages</option></select></label>{splitMode === "ranges" ? <label>Ranges <small>Comma-separated, e.g. 1-3, 4-7</small><input value={ranges} onChange={(event) => setRanges(event.target.value)} /></label> : splitMode === "selected" ? <label>Selected pages<input value={pages} onChange={(event) => setPages(event.target.value)} /></label> : null}</>}
-              {tool === "pdf-to-images" && <><label>Pages <small>Leave blank for all pages</small><input value={pages} onChange={(event) => setPages(event.target.value)} placeholder="All pages" /></label><label>Format<select value={imageFormat} onChange={(event) => setImageFormat(event.target.value)}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label><label>Resolution<select value={dpi} onChange={(event) => setDpi(Number(event.target.value))}><option value={96}>96 DPI</option><option value={144}>144 DPI</option><option value={216}>216 DPI</option><option value={300}>300 DPI</option></select></label></>}
-              {tool === "images-to-pdf" && <><label className="image-drop"><Upload size={24} />Choose PNG/JPEG images<input type="file" accept="image/png,image/jpeg" multiple onChange={(event) => setImages(Array.from(event.target.files ?? []))} /><small>{images.length ? `${images.length} image(s)` : "Up to 50 images"}</small></label>
-                {images.length > 0 && <><label className="save-source-images"><input type="checkbox" checked={saveSourceImages} onChange={(event) => setSaveSourceImages(event.target.checked)} /><span><strong>Save source images to workspace</strong><small>Off by default to avoid clutter and extra storage.</small></span></label><div className="image-order-list" aria-label="Image order">{images.map((image, index) => <article key={`${image.name}-${image.lastModified}-${index}`}><span>{index + 1}. {image.name}</span><button disabled={index === 0} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index - 1 ? current[index] : itemIndex === index ? current[index - 1] : item))}>Up</button><button disabled={index === images.length - 1} onClick={() => setImages((current) => current.map((item, itemIndex) => itemIndex === index + 1 ? current[index] : itemIndex === index ? current[index + 1] : item))}>Down</button><button onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}</div></>}</>}
-              {needsWordFile && <label className="image-drop"><Upload size={24} />Choose a Word document<input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setWordFile(event.target.files?.[0] ?? null)} /><small>{wordFile?.name ?? "DOCX files up to 50 MB"}</small></label>}
-              {tool === "watermark" && <><label>Watermark text <small>Optional when using an image</small><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} /></label><label>Watermark image <small>Optional PNG/JPEG</small><input type="file" accept="image/png,image/jpeg" onChange={(event) => setWatermarkImage(event.target.files?.[0] ?? null)} /></label><label>Pages <small>Leave blank for every page</small><input value={pages} onChange={(event) => setPages(event.target.value)} /></label><label>Position<select value={position} onChange={(event) => setPosition(event.target.value)}><option value="center">Center</option><option value="top_left">Top left</option><option value="top_right">Top right</option><option value="bottom_left">Bottom left</option><option value="bottom_right">Bottom right</option></select></label><label>Opacity<input type="range" min="0.05" max="1" step="0.05" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} /><small>{Math.round(opacity * 100)}%</small></label></>}
-              <button className="run-pdf-tool" disabled={!canRun} onClick={run}>{busy ? <RefreshCw className="spin" size={15} /> : <Scissors size={15} />}{busy ? "Processing…" : "Create file"}</button>
-            </div>
-            {error && <div className="form-error">{error}</div>}
-            {artifact && <div className="artifact-ready"><Check size={25} /><div><strong>{artifact.filename}</strong><span>{(artifact.size_bytes / 1024).toFixed(1)} KB · Ready to download</span></div><button onClick={() => downloadArtifact(artifact, token).catch((reason) => setError(reason.message))}><Download size={15} /> Download</button></div>}
-            <section className="artifact-history"><h4>Recent generated files</h4>{artifacts.slice(0, 8).map((item) => <article key={item.id}><FileText size={17} /><div><strong>{item.filename}</strong><span>{item.operation.replaceAll("_", " ")} · {new Date(item.created_at).toLocaleString()}</span></div><button onClick={() => downloadArtifact(item, token).catch((reason) => setError(reason.message))}><Download size={14} /></button></article>)}</section>
-          </main>
-        </div>
-      </section>
-    </div>
-  );
-}
 
 function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void }) {
   const [items, setItems] = useState<Job[]>([]);
@@ -610,11 +380,7 @@ export function WorkspaceApp({
   onPendingUploadHandled: () => void;
   onExit: () => void;
 }) {
-  const [initialAuth] = useState<AuthResult | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = localStorage.getItem("insightpdf-auth");
-    return saved ? JSON.parse(saved) as AuthResult : null;
-  });
+  const [initialAuth] = useState<AuthResult | null>(() => getStoredAuth());
   const [token, setToken] = useState(initialAuth?.access_token ?? "");
   const [user, setUser] = useState<AuthResult["user"] | null>(initialAuth?.user ?? null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -622,10 +388,8 @@ export function WorkspaceApp({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [viewer, setViewer] = useState<DocumentItem | null>(null);
-  const [artifactViewer, setArtifactViewer] = useState<Artifact | null>(null);
   const [viewerPage, setViewerPage] = useState(1);
   const [viewerSearch, setViewerSearch] = useState("");
-  const [pdfToolsOpen, setPDFToolsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -662,8 +426,12 @@ export function WorkspaceApp({
       const preferences = (event as CustomEvent<UserPreferences>).detail;
       document.documentElement.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
     };
+    window.addEventListener("groundwork-preferences-changed", update);
     window.addEventListener("insightpdf-preferences-changed", update);
-    return () => window.removeEventListener("insightpdf-preferences-changed", update);
+    return () => {
+      window.removeEventListener("groundwork-preferences-changed", update);
+      window.removeEventListener("insightpdf-preferences-changed", update);
+    };
   }, []);
 
   useEffect(() => {
@@ -672,8 +440,6 @@ export function WorkspaceApp({
       setUser(null);
       setDocuments([]);
       setViewer(null);
-      setArtifactViewer(null);
-      setPDFToolsOpen(false);
       setAccountOpen(false);
       setNotificationsOpen(false);
       setNotificationUnread(0);
@@ -825,8 +591,9 @@ export function WorkspaceApp({
           }
         });
       }
-      const pendingPrompt = sessionStorage.getItem("insightpdf-pending-prompt");
+      const pendingPrompt = sessionStorage.getItem("groundwork-pending-prompt") || sessionStorage.getItem("insightpdf-pending-prompt");
       if (pendingPrompt) {
+        sessionStorage.removeItem("groundwork-pending-prompt");
         sessionStorage.removeItem("insightpdf-pending-prompt");
         handleCreateWorkspace(pendingPrompt.slice(0, 30) || "Research Workspace").then((wsId) => {
           if (wsId) {
@@ -850,7 +617,7 @@ export function WorkspaceApp({
     function keyboardShortcuts(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setCommandPaletteOpen((value) => !value); return; }
       if (event.key === "Escape") {
-        setViewer(null); setArtifactViewer(null); setPDFToolsOpen(false); setCommandPaletteOpen(false);
+        setViewer(null); setCommandPaletteOpen(false);
       }
     }
     window.addEventListener("keydown", keyboardShortcuts);
@@ -859,13 +626,12 @@ export function WorkspaceApp({
 
   const workspaceCommands: WorkspaceCommand[] = user ? [
     { id: "library", label: "Open Workspace Library", detail: "Browse all research workspaces", icon: <FileText size={16} />, run: () => setWorkspaceView("library") },
-    { id: "pdf-tools", label: "Open PDF tools", detail: "Merge, split, rotate, convert, or watermark", icon: <Scissors size={16} />, run: () => setPDFToolsOpen(true) },
     { id: "jobs", label: "View processing jobs", detail: "Inspect progress, retry failures, or cancel work", icon: <Activity size={16} />, run: () => setJobsOpen(true) },
     { id: "settings", label: "Open account settings", detail: "Profile, security, preferences, and usage", icon: <BrandMark />, run: () => setAccountOpen(true) },
   ] : [];
 
   async function completeAuthentication(result: AuthResult) {
-    localStorage.setItem("insightpdf-auth", JSON.stringify(result));
+    setStoredAuth(result);
     setToken(result.access_token);
     setUser(result.user);
     await Promise.all([
@@ -916,8 +682,8 @@ export function WorkspaceApp({
   }
 
   function signOut() {
-    localStorage.removeItem("insightpdf-auth");
-    setToken(""); setUser(null); setDocuments([]); setArtifactViewer(null); setNotificationsOpen(false); setNotificationUnread(0);
+    setStoredAuth(null);
+    setToken(""); setUser(null); setDocuments([]); setNotificationsOpen(false); setNotificationUnread(0);
     onExit();
   }
 
@@ -932,7 +698,7 @@ export function WorkspaceApp({
   if (!token || !user) return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand auth-brand-login"><BrandMark /><strong>Insight<b>PDF</b></strong></div>
+        <div className="auth-brand auth-brand-login"><BrandMark /><strong>Ground<b>work</b></strong></div>
         <p className="eyebrow">Document Intelligence Workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
         <p>Grounded research, document synthesis, and verified deliverable drafting.</p>
@@ -968,11 +734,10 @@ export function WorkspaceApp({
     </main>
   );
 
-  const readyDocuments = documents.filter((item) => item.status === "ready");
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0] || null;
 
   return (
-    <div className="insightpdf-app-root h-screen w-screen overflow-hidden">
+    <div className="groundwork-app-root insightpdf-app-root h-screen w-screen overflow-hidden">
       {workspaceView === "workspace" && activeWorkspace ? (
         <ResearchWorkspace
           auth={{ access_token: token, refresh_token: "", user }}
@@ -988,7 +753,6 @@ export function WorkspaceApp({
             const doc = documents.find((d) => d.id === docId);
             if (doc) await removeDocument(doc);
           }}
-          onOpenPdfTools={() => setPDFToolsOpen(true)}
           onOpenAccount={() => setAccountOpen(true)}
           onToggleTheme={() => toggleTheme()}
           onOpenViewer={(docId, pageNumber) => {
@@ -1022,7 +786,6 @@ export function WorkspaceApp({
           }}
           onOpenAccount={() => setAccountOpen(true)}
           onToggleTheme={() => toggleTheme()}
-          onOpenPdfTools={() => setPDFToolsOpen(true)}
           onOpenTwoMinuteDemo={async () => {
             const existingDemo = workspaces.find(
               (w) => w.name.toLowerCase().includes("demo") || w.name.toLowerCase().includes("proposal"),
@@ -1051,24 +814,6 @@ export function WorkspaceApp({
           onClose={() => setViewer(null)}
         />
       )}
-      {artifactViewer && (
-        <ArtifactViewer
-          artifact={artifactViewer}
-          token={token}
-          onClose={() => setArtifactViewer(null)}
-        />
-      )}
-      {pdfToolsOpen && (
-        <PDFToolsWorkspace
-          documents={readyDocuments}
-          token={token}
-          initialDocument={null}
-          onClose={() => {
-            setPDFToolsOpen(false);
-            loadStats(token).catch(() => undefined);
-          }}
-        />
-      )}
       {accountOpen && (
         <AccountSettingsPanel
           user={user}
@@ -1076,8 +821,8 @@ export function WorkspaceApp({
           stats={stats}
           onUser={(updated) => {
             setUser(updated);
-            const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "{}");
-            localStorage.setItem("insightpdf-auth", JSON.stringify({ ...saved, user: updated }));
+            const saved = getStoredAuth();
+            if (saved) setStoredAuth({ ...saved, user: updated });
           }}
           onClose={() => setAccountOpen(false)}
           onSignOut={signOut}

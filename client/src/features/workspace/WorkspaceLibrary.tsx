@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   ArrowRight,
   MoreVertical,
-  Scissors,
   PlayCircle,
   X,
   Upload,
@@ -36,7 +35,6 @@ interface WorkspaceLibraryProps {
   onUploadToNewWorkspace: (file: File) => Promise<void>;
   onOpenAccount: () => void;
   onToggleTheme: () => void;
-  onOpenPdfTools?: () => void;
   onOpenTwoMinuteDemo?: () => void;
   // Backward-compatibility props
   onSelectNotebook?: (workspaceId: string) => void;
@@ -59,7 +57,6 @@ export function WorkspaceLibrary({
   onUploadToNewWorkspace,
   onOpenAccount,
   onToggleTheme,
-  onOpenPdfTools,
   onOpenTwoMinuteDemo,
   onSelectNotebook,
   onCreateNotebook,
@@ -216,8 +213,8 @@ export function WorkspaceLibrary({
       <header className="notebook-nav workspace-nav">
         <div className="notebook-brand-link">
           <BrandMark />
-          <strong>Insight<span>PDF</span></strong>
-          <span className="hub-beta">Beta</span>
+          <strong>Ground<span>work</span></strong>
+          <span className="hub-beta">Workspace</span>
         </div>
 
         {/* Global search */}
@@ -235,13 +232,6 @@ export function WorkspaceLibrary({
 
         {/* Action Controls */}
         <div className="notebook-nav-actions">
-          {onOpenPdfTools && (
-            <button className="btn-secondary-white" onClick={onOpenPdfTools} title="Document tools (merge, split, convert)">
-              <Scissors size={14} />
-              <span>PDF Tools</span>
-            </button>
-          )}
-
           {onOpenTwoMinuteDemo && (
             <button className="btn-secondary-white btn-demo" onClick={onOpenTwoMinuteDemo} title="Load technical proposal demo">
               <PlayCircle size={14} />

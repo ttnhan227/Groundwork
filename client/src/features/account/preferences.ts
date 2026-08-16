@@ -36,20 +36,26 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   retention_days: 90,
 };
 
+export const PREFERENCES_STORAGE_KEY = "groundwork-preferences";
+export const LEGACY_PREFERENCES_STORAGE_KEY = "insightpdf-preferences";
+export const PREFERENCES_CHANGED_EVENT = "groundwork-preferences-changed";
+
 export function storedPreferences(): UserPreferences {
   try {
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(localStorage.getItem("insightpdf-preferences") ?? "{}") };
+    const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY) ?? localStorage.getItem(LEGACY_PREFERENCES_STORAGE_KEY);
+    return { ...DEFAULT_PREFERENCES, ...(raw ? JSON.parse(raw) : {}) };
   } catch {
     return DEFAULT_PREFERENCES;
   }
 }
 
 export function applyPreferences(preferences: UserPreferences) {
-  localStorage.setItem("insightpdf-preferences", JSON.stringify(preferences));
+  localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
   const root = document.documentElement;
   root.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
   root.toggleAttribute("data-high-contrast", preferences.high_contrast);
   root.dataset.theme = preferences.theme;
   root.dataset.interfaceSize = preferences.interface_size;
+  window.dispatchEvent(new CustomEvent<UserPreferences>(PREFERENCES_CHANGED_EVENT, { detail: preferences }));
   window.dispatchEvent(new CustomEvent<UserPreferences>("insightpdf-preferences-changed", { detail: preferences }));
 }

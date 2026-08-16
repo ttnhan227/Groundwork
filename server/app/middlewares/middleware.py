@@ -9,7 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.configs.config import get_settings
 
-logger = logging.getLogger("insightpdf.requests")
+logger = logging.getLogger("groundwork.requests")
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

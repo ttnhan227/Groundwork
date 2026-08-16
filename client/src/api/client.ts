@@ -1,8 +1,36 @@
 import type { AuthResult, Citation, Job, NativeDocument } from "../types";
 
 export const API = import.meta.env.VITE_API_URL ?? "/api/v1";
-export const AUTH_EXPIRED_EVENT = "insightpdf-auth-expired";
-export const AUTH_REFRESHED_EVENT = "insightpdf-auth-refreshed";
+export const AUTH_STORAGE_KEY = "groundwork-auth";
+export const LEGACY_AUTH_STORAGE_KEY = "insightpdf-auth";
+export const AUTH_EXPIRED_EVENT = "groundwork-auth-expired";
+export const AUTH_REFRESHED_EVENT = "groundwork-auth-refreshed";
+
+export function getStoredAuth(): AuthResult | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY) ?? localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthResult;
+    if (localStorage.getItem(LEGACY_AUTH_STORAGE_KEY) && !localStorage.getItem(AUTH_STORAGE_KEY)) {
+      localStorage.setItem(AUTH_STORAGE_KEY, raw);
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAuth(auth: AuthResult | null) {
+  if (typeof window === "undefined") return;
+  if (auth) {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+  } else {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+  }
+}
 
 let refreshPromise: Promise<AuthResult> | null = null;
 
@@ -17,14 +45,14 @@ function tokenExpiresSoon(token: string): boolean {
 }
 
 export function expireSession() {
-  localStorage.removeItem("insightpdf-auth");
+  setStoredAuth(null);
   window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 }
 
 async function refreshSession(): Promise<AuthResult> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
-    const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+    const saved = getStoredAuth();
     if (!saved?.refresh_token) {
       expireSession();
       throw new Error("Your session expired. Please log in again.");
@@ -41,7 +69,7 @@ async function refreshSession(): Promise<AuthResult> {
       throw new Error(message);
     }
     const refreshed = await response.json() as AuthResult;
-    localStorage.setItem("insightpdf-auth", JSON.stringify(refreshed));
+    setStoredAuth(refreshed);
     window.dispatchEvent(new CustomEvent<AuthResult>(AUTH_REFRESHED_EVENT, { detail: refreshed }));
     return refreshed;
   })().finally(() => { refreshPromise = null; });
@@ -54,14 +82,14 @@ export async function authenticatedFetch(input: RequestInfo | URL, token: string
     headers.set("Authorization", `Bearer ${accessToken}`);
     return fetch(input, { ...init, headers });
   };
-  const savedBeforeRequest = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+  const savedBeforeRequest = getStoredAuth();
   let activeToken = savedBeforeRequest?.access_token && savedBeforeRequest.access_token !== token && !tokenExpiresSoon(savedBeforeRequest.access_token)
     ? savedBeforeRequest.access_token
     : token;
   if (tokenExpiresSoon(activeToken)) activeToken = (await refreshSession()).access_token;
   let response = await send(activeToken);
   if (response.status !== 401) return response;
-  const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
+  const saved = getStoredAuth();
   const refreshed = saved?.access_token && saved.access_token !== activeToken && !tokenExpiresSoon(saved.access_token) ? saved : await refreshSession();
   response = await send(refreshed.access_token);
   if (response.status === 401) expireSession();

@@ -6,10 +6,9 @@ import {
   FileCheck2,
   FileSpreadsheet,
   FileText,
-  LockKeyhole,
   Layers,
+  LockKeyhole,
   PenLine,
-  Scissors,
   Search,
   Send,
   ShieldCheck,
@@ -17,8 +16,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { BrandMark } from "../../components/common/BrandMark";
-import { AUTH_EXPIRED_EVENT } from "../../api/client";
-import type { AuthResult } from "../../types";
+import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, getStoredAuth } from "../../api/client";
 
 const DOCUMENT_UPLOAD_ACCEPT = ".pdf,.docx,.pptx,.md,.markdown,.txt,.rtf,.png,.jpg,.jpeg,.webp";
 
@@ -31,34 +29,29 @@ export function LandingPage({
 }) {
   const [prompt, setPrompt] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
-      return Boolean(saved?.access_token && saved?.user);
-    } catch {
-      return false;
-    }
+    const saved = getStoredAuth();
+    return Boolean(saved?.access_token && saved?.user);
   });
 
   useEffect(() => {
     const syncAuthentication = () => {
-      try {
-        const saved = JSON.parse(localStorage.getItem("insightpdf-auth") ?? "null") as AuthResult | null;
-        setIsAuthenticated(Boolean(saved?.access_token && saved?.user));
-      } catch {
-        setIsAuthenticated(false);
-      }
+      const saved = getStoredAuth();
+      setIsAuthenticated(Boolean(saved?.access_token && saved?.user));
     };
     window.addEventListener("storage", syncAuthentication);
     window.addEventListener(AUTH_EXPIRED_EVENT, syncAuthentication);
+    window.addEventListener(AUTH_REFRESHED_EVENT, syncAuthentication);
     return () => {
       window.removeEventListener("storage", syncAuthentication);
       window.removeEventListener(AUTH_EXPIRED_EVENT, syncAuthentication);
+      window.removeEventListener(AUTH_REFRESHED_EVENT, syncAuthentication);
     };
   }, []);
 
   function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prompt.trim()) return;
+    sessionStorage.setItem("groundwork-pending-prompt", prompt.trim());
     sessionStorage.setItem("insightpdf-pending-prompt", prompt.trim());
     onOpen();
   }
@@ -67,13 +60,12 @@ export function LandingPage({
     <main className="ai-landing">
       {/* Navigation */}
       <header className="ai-landing-nav">
-        <a className="ai-landing-brand" href="/" aria-label="InsightPDF home">
+        <a className="ai-landing-brand" href="/" aria-label="Groundwork home">
           <BrandMark />
-          <span>Insight<b>PDF</b></span>
+          <span>Ground<b>work</b></span>
         </a>
         <nav aria-label="Landing navigation">
           <a href="#workflow">Workflow</a>
-          <a href="#tools">Document Tools</a>
           <a href="#security">Security & Privacy</a>
           <span className="nav-privacy-tag"><LockKeyhole size={13} /> Private workspace</span>
           <button onClick={onOpen} className="btn-nav-action">
@@ -90,7 +82,7 @@ export function LandingPage({
             <ShieldCheck size={13} /> Grounded Document Intelligence
           </div>
           <h1>
-            Turn complex PDFs into<br />
+            Turn complex documents into<br />
             <span>verified deliverables.</span>
           </h1>
           <p>
@@ -101,7 +93,7 @@ export function LandingPage({
             <div className="composer-input-row">
               <Search size={18} className="composer-icon" />
               <input
-                aria-label="Ask InsightPDF"
+                aria-label="Ask Groundwork"
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder="Ask a question or describe a brief to draft…"
@@ -122,41 +114,48 @@ export function LandingPage({
                   }}
                 />
               </label>
-              <span>PDF, Word, Markdown, text, slides, or scans</span>
+              <div className="composer-hints">
+                <span>Try:</span>
+                <button type="button" onClick={() => setPrompt("Audit technical compliance across all uploaded specifications")}>
+                  Audit technical compliance
+                </button>
+                <button type="button" onClick={() => setPrompt("Draft an executive summary comparing our SLA terms")}>
+                  Draft executive summary
+                </button>
+              </div>
             </footer>
           </form>
-
-          <div className="ai-hero-assurance">
-            <span><Check size={14} /> Exact page citations</span>
-            <span><Check size={14} /> Requirement verification</span>
-            <span><Check size={14} /> Export to PDF, Word & Markdown</span>
-          </div>
         </div>
 
-        {/* Realistic 3-Panel Product Stage */}
-        <div className="ai-product-stage" aria-label="InsightPDF workspace preview">
-          <div className="ai-product-window">
-            <header className="product-window-header">
-              <div className="window-dots"><i /><i /><i /></div>
-              <span className="window-title">
-                <FileText size={13} /> Technical Proposal & Compliance Audit · Workspace
-              </span>
-              <span className="window-status">
-                <CheckCircle2 size={12} /> Grounded
-              </span>
+        {/* Live Product Preview */}
+        <div className="ai-product-stage" aria-label="Groundwork workspace preview">
+          <div className="preview-window">
+            <header className="preview-header">
+              <div className="preview-dots">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="preview-title">
+                <BrandMark size={14} />
+                <span>Groundwork — Technical Proposal & Audit Demo</span>
+              </div>
+              <div className="preview-meta">
+                <span className="badge-grounded">● Grounded in 3 sources</span>
+              </div>
             </header>
 
-            <div className="ai-product-body">
+            <div className="preview-workspace-layout">
               {/* Column 1: Sources */}
               <aside className="preview-col-sources">
                 <div className="preview-section-title">
                   <span>Sources</span>
-                  <b>3 linked</b>
+                  <span className="count-pill">3 linked</span>
                 </div>
                 <div className="preview-source-item active">
-                  <FileText size={14} className="text-accent" />
+                  <FileText size={14} />
                   <div>
-                    <strong>Q3-Engineering-Spec.pdf</strong>
+                    <strong>Architecture-Spec-v2.pdf</strong>
                     <small>38 pages · Indexed</small>
                   </div>
                   <Check size={12} className="text-success" />
@@ -251,7 +250,7 @@ export function LandingPage({
         <header>
           <div className="ai-eyebrow"><Layers size={13} /> Architecture & Process</div>
           <h2>From raw documentation to verified deliverables.</h2>
-          <p>InsightPDF is designed around an end-to-end document intelligence workflow with full evidence traceability.</p>
+          <p>Groundwork is designed around an end-to-end document intelligence workflow with full evidence traceability.</p>
         </header>
 
         <div className="ai-workflow-grid">
@@ -259,7 +258,7 @@ export function LandingPage({
             <span className="step-num">01</span>
             <div className="step-icon"><Upload size={20} /></div>
             <h3>Ingest & Index</h3>
-            <p>Upload PDFs, Word documents, decks, or scans. InsightPDF parses text, layout, and pages into a searchable local index.</p>
+            <p>Upload PDFs, Word documents, decks, or scans. Groundwork parses text, layout, and pages into a searchable local index.</p>
           </article>
           <article>
             <span className="step-num">02</span>
@@ -276,40 +275,9 @@ export function LandingPage({
           <article>
             <span className="step-num">04</span>
             <div className="step-icon"><Download size={20} /></div>
-            <h3>Export & Manipulate</h3>
-            <p>Export clean PDF, Word, or Markdown files, or run server-side tools to merge, split, watermark, and convert documents.</p>
+            <h3>Export & Share</h3>
+            <p>Export clean PDF, Word (.docx), or Markdown deliverables with formatted citations and full evidence traceability.</p>
           </article>
-        </div>
-      </section>
-
-      {/* Document Tools Feature Section */}
-      <section className="ai-tools-section" id="tools">
-        <header>
-          <div className="ai-eyebrow"><Scissors size={13} /> Server-Side Utilities</div>
-          <h2>Full suite of built-in document tools.</h2>
-          <p>No need for external converters or separate PDF utilities. Everything is handled securely within your workspace.</p>
-        </header>
-        <div className="tools-grid">
-          <div className="tool-card">
-            <div className="tool-card-icon"><Scissors size={18} /></div>
-            <h4>Merge & Split</h4>
-            <p>Combine multiple PDFs in custom order or split by page ranges, individual pages, or custom selections.</p>
-          </div>
-          <div className="tool-card">
-            <div className="tool-card-icon"><Layers size={18} /></div>
-            <h4>Extract & Rotate</h4>
-            <p>Extract specific page sequences into a new PDF or rotate orientations by 90°, 180°, or 270°.</p>
-          </div>
-          <div className="tool-card">
-            <div className="tool-card-icon"><FileSpreadsheet size={18} /></div>
-            <h4>Format Conversions</h4>
-            <p>Convert PDFs to PNG/JPEG images (up to 300 DPI), Images to PDF, Word (DOCX) to PDF, and Word to Markdown.</p>
-          </div>
-          <div className="tool-card">
-            <div className="tool-card-icon"><LockKeyhole size={18} /></div>
-            <h4>Watermark & Security</h4>
-            <p>Apply text or image watermarks with precise positioning, custom opacity, and page selection.</p>
-          </div>
         </div>
       </section>
 
@@ -321,7 +289,7 @@ export function LandingPage({
           Your documents are never used to train public models. Files are stored securely in your isolated workspace, processed with durable background jobs, and remain completely under your control with one-click data deletion and export.
         </p>
         <button onClick={onOpen} className="btn-security-cta">
-          {isAuthenticated ? "Continue to your workspace" : "Get started with InsightPDF"}
+          {isAuthenticated ? "Continue to your workspace" : "Get started with Groundwork"}
           <ArrowRight size={15} />
         </button>
       </section>
@@ -330,7 +298,7 @@ export function LandingPage({
       <footer className="ai-landing-footer">
         <div className="footer-brand">
           <BrandMark />
-          <span>Insight<b>PDF</b></span>
+          <span>Ground<b>work</b></span>
         </div>
         <p>Document intelligence, traceable synthesis, and verifiable deliverables.</p>
         <button onClick={onOpen} className="footer-open-btn">

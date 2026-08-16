@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.dependencies import current_user
 from app.documents import owned_document
-from app.models import Collection, Document, GeneratedArtifact, User
+from app.models import Collection, Document, User
 from app.schemas import (
     CollectionCreate,
     CollectionResponse,
@@ -104,25 +104,3 @@ async def update_document_metadata(
     await session.commit()
     await session.refresh(document)
     return document
-
-
-@router.patch("/pdf-tools/artifacts/{artifact_id}/collection", response_model=dict)
-async def update_artifact_collection(
-    artifact_id: uuid.UUID,
-    payload: DocumentMetadataUpdate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    artifact = await session.scalar(
-        select(GeneratedArtifact).where(
-            GeneratedArtifact.id == artifact_id,
-            GeneratedArtifact.owner_id == user.id,
-        )
-    )
-    if artifact is None:
-        raise HTTPException(status_code=404, detail="Generated file not found")
-    await _validate_collection(payload.collection_id, user, session)
-    artifact.collection_id = payload.collection_id
-    await session.commit()
-    return {"id": str(artifact.id), "collection_id": str(artifact.collection_id) if artifact.collection_id else None}
-

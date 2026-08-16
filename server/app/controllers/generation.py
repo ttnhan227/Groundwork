@@ -234,7 +234,7 @@ def _content(prompt: str, source: str) -> tuple[str, list[tuple[str, str]]]:
 async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
     settings = get_settings()
     if not settings.llm_api_key:
-        raise HTTPException(status_code=503, detail="InsightPDF document generation is not configured")
+        raise HTTPException(status_code=503, detail="Groundwork document generation is not configured")
     format_name = {"docx": "Word document", "pdf": "PDF report", "pptx": "PowerPoint presentation"}[payload.output_format]
     source_rule = (
         "Use the supplied source text as evidence. Do not invent figures, names, dates, or claims that are absent from it."
@@ -277,7 +277,7 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
             temperature=.35,
         )
     except AIProviderError as exc:
-        raise HTTPException(status_code=502, detail="InsightPDF could not generate this document") from exc
+        raise HTTPException(status_code=502, detail="Groundwork could not generate this document") from exc
     try:
         aliases = {"bill": "invoice", "memo": "policy", "pitch_deck": "presentation", "slide_deck": "presentation"}
         value["document_type"] = aliases.get(str(value.get("document_type", "")).lower(), str(value.get("document_type", "general")).lower())
@@ -299,7 +299,7 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
                 value["table"] = None
         result = GeneratedContent.model_validate(value)
     except ValueError as exc:
-        raise HTTPException(status_code=502, detail="InsightPDF returned an invalid document structure") from exc
+        raise HTTPException(status_code=502, detail="Groundwork returned an invalid document structure") from exc
     return result
 
 
@@ -314,7 +314,7 @@ def _docx(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) ->
     heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
     heading.runs[0].font.color.rgb = RGBColor.from_string(theme["navy"])
     heading.runs[0].font.size = Pt(28)
-    sub = document.add_paragraph("Created with InsightPDF AI")
+    sub = document.add_paragraph("Created with Groundwork AI")
     sub.runs[0].font.color.rgb = RGBColor.from_string(theme["accent"])
     sub.runs[0].font.size = Pt(10)
     for index, (name, body) in enumerate(sections, 1):
@@ -335,7 +335,7 @@ def _pdf(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) -> 
     navy = tuple(int(theme["navy"][index:index + 2], 16) / 255 for index in (0, 2, 4))
     page.draw_rect(fitz.Rect(0, 0, 14, page.rect.height), color=accent, fill=accent)
     page.insert_textbox(fitz.Rect(48, 58, 545, 150), title, fontsize=26, fontname="hebo", color=navy)
-    page.insert_text((48, 158), "Created with InsightPDF AI", fontsize=9, color=accent)
+    page.insert_text((48, 158), "Created with Groundwork AI", fontsize=9, color=accent)
     y = 205
     for index, (name, body) in enumerate(sections, 1):
         page.insert_text((48, y), f"{index:02d}  {name.upper()}", fontsize=11, fontname="hebo", color=navy)
@@ -370,7 +370,7 @@ def _pptx(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) ->
     title_slide = deck.slides.add_slide(deck.slide_layouts[6])
     title_slide.background.fill.solid()
     title_slide.background.fill.fore_color.rgb = colors["navy"]
-    add_text(title_slide, "INSIGHTPDF PRESENTATION", .85, .75, 5, .35, 13, colors["accent"], True)
+    add_text(title_slide, "GROUNDWORK PRESENTATION", .85, .75, 5, .35, 13, colors["accent"], True)
     add_text(title_slide, title, .85, 2.0, 9.4, 2.0, 34, PptxRGBColor(255, 255, 255), True)
     add_text(title_slide, "A clear, AI-created narrative", .85, 5.75, 6, .4, 18, PptxRGBColor(190, 200, 218))
     for index, (name, body) in enumerate(sections, 1):
@@ -384,7 +384,7 @@ def _pptx(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) ->
         add_text(slide, f"{index:02d} · {name.upper()}", .82, .72, 5, .35, 13, colors["accent"], True)
         add_text(slide, name, .82, 1.45, 10.7, .85, 30, colors["navy"], True)
         add_text(slide, body, .82, 2.65, 8.9, 2.2, 20, PptxRGBColor(62, 72, 91))
-        add_text(slide, "InsightPDF", .82, 6.7, 2, .3, 10, PptxRGBColor(130, 140, 158), True)
+        add_text(slide, "Groundwork", .82, 6.7, 2, .3, 10, PptxRGBColor(130, 140, 158), True)
         add_text(slide, f"{index + 1:02d}", 11.8, 6.7, .5, .3, 10, PptxRGBColor(130, 140, 158))
     output = BytesIO()
     deck.save(output)
@@ -507,7 +507,7 @@ def _docx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         body.paragraph_format.line_spacing = 1.15 if plan.layout != "editorial" else 1.28
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer.add_run(f"Created with InsightPDF AI · {plan.document_type.title()} · {plan.layout.title()} layout").font.size = Pt(8)
+    footer.add_run(f"Created with Groundwork AI · {plan.document_type.title()} · {plan.layout.title()} layout").font.size = Pt(8)
     output = BytesIO()
     document.save(output)
     return output.getvalue()
@@ -658,7 +658,7 @@ def _pptx_preview_slides(plan: GeneratedContent) -> list[dict[str, str]]:
     slides = [{
         "eyebrow": _shorten_slide_text(plan.document_type.upper(), 34),
         "title": _shorten_slide_text(plan.title, 76),
-        "body": _shorten_slide_text(plan.subtitle or "Created with InsightPDF AI", 130),
+        "body": _shorten_slide_text(plan.subtitle or "Created with Groundwork AI", 130),
         "variant": "title",
     }]
     limits = {1: (64, 330), 2: (48, 250), 3: (68, 310)}
@@ -792,7 +792,7 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: byt
             text(slide, f"{index:02d}  /  INSIGHT", .85, .78, 4, .3, 14, accent, True)
             text(slide, heading, .85, 1.75, 11.45, 1.35, 37, ink, True, vertical=MSO_ANCHOR.MIDDLE)
             text(slide, body, .85, 3.5, 10.9, 2.25, 19, muted)
-        text(slide, "InsightPDF", .8, 6.8, 2, .25, 10, muted, True)
+        text(slide, "Groundwork", .8, 6.8, 2, .25, 10, muted, True)
     output = BytesIO()
     deck.save(output)
     return output.getvalue()

@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "InsightPDF API"
+    app_name: str = "Groundwork API"
     environment: str = "development"
     database_url: str = "postgresql+asyncpg://insightpdf:insightpdf@postgres:5432/insightpdf"
     jwt_secret: str = "change-me-in-production"

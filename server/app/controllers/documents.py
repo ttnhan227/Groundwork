@@ -244,7 +244,7 @@ async def download_documents_archive(
         stream_archive(),
         media_type="application/zip",
         headers={
-            "Content-Disposition": 'attachment; filename="insightpdf-documents.zip"',
+            "Content-Disposition": 'attachment; filename="groundwork-documents.zip"',
             "X-File-Count": str(len(files)),
         },
     )

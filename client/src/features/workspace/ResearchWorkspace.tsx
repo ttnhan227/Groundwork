@@ -14,7 +14,6 @@ import {
   ExternalLink,
   CheckSquare,
   Square as SquareOutline,
-  Scissors,
   Upload,
   Sun,
   Moon,
@@ -47,7 +46,6 @@ export interface ResearchWorkspaceProps {
   onBackToLibrary: () => void;
   onUploadDocument: (file: File, workspaceId: string) => Promise<DocumentItem | null>;
   onDeleteDocument: (docId: string) => Promise<void>;
-  onOpenPdfTools?: () => void;
   onOpenAccount?: () => void;
   onToggleTheme?: () => void;
   onOpenViewer?: (docId: string, pageNumber?: number) => void;
@@ -64,7 +62,6 @@ export function ResearchWorkspace({
   onBackToLibrary,
   onUploadDocument,
   onDeleteDocument,
-  onOpenPdfTools,
   onOpenAccount,
   onToggleTheme,
   onOpenViewer,
@@ -447,12 +444,6 @@ export function ResearchWorkspace({
 
         {/* Right action controls */}
         <div className="topbar-right">
-          {onOpenPdfTools && (
-            <button className="btn-secondary-white" onClick={onOpenPdfTools} title="Document tools (merge, split, convert)">
-              <Scissors size={14} />
-              <span>PDF Tools</span>
-            </button>
-          )}
 
           {activeArtifact && (
             <button
@@ -787,7 +778,7 @@ export function ResearchWorkspace({
                     handleSendPrompt();
                   }
                 }}
-                placeholder={`Ask InsightPDF agent grounded on ${selectedSourceIds.length} sources...`}
+                placeholder={`Ask Groundwork agent grounded on ${selectedSourceIds.length} sources...`}
                 rows={2}
                 className="composer-textarea"
                 aria-label="Agent prompt input"

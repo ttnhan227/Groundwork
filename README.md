@@ -1,17 +1,12 @@
-<p align="center">
-  <img src="client/public/readme-logo.png" alt="InsightPDF" width="420" />
-</p>
+# Groundwork
 
-# InsightPDF
-
-InsightPDF is a workspace for ingesting source documents (PDFs, Office files, images, markdown), performing grounded research with citations, and generating verified reports, proposals, and presentations.
+Groundwork is an AI-first research workspace for ingesting source documents (PDFs, Office files, images, markdown), performing grounded research with citations, and generating verified deliverables like proposals, reports, and briefs.
 
 ## Features
 
 - **Research Workspaces**: Conversational research interface with multi-step reasoning, source citations tied to exact pages, and direct deliverable drafting.
 - **Document Ingestion & RAG**: Text extraction and OCR across PDF, DOCX, PPTX, XLSX, and images. Semantic search powered by PostgreSQL and pgvector.
-- **Generation & Verification**: Export to Markdown, PDF, Word (.docx), and PowerPoint (.pptx) with automated checks for missing requirements and unsupported claims.
-- **PDF Tools**: In-browser tools to merge, split, rotate, compress, watermark, convert, and reorder PDF pages.
+- **Generation & Verification**: Export to Markdown, PDF, and Word (.docx) with automated audit checks for requirement coverage and grounded claims.
 - **Review & Collaboration**: Inline feedback, requirement tracing, evidence inspection, and version history.
 
 ## Architecture
@@ -19,7 +14,7 @@ InsightPDF is a workspace for ingesting source documents (PDFs, Office files, im
 The backend is built with FastAPI in a layered architecture (controllers, services, repositories, models, dtos, tasks), backed by Celery for asynchronous background jobs like OCR and embedding generation.
 
 ```
-InsightPDF/
+Groundwork/
 ├── client/                     # React + TypeScript SPA (Vite)
 │   └── src/
 │       ├── api/                # API client and endpoints

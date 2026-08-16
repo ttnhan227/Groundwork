@@ -185,6 +185,48 @@ def process_document(self: Task, document_id: str) -> None:
         raise failure
 
 
+async def _store(
+    operation: str,
+    filename: str,
+    data: bytes,
+    content_type: str,
+    parameters: dict,
+    user: User,
+    session: AsyncSession,
+) -> GeneratedArtifact:
+    identifier = uuid.uuid4()
+    filename = safe_filename(filename)
+    key = f"{user.id}/generated/{identifier}/{filename}"
+    ObjectStorage().upload(key, data, content_type)
+    from app.deliverables import ensure_personal_workspace
+    workspace = await ensure_personal_workspace(user, session)
+    artifact = GeneratedArtifact(
+        id=identifier,
+        owner_id=user.id,
+        workspace_id=workspace.id,
+        operation=operation,
+        filename=filename,
+        object_key=key,
+        content_type=content_type,
+        size_bytes=len(data),
+        parameters=parameters,
+    )
+    session.add(artifact)
+    session.add(
+        ArtifactVersion(
+            artifact_id=identifier,
+            version_number=1,
+            object_key=key,
+            content_type=content_type,
+            size_bytes=len(data),
+            metadata_json={"operation": operation},
+        )
+    )
+    await session.commit()
+    await session.refresh(artifact)
+    return artifact
+
+
 async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
     async with SessionLocal() as session:
         job = await session.get(ProcessingJob, job_id)
@@ -205,6 +247,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         operation = job.operation
 
         from app.ai_features import (
+            _ready_document,
             compare,
             extract_information,
             quiz,
@@ -217,25 +260,10 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             images_to_pdf,
             watermark_pdf,
         )
-        from app.pdf_tools import (
-            _ready_document,
-            _store,
-            convert_pdf_to_images,
-            delete_pages_route,
-            extract_pages_route,
-            merge,
-            rotate,
-            split,
-        )
         from app.schemas import (
             ComparisonRequest,
             ExtractionRequest,
-            MergeRequest,
-            PageOperationRequest,
-            PDFToImagesRequest,
             QuizRequest,
-            RotateRequest,
-            SplitRequest,
             SummaryRequest,
             TranslationRequest,
         )
@@ -264,34 +292,6 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         elif operation == "comparison":
             result = await compare(ComparisonRequest(**parameters), user, session)
             result_kind = "ai_result"
-        elif operation == "merge":
-            result = await merge(MergeRequest(**parameters), user, session)
-            result_kind = "artifact"
-        elif operation == "split":
-            result = await split(
-                SplitRequest(document_id=uuid.UUID(document_id), **parameters), user, session
-            )
-            result_kind = "artifact"
-        elif operation == "rotate":
-            result = await rotate(
-                RotateRequest(document_id=uuid.UUID(document_id), **parameters), user, session
-            )
-            result_kind = "artifact"
-        elif operation == "delete_pages":
-            result = await delete_pages_route(
-                PageOperationRequest(document_id=uuid.UUID(document_id), **parameters), user, session
-            )
-            result_kind = "artifact"
-        elif operation == "extract_pages":
-            result = await extract_pages_route(
-                PageOperationRequest(document_id=uuid.UUID(document_id), **parameters), user, session
-            )
-            result_kind = "artifact"
-        elif operation == "pdf_to_images":
-            result = await convert_pdf_to_images(
-                PDFToImagesRequest(document_id=uuid.UUID(document_id), **parameters), user, session
-            )
-            result_kind = "artifact"
         elif operation == "images_to_pdf":
             staged_keys = parameters.pop("staged_keys")
             save_sources = parameters.pop("save_sources", False)

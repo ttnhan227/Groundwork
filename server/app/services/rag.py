@@ -344,7 +344,7 @@ def _general_answer_messages(
         {
             "role": "system",
             "content": (
-                "You are InsightPDF AI, a helpful general-purpose assistant inside a document workspace. "
+                "You are Groundwork AI, a helpful general-purpose assistant inside a document workspace. "
                 "Answer clearly and concisely in polished Markdown. Do not claim to have read or searched "
                 "the user's documents unless documents were explicitly attached in document chat."
             ),

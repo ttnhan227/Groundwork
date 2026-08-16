@@ -13,9 +13,9 @@ async function readSourceTree(directory = new URL("../src/", import.meta.url)) {
   return contents.join("\n");
 }
 
-test("builds the InsightPDF static application shell", async () => {
+test("builds the Groundwork static application shell", async () => {
   const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
-  assert.match(html, /<title>InsightPDF/);
+  assert.match(html, /<title>Groundwork/);
   assert.match(html, /<div id="root"><\/div>/);
   assert.match(html, /\/assets\/index-/);
 });
@@ -41,26 +41,22 @@ test("includes background processing jobs and durable execution", async () => {
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /queueOperation/);
   assert.match(page, /\/jobs/);
   assert.match(page, /ProcessingJobs/);
-  assert.match(page, /downloadArtifact/);
   assert.match(css, /\.jobs-panel/);
   assert.match(css, /\.job-state/);
 });
 
-test("includes the complete PDF tools workspace", async () => {
+test("includes research workspace workflows and export options", async () => {
   const [page, css] = await Promise.all([
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  for (const label of ["Merge", "Split", "Extract pages", "Delete pages", "Rotate", "PDF to images", "Images to PDF", "Watermark"]) {
+  for (const label of ["Technical Proposal", "Client Research Report", "Executive Presentation", "Blank Workspace"]) {
     assert.match(page, new RegExp(label));
   }
-  assert.match(page, /\/pdf-tools\/artifacts/);
-  assert.match(page, /downloadArtifact/);
-  assert.match(css, /\.pdf-tools-panel/);
-  assert.match(css, /\.artifact-ready/);
+  assert.match(page, /Export Deliverable/);
+  assert.match(css, /\.notebook-template-card/);
 });
 
 test("includes profile, account settings, brand mark and admin access", async () => {

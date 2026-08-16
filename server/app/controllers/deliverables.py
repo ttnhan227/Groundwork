@@ -433,7 +433,7 @@ async def invite_workspace_member(
     workspace, _ = await workspace_access(workspace_id, user, session, {"owner"})
     invited_user = await session.scalar(select(User).where(User.email == str(payload.email).lower()))
     if invited_user is None or not invited_user.is_active:
-        raise HTTPException(status_code=404, detail="No active InsightPDF account uses that email")
+        raise HTTPException(status_code=404, detail="No active Groundwork account uses that email")
     existing = await session.scalar(select(WorkspaceMember).where(
         WorkspaceMember.workspace_id == workspace_id,
         WorkspaceMember.user_id == invited_user.id,
