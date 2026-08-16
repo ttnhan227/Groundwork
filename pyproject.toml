@@ -1,0 +1,22 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "B008",  # Do not perform function call in argument defaults (FastAPI Depends/Query pattern)
+    "E501",  # Line length
+    "F403",  # Star imports for backwards compatibility proxies
+    "F405",  # Undefined names from star imports
+    "B904",  # raise ... from err
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

@@ -10,6 +10,7 @@ export type DocumentItem = {
   original_content_type?: string | null;
   tags: string[];
   collection_id: string | null;
+  workspace_id?: string | null;
   created_at: string;
 };
 

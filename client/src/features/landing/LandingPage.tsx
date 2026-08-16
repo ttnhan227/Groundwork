@@ -1,14 +1,18 @@
 import {
   ArrowRight,
   Check,
+  CheckCircle2,
   Download,
+  FileCheck2,
+  FileSpreadsheet,
   FileText,
   LockKeyhole,
+  Layers,
   PenLine,
+  Scissors,
   Search,
   Send,
   ShieldCheck,
-  Sparkles,
   Upload,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
@@ -61,38 +65,54 @@ export function LandingPage({
 
   return (
     <main className="ai-landing">
+      {/* Navigation */}
       <header className="ai-landing-nav">
         <a className="ai-landing-brand" href="/" aria-label="InsightPDF home">
           <BrandMark />
-          <span>InsightPDF</span>
+          <span>Insight<b>PDF</b></span>
         </a>
         <nav aria-label="Landing navigation">
-          <a href="#workflow">How it works</a>
-          <span><LockKeyhole size={13} /> Private by default</span>
-          <button onClick={onOpen}>{isAuthenticated ? "Open workspace" : "Sign in"}<ArrowRight size={15} /></button>
+          <a href="#workflow">Workflow</a>
+          <a href="#tools">Document Tools</a>
+          <a href="#security">Security & Privacy</a>
+          <span className="nav-privacy-tag"><LockKeyhole size={13} /> Private workspace</span>
+          <button onClick={onOpen} className="btn-nav-action">
+            {isAuthenticated ? "Open workspace" : "Sign in"}
+            <ArrowRight size={14} />
+          </button>
         </nav>
       </header>
 
+      {/* Hero Section */}
       <section className="ai-landing-hero">
         <div className="ai-landing-copy">
-          <div className="ai-eyebrow"><Sparkles size={14} /> AI workspace for serious document work</div>
-          <h1>Your source material,<br /><span>ready to answer.</span></h1>
-          <p>Bring scattered PDFs, reports, slides, and notes into one focused workspace. Research with citations, shape the argument, and ship a polished deliverable.</p>
+          <div className="ai-eyebrow">
+            <ShieldCheck size={13} /> Grounded Document Intelligence
+          </div>
+          <h1>
+            Turn complex PDFs into<br />
+            <span>verified deliverables.</span>
+          </h1>
+          <p>
+            Bring scattered reports, specifications, contracts, and decks into one focused workspace. Research with page-level citations, verify requirement coverage, and export structured documents.
+          </p>
 
           <form className="ai-hero-composer" onSubmit={submitPrompt}>
-            <div>
-              <Sparkles size={18} />
+            <div className="composer-input-row">
+              <Search size={18} className="composer-icon" />
               <input
                 aria-label="Ask InsightPDF"
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Ask a question or describe what you need to create"
+                placeholder="Ask a question or describe a brief to draft…"
               />
-              <button type="submit" aria-label="Send question" disabled={!prompt.trim()}><Send size={17} /></button>
+              <button type="submit" aria-label="Send question" disabled={!prompt.trim()} className="btn-send">
+                <Send size={15} />
+              </button>
             </div>
             <footer>
-              <label>
-                <Upload size={14} /> Attach source
+              <label className="attach-source-btn">
+                <Upload size={14} /> Attach document
                 <input
                   type="file"
                   accept={DOCUMENT_UPLOAD_ACCEPT}
@@ -102,95 +122,220 @@ export function LandingPage({
                   }}
                 />
               </label>
-              <span>PDF, Word, slides, text, or images</span>
+              <span>PDF, Word, Markdown, text, slides, or scans</span>
             </footer>
           </form>
 
           <div className="ai-hero-assurance">
-            <span><Check size={14} /> Page-level citations</span>
-            <span><Check size={14} /> Reviewable AI edits</span>
-            <span><Check size={14} /> Real file exports</span>
+            <span><Check size={14} /> Exact page citations</span>
+            <span><Check size={14} /> Requirement verification</span>
+            <span><Check size={14} /> Export to PDF, Word & Markdown</span>
           </div>
         </div>
 
+        {/* Realistic 3-Panel Product Stage */}
         <div className="ai-product-stage" aria-label="InsightPDF workspace preview">
           <div className="ai-product-window">
-            <header>
-              <div><i /><i /><i /></div>
-              <span><ShieldCheck size={12} /> Private research workspace</span>
-              <b>Ready</b>
+            <header className="product-window-header">
+              <div className="window-dots"><i /><i /><i /></div>
+              <span className="window-title">
+                <FileText size={13} /> Technical Proposal & Compliance Audit · Workspace
+              </span>
+              <span className="window-status">
+                <CheckCircle2 size={12} /> Grounded
+              </span>
             </header>
+
             <div className="ai-product-body">
-              <aside>
-                <div className="ai-preview-brand"><BrandMark /><strong>InsightPDF</strong></div>
-                <small>BRIEF WORKSPACE</small>
-                <span className="active"><Search size={14} /> Research</span>
-                <span><FileText size={14} /> Sources <b>3</b></span>
-                <span><PenLine size={14} /> Deliverables <b>1</b></span>
-                <div className="ai-preview-source">
-                  <FileText size={15} />
-                  <div><strong>Q2-board-report.pdf</strong><small>42 pages · searchable</small></div>
-                  <Check size={12} />
+              {/* Column 1: Sources */}
+              <aside className="preview-col-sources">
+                <div className="preview-section-title">
+                  <span>Sources</span>
+                  <b>3 linked</b>
+                </div>
+                <div className="preview-source-item active">
+                  <FileText size={14} className="text-accent" />
+                  <div>
+                    <strong>Q3-Engineering-Spec.pdf</strong>
+                    <small>38 pages · Indexed</small>
+                  </div>
+                  <Check size={12} className="text-success" />
+                </div>
+                <div className="preview-source-item">
+                  <FileText size={14} />
+                  <div>
+                    <strong>SOC2-Compliance-Report.pdf</strong>
+                    <small>54 pages · Indexed</small>
+                  </div>
+                  <Check size={12} className="text-success" />
+                </div>
+                <div className="preview-source-item">
+                  <FileSpreadsheet size={14} />
+                  <div>
+                    <strong>SLA-Requirements.docx</strong>
+                    <small>12 pages · Indexed</small>
+                  </div>
+                  <Check size={12} className="text-success" />
                 </div>
               </aside>
-              <section>
-                <div className="ai-preview-context"><Sparkles size={14} /><span>Researching across 3 linked sources</span></div>
-                <h2>What changed in Q2, and what needs attention?</h2>
+
+              {/* Column 2: Grounded QA & Synthesis */}
+              <section className="preview-col-chat">
+                <div className="preview-chat-context">
+                  <Search size={13} />
+                  <span>Cross-referencing 3 active sources</span>
+                </div>
+                <div className="preview-chat-question">
+                  <strong>User:</strong> What are the mandatory encryption standards and SLA recovery targets?
+                </div>
                 <article className="ai-preview-answer">
-                  <div className="ai-answer-label"><Sparkles size={14} /> Grounded answer <span>3 citations</span></div>
-                  <p>Revenue accelerated while operating margin improved, but enterprise churn remains the clearest risk to the second-half plan.</p>
-                  <div className="ai-preview-metrics">
-                    <span><small>Revenue</small><strong>$48.2M</strong><em>↑ 18.4%</em></span>
-                    <span><small>Margin</small><strong>24.1%</strong><em>↑ 7.2 pts</em></span>
-                    <span><small>Retention</small><strong>92%</strong><em className="warn">Watch</em></span>
+                  <div className="ai-answer-label">
+                    <CheckCircle2 size={13} /> Grounded Synthesis
+                    <span className="citation-badge">2 citations</span>
                   </div>
-                  <footer>
-                    <button>Revenue · p.12</button>
-                    <button>Margin · p.27</button>
-                    <button>Retention · p.31</button>
+                  <p>
+                    All data at rest must use AES-256 with KMS envelope encryption, and TLS 1.3 is enforced in transit. The contract specifies an RTO of &lt; 15 minutes and RPO of &lt; 1 minute for Tier 1 services.
+                  </p>
+                  <footer className="preview-citation-list">
+                    <span className="citation-chip">Spec · p.14</span>
+                    <span className="citation-chip">SOC2 · p.27</span>
+                    <span className="citation-chip">SLA · p.4</span>
                   </footer>
                 </article>
-                <div className="ai-preview-composer"><span>Ask a follow-up…</span><button><Send size={14} /></button></div>
               </section>
+
+              {/* Column 3: Deliverable & Verification */}
+              <aside className="preview-col-studio">
+                <div className="preview-section-title">
+                  <span>Deliverable</span>
+                  <span className="badge-verified">✓ 100% Verified</span>
+                </div>
+                <div className="preview-deliverable-card">
+                  <strong>Architecture & SLA Proposal</strong>
+                  <small>Updated 2m ago · 4 sections</small>
+                  <div className="preview-req-list">
+                    <div className="req-row covered">
+                      <Check size={11} /> <span>AES-256 Encryption requirement</span>
+                    </div>
+                    <div className="req-row covered">
+                      <Check size={11} /> <span>15-min RTO target specified</span>
+                    </div>
+                    <div className="req-row covered">
+                      <Check size={11} /> <span>Audit logging retention policy</span>
+                    </div>
+                  </div>
+                  <div className="preview-export-row">
+                    <button className="preview-btn-export"><Download size={12} /> Export PDF</button>
+                    <button className="preview-btn-subtle">Word (.docx)</button>
+                  </div>
+                </div>
+              </aside>
             </div>
           </div>
-          <div className="ai-floating-card ai-floating-source"><FileText size={16} /><span><strong>Source connected</strong><small>Evidence stays traceable</small></span><Check size={14} /></div>
-          <div className="ai-floating-card ai-floating-export"><Download size={16} /><span><strong>Brief ready</strong><small>PDF · Word · Markdown</small></span></div>
         </div>
       </section>
 
-      <section className="ai-trust-strip" aria-label="Product principles">
-        <span>Grounded in your sources</span><i />
-        <span>Original files preserved</span><i />
-        <span>Changes stay reviewable</span><i />
-        <span>Outputs remain editable</span>
+      {/* Trust Strip */}
+      <section className="ai-trust-strip" aria-label="Product guarantees">
+        <span><FileCheck2 size={15} /> Grounded in your uploaded sources</span>
+        <i />
+        <span><LockKeyhole size={15} /> Private, isolated workspace per account</span>
+        <i />
+        <span><Search size={15} /> Clickable page-level citations</span>
+        <i />
+        <span><Download size={15} /> Clean exports in PDF, DOCX, and Markdown</span>
       </section>
 
+      {/* Workflow Section */}
       <section className="ai-workflow-section" id="workflow">
         <header>
-          <div className="ai-eyebrow"><Sparkles size={14} /> A workflow, not another chat box</div>
-          <h2>One workspace from first read to final draft.</h2>
-          <p>Each step has a clear purpose, visible state, and a natural next action.</p>
+          <div className="ai-eyebrow"><Layers size={13} /> Architecture & Process</div>
+          <h2>From raw documentation to verified deliverables.</h2>
+          <p>InsightPDF is designed around an end-to-end document intelligence workflow with full evidence traceability.</p>
         </header>
+
         <div className="ai-workflow-grid">
-          <article><span>01</span><div><FileText size={20} /></div><h3>Collect</h3><p>Add source material and see exactly what is ready, processing, or needs attention.</p></article>
-          <article><span>02</span><div><Search size={20} /></div><h3>Understand</h3><p>Ask across selected sources, inspect citations, and move from claims back to pages.</p></article>
-          <article><span>03</span><div><PenLine size={20} /></div><h3>Create</h3><p>Turn evidence into an editable brief with linked sources, comments, and AI suggestions.</p></article>
-          <article><span>04</span><div><Download size={20} /></div><h3>Review & ship</h3><p>Compare versions, resolve feedback, then export a real PDF, Word, or Markdown file.</p></article>
+          <article>
+            <span className="step-num">01</span>
+            <div className="step-icon"><Upload size={20} /></div>
+            <h3>Ingest & Index</h3>
+            <p>Upload PDFs, Word documents, decks, or scans. InsightPDF parses text, layout, and pages into a searchable local index.</p>
+          </article>
+          <article>
+            <span className="step-num">02</span>
+            <div className="step-icon"><Search size={20} /></div>
+            <h3>Query & Ground</h3>
+            <p>Ask questions across one or many linked documents. Every statement includes interactive citations jumping to the exact source page.</p>
+          </article>
+          <article>
+            <span className="step-num">03</span>
+            <div className="step-icon"><PenLine size={20} /></div>
+            <h3>Draft & Verify</h3>
+            <p>Generate structured proposals, executive summaries, or technical notes. Automated audits check every claim against source evidence.</p>
+          </article>
+          <article>
+            <span className="step-num">04</span>
+            <div className="step-icon"><Download size={20} /></div>
+            <h3>Export & Manipulate</h3>
+            <p>Export clean PDF, Word, or Markdown files, or run server-side tools to merge, split, watermark, and convert documents.</p>
+          </article>
         </div>
       </section>
 
-      <section className="ai-security-section">
-        <div><ShieldCheck size={26} /><span>Private workspace</span></div>
-        <h2>AI that shows its work.</h2>
-        <p>InsightPDF keeps the evidence visible. Citations open the source page, suggestions wait for your approval, and original uploads stay available.</p>
-        <button onClick={onOpen}>{isAuthenticated ? "Continue your work" : "Create your workspace"}<ArrowRight size={16} /></button>
+      {/* Document Tools Feature Section */}
+      <section className="ai-tools-section" id="tools">
+        <header>
+          <div className="ai-eyebrow"><Scissors size={13} /> Server-Side Utilities</div>
+          <h2>Full suite of built-in document tools.</h2>
+          <p>No need for external converters or separate PDF utilities. Everything is handled securely within your workspace.</p>
+        </header>
+        <div className="tools-grid">
+          <div className="tool-card">
+            <div className="tool-card-icon"><Scissors size={18} /></div>
+            <h4>Merge & Split</h4>
+            <p>Combine multiple PDFs in custom order or split by page ranges, individual pages, or custom selections.</p>
+          </div>
+          <div className="tool-card">
+            <div className="tool-card-icon"><Layers size={18} /></div>
+            <h4>Extract & Rotate</h4>
+            <p>Extract specific page sequences into a new PDF or rotate orientations by 90°, 180°, or 270°.</p>
+          </div>
+          <div className="tool-card">
+            <div className="tool-card-icon"><FileSpreadsheet size={18} /></div>
+            <h4>Format Conversions</h4>
+            <p>Convert PDFs to PNG/JPEG images (up to 300 DPI), Images to PDF, Word (DOCX) to PDF, and Word to Markdown.</p>
+          </div>
+          <div className="tool-card">
+            <div className="tool-card-icon"><LockKeyhole size={18} /></div>
+            <h4>Watermark & Security</h4>
+            <p>Apply text or image watermarks with precise positioning, custom opacity, and page selection.</p>
+          </div>
+        </div>
       </section>
 
+      {/* Security & Privacy Section */}
+      <section className="ai-security-section" id="security">
+        <div className="security-badge"><ShieldCheck size={20} /><span>Private Workspace Storage</span></div>
+        <h2>Privacy and source integrity come first.</h2>
+        <p>
+          Your documents are never used to train public models. Files are stored securely in your isolated workspace, processed with durable background jobs, and remain completely under your control with one-click data deletion and export.
+        </p>
+        <button onClick={onOpen} className="btn-security-cta">
+          {isAuthenticated ? "Continue to your workspace" : "Get started with InsightPDF"}
+          <ArrowRight size={15} />
+        </button>
+      </section>
+
+      {/* Footer */}
       <footer className="ai-landing-footer">
-        <div className="ai-landing-brand"><BrandMark /><span>InsightPDF</span></div>
-        <p>Research, write, and deliver from the same source of truth.</p>
-        <button onClick={onOpen}>Open workspace <ArrowRight size={14} /></button>
+        <div className="footer-brand">
+          <BrandMark />
+          <span>Insight<b>PDF</b></span>
+        </div>
+        <p>Document intelligence, traceable synthesis, and verifiable deliverables.</p>
+        <button onClick={onOpen} className="footer-open-btn">
+          Open workspace <ArrowRight size={14} />
+        </button>
       </footer>
     </main>
   );

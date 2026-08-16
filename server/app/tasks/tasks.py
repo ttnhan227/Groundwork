@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from celery import Task
 from sqlalchemy import delete, select
@@ -37,7 +37,7 @@ async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
         job.task_id = task_id
         job.status = JobStatus.RUNNING
         job.progress = 5
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         persisted_workflow = await session.scalar(
             select(WorkflowRun).where(WorkflowRun.job_id == job.id)
         )
@@ -60,7 +60,7 @@ async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
                 )
                 if execution:
                     execution.status = "running"
-                    execution.started_at = datetime.now(timezone.utc)
+                    execution.started_at = datetime.now(UTC)
         await session.commit()
         return document.object_key
 
@@ -105,7 +105,7 @@ async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
         document.error_message = None
         job.status = JobStatus.COMPLETED
         job.progress = 100
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         user = await session.get(User, document.owner_id)
         if user is not None:
             from app.deliverables import activity, ensure_personal_workspace
@@ -145,7 +145,7 @@ async def _fail(document_id: uuid.UUID, message: str, retries: int) -> None:
             job.status = JobStatus.FAILED
             job.error_message = message[:2000]
             job.retry_count = retries
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = datetime.now(UTC)
         await session.commit()
 
 
@@ -198,7 +198,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         job.task_id = task_id
         job.status = JobStatus.RUNNING
         job.progress = 10
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         await session.commit()
 
         parameters = dict(job.parameters)
@@ -416,7 +416,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                     persisted_step.status = "running"
                 if execution:
                     execution.status = "running"
-                    execution.started_at = datetime.now(timezone.utc)
+                    execution.started_at = datetime.now(UTC)
                 await session.commit()
                 tool = step["tool"]
                 values = dict(step["parameters"])
@@ -456,7 +456,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                 if execution:
                     execution.status = "completed"
                     execution.outputs = {"page_count": report_steps[-1]["page_count"]}
-                    execution.completed_at = datetime.now(timezone.utc)
+                    execution.completed_at = datetime.now(UTC)
                 job.progress = min(90, 10 + round(index / len(workflow_steps) * 75))
                 await session.commit()
             final_pdf = fitz.open(stream=data, filetype="pdf")
@@ -549,7 +549,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             result_kind = "artifact"
         job.status = JobStatus.COMPLETED
         job.progress = 100
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         job.result_kind = result_kind
         job.result_id = result.id
         if workflow:
@@ -573,7 +573,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                         "result_kind": result_kind,
                         "result_id": str(result.id),
                     }
-                    execution.completed_at = datetime.now(timezone.utc)
+                    execution.completed_at = datetime.now(UTC)
         from app.notifications import notify_user
         from app.schemas import UserPreferences
         preferences = UserPreferences.model_validate(user.preferences or {})
@@ -601,7 +601,7 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
         job.status = JobStatus.FAILED
         job.error_message = message[:2000]
         job.retry_count = retries
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         workflow = await session.scalar(select(WorkflowRun).where(WorkflowRun.job_id == job.id))
         if workflow:
             workflow.status = "failed"
@@ -623,7 +623,7 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
                 if execution:
                     execution.status = "failed"
                     execution.error_message = message[:2000]
-                    execution.completed_at = datetime.now(timezone.utc)
+                    execution.completed_at = datetime.now(UTC)
         if job.owner_id is not None:
             owner = await session.get(User, job.owner_id)
             if owner is not None:

@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -6,13 +6,13 @@ from app.rag import (
     answer_declines_context,
     build_retrieval_query,
     chunk_pages,
-    clean_user_answer,
     cited_sources,
+    clean_user_answer,
     embed_texts,
     generate_answer,
-    requires_visual_answer,
     is_casual_message,
     relevant_snippet,
+    requires_visual_answer,
 )
 
 

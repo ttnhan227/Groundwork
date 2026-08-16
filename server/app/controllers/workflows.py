@@ -2,7 +2,7 @@ import hashlib
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -471,7 +471,7 @@ async def confirm_workflow(
     workflow = await _owned_workflow(workflow_id, user, session)
     if workflow.status != "awaiting_confirmation":
         raise HTTPException(status_code=409, detail="This workflow is not awaiting confirmation")
-    workflow.approved_at = datetime.now(timezone.utc)
+    workflow.approved_at = datetime.now(UTC)
     await session.commit()
     job = await _queue_persisted_workflow(workflow, user, session)
     workflow = await _owned_workflow(workflow.id, user, session)

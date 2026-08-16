@@ -1,4 +1,3 @@
-import uuid
 from app.main import app
 from app.schemas import (
     NativeDocumentBlocksRequest,
@@ -9,45 +8,45 @@ from app.schemas import (
 
 def test_dual_routes_registered_in_fastapi() -> None:
     routes = {route.path for route in app.routes if hasattr(route, "path")}
-    
+
     # Conversations
     assert "/api/v1/conversations/{conversation_id}" in routes
-    
+
     # Workspace CRUD
     assert "/api/v1/workspaces" in routes
     assert "/api/v1/workspaces/{workspace_id}" in routes
-    
+
     # Dual-routed native documents & sub-resources
     assert "/api/v1/native-documents/{native_id}" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/blocks" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/blocks" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/review-findings" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/review-findings" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/readiness" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/readiness" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/versions" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/versions" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/comments" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/comments" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/suggestions" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/suggestions" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/requirements" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/requirements" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/requirements/extract" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/requirements/extract" in routes
-    
+
     assert "/api/v1/native-documents/{native_id}/export" in routes
     assert "/api/v1/workspaces/{workspace_id}/native-documents/{native_id}/export" in routes
-    
+
     # Workspace memories
     assert "/api/v1/workspaces/{workspace_id}/memories" in routes
     assert "/api/v1/workspaces/{workspace_id}/memories/{memory_id}" in routes

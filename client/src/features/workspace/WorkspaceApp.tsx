@@ -736,19 +736,19 @@ export function WorkspaceApp({
     }
   }
 
-  async function handleCreateNotebook(name: string, _template?: string): Promise<string | null> {
+  async function handleCreateNotebook(name: string, template?: string): Promise<string | null> {
     try {
       const newWs = await api<Workspace>("/workspaces", token, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, kind: "personal" }),
+        body: JSON.stringify({ name, kind: "personal", template }),
       });
       setWorkspaces((prev) => [newWs, ...prev]);
       setActiveWorkspaceId(newWs.id);
       setNotebookView("workspace");
       return newWs.id;
-    } catch (err: any) {
-      setError(err.message || "Could not create notebook");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not create notebook");
       return null;
     }
   }
@@ -762,8 +762,8 @@ export function WorkspaceApp({
         setActiveWorkspaceId(null);
         setNotebookView("library");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to delete notebook");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete notebook");
     }
   }
 
@@ -775,8 +775,8 @@ export function WorkspaceApp({
         body: JSON.stringify({ name: newName }),
       });
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)));
-    } catch (err: any) {
-      setError(err.message || "Failed to rename notebook");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to rename notebook");
     }
   }
 
@@ -933,9 +933,9 @@ export function WorkspaceApp({
     <main className="auth-page">
       <section className="auth-card">
         <div className="auth-brand auth-brand-login"><BrandMark /><strong>Insight<b>PDF</b></strong></div>
-        <p className="eyebrow">AI-powered document workspace</p>
+        <p className="eyebrow">Document Intelligence Workspace</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
-        <p>Understand source files and create polished Word, PDF, and PowerPoint outputs securely.</p>
+        <p>Grounded research, document synthesis, and verified deliverable drafting.</p>
         {pendingUpload && <div className="pending-upload-note">
           <FileText size={16} />
           <span><strong>{pendingUpload.name}</strong><small>Ready to upload securely after you sign in.</small></span>
@@ -957,7 +957,7 @@ export function WorkspaceApp({
           <span className="auth-loading-spinner"><RefreshCw size={18} className="spin" /></span>
           <div>
             <strong>{mode === "login" ? "Connecting to your workspace" : "Preparing your workspace"}</strong>
-            <small>The free demo server may take up to 30 seconds to wake. Please keep this page open.</small>
+            <small>The demo server may take up to 30 seconds to wake if idle. Please keep this page open.</small>
           </div>
         </div>}
         {(REGISTRATION_ENABLED || mode === "register") && <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>

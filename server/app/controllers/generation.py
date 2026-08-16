@@ -499,7 +499,7 @@ def _docx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         document.add_paragraph()
 
     visible_sections = plan.sections[:2] if plan.document_type == "invoice" else plan.sections
-    for index, item in enumerate(visible_sections, 1):
+    for item in visible_sections:
         heading = document.add_heading(item.heading, level=1)
         heading.paragraph_format.keep_with_next = True
         body = document.add_paragraph(item.body)
@@ -777,10 +777,14 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: byt
             text(slide, heading, .8, 1.35, 9.25, 1.15, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
             text(slide, body, .8, 2.95, 8.95, 2.55, 19, muted)
             marker = slide.shapes.add_shape(1, PptxInches(10.75), PptxInches(1.35), PptxInches(1.65), PptxInches(4.85))
-            marker.fill.solid(); marker.fill.fore_color.rgb = accent; marker.line.fill.background()
+            marker.fill.solid()
+            marker.fill.fore_color.rgb = accent
+            marker.line.fill.background()
         elif index % 3 == 2:
             panel = slide.shapes.add_shape(1, PptxInches(0), PptxInches(0), PptxInches(4.9), deck.slide_height)
-            panel.fill.solid(); panel.fill.fore_color.rgb = soft; panel.line.fill.background()
+            panel.fill.solid()
+            panel.fill.fore_color.rgb = soft
+            panel.line.fill.background()
             text(slide, f"{index:02d}", 1.05, 2.35, 2.7, 1.4, 60, accent, True, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
             text(slide, heading, 5.75, 1.2, 6.55, 1.45, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
             text(slide, body, 5.75, 3.0, 6.35, 2.4, 18, muted)

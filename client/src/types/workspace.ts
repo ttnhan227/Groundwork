@@ -54,5 +54,5 @@ export type NotebookNote = {
 
 export type NotebookAgentEvent = {
   event: "status" | "token" | "citation" | "artifact" | "verification" | "complete" | "error";
-  data: any;
+  data: unknown;
 };

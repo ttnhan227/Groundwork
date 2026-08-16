@@ -5,14 +5,14 @@ import fitz
 from docx import Document as WordDocument
 from pptx import Presentation
 
-from app.documents import source_to_pdf, text_to_pdf
 from app.config import Settings
+from app.documents import source_to_pdf, text_to_pdf
 from app.models import (
-    AISuggestion,
     ActivityEvent,
-    DocumentComment,
+    AISuggestion,
     DeliverableRequirement,
     DeliverableReviewFinding,
+    DocumentComment,
     NativeDocument,
     NativeDocumentSource,
     NativeDocumentVersion,

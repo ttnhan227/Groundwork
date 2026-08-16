@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -75,7 +75,7 @@ async def cancel_job(
         raise HTTPException(status_code=409, detail="This job has already finished")
     job.status = JobStatus.CANCELLED
     job.error_message = "Cancelled by user"
-    job.completed_at = datetime.now(timezone.utc)
+    job.completed_at = datetime.now(UTC)
     await session.commit()
     if job.task_id:
         from app.celery_app import celery_app

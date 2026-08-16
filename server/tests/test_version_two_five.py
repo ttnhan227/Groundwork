@@ -1,5 +1,5 @@
-import uuid
 import json
+import uuid
 
 from app.chat import _sse
 from app.models import Collection, Document

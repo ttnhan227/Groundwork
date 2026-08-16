@@ -3,7 +3,6 @@ from pathlib import Path
 from app.models import Notification
 from app.schemas import UserPreferences, WorkspaceMemberInviteRequest
 
-
 ROOT = Path(__file__).parents[1]
 
 

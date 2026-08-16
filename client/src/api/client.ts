@@ -1,4 +1,4 @@
-import type { AuthResult, Job } from "../types";
+import type { AuthResult, Citation, Job, NativeDocument } from "../types";
 
 export const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 export const AUTH_EXPIRED_EVENT = "insightpdf-auth-expired";
@@ -123,10 +123,10 @@ export async function queueOperation(operation: string, parameters: Record<strin
 export type NotebookAgentCallbacks = {
   onStatus?: (step: { step: string; label: string }) => void;
   onToken?: (text: string) => void;
-  onCitation?: (citation: any) => void;
-  onArtifact?: (artifact: any) => void;
-  onVerification?: (readiness: any) => void;
-  onComplete?: (data: any) => void;
+  onCitation?: (citation: Citation) => void;
+  onArtifact?: (artifact: NativeDocument) => void;
+  onVerification?: (readiness: { unsupported_claims: number; requirements_covered?: number }) => void;
+  onComplete?: (data: { conversation_id?: string }) => void;
   onError?: (error: string) => void;
 };
 

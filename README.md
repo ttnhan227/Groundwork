@@ -4,38 +4,68 @@
 
 # InsightPDF
 
-InsightPDF is an AI workspace for turning briefs and source files into verified, export-ready documents.
+InsightPDF is a workspace for ingesting source documents (PDFs, Office files, images, markdown), performing grounded research with citations, and generating verified reports, proposals, and presentations.
 
-It provides:
+## Features
 
-- PDF, Office document, image, and text ingestion with OCR
-- Source-grounded research with page citations
-- AI-generated reports, proposals, technical documents, and presentations
-- Editable deliverables with requirements, evidence, comments, and version history
-- Whole-document verification for missing requirements and unsupported claims
-- PDF, Word, Markdown, and PowerPoint exports
-- PDF merge, split, rotate, compress, watermark, conversion, and page organization
+- **Notebook Workspace**: Conversational research interface with multi-step reasoning, source citations tied to exact pages, and direct deliverable drafting.
+- **Document Ingestion & RAG**: Text extraction and OCR across PDF, DOCX, PPTX, XLSX, and images. Semantic search powered by PostgreSQL and pgvector.
+- **Generation & Verification**: Export to Markdown, PDF, Word (.docx), and PowerPoint (.pptx) with automated checks for missing requirements and unsupported claims.
+- **PDF Tools**: In-browser tools to merge, split, rotate, compress, watermark, convert, and reorder PDF pages.
+- **Review & Collaboration**: Inline feedback, requirement tracing, evidence inspection, and version history.
 
-## Stack
+## Architecture
 
-- React and TypeScript
-- FastAPI and Python
-- PostgreSQL with pgvector
-- Redis and Celery
-- MinIO object storage
-- Nginx
+The backend is built with FastAPI in a layered architecture (controllers, services, repositories, models, dtos, tasks), backed by Celery for asynchronous background jobs like OCR and embedding generation.
 
-## Run locally
+```
+InsightPDF/
+├── client/                     # React + TypeScript SPA (Vite)
+│   └── src/
+│       ├── api/                # API client and endpoints
+│       ├── components/         # Shared UI components
+│       ├── features/           # Feature modules (workspace, landing, account)
+│       └── types/              # Type definitions
+├── server/                     # FastAPI backend (Python)
+│   └── app/
+│       ├── configs/            # Configuration and environment settings
+│       ├── controllers/        # Route handlers
+│       ├── database/           # Database sessions and migrations
+│       ├── dtos/               # Request/response schemas
+│       ├── middlewares/        # Auth, logging, and error handling
+│       ├── models/             # SQLAlchemy ORM models
+│       ├── repositories/       # Database access layer
+│       ├── seeders/            # Database seed scripts
+│       ├── services/           # Business logic, RAG, and LLM orchestration
+│       ├── tasks/              # Celery background workers
+│       └── utils/              # Helper utilities
+└── docker-compose.yml
+```
 
-Requirements: Docker Desktop with Docker Compose.
+## Tech Stack
+
+- **Frontend**: React, TypeScript, Vite
+- **Backend**: FastAPI, Python 3.11, SQLAlchemy 2.0, Pydantic v2
+- **Database & Search**: PostgreSQL 16 with pgvector
+- **Async Workers**: Celery, Redis
+- **Storage**: MinIO (S3-compatible)
+- **Proxy**: Nginx
+
+## Getting Started
+
+### Prerequisites
+
+- Docker Desktop with Docker Compose
+
+### 1. Environment Setup
+
+Copy `.env.example` to `.env`:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up -d --build
-docker compose ps
 ```
 
-Configure at least these values in `.env`:
+Set the required environment variables in `.env`:
 
 ```dotenv
 JWT_SECRET=replace-with-a-strong-secret
@@ -44,23 +74,28 @@ LLM_BASE_URL=https://api.mistral.ai/v1
 LLM_MODEL=mistral-small-latest
 ```
 
-Open:
+### 2. Run with Docker Compose
 
-- Application: http://localhost:8080
-- API documentation: http://localhost:8000/docs
-- MinIO console: http://localhost:9001
+```powershell
+docker compose up -d --build
+docker compose ps
+```
 
-Database migrations run automatically when the API starts.
+Services will be available at:
 
-## Verify
+- **App**: http://localhost:8080
+- **API Docs**: http://localhost:8000/docs
+- **MinIO Console**: http://localhost:9001
 
-Backend:
+### 3. Verify
+
+Run backend tests:
 
 ```powershell
 docker compose exec -T api python -m pytest -q
 ```
 
-Frontend:
+Run frontend tests and build:
 
 ```powershell
 Set-Location client
@@ -70,13 +105,13 @@ npm run lint
 npm run build
 ```
 
-Running stack:
+Health check:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://localhost:8080/health
-docker compose ps
 ```
 
 ## Deployment
 
-Production deployments require strong secrets, HTTPS, private backing services, and coordinated PostgreSQL and object-storage backups. See [DEPLOYMENT.md](DEPLOYMENT.md).
+See [DEPLOYMENT.md](DEPLOYMENT.md) for production configuration, backups, and security guidelines.
+

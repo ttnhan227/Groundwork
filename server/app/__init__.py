@@ -24,10 +24,10 @@ _MODULE_MAPPING = {
     "app.config": "app.configs.config",
     "app.core.config": "app.configs.config",
     "app.core": "app.configs",
-    
+
     # Database
     "app.core.database": "app.database.database",
-    
+
     # Security, Storage & Middlewares
     "app.security": "app.utils.security",
     "app.core.security": "app.utils.security",
@@ -37,7 +37,7 @@ _MODULE_MAPPING = {
     "app.core.middleware": "app.middlewares.middleware",
     "app.logging_config": "app.middlewares.logging_config",
     "app.core.logging_config": "app.middlewares.logging_config",
-    
+
     # Utilities & Engines
     "app.pdf_operations": "app.utils.pdf_operations",
     "app.engines.pdf_operations": "app.utils.pdf_operations",
@@ -50,13 +50,13 @@ _MODULE_MAPPING = {
     "app.usage": "app.utils.usage",
     "app.engines.usage": "app.utils.usage",
     "app.engines": "app.utils",
-    
+
     # DTOs & Schemas
     "app.schemas": "app.dtos.schemas",
-    
+
     # Tasks & Workers
     "app.celery_app": "app.tasks.celery_app",
-    
+
     # Services
     "app.ai_orchestration": "app.services.ai_orchestration",
     "app.deliverable_review": "app.services.deliverable_review",
@@ -69,7 +69,7 @@ _MODULE_MAPPING = {
     "app.document_service": "app.services.document_service",
     "app.pdf_service": "app.services.pdf_service",
     "app.notification_service": "app.services.notification_service",
-    
+
     # Controllers
     "app.auth": "app.controllers.auth",
     "app.users": "app.controllers.users",

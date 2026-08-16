@@ -1,6 +1,6 @@
 import uuid
-import pytest
-from app.notebook_agent import _classify_intent, _content_to_blocks, _sse_event, NotebookAgentRequest
+
+from app.notebook_agent import NotebookAgentRequest, _classify_intent, _content_to_blocks, _sse_event
 
 
 def test_classify_intent_identifies_artifact_generation() -> None:

@@ -244,7 +244,6 @@ async def ask_question(
     conversation = await owned_conversation(conversation_id, user, session)
     document_ids = [document.id for document in conversation.documents]
     history = [(message.role.value, message.content) for message in conversation.messages]
-    general_mode = not document_ids
     if is_casual_message(payload.question):
         answer = "Hello! Ask me anything about this PDF, and I’ll answer using its indexed content."
         session.add_all([
