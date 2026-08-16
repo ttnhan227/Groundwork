@@ -36,7 +36,7 @@ async def test_ai_daily_limit_rejects_new_paid_request_but_allows_cache_hit() ->
     user = User(id=uuid.uuid4(), email="user@example.com", display_name="User", password_hash="hash")
     session = MagicMock()
     session.scalar = AsyncMock(return_value=5)
-    with patch("app.usage.get_settings") as settings:
+    with patch("app.engines.usage.get_settings") as settings:
         settings.return_value.ai_daily_request_limit = 5
         with pytest.raises(HTTPException) as error:
             await record_ai_usage(user, "summary", session, cached=False)
@@ -50,11 +50,11 @@ async def test_global_ai_daily_limit_stops_additional_usage() -> None:
     user = User(id=uuid.uuid4(), email="user@example.com", display_name="User", password_hash="hash")
     session = MagicMock()
     session.scalar = AsyncMock(side_effect=[2, 25])
-    with patch("app.usage.get_settings") as settings:
+    with patch("app.engines.usage.get_settings") as settings:
         settings.return_value.ai_daily_request_limit = 10
         settings.return_value.ai_global_daily_request_limit = 25
         with pytest.raises(HTTPException) as error:
             await record_ai_usage(user, "chat", session, cached=False)
-    assert error.value.status_code == 429
-    assert "preview" in error.value.detail.lower()
-    session.add.assert_not_called()
+        assert error.value.status_code == 429
+        assert "preview" in error.value.detail.lower()
+        session.add.assert_not_called()

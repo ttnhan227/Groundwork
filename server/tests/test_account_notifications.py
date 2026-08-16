@@ -27,7 +27,7 @@ def test_notification_model_is_durable_and_user_scoped() -> None:
 
 
 def test_notification_api_supports_inbox_lifecycle() -> None:
-    source = ROOT.joinpath("app", "notifications.py").read_text(encoding="utf-8")
+    source = ROOT.joinpath("app", "controllers", "notifications.py").read_text(encoding="utf-8")
     for route in ('@router.get("",', '"/unread-count"', '"/{notification_id}/read"', '"/read-all"', '@router.delete("/{notification_id}"'):
         assert route in source
 
@@ -35,7 +35,7 @@ def test_notification_api_supports_inbox_lifecycle() -> None:
 def test_team_membership_routes_and_roles_are_explicit() -> None:
     payload = WorkspaceMemberInviteRequest(email="member@example.com", role="viewer")
     assert payload.role == "viewer"
-    source = ROOT.joinpath("app", "deliverables.py").read_text(encoding="utf-8")
+    source = ROOT.joinpath("app", "controllers", "deliverables.py").read_text(encoding="utf-8")
     assert '"/workspaces/{workspace_id}/members"' in source
     assert '"/workspaces/{workspace_id}/members/{member_id}"' in source
     assert 'workspace.kind = "team"' in source
@@ -49,7 +49,7 @@ def test_notification_migration_follows_guided_verification_head() -> None:
 
 
 def test_account_api_exposes_security_usage_and_privacy_controls() -> None:
-    source = ROOT.joinpath("app", "users.py").read_text(encoding="utf-8")
+    source = ROOT.joinpath("app", "controllers", "users.py").read_text(encoding="utf-8")
     for route in (
         '"/profile/sessions"', '"/profile/sessions/{session_id}"', '"/profile/sessions/revoke-all"',
         '"/profile/usage"', '"/profile/data-export"', '"/profile/history"', '"/profile/account"',

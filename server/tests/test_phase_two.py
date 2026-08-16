@@ -18,7 +18,7 @@ def make_pdf(text: str = "") -> bytes:
 
 
 def test_native_text_skips_ocr() -> None:
-    with patch("app.processing.pytesseract.image_to_string") as ocr:
+    with patch("app.services.processing.pytesseract.image_to_string") as ocr:
         pages = extract_pages(make_pdf("A sufficiently long native text page"), 10)
     assert pages[0].method == "native"
     assert "sufficiently long" in pages[0].text
@@ -26,7 +26,7 @@ def test_native_text_skips_ocr() -> None:
 
 
 def test_sparse_page_uses_ocr() -> None:
-    with patch("app.processing.pytesseract.image_to_string", return_value="Scanned page text") as ocr:
+    with patch("app.services.processing.pytesseract.image_to_string", return_value="Scanned page text") as ocr:
         pages = extract_pages(make_pdf(), 10)
     assert pages[0].method == "ocr"
     assert pages[0].text == "Scanned page text"

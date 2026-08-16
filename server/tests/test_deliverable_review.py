@@ -17,7 +17,7 @@ async def test_requirement_extraction_normalizes_unknown_kinds(monkeypatch) -> N
             {"text": "Invent a 30-page appendix", "kind": "format", "is_required": True, "supporting_quote": "not present in source", "document_id": str(document_id), "page_number": 1},
         ]}
 
-    monkeypatch.setattr("app.deliverable_review.ai_orchestrator.complete_json", complete_json)
+    monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     result = await extract_requirements("Include an executive summary. Use the client's logo. Client brief text")
     assert [item.kind for item in result.requirements] == ["section", "content"]
     assert result.requirements[1].is_required is False
@@ -50,7 +50,7 @@ async def test_review_preserves_source_identity_and_normalizes_findings(monkeypa
             }],
         }
 
-    monkeypatch.setattr("app.deliverable_review.ai_orchestrator.complete_json", complete_json)
+    monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     result = await review_deliverable(
         "Revenue doubled.",
         [{"id": str(requirement_id), "text": "Explain performance", "is_required": True}],
@@ -79,7 +79,7 @@ async def test_review_accepts_nullable_optional_ai_fields(monkeypatch) -> None:
             }],
         }
 
-    monkeypatch.setattr("app.deliverable_review.ai_orchestrator.complete_json", complete_json)
+    monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     result = await review_deliverable(
         "Draft",
         [{"id": str(requirement_id), "text": "Include a summary", "is_required": True}],
@@ -97,7 +97,7 @@ async def test_review_converts_malformed_ai_shape_to_provider_error(monkeypatch)
     async def complete_json(*args, **kwargs):
         return {"coverage": [{"requirement_id": "not-a-uuid", "covered": True}], "findings": []}
 
-    monkeypatch.setattr("app.deliverable_review.ai_orchestrator.complete_json", complete_json)
+    monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     with pytest.raises(AIProviderError, match="invalid review result"):
         await review_deliverable("Draft", [], "No linked source pages.")
 
@@ -109,7 +109,7 @@ async def test_review_enforces_explicit_citations_for_numeric_claims(monkeypatch
     async def complete_json(*args, **kwargs):
         return {"coverage": [], "findings": []}
 
-    monkeypatch.setattr("app.deliverable_review.ai_orchestrator.complete_json", complete_json)
+    monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     result = await review_deliverable(
         "Support tickets represent 31% of first-month questions.",
         [],
@@ -129,7 +129,7 @@ async def test_review_accepts_numeric_claim_with_inline_source_marker(monkeypatc
     async def complete_json(*args, **kwargs):
         return {"coverage": [], "findings": []}
 
-    monkeypatch.setattr("app.deliverable_review.ai_orchestrator.complete_json", complete_json)
+    monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     result = await review_deliverable(
         "Support tickets represent 31% of questions. [Source: research.pdf, p. 3]",
         [],

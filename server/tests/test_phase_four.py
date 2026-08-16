@@ -69,7 +69,7 @@ def test_comparison_never_calls_unreadable_image_document_identical() -> None:
 @pytest.mark.asyncio
 async def test_structured_llm_request_uses_json_mode_and_prompt_injection_guard() -> None:
     completion = AsyncMock(return_value={"title": "Result"})
-    with patch("app.ai_features.ai_orchestrator.complete_json", completion):
+    with patch("app.controllers.ai_features.ai_orchestrator.complete_json", completion):
         result = await _llm_json("Summarize.", "[Page: 1]\nText")
     assert result == {"title": "Result"}
     messages = completion.await_args.args[0]

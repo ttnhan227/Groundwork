@@ -32,8 +32,8 @@ def test_chunking_rejects_invalid_overlap() -> None:
 
 def test_hosted_embeddings_are_batched_sorted_and_normalized() -> None:
     with (
-        patch("app.rag.get_settings") as settings,
-        patch("app.rag.ai_orchestrator.embeddings_sync", return_value=[[3.0, 4.0], [0.0, 2.0]]) as embeddings,
+        patch("app.services.rag.get_settings") as settings,
+        patch("app.services.rag.ai_orchestrator.embeddings_sync", return_value=[[3.0, 4.0], [0.0, 2.0]]) as embeddings,
     ):
         settings.return_value.embedding_provider = "api"
         settings.return_value.embedding_dimensions = 3
@@ -110,8 +110,8 @@ def test_source_says_phrase_is_rewritten_as_document_language() -> None:
 async def test_llm_prompt_is_grounded_and_includes_history() -> None:
     completion = AsyncMock(return_value="Grounded answer [Source 1]")
     with (
-        patch("app.rag.get_settings") as settings,
-        patch("app.rag.ai_orchestrator.complete", completion),
+        patch("app.services.rag.get_settings") as settings,
+        patch("app.services.rag.ai_orchestrator.complete", completion),
     ):
         settings.return_value.llm_model = "test-model"
         answer = await generate_answer("What changed?", ["The total is 42."], [("user", "Earlier question")])

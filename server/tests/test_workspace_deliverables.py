@@ -88,7 +88,7 @@ def test_workspace_lifecycle_models_have_explicit_ownership_and_review_state() -
 
 
 def test_workspace_api_exposes_domain_routes() -> None:
-    source = Path(__file__).parents[1].joinpath("app", "deliverables.py").read_text(encoding="utf-8")
+    source = Path(__file__).parents[1].joinpath("app", "controllers", "deliverables.py").read_text(encoding="utf-8")
     for route in (
         '"/workspaces"',
         '"/workspaces/{workspace_id}/search"',
@@ -131,7 +131,7 @@ def test_verified_deliverable_migration_follows_current_head() -> None:
 
 
 def test_readiness_requires_a_draft_and_completed_verification() -> None:
-    source = Path(__file__).parents[1].joinpath("app", "deliverables.py").read_text(encoding="utf-8")
+    source = Path(__file__).parents[1].joinpath("app", "controllers", "deliverables.py").read_text(encoding="utf-8")
     assert 'blockers.append("Write or generate the draft")' in source
     assert 'blockers.append("Run whole-deliverable verification")' in source
     assert 'status_code=409' in source
@@ -145,7 +145,7 @@ def test_default_ai_quota_supports_a_complete_local_workflow() -> None:
 
 
 def test_upload_assigns_workspace_before_document_can_autoflush() -> None:
-    source = Path(__file__).parents[1].joinpath("app", "documents.py").read_text(encoding="utf-8")
+    source = Path(__file__).parents[1].joinpath("app", "controllers", "documents.py").read_text(encoding="utf-8")
     workspace_lookup = source.index("workspace = await ensure_personal_workspace(user, session)")
     document_construction = source.index("document = Document(", workspace_lookup)
     session_add = source.index("session.add(document)", document_construction)

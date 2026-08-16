@@ -2,9 +2,9 @@
 set -eu
 
 alembic upgrade head
-python -m app.seed
+python -m app.seeders.seed
 
-celery -A app.celery_app:celery_app worker \
+celery -A app.tasks.celery_app:celery_app worker \
   --loglevel=INFO \
   --pool=solo \
   --concurrency=1 &

@@ -18,7 +18,7 @@ def test_structured_provider_response_rejects_non_objects() -> None:
 def test_all_provider_http_calls_are_centralized() -> None:
     app = Path(__file__).parents[1] / "app"
     offenders = []
-    for path in app.glob("*.py"):
+    for path in app.rglob("*.py"):
         if path.name == "ai_orchestration.py":
             continue
         source = path.read_text(encoding="utf-8")
@@ -36,9 +36,9 @@ def test_jobs_and_users_expose_durable_redesign_state() -> None:
 
 
 def test_generation_runs_through_a_cancellable_background_job() -> None:
-    generation = Path(__file__).parents[1].joinpath("app", "generation.py").read_text(encoding="utf-8")
-    tasks = Path(__file__).parents[1].joinpath("app", "tasks.py").read_text(encoding="utf-8")
-    jobs = Path(__file__).parents[1].joinpath("app", "jobs.py").read_text(encoding="utf-8")
+    generation = Path(__file__).parents[1].joinpath("app", "controllers", "generation.py").read_text(encoding="utf-8")
+    tasks = Path(__file__).parents[1].joinpath("app", "tasks", "tasks.py").read_text(encoding="utf-8")
+    jobs = Path(__file__).parents[1].joinpath("app", "controllers", "jobs.py").read_text(encoding="utf-8")
     assert '@router.post("/jobs"' in generation
     assert '"ai_create"' in generation
     assert 'operation == "ai_create"' in tasks

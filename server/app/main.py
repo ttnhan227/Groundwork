@@ -4,27 +4,41 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.auth import router as auth_router
-from app.ai_features import router as ai_router
-from app.chat import router as chat_router
-from app.collections import router as collections_router
-from app.config import get_settings
-from app.documents import router as documents_router
-from app.deliverables import router as deliverables_router
-from app.generation import router as generation_router
-from app.jobs import router as jobs_router
-from app.pdf_tools import router as pdf_tools_router
-from app.users import router as users_router
-from app.workflows import router as workflows_router
-from app.workspace import router as workspace_router
-from app.logging_config import configure_logging
-from app.middleware import RateLimitMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
-from app.notifications import router as notifications_router
+from app.configs import get_settings
+from app.controllers import (
+    ai_router,
+    auth_router,
+    chat_router,
+    collections_router,
+    deliverables_router,
+    documents_router,
+    generation_router,
+    jobs_router,
+    notebook_agent_router,
+    notifications_router,
+    pdf_tools_router,
+    users_router,
+    workflows_router,
+    workspace_router,
+)
+from app.middlewares import (
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+    configure_logging,
+)
 
 configure_logging()
 logger = logging.getLogger("insightpdf.errors")
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="2.5.0", description="InsightPDF AI-first document workspace API.")
+
+app = FastAPI(
+    title=settings.app_name,
+    version="2.5.0",
+    description="InsightPDF AI-first document workspace API with Clean Architecture.",
+)
+
+# --- Global Middlewares ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -35,6 +49,8 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+
+# --- API Routers (Controllers) ---
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(generation_router, prefix="/api/v1")
@@ -48,6 +64,7 @@ app.include_router(collections_router, prefix="/api/v1")
 app.include_router(workspace_router, prefix="/api/v1")
 app.include_router(deliverables_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(notebook_agent_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
@@ -62,4 +79,13 @@ async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
         exc_info=error,
         extra={"method": request.method, "path": request.url.path},
     )
-    return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL_ERROR", "message": "An unexpected error occurred.", "details": {}}})
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred.",
+                "details": {},
+            }
+        },
+    )

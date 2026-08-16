@@ -37,7 +37,8 @@ async function refreshSession(): Promise<AuthResult> {
     if (!response.ok) {
       if ([400, 401, 403].includes(response.status)) expireSession();
       const body = await response.json().catch(() => null);
-      throw new Error(body?.detail ?? "Could not refresh your session");
+      const message = typeof body?.detail === "string" ? body.detail : body?.detail?.message ?? body?.error?.message ?? "Could not refresh your session";
+      throw new Error(message);
     }
     const refreshed = await response.json() as AuthResult;
     localStorage.setItem("insightpdf-auth", JSON.stringify(refreshed));
@@ -117,4 +118,78 @@ export async function queueOperation(operation: string, parameters: Record<strin
     body: JSON.stringify({ operation, parameters }),
   });
   return waitForJob(job, token);
+}
+
+export type NotebookAgentCallbacks = {
+  onStatus?: (step: { step: string; label: string }) => void;
+  onToken?: (text: string) => void;
+  onCitation?: (citation: any) => void;
+  onArtifact?: (artifact: any) => void;
+  onVerification?: (readiness: any) => void;
+  onComplete?: (data: any) => void;
+  onError?: (error: string) => void;
+};
+
+export async function streamNotebookAgent(
+  payload: {
+    workspace_id: string;
+    prompt: string;
+    source_document_ids?: string[];
+    conversation_id?: string;
+    artifact_id?: string;
+    action_type?: string;
+  },
+  token: string,
+  callbacks: NotebookAgentCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await authenticatedFetch(`${API}/notebook/agent/execute`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const message = typeof body?.detail === "string" ? body.detail : body?.detail?.message ?? body?.error?.message ?? "Agent execution failed";
+    throw new Error(message);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body stream");
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n\n");
+    buffer = lines.pop() ?? "";
+
+    for (const chunk of lines) {
+      if (!chunk.trim()) continue;
+      let eventType = "message";
+      let dataStr = "";
+      for (const line of chunk.split("\n")) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          dataStr = line.slice(6).trim();
+        }
+      }
+      if (!dataStr) continue;
+      try {
+        const parsed = JSON.parse(dataStr);
+        if (eventType === "status") callbacks.onStatus?.(parsed);
+        else if (eventType === "token") callbacks.onToken?.(parsed.text);
+        else if (eventType === "citation") callbacks.onCitation?.(parsed);
+        else if (eventType === "artifact") callbacks.onArtifact?.(parsed.artifact);
+        else if (eventType === "verification") callbacks.onVerification?.(parsed.readiness);
+        else if (eventType === "complete") callbacks.onComplete?.(parsed);
+        else if (eventType === "error") callbacks.onError?.(parsed.message || "Agent error");
+      } catch {
+        // Continue parsing
+      }
+    }
+  }
 }
