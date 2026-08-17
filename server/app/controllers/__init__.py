@@ -10,7 +10,6 @@ from app.controllers.generation import router as generation_router
 from app.controllers.jobs import router as jobs_router
 from app.controllers.notifications import router as notifications_router
 from app.controllers.users import router as users_router
-from app.controllers.workflows import router as workflows_router
 from app.controllers.workspace import router as workspace_router
 from app.controllers.workspace_agent import router as workspace_agent_router
 
@@ -29,7 +28,6 @@ __all__ = [
     "notebook_agent_router",
     "notifications_router",
     "users_router",
-    "workflows_router",
     "workspace_agent_router",
     "workspace_router",
 ]

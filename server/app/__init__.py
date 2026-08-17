@@ -39,14 +39,10 @@ _MODULE_MAPPING = {
     "app.core.logging_config": "app.middlewares.logging_config",
 
     # Utilities & Engines
-    "app.pdf_operations": "app.utils.pdf_operations",
-    "app.engines.pdf_operations": "app.utils.pdf_operations",
     "app.document_conversions": "app.utils.document_conversions",
     "app.engines.document_conversions": "app.utils.document_conversions",
     "app.generated_text": "app.utils.generated_text",
     "app.engines.generated_text": "app.utils.generated_text",
-    "app.tool_registry": "app.utils.tool_registry",
-    "app.engines.tool_registry": "app.utils.tool_registry",
     "app.usage": "app.utils.usage",
     "app.engines.usage": "app.utils.usage",
     "app.engines": "app.utils",
@@ -81,7 +77,6 @@ _MODULE_MAPPING = {
     "app.notifications": "app.controllers.notifications",
     "app.chat": "app.controllers.chat",
     "app.ai_features": "app.controllers.ai_features",
-    "app.workflows": "app.controllers.workflows",
     "app.workspace": "app.controllers.workspace",
     "app.collections": "app.controllers.collections",
     "app.generation": "app.controllers.generation",

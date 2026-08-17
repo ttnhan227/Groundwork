@@ -75,12 +75,7 @@ from app.dtos.notification_dto import (
 from app.dtos.tools_dto import (
     ComparisonRequest,
     ExtractionRequest,
-    MergeRequest,
-    PageOperationRequest,
-    PDFToImagesRequest,
     QuizRequest,
-    RotateRequest,
-    SplitRequest,
     SummaryRequest,
     TranslationRequest,
 )
@@ -207,11 +202,6 @@ __all__ = [
     "ExtractionRequest",
     "TranslationRequest",
     "ComparisonRequest",
-    "MergeRequest",
-    "PageOperationRequest",
-    "RotateRequest",
-    "SplitRequest",
-    "PDFToImagesRequest",
     # Notifications
     "NotificationResponse",
     "NotificationCountResponse",

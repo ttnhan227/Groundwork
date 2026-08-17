@@ -16,7 +16,6 @@ from app.controllers import (
     jobs_router,
     notifications_router,
     users_router,
-    workflows_router,
     workspace_agent_router,
     workspace_router,
 )
@@ -57,7 +56,6 @@ app.include_router(chat_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
-app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(collections_router, prefix="/api/v1")
 app.include_router(workspace_router, prefix="/api/v1")
 app.include_router(deliverables_router, prefix="/api/v1")
