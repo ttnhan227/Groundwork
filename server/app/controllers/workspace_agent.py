@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ai_orchestration import ai_orchestrator
-from app.database import get_session
+from app.database import SessionLocal, get_session
 from app.deliverable_review import (
     extract_requirements,
     review_deliverable,
@@ -149,12 +149,9 @@ async def execute_workspace_agent(
     conversation: Conversation | None = None
     if payload.conversation_id:
         conversation = await session.scalar(
-            select(Conversation)
-            .options(
-                selectinload(Conversation.documents),
-                selectinload(Conversation.messages).selectinload(Message.citations),
+            select(Conversation).where(
+                Conversation.id == payload.conversation_id, Conversation.workspace_id == workspace.id
             )
-            .where(Conversation.id == payload.conversation_id, Conversation.workspace_id == workspace.id)
         )
     if conversation is None:
         title = payload.prompt[:50].strip() or "Workspace conversation"
@@ -166,11 +163,15 @@ async def execute_workspace_agent(
         session.add(conversation)
         await session.flush()
 
-    # Resolve active sources
-    source_query = select(Document).where(Document.workspace_id == workspace.id, Document.status == DocumentStatus.READY)
-    if payload.source_document_ids:
-        source_query = source_query.where(Document.id.in_(payload.source_document_ids))
-    sources = list(await session.scalars(source_query))
+    # Load recent conversation history before stream generator
+    message_rows = list(await session.scalars(
+        select(Message)
+        .where(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.asc())
+    ))
+    chat_history: list[dict[str, str]] = [
+        {"role": m.role.value, "content": m.content} for m in message_rows
+    ]
 
     # Add user message
     user_msg = Message(
@@ -179,47 +180,66 @@ async def execute_workspace_agent(
         content=payload.prompt,
     )
     session.add(user_msg)
-    await session.flush()
+    await session.commit()
 
+    conversation_id = conversation.id
+    workspace_id = workspace.id
     intent = _classify_intent(payload.prompt, payload.action_type)
 
     async def event_generator() -> AsyncIterator[str]:
-        try:
-            yield _sse_event("conversation", {"conversation_id": str(conversation.id)})
+        async with SessionLocal() as db_session:
+            try:
+                # Resolve workspace and active sources in db_session
+                workspace_obj = await db_session.get(Workspace, workspace_id)
+                if not workspace_obj:
+                    yield _sse_event("error", {"message": "Workspace not found."})
+                    return
 
-            if intent == "generate_artifact":
-                async for chunk in _orchestrate_artifact_generation(
-                    workspace, conversation, sources, payload, user, session
-                ):
-                    yield chunk
+                source_query = select(Document).where(Document.workspace_id == workspace_id, Document.status == DocumentStatus.READY)
+                if payload.source_document_ids:
+                    source_query = source_query.where(Document.id.in_(payload.source_document_ids))
+                sources_list = list(await db_session.scalars(source_query))
 
-            elif intent == "modify_artifact":
-                async for chunk in _orchestrate_artifact_modification(
-                    workspace, conversation, sources, payload, user, session
-                ):
-                    yield chunk
+                yield _sse_event("conversation", {"conversation_id": str(conversation_id)})
 
-            elif intent == "verify_artifact":
-                async for chunk in _orchestrate_artifact_verification(
-                    workspace, conversation, sources, payload, user, session
-                ):
-                    yield chunk
+                if intent == "generate_artifact":
+                    async for chunk in _orchestrate_artifact_generation(
+                        workspace_obj, conversation_id, sources_list, payload, user, db_session
+                    ):
+                        yield chunk
 
-            elif intent == "create_note":
-                async for chunk in _orchestrate_create_note(
-                    workspace, conversation, payload, user, session
-                ):
-                    yield chunk
+                elif intent == "modify_artifact":
+                    async for chunk in _orchestrate_artifact_modification(
+                        workspace_obj, conversation_id, sources_list, payload, user, db_session
+                    ):
+                        yield chunk
 
-            else:
-                async for chunk in _orchestrate_grounded_qa(
-                    workspace, conversation, sources, payload, user, session
-                ):
-                    yield chunk
+                elif intent == "verify_artifact":
+                    async for chunk in _orchestrate_artifact_verification(
+                        workspace_obj, conversation_id, sources_list, payload, user, db_session
+                    ):
+                        yield chunk
 
-        except Exception as exc:
-            logger.exception("workspace_agent_error: %s", exc)
-            yield _sse_event("error", {"message": str(exc) or "An error occurred during agent execution."})
+                elif intent == "create_note":
+                    async for chunk in _orchestrate_create_note(
+                        workspace_obj, conversation_id, payload, user, db_session
+                    ):
+                        yield chunk
+
+                else:
+                    async for chunk in _orchestrate_grounded_qa(
+                        workspace_obj, conversation_id, sources_list, chat_history, payload, user, db_session
+                    ):
+                        yield chunk
+
+            except Exception as exc:
+                logger.exception("workspace_agent_error: %s", exc)
+                user_friendly = (
+                    str(exc)
+                    if isinstance(exc, (ValueError, RuntimeError)) and not any(k in str(exc).lower() for k in ["session", "lazy", "sqlalche", "parent instance", "detached"])
+                    else "Groundwork agent encountered an unexpected issue while executing this task. Please try again."
+                )
+                yield _sse_event("error", {"message": user_friendly})
 
     return StreamingResponse(
         event_generator(),
@@ -238,7 +258,7 @@ execute_notebook_agent = execute_workspace_agent
 
 async def _orchestrate_artifact_generation(
     workspace: Workspace,
-    conversation: Conversation,
+    conversation_id: uuid.UUID,
     sources: list[Document],
     payload: WorkspaceAgentRequest,
     user: User,
@@ -410,7 +430,7 @@ async def _orchestrate_artifact_generation(
     )
 
     asst_msg = Message(
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role=MessageRole.ASSISTANT,
         content=summary_text,
     )
@@ -426,13 +446,13 @@ async def _orchestrate_artifact_generation(
     yield _sse_event("complete", {
         "message_id": str(asst_msg.id),
         "artifact_id": str(native_doc.id),
-        "conversation_id": str(conversation.id),
+        "conversation_id": str(conversation_id),
     })
 
 
 async def _orchestrate_artifact_modification(
     workspace: Workspace,
-    conversation: Conversation,
+    conversation_id: uuid.UUID,
     sources: list[Document],
     payload: WorkspaceAgentRequest,
     user: User,
@@ -452,7 +472,7 @@ async def _orchestrate_artifact_modification(
 
     if target_artifact is None:
         yield _sse_event("token", {"text": "No artifact found in this workspace to modify. Please ask me to generate one first."})
-        yield _sse_event("complete", {"conversation_id": str(conversation.id)})
+        yield _sse_event("complete", {"conversation_id": str(conversation_id)})
         return
 
     current_text = native_text(target_artifact)
@@ -503,7 +523,7 @@ async def _orchestrate_artifact_modification(
     reply_text = f"I've updated **{target_artifact.title}** (Revision {target_artifact.revision}) based on your instruction: *\"{payload.prompt}\"*.\n\nYou can review the updated sections and version history in the Studio panel."
 
     asst_msg = Message(
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role=MessageRole.ASSISTANT,
         content=reply_text,
     )
@@ -516,13 +536,13 @@ async def _orchestrate_artifact_modification(
     yield _sse_event("complete", {
         "message_id": str(asst_msg.id),
         "artifact_id": str(target_artifact.id),
-        "conversation_id": str(conversation.id),
+        "conversation_id": str(conversation_id),
     })
 
 
 async def _orchestrate_artifact_verification(
     workspace: Workspace,
-    conversation: Conversation,
+    conversation_id: uuid.UUID,
     sources: list[Document],
     payload: WorkspaceAgentRequest,
     user: User,
@@ -542,7 +562,7 @@ async def _orchestrate_artifact_verification(
 
     if target_artifact is None:
         yield _sse_event("token", {"text": "No deliverable found in this workspace to verify. Upload sources and ask me to generate a deliverable first."})
-        yield _sse_event("complete", {"conversation_id": str(conversation.id)})
+        yield _sse_event("complete", {"conversation_id": str(conversation_id)})
         return
 
     source_ctx = await source_context(target_artifact, user, session)
@@ -590,7 +610,7 @@ async def _orchestrate_artifact_verification(
         verification_summary += "All requirements are covered and claims are grounded in your sources! The deliverable is ready to export."
 
     asst_msg = Message(
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role=MessageRole.ASSISTANT,
         content=verification_summary,
     )
@@ -603,13 +623,13 @@ async def _orchestrate_artifact_verification(
     yield _sse_event("complete", {
         "message_id": str(asst_msg.id),
         "artifact_id": str(target_artifact.id),
-        "conversation_id": str(conversation.id),
+        "conversation_id": str(conversation_id),
     })
 
 
 async def _orchestrate_create_note(
     workspace: Workspace,
-    conversation: Conversation,
+    conversation_id: uuid.UUID,
     payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
@@ -629,7 +649,7 @@ async def _orchestrate_create_note(
 
     reply_text = f"Saved note to your workspace:\n\n> {note_text}"
     asst_msg = Message(
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role=MessageRole.ASSISTANT,
         content=reply_text,
     )
@@ -639,14 +659,15 @@ async def _orchestrate_create_note(
     yield _sse_event("token", {"text": reply_text})
     yield _sse_event("complete", {
         "message_id": str(asst_msg.id),
-        "conversation_id": str(conversation.id),
+        "conversation_id": str(conversation_id),
     })
 
 
 async def _orchestrate_grounded_qa(
     workspace: Workspace,
-    conversation: Conversation,
+    conversation_id: uuid.UUID,
     sources: list[Document],
+    chat_history: list[dict[str, str]],
     payload: WorkspaceAgentRequest,
     user: User,
     session: AsyncSession,
@@ -660,7 +681,7 @@ async def _orchestrate_grounded_qa(
     if source_ids:
         query_text = await build_retrieval_query(
             payload.prompt,
-            [{"role": m.role.value, "content": m.content} for m in conversation.messages[-4:]],
+            chat_history[-4:],
         )
         embeddings = await embed_texts_async([query_text], operation="workspace_agent.embed_query")
         if embeddings:
@@ -683,14 +704,14 @@ async def _orchestrate_grounded_qa(
     answer_text = await generate_answer(
         payload.prompt,
         [(doc_id, page_num, text) for doc_id, page_num, text, _, _ in retrieved_items],
-        [{"role": m.role.value, "content": m.content} for m in conversation.messages[-4:]],
+        chat_history[-4:],
     )
 
     clean_answer = clean_user_answer(answer_text)
 
     # Save citations
     asst_msg = Message(
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role=MessageRole.ASSISTANT,
         content=clean_answer,
     )
@@ -723,5 +744,5 @@ async def _orchestrate_grounded_qa(
     yield _sse_event("token", {"text": clean_answer})
     yield _sse_event("complete", {
         "message_id": str(asst_msg.id),
-        "conversation_id": str(conversation.id),
+        "conversation_id": str(conversation_id),
     })

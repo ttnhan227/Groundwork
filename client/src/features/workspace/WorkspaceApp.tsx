@@ -337,7 +337,13 @@ function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void
   async function retry(job: Job) {
     if (!job.id) return;
     try {
-      await api(`/jobs/status/${job.id}/retry`, token, { method: "POST" });
+      const params = job.parameters as Record<string, unknown> | undefined;
+      const docId = params?.document_id || params?.doc_id;
+      if (job.operation === "document_processing" && typeof docId === "string") {
+        await api(`/documents/${docId}/retry`, token, { method: "POST" });
+      } else {
+        await api(`/jobs/status/${job.id}/retry`, token, { method: "POST" });
+      }
       await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Retry failed"); }
   }
@@ -360,7 +366,7 @@ function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void
               <div><strong>{(job.operation ?? "document processing").replaceAll("_", " ")}</strong><span>{job.created_at ? new Date(job.created_at).toLocaleString() : ""} · {job.progress}%</span></div>
               <b className={`job-state ${job.status}`}>{job.status}</b>
               {["queued", "running"].includes(job.status) && <button onClick={() => cancel(job)}>Cancel</button>}
-              {job.status === "failed" && job.operation !== "document_processing" && <button onClick={() => retry(job)}>Retry</button>}
+              {job.status === "failed" && <button onClick={() => retry(job)}>Retry</button>}
               {job.error_message && <small>{job.error_message}</small>}
             </article>
           ))}
@@ -469,7 +475,18 @@ export function WorkspaceApp({
 
   const loadWorkspaces = useCallback(async (accessToken: string) => {
     try {
-      const items = await api<Workspace[]>("/workspaces", accessToken);
+      let items = await api<Workspace[]>("/workspaces", accessToken);
+      if (items.length === 0) {
+        const starter = await api<Workspace>("/workspaces", accessToken, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "Apex Horizon Cloud Modernization Proposal", kind: "personal", template: "proposal" }),
+        }).catch(() => null);
+        if (starter) {
+          await api(`/workspaces/${starter.id}/demo`, accessToken, { method: "POST" }).catch(() => undefined);
+          items = [starter];
+        }
+      }
       setWorkspaces(items);
       return items;
     } catch {
@@ -562,6 +579,7 @@ export function WorkspaceApp({
           ? body.detail
           : body?.detail?.message ?? body?.error?.message ?? "Upload failed";
       if (response.status === 409 && body?.detail?.document_id) {
+        await loadDocuments(token).catch(() => undefined);
         const existing = documents.find((d) => d.id === body.detail.document_id);
         if (existing) {
           return existing;
@@ -585,9 +603,12 @@ export function WorkspaceApp({
       ]).catch(() => undefined);
       if (pendingUpload) {
         onPendingUploadHandled();
-        handleCreateWorkspace(pendingUpload.name.replace(/\.[^/.]+$/, "")).then((wsId) => {
+        const safeName = pendingUpload.name.replace(/\.[^/.]+$/, "").trim().slice(0, 120) || "Workspace";
+        handleCreateWorkspace(safeName).then((wsId) => {
           if (wsId) {
-            handleUploadWorkspaceDocument(pendingUpload, wsId);
+            handleUploadWorkspaceDocument(pendingUpload, wsId).catch((err: unknown) => {
+              setError(err instanceof Error ? err.message : "Failed to upload document");
+            });
           }
         });
       }
@@ -595,8 +616,14 @@ export function WorkspaceApp({
       if (pendingPrompt) {
         sessionStorage.removeItem("groundwork-pending-prompt");
         sessionStorage.removeItem("insightpdf-pending-prompt");
-        handleCreateWorkspace(pendingPrompt.slice(0, 30) || "Research Workspace").then((wsId) => {
+        const wsName = pendingPrompt.length > 4 ? pendingPrompt.slice(0, 45) : "Technical Proposal Workspace";
+        handleCreateWorkspace(wsName, "proposal").then(async (wsId) => {
           if (wsId) {
+            await api(`/workspaces/${wsId}/demo`, initialAuth.access_token, { method: "POST" }).catch(() => undefined);
+            await Promise.all([
+              loadDocuments(initialAuth.access_token),
+              loadAllNativeDocs(initialAuth.access_token),
+            ]);
             setActiveWorkspaceId(wsId);
             setWorkspaceView("workspace");
           }
@@ -779,26 +806,48 @@ export function WorkspaceApp({
           onDeleteWorkspace={handleDeleteWorkspace}
           onRenameWorkspace={handleRenameWorkspace}
           onUploadToNewWorkspace={async (file) => {
-            const wsId = await handleCreateWorkspace(file.name.replace(/\.[^/.]+$/, ""));
-            if (wsId) {
-              await handleUploadWorkspaceDocument(file, wsId);
+            try {
+              const safeName = file.name.replace(/\.[^/.]+$/, "").trim().slice(0, 120) || "Workspace";
+              const wsId = await handleCreateWorkspace(safeName);
+              if (wsId) {
+                await handleUploadWorkspaceDocument(file, wsId);
+              }
+            } catch (err: unknown) {
+              setError(err instanceof Error ? err.message : "Failed to upload document to new workspace");
             }
           }}
           onOpenAccount={() => setAccountOpen(true)}
           onToggleTheme={() => toggleTheme()}
           onOpenTwoMinuteDemo={async () => {
-            const existingDemo = workspaces.find(
-              (w) => w.name.toLowerCase().includes("demo") || w.name.toLowerCase().includes("proposal"),
-            );
-            if (existingDemo) {
-              setActiveWorkspaceId(existingDemo.id);
-              setWorkspaceView("workspace");
-            } else {
-              const demoWsId = await handleCreateWorkspace("Technical Proposal & Audit Demo", "proposal");
-              if (demoWsId) {
-                setActiveWorkspaceId(demoWsId);
+            setBusy(true);
+            try {
+              let demoWs = workspaces.find(
+                (w) => w.name.toLowerCase().includes("apex") || w.name.toLowerCase().includes("demo") || w.name.toLowerCase().includes("proposal"),
+              );
+              if (!demoWs) {
+                const newWsId = await handleCreateWorkspace("Apex Horizon RFP & Verification Demo", "proposal");
+                if (newWsId) {
+                  await api(`/workspaces/${newWsId}/demo`, token, { method: "POST" }).catch(() => undefined);
+                  await Promise.all([
+                    loadDocuments(token),
+                    loadAllNativeDocs(token),
+                  ]);
+                  setActiveWorkspaceId(newWsId);
+                  setWorkspaceView("workspace");
+                }
+              } else {
+                await api(`/workspaces/${demoWs.id}/demo`, token, { method: "POST" }).catch(() => undefined);
+                await Promise.all([
+                  loadDocuments(token),
+                  loadAllNativeDocs(token),
+                ]);
+                setActiveWorkspaceId(demoWs.id);
                 setWorkspaceView("workspace");
               }
+            } catch (err) {
+              console.error("Failed to load demo", err);
+            } finally {
+              setBusy(false);
             }
           }}
         />

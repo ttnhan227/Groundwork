@@ -18,6 +18,9 @@ import {
   Sun,
   Moon,
   CheckCircle2,
+  Sparkles,
+  Lock,
+  FileCheck2,
 } from "lucide-react";
 import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
@@ -179,7 +182,7 @@ export function WorkspaceLibrary({
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      uploadToNewWorkspace(files[0]);
+      uploadToNewWorkspace(files[0]).catch(() => undefined);
     }
   }
 
@@ -212,7 +215,7 @@ export function WorkspaceLibrary({
       {/* Top Navbar */}
       <header className="notebook-nav workspace-nav">
         <div className="notebook-brand-link">
-          <BrandMark />
+          <BrandMark size={20} />
           <strong>Ground<span>work</span></strong>
           <span className="hub-beta">Workspace</span>
         </div>
@@ -232,13 +235,6 @@ export function WorkspaceLibrary({
 
         {/* Action Controls */}
         <div className="notebook-nav-actions">
-          {onOpenTwoMinuteDemo && (
-            <button className="btn-secondary-white btn-demo" onClick={onOpenTwoMinuteDemo} title="Load technical proposal demo">
-              <PlayCircle size={14} />
-              <span>Sample Demo</span>
-            </button>
-          )}
-
           <button className="btn-theme-toggle" onClick={onToggleTheme} title={`Switch to ${activeTheme === "dark" ? "light" : "dark"} mode`} aria-label="Toggle theme">
             {activeTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
           </button>
@@ -269,6 +265,7 @@ export function WorkspaceLibrary({
 
       {/* Main Container */}
       <main className="notebook-library-body">
+
         {/* Recommended Workflows */}
         <section className="notebook-workflows-section">
           <div className="section-header-compact">
@@ -354,7 +351,7 @@ export function WorkspaceLibrary({
                     <div className="notebook-card-header">
                       <div className="notebook-card-info">
                         <div className="notebook-card-icon">
-                          <BookOpen size={17} />
+                          <FileCheck2 size={17} />
                         </div>
                         <div className="notebook-title-wrap">
                           {isEditing ? (
@@ -437,13 +434,13 @@ export function WorkspaceLibrary({
                       {stats.hasVerified ? (
                         <span className="badge-verified-pill"><CheckCircle2 size={12} /> Verified</span>
                       ) : (
-                        <span className="badge-draft-pill">Active</span>
+                        <span className="badge-draft-pill"><ShieldCheck size={12} /> In Review</span>
                       )}
                     </div>
 
                     {/* Footer / Open Button */}
                     <div className="notebook-card-footer" onClick={() => selectWorkspace(ws.id)}>
-                      <span>Open research workspace</span>
+                      <span>Open deliverable workspace</span>
                       <ArrowRight size={14} />
                     </div>
                   </div>
@@ -453,11 +450,11 @@ export function WorkspaceLibrary({
           ) : (
             <div className="notebook-empty-state">
               <FolderPlus size={36} className="empty-icon" />
-              <h3>{searchQuery ? "No matching workspaces found" : "No research workspaces created yet"}</h3>
+              <h3>{searchQuery ? "No matching workspaces found" : "No workspaces created yet"}</h3>
               <p>
                 {searchQuery
                   ? "Try adjusting your search terms or view all workspaces."
-                  : "Create your first workspace to organize source documents, ask grounded questions, and draft verified deliverables."}
+                  : "Create your first workspace to organize source documents, draft deliverables, and enforce verification audits."}
               </p>
               <button
                 className="btn-primary-gradient"
@@ -482,7 +479,7 @@ export function WorkspaceLibrary({
             <header className="modal-header">
               <div>
                 <p className="modal-eyebrow">Workspace Setup</p>
-                <h3 id="create-workspace-title">Create Research Workspace</h3>
+                <h3 id="create-workspace-title">Create Deliverable Workspace</h3>
               </div>
               <button className="btn-modal-close" onClick={() => setIsCreateOpen(false)} aria-label="Close dialog">
                 <X size={16} />
@@ -517,8 +514,9 @@ export function WorkspaceLibrary({
                       const f = e.target.files?.[0];
                       if (f) {
                         setIsCreateOpen(false);
-                        uploadToNewWorkspace(f);
+                        uploadToNewWorkspace(f).catch(() => undefined);
                       }
+                      e.target.value = "";
                     }}
                   />
                 </label>

@@ -12,6 +12,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     Response,
     UploadFile,
@@ -103,6 +104,10 @@ def text_to_pdf(text: str, title: str) -> bytes:
 
 
 def source_to_pdf(data: bytes, suffix: str, title: str) -> bytes:
+    if suffix == "pdf":
+        if not data.startswith(b"%PDF-"):
+            raise ValueError("The uploaded file is not a valid PDF")
+        return data
     if suffix == "docx":
         validate_docx(data)
         return text_to_pdf(docx_to_markdown(data).decode("utf-8"), title)
@@ -378,7 +383,7 @@ async def document_thumbnail(
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file: UploadFile = File(...),
-    workspace_id: uuid.UUID | None = None,
+    workspace_id: str | None = Form(default=None),
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
@@ -402,12 +407,12 @@ async def upload_document(
         raise HTTPException(status_code=422, detail=f"Document limit reached ({settings.max_documents_per_user})")
     original_filename = safe_filename(file.filename or "document.pdf")
     suffix = original_filename.lower().rsplit(".", 1)[-1] if "." in original_filename else ""
-    is_pdf = suffix == "pdf" and file.content_type == "application/pdf"
-    is_image = suffix in {"png", "jpg", "jpeg", "webp"} and file.content_type in IMAGE_CONTENT_TYPES
     generic_upload_types = {None, "", "application/octet-stream", "application/zip"}
-    is_docx = suffix == "docx" and file.content_type in {DOCX_CONTENT_TYPE, *generic_upload_types}
-    is_pptx = suffix == "pptx" and file.content_type in {PPTX_CONTENT_TYPE, *generic_upload_types}
-    is_text = suffix in {"txt", "md", "markdown", "rtf"} and file.content_type in {*TEXT_CONTENT_TYPES, *generic_upload_types}
+    is_pdf = suffix == "pdf" and (file.content_type in {"application/pdf", "application/x-pdf", *generic_upload_types} or not file.content_type)
+    is_image = suffix in {"png", "jpg", "jpeg", "webp"} and (file.content_type in {*IMAGE_CONTENT_TYPES, *generic_upload_types} or not file.content_type)
+    is_docx = suffix == "docx" and (file.content_type in {DOCX_CONTENT_TYPE, *generic_upload_types} or not file.content_type)
+    is_pptx = suffix == "pptx" and (file.content_type in {PPTX_CONTENT_TYPE, *generic_upload_types} or not file.content_type)
+    is_text = suffix in {"txt", "md", "markdown", "rtf"} and (file.content_type in {*TEXT_CONTENT_TYPES, *generic_upload_types} or not file.content_type)
     if not is_pdf and not is_image and not is_docx and not is_pptx and not is_text:
         raise HTTPException(status_code=415, detail="Supported sources are PDF, DOCX, PPTX, Markdown, text, RTF, PNG, JPEG, and WebP")
     data = await file.read(settings.max_file_size_mb * 1024 * 1024 + 1)
@@ -415,18 +420,26 @@ async def upload_document(
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_file_size_mb} MB")
     if is_pdf and not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=422, detail="The file is not a valid PDF")
+    from app.deliverables import activity, ensure_personal_workspace, workspace_access
+
+    ws_uuid: uuid.UUID | None = None
+    if workspace_id and str(workspace_id).strip() and str(workspace_id).strip().lower() not in {"null", "undefined"}:
+        try:
+            ws_uuid = uuid.UUID(str(workspace_id).strip())
+        except (ValueError, AttributeError):
+            ws_uuid = None
+
+    if ws_uuid is not None:
+        workspace, _ = await workspace_access(ws_uuid, user, session, {"owner", "editor"})
+    else:
+        workspace = await ensure_personal_workspace(user, session)
+
     source_sha256 = hashlib.sha256(data).hexdigest()
     duplicate = await session.scalar(select(Document).where(
-        Document.owner_id == user.id, Document.source_sha256 == source_sha256
+        Document.owner_id == user.id, Document.workspace_id == workspace.id, Document.source_sha256 == source_sha256
     ))
     if duplicate is not None:
         raise HTTPException(status_code=409, detail={"message": "This source is already in your workspace", "document_id": str(duplicate.id)})
-    from app.deliverables import activity, ensure_personal_workspace, workspace_access
-
-    if workspace_id is not None:
-        workspace, _ = await workspace_access(workspace_id, user, session, {"owner", "editor"})
-    else:
-        workspace = await ensure_personal_workspace(user, session)
     display_title = None
     filename = original_filename
     original_data = data
@@ -495,13 +508,12 @@ async def upload_document(
         task = process_document.delay(str(document.id))
         job.task_id = task.id
         await session.commit()
-    except Exception as exc:
+    except Exception:
         document.status = DocumentStatus.FAILED
-        document.error_message = "Processing queue is temporarily unavailable"
+        document.error_message = "Processing worker is temporarily offline"
         job.status = JobStatus.FAILED
         job.error_message = document.error_message
         await session.commit()
-        raise HTTPException(status_code=503, detail=document.error_message) from exc
     return document
 
 

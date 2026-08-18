@@ -6,6 +6,7 @@ export type Job = {
   result_kind?: string | null;
   result_id?: string | null;
   operation?: string;
+  parameters?: Record<string, unknown>;
   retry_count?: number;
   created_at?: string;
 };

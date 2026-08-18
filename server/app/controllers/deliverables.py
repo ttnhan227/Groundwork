@@ -62,47 +62,55 @@ from app.schemas import (
 router = APIRouter(tags=["Workspaces and native deliverables"])
 
 
-DEMO_TITLE = "[Demo] Northstar Customer Onboarding Review"
+DEMO_TITLE = "[Demo] Apex Horizon Cloud Modernization RFP Proposal"
 DEMO_SOURCES = {
-    "Northstar Client Brief (Demo).pdf": """NORTHSTAR SOFTWARE — CUSTOMER ONBOARDING REVIEW BRIEF
+    "Apex Horizon RFP - Cloud Modernization Brief (Demo).pdf": """APEX HORIZON ENTERPRISE — CLOUD MODERNIZATION & SECURITY RFP (RFP-2026-88)
 
-Audience: Executive leadership.
-Deliverable: A 5–7 page client-ready report in PDF format.
-Include a one-page executive summary, describe the current onboarding process, identify three priority problems, provide five evidence-backed recommendations, and finish with a 30/60/90-day implementation plan.
-Every factual statement and statistic must be supported by the supplied research notes. Do not invent metrics.
-The report must be concise, confident, and suitable to send to the client.
-Deadline: August 15, 2026.
+1. Scope & Objective:
+Apex Horizon requires a technical proposal to migrate our transactional core to a multi-region cloud architecture.
+Audience: Technical Review Committee and Executive Leadership.
+
+2. Mandatory Technical & Operational Requirements:
+- Requirement RFP-01: Executive summary detailing cloud architecture strategy and business continuity.
+- Requirement RFP-02: Guaranteed high availability SLA of 99.99% across active-active cloud regions.
+- Requirement RFP-03: Zero-trust data security with AES-256 envelope encryption at rest and TLS 1.3 in transit.
+- Requirement RFP-04: SOC2 Type II and ISO/IEC 27001 compliance audit coverage.
+- Requirement RFP-05: 30-day phased cutover with Disaster Recovery RTO under 15 minutes and RPO under 1 minute.
+- Requirement RFP-06: All architectural claims, benchmark stats, and SLA commitments must cite supporting documentation.
+
+3. Deliverable Format:
+Technical Proposal with compliance matrix and verification provenance.
 """,
-    "Northstar Research Notes (Demo).pdf": """NORTHSTAR SOFTWARE — CUSTOMER RESEARCH NOTES
+    "Apex Cloud Infrastructure & Security Spec (Demo).pdf": """APEX HORIZON — TECHNICAL ARCHITECTURE & SECURITY SPECIFICATION
 
-Eight recent customer interviews were reviewed. Six customers described setup ownership as unclear during the first week. Five customers said they repeated account details to more than one Northstar contact. Four customers could not tell whether onboarding tasks were complete.
+Architecture Specification:
+- High Availability: Multi-region active-active cluster deployment engineered for 99.99% availability with automated sub-minute DNS failover.
+- Data Protection: AES-256 KMS envelope encryption for all database volumes; TLS 1.3 enforced for public endpoints.
+- Compliance Certifications: Dedicated audit logging satisfying SOC2 Type II, ISO/IEC 27001, and HIPAA compliance mandates.
+- Operational SLOs: Automated health probes with 30-second interval checks and cross-region replication lag under 800ms.
+""",
+    "Q2 Benchmark & Performance Testing Report (Demo).pdf": """APEX HORIZON — SYSTEM BENCHMARK & MIGRATION PERFORMANCE REPORT
 
-Internal support notes show that onboarding questions account for 31% of new-customer tickets during the first 30 days. The median time from contract signature to kickoff is 9 days.
-
-Recommended response: assign one onboarding owner, publish a shared milestone checklist, collect account details once, add a kickoff preparation email, and review progress at days 30, 60, and 90.
+Empirical Testing Summary:
+- Disaster Recovery: Simulated region failover achieved a verified RTO of 11.4 minutes (target < 15 min) and RPO of 18 seconds (target < 1 min).
+- Phased Cutover: Pilot database synchronization achieved zero packet loss across 2.4 million test transactions.
+- Capacity: Sustained 45,000 requests/sec at peak load with 99.99% service availability.
+- Cost Efficiency: Modernized serverless compute allocation reduces baseline operational expenditure by 28%.
 """,
 }
 
 
 DEMO_BLOCKS = [
-    {"type": "heading", "text": "Executive summary"},
-    {"type": "paragraph", "text": "Northstar can make onboarding clearer and less repetitive by assigning one accountable owner, sharing milestones, and collecting customer details once. Six of eight interviewed customers described first-week ownership as unclear. [Source: Northstar Research Notes (Demo).pdf, p. 1]"},
-    {"type": "heading", "text": "Current onboarding process"},
-    {"type": "paragraph", "text": "Customers move from contract signature to kickoff in a median of 9 days and interact with multiple Northstar contacts before setup is complete. [Source: Northstar Research Notes (Demo).pdf, p. 1]"},
-    {"type": "heading", "text": "Three priority problems"},
-    {"type": "bullet", "text": "Ownership is unclear during the first week."},
-    {"type": "bullet", "text": "Customers repeat account information across contacts."},
-    {"type": "bullet", "text": "Customers cannot reliably see whether onboarding tasks are complete."},
-    {"type": "heading", "text": "Five recommendations"},
-    {"type": "bullet", "text": "Assign one onboarding owner for every new account."},
-    {"type": "bullet", "text": "Publish a shared milestone checklist."},
-    {"type": "bullet", "text": "Collect account details once and reuse them."},
-    {"type": "bullet", "text": "Send a kickoff preparation email."},
-    {"type": "bullet", "text": "Review progress at days 30, 60, and 90."},
-    {"type": "heading", "text": "30/60/90-day implementation plan"},
-    {"type": "paragraph", "text": "Days 1–30: name owners and publish milestones. Days 31–60: consolidate intake and launch kickoff preparation. Days 61–90: review progress, ticket volume, and customer feedback. [Source: Northstar Research Notes (Demo).pdf, p. 1]"},
-    {"type": "heading", "text": "Source notes"},
-    {"type": "paragraph", "text": "Prepared from the Northstar client brief and research notes. Demo content is synthetic and labeled for product evaluation."},
+    {"type": "heading", "text": "Executive Summary"},
+    {"type": "paragraph", "text": "Apex Horizon requires a resilient, multi-region cloud modernization proposal that delivers high availability, zero-trust security, and zero-downtime cutover. Our technical approach migrates core workloads to active-active clusters while maintaining continuous SOC2 Type II compliance. [Source: Apex Horizon RFP - Cloud Modernization Brief (Demo).pdf, p. 1]"},
+    {"type": "heading", "text": "Cloud Architecture & High Availability SLA"},
+    {"type": "paragraph", "text": "The modernized cloud infrastructure guarantees 99.999% uptime with under 10-second automated failover across all multi-region clusters."},
+    {"type": "heading", "text": "Security, Compliance & Envelope Encryption"},
+    {"type": "paragraph", "text": "All data at rest is secured via AES-256 envelope encryption with KMS key rotation, while TLS 1.3 is strictly enforced for all service transit. Dedicated immutable audit logs ensure full SOC2 Type II and ISO/IEC 27001 compliance. [Source: Apex Cloud Infrastructure & Security Spec (Demo).pdf, p. 1]"},
+    {"type": "heading", "text": "Disaster Recovery & Phased Migration Plan"},
+    {"type": "paragraph", "text": "Disaster recovery benchmarks demonstrate a verified RTO of 11.4 minutes and an RPO of 18 seconds under full region failover simulation. The 30-day phased cutover plan isolates risk through parallel run verification and live database replication. [Source: Q2 Benchmark & Performance Testing Report (Demo).pdf, p. 1]"},
+    {"type": "heading", "text": "Verification & Evidence Provenance"},
+    {"type": "paragraph", "text": "This deliverable is cross-referenced against client RFP-2026-88 and technical specifications. Every factual claim and performance metric is grounded in verifiable project evidence."},
 ]
 
 
@@ -640,22 +648,25 @@ async def create_demo_project(
     for source in source_items:
         session.add(NativeDocumentSource(native_document_id=item.id, document_id=source.id))
 
-    brief, research = source_items
+    rfp_brief = next((s for s in source_items if "RFP" in s.filename), source_items[0])
+    tech_spec = next((s for s in source_items if "Spec" in s.filename), source_items[1] if len(source_items) > 1 else source_items[0])
+    benchmark_rep = next((s for s in source_items if "Benchmark" in s.filename), source_items[-1])
+
     requirements = [
-        ("Include a one-page executive summary for executive leadership", "Executive summary", brief, "Include a one-page executive summary"),
-        ("Describe the current onboarding process", "Current onboarding process", brief, "describe the current onboarding process"),
-        ("Identify three priority problems", "Three priority problems", research, "Ownership is unclear during the first week"),
-        ("Provide five evidence-backed recommendations", "Five recommendations", research, "Recommended response"),
-        ("Finish with a 30/60/90-day implementation plan", "30/60/90-day implementation plan", brief, "30/60/90-day implementation plan"),
-        ("Support every factual statement and statistic with supplied evidence", "Source notes", brief, "Every factual statement and statistic must be supported"),
+        ("Requirement RFP-01: Executive summary detailing cloud architecture strategy and business continuity", "Executive Summary", rfp_brief, "Scope & Objective: Apex Horizon requires a technical proposal to migrate our transactional core to a multi-region cloud architecture.", "covered"),
+        ("Requirement RFP-02: Guaranteed high availability SLA of 99.99% across active-active cloud regions", "Cloud Architecture & High Availability SLA", tech_spec, "Multi-region active-active cluster deployment engineered for 99.99% availability with automated sub-minute DNS failover.", "unverified"),
+        ("Requirement RFP-03: Zero-trust data security with AES-256 envelope encryption at rest and TLS 1.3 in transit", "Security, Compliance & Envelope Encryption", tech_spec, "Data Protection: AES-256 KMS envelope encryption for all database volumes; TLS 1.3 enforced for public endpoints.", "covered"),
+        ("Requirement RFP-04: SOC2 Type II and ISO/IEC 27001 compliance audit coverage", "Security, Compliance & Envelope Encryption", tech_spec, "Dedicated audit logging satisfying SOC2 Type II, ISO/IEC 27001, and HIPAA compliance mandates.", "covered"),
+        ("Requirement RFP-05: 30-day phased cutover with Disaster Recovery RTO under 15 minutes and RPO under 1 minute", "Disaster Recovery & Phased Migration Plan", benchmark_rep, "Simulated region failover achieved a verified RTO of 11.4 minutes and RPO of 18 seconds.", "covered"),
+        ("Requirement RFP-06: All architectural claims, benchmark stats, and SLA commitments must cite supporting documentation", "Verification & Evidence Provenance", rfp_brief, "All architectural claims, benchmark stats, and SLA commitments must cite supporting documentation.", "covered"),
     ]
-    for position, (text, section_name, source, quote) in enumerate(requirements):
+    for position, (text, section_name, source, quote, status) in enumerate(requirements):
         session.add(DeliverableRequirement(
             native_document_id=item.id,
             created_by=user.id,
             text=text,
             kind="section" if position < 5 else "evidence",
-            status="covered",
+            status=status,
             is_required=True,
             position=position,
             origin="ai",
@@ -667,8 +678,28 @@ async def create_demo_project(
             }],
             linked_sections=[section_name],
         ))
-    await activity(session, workspace_id, user.id, "onboarding.demo_created", "native_document", item.id, {"sources": 2, "requirements": len(requirements)})
-    await activity(session, workspace_id, user.id, "deliverable.reviewed", "native_document", item.id, {"findings": 0, "demo": True})
+
+    initial_finding = DeliverableReviewFinding(
+        native_document_id=item.id,
+        created_by=user.id,
+        kind="unsupported_claim",
+        claim_type="number_stat",
+        severity="high",
+        status="open",
+        claim_text="The modernized cloud infrastructure guarantees 99.999% uptime with under 10-second automated failover across all multi-region clusters.",
+        explanation="Source documents only establish 99.99% availability with sub-minute failover (Apex Cloud Infrastructure & Security Spec.pdf, p. 1). The 99.999% claim is unsupported by evidence and blocks export.",
+        proposed_text="The modernized cloud infrastructure guarantees 99.99% high availability with sub-minute automated failover across all multi-region clusters. [Source: Apex Cloud Infrastructure & Security Spec (Demo).pdf, p. 1]",
+        citations=[{
+            "document_id": str(tech_spec.id),
+            "document_name": tech_spec.filename,
+            "page_number": 1,
+            "snippet": "Multi-region active-active cluster deployment engineered for 99.99% availability with automated sub-minute DNS failover.",
+        }],
+    )
+    session.add(initial_finding)
+
+    await activity(session, workspace_id, user.id, "onboarding.demo_created", "native_document", item.id, {"sources": len(source_items), "requirements": len(requirements)})
+    await activity(session, workspace_id, user.id, "deliverable.reviewed", "native_document", item.id, {"findings": 1, "demo": True})
     await session.commit()
     await session.refresh(item)
     return await native_response(item, session)
@@ -1343,8 +1374,17 @@ async def decide_review_finding(
                     block["text"] = value.replace(finding.claim_text, finding.proposed_text, 1)
                     replaced = True
                     break
-        if not replaced:
-            blocks.append({"type": "paragraph", "text": finding.proposed_text})
+        if finding.requirement_id:
+            req = await session.scalar(select(DeliverableRequirement).where(DeliverableRequirement.id == finding.requirement_id))
+            if req:
+                req.status = "covered"
+        else:
+            unverified_reqs = list(await session.scalars(select(DeliverableRequirement).where(
+                DeliverableRequirement.native_document_id == item.id,
+                DeliverableRequirement.status == "unverified"
+            )))
+            for u_req in unverified_reqs:
+                u_req.status = "covered"
         item.content = {"type": "doc", "blocks": blocks}
         item.revision += 1
         session.add(NativeDocumentVersion(
@@ -1355,6 +1395,13 @@ async def decide_review_finding(
             change_summary=f"Applied verified revision: {finding.explanation[:170]}",
             created_by=user.id,
         ))
+    elif payload.action in {"resolve", "reject"}:
+        unverified_reqs = list(await session.scalars(select(DeliverableRequirement).where(
+            DeliverableRequirement.native_document_id == item.id,
+            DeliverableRequirement.status == "unverified"
+        )))
+        for u_req in unverified_reqs:
+            u_req.status = "covered"
     await activity(session, item.workspace_id, user.id, f"review_finding.{finding.status}", "native_document", item.id, {"finding_id": str(finding.id), "revision": item.revision})
     await session.commit()
     await session.refresh(finding)
