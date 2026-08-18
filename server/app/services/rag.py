@@ -158,9 +158,7 @@ def embedding_model():
 
 
 def _normalize_embedding(vector: list[float], dimensions: int) -> list[float]:
-    if len(vector) > dimensions:
-        raise RuntimeError(f"Embedding provider returned {len(vector)} dimensions; expected {dimensions}")
-    fitted = [*vector, *([0.0] * (dimensions - len(vector)))]
+    fitted = vector[:dimensions] if len(vector) >= dimensions else [*vector, *([0.0] * (dimensions - len(vector)))]
     magnitude = math.sqrt(sum(value * value for value in fitted))
     return [value / magnitude for value in fitted] if magnitude else fitted
 
@@ -188,13 +186,13 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     ]
 
 
-async def embed_texts_async(texts: list[str]) -> list[list[float]]:
+async def embed_texts_async(texts: list[str], *, operation: str = "document_retrieval") -> list[list[float]]:
     if not texts:
         return []
     settings = get_settings()
     if settings.embedding_provider != "api":
         return embed_texts(texts)
-    vectors = await ai_orchestrator.embeddings(texts, operation="document_retrieval")
+    vectors = await ai_orchestrator.embeddings(texts, operation=operation)
     return [_normalize_embedding(vector, settings.embedding_dimensions) for vector in vectors]
 
 

@@ -110,7 +110,7 @@ Configure your LLM credentials in `.env`:
 JWT_SECRET=your-secure-jwt-secret
 LLM_API_KEY=your-gemini-api-key
 LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemini-2.5-flash
+LLM_MODEL=gemini-flash-latest
 ```
 
 ### 2. Run with Docker Compose

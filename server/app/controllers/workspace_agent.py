@@ -678,10 +678,12 @@ async def _orchestrate_grounded_qa(
     chunks: list[DocumentChunk] = []
     citations_data: list[dict[str, Any]] = []
 
+    history_tuples = [(m.get("role", "user"), m.get("content", "")) for m in chat_history]
+
     if source_ids:
-        query_text = await build_retrieval_query(
+        query_text = build_retrieval_query(
             payload.prompt,
-            chat_history[-4:],
+            history_tuples[-4:],
         )
         embeddings = await embed_texts_async([query_text], operation="workspace_agent.embed_query")
         if embeddings:
@@ -703,8 +705,8 @@ async def _orchestrate_grounded_qa(
 
     answer_text = await generate_answer(
         payload.prompt,
-        [(doc_id, page_num, text) for doc_id, page_num, text, _, _ in retrieved_items],
-        chat_history[-4:],
+        [c.text for c in chunks],
+        history_tuples[-4:],
     )
 
     clean_answer = clean_user_answer(answer_text)
@@ -719,7 +721,7 @@ async def _orchestrate_grounded_qa(
     await session.flush()
 
     for doc_id, page_num, text, doc_name, chunk_id in retrieved_items[:6]:
-        snippet = relevant_snippet(clean_answer, text)
+        snippet = relevant_snippet(text, clean_answer, payload.prompt)
         citation = Citation(
             message_id=asst_msg.id,
             chunk_id=chunk_id,

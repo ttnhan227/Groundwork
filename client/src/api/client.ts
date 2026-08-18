@@ -20,10 +20,8 @@ export function setStoredAuth(auth: AuthResult | null) {
   if (typeof window === "undefined") return;
   if (auth) {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
-    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
   } else {
     localStorage.removeItem(AUTH_STORAGE_KEY);
-    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
   }
 }
 

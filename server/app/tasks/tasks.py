@@ -5,15 +5,19 @@ from datetime import UTC, datetime
 
 from celery import Task
 from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.celery_app import celery_app
 from app.config import get_settings
 from app.database import SessionLocal
+from app.documents import safe_filename
 from app.models import (
+    ArtifactVersion,
     Document,
     DocumentChunk,
     DocumentPage,
     DocumentStatus,
+    GeneratedArtifact,
     JobStatus,
     ProcessingJob,
     ToolExecution,
