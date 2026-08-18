@@ -1,4 +1,4 @@
-"""Business logic services layer for InsightPDF."""
+"""Business logic services layer for Groundwork."""
 
 from app.services import ai_orchestration, deliverable_review, processing, rag
 from app.services.auth_service import AuthService

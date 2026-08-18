@@ -1,4 +1,4 @@
-"""Controllers (HTTP API Routers) layer for InsightPDF."""
+"""Controllers (HTTP API Routers) layer for Groundwork."""
 
 from app.controllers.ai_features import router as ai_router
 from app.controllers.auth import router as auth_router

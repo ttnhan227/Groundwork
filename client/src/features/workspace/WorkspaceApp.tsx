@@ -433,10 +433,8 @@ export function WorkspaceApp({
       document.documentElement.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
     };
     window.addEventListener("groundwork-preferences-changed", update);
-    window.addEventListener("insightpdf-preferences-changed", update);
     return () => {
       window.removeEventListener("groundwork-preferences-changed", update);
-      window.removeEventListener("insightpdf-preferences-changed", update);
     };
   }, []);
 
@@ -612,10 +610,9 @@ export function WorkspaceApp({
           }
         });
       }
-      const pendingPrompt = sessionStorage.getItem("groundwork-pending-prompt") || sessionStorage.getItem("insightpdf-pending-prompt");
+      const pendingPrompt = sessionStorage.getItem("groundwork-pending-prompt");
       if (pendingPrompt) {
         sessionStorage.removeItem("groundwork-pending-prompt");
-        sessionStorage.removeItem("insightpdf-pending-prompt");
         const wsName = pendingPrompt.length > 4 ? pendingPrompt.slice(0, 45) : "Technical Proposal Workspace";
         handleCreateWorkspace(wsName, "proposal").then(async (wsId) => {
           if (wsId) {
@@ -764,7 +761,7 @@ export function WorkspaceApp({
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0] || null;
 
   return (
-    <div className="groundwork-app-root insightpdf-app-root h-screen w-screen overflow-hidden">
+    <div className="groundwork-app-root h-screen w-screen overflow-hidden">
       {workspaceView === "workspace" && activeWorkspace ? (
         <ResearchWorkspace
           auth={{ access_token: token, refresh_token: "", user }}

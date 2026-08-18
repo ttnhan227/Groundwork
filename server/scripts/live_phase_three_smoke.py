@@ -14,7 +14,7 @@ def make_pdf() -> bytes:
     page = document.new_page()
     page.insert_text(
         (72, 72),
-        "InsightPDF live smoke test. The verified launch code is 7391. "
+        "Groundwork live smoke test. The verified launch code is 7391. "
         "This validates extraction, indexing, retrieval, and citation.",
     )
     data = document.tobytes()

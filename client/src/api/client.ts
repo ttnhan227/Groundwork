@@ -2,20 +2,15 @@ import type { AuthResult, Citation, Job, NativeDocument } from "../types";
 
 export const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 export const AUTH_STORAGE_KEY = "groundwork-auth";
-export const LEGACY_AUTH_STORAGE_KEY = "insightpdf-auth";
 export const AUTH_EXPIRED_EVENT = "groundwork-auth-expired";
 export const AUTH_REFRESHED_EVENT = "groundwork-auth-refreshed";
 
 export function getStoredAuth(): AuthResult | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY) ?? localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as AuthResult;
-    if (localStorage.getItem(LEGACY_AUTH_STORAGE_KEY) && !localStorage.getItem(AUTH_STORAGE_KEY)) {
-      localStorage.setItem(AUTH_STORAGE_KEY, raw);
-    }
-    return parsed;
+    return JSON.parse(raw) as AuthResult;
   } catch {
     return null;
   }

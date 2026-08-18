@@ -1,4 +1,4 @@
-"""Data Transfer Objects (DTOs) and request/response validation schemas for InsightPDF."""
+"""Data Transfer Objects (DTOs) and request/response validation schemas for Groundwork."""
 
 from app.dtos.auth_dto import (
     GoogleLoginRequest,

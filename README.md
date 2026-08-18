@@ -108,9 +108,9 @@ Copy-Item .env.example .env
 Configure your LLM credentials in `.env`:
 ```dotenv
 JWT_SECRET=your-secure-jwt-secret
-LLM_API_KEY=your-api-key
-LLM_BASE_URL=https://api.mistral.ai/v1
-LLM_MODEL=mistral-small-latest
+LLM_API_KEY=your-gemini-api-key
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_MODEL=gemini-2.5-flash
 ```
 
 ### 2. Run with Docker Compose

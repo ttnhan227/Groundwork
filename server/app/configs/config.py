@@ -6,13 +6,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Groundwork API"
     environment: str = "development"
-    database_url: str = "postgresql+asyncpg://insightpdf:insightpdf@postgres:5432/insightpdf"
+    database_url: str = "postgresql+asyncpg://groundwork:groundwork@postgres:5432/groundwork"
     jwt_secret: str = "change-me-in-production"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
     minio_endpoint: str = "minio:9000"
-    minio_access_key: str = "insightpdf"
-    minio_secret_key: str = "insightpdf-secret"
+    minio_access_key: str = "groundwork"
+    minio_secret_key: str = "groundwork-secret"
     minio_secure: bool = False
     minio_region: str = "us-east-1"
     minio_bucket_originals: str = "original-documents"
@@ -22,15 +22,15 @@ class Settings(BaseSettings):
     ocr_text_density_threshold: int = 40
     ocr_language: str = "eng"
     embedding_provider: str = "api"
-    embedding_model: str = "mistral-embed"
+    embedding_model: str = "text-embedding-004"
     embedding_dimensions: int = 1024
     chunk_size: int = 900
     chunk_overlap: int = 150
     rag_top_k: int = 6
     llm_api_key: str = ""
-    llm_base_url: str = "https://api.mistral.ai/v1"
-    llm_model: str = "mistral-small-latest"
-    vision_model: str = "mistral-small-latest"
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    llm_model: str = "gemini-2.5-flash"
+    vision_model: str = "gemini-2.5-flash"
     vision_max_pages: int = 6
     llm_timeout_seconds: int = 60
     ai_daily_request_limit: int = 50

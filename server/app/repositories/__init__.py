@@ -1,4 +1,4 @@
-"""Data access repositories layer for InsightPDF."""
+"""Data access repositories layer for Groundwork."""
 
 from app.repositories.artifact_repository import ArtifactRepository
 from app.repositories.base import BaseRepository

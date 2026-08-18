@@ -1,4 +1,4 @@
-"""SQLAlchemy Database Models and Enums for InsightPDF."""
+"""SQLAlchemy Database Models and Enums for Groundwork."""
 
 from app.models.chat import (
     Citation,

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: insightpdf-client
+    name: groundwork-client
     runtime: static
     rootDir: client
     buildCommand: npm ci && npm run build

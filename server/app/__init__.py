@@ -1,4 +1,4 @@
-"""InsightPDF Enterprise Clean Layered Architecture root package.
+"""Groundwork Enterprise Clean Layered Architecture root package.
 
 Provides automated on-demand module resolution and backward-compatibility aliases:
 - app.configs

@@ -55,7 +55,6 @@ export function LandingPage({
     event.preventDefault();
     if (!prompt.trim()) return;
     sessionStorage.setItem("groundwork-pending-prompt", prompt.trim());
-    sessionStorage.setItem("insightpdf-pending-prompt", prompt.trim());
     onOpen();
   }
 

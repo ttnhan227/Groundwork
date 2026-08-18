@@ -1,4 +1,4 @@
-"""Middlewares and request logging module for InsightPDF."""
+"""Middlewares and request logging module for Groundwork."""
 
 from app.middlewares.logging_config import JsonFormatter, configure_logging
 from app.middlewares.middleware import (

@@ -37,12 +37,11 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
 };
 
 export const PREFERENCES_STORAGE_KEY = "groundwork-preferences";
-export const LEGACY_PREFERENCES_STORAGE_KEY = "insightpdf-preferences";
 export const PREFERENCES_CHANGED_EVENT = "groundwork-preferences-changed";
 
 export function storedPreferences(): UserPreferences {
   try {
-    const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY) ?? localStorage.getItem(LEGACY_PREFERENCES_STORAGE_KEY);
+    const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
     return { ...DEFAULT_PREFERENCES, ...(raw ? JSON.parse(raw) : {}) };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -57,5 +56,4 @@ export function applyPreferences(preferences: UserPreferences) {
   root.dataset.theme = preferences.theme;
   root.dataset.interfaceSize = preferences.interface_size;
   window.dispatchEvent(new CustomEvent<UserPreferences>(PREFERENCES_CHANGED_EVENT, { detail: preferences }));
-  window.dispatchEvent(new CustomEvent<UserPreferences>("insightpdf-preferences-changed", { detail: preferences }));
 }

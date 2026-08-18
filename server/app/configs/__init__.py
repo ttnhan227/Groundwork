@@ -1,4 +1,4 @@
-"""Configuration module for InsightPDF."""
+"""Configuration module for Groundwork."""
 
 from app.configs.config import Settings, get_settings
 

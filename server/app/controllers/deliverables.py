@@ -617,7 +617,7 @@ async def create_demo_project(
                 status=DocumentStatus.READY,
                 page_count=1,
                 display_title=filename.removesuffix(" (Demo).pdf"),
-                tags=["insightpdf-demo", "northstar"],
+                tags=["groundwork-demo", "northstar"],
             )
             session.add(source)
             session.add(DocumentPage(

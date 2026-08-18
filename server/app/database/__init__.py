@@ -1,4 +1,4 @@
-"""Database engine, base, and session module for InsightPDF."""
+"""Database engine, base, and session module for Groundwork."""
 
 from app.database.database import Base, SessionLocal, engine, get_session
 

@@ -1,4 +1,4 @@
-"""Database seeders for InsightPDF development and testing."""
+"""Database seeders for Groundwork development and testing."""
 
 import asyncio
 import logging
@@ -10,7 +10,7 @@ from app.database.database import SessionLocal
 from app.models import User, UserRole
 from app.utils.security import hash_password
 
-logger = logging.getLogger("insightpdf.seeders")
+logger = logging.getLogger("groundwork.seeders")
 
 
 async def seed_admin_user() -> None:

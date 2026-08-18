@@ -26,7 +26,7 @@ def validate_docx(data: bytes) -> None:
 
 def docx_to_pdf(data: bytes) -> bytes:
     validate_docx(data)
-    with tempfile.TemporaryDirectory(prefix="insightpdf-docx-") as directory:
+    with tempfile.TemporaryDirectory(prefix="groundwork-docx-") as directory:
         workdir = Path(directory)
         source = workdir / "source.docx"
         source.write_bytes(data)
