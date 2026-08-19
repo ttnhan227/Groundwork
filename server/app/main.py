@@ -37,6 +37,14 @@ app = FastAPI(
 )
 
 # --- Global Middlewares ---
+# Note: In FastAPI/Starlette, user middlewares are executed in reverse addition order.
+# Adding CORSMiddleware last ensures it is the outermost middleware, guaranteeing
+# that all responses (including 429 rate limits, 500 error handlers, and preflight OPTIONS)
+# receive appropriate Access-Control-* headers.
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
 cors_kwargs = (
     {"allow_origin_regex": ".*"}
     if "*" in settings.cors_origins
@@ -49,9 +57,6 @@ app.add_middleware(
     allow_headers=["*"],
     **cors_kwargs,
 )
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(RequestLoggingMiddleware)
 
 # --- API Routers (Controllers) ---
 app.include_router(auth_router, prefix="/api/v1")

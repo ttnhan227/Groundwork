@@ -39,17 +39,25 @@ function GoogleSignInButton({ disabled, onCredential, onError }: {
   onError: (message: string) => void;
 }) {
   const buttonRef = useRef<HTMLDivElement>(null);
+  const onCredentialRef = useRef(onCredential);
+  onCredentialRef.current = onCredential;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || disabled) return;
     let cancelled = false;
     const render = () => {
       if (cancelled || !buttonRef.current || !window.google) return;
+      if (!initializedRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => onCredentialRef.current(response.credential),
+        });
+        initializedRef.current = true;
+      }
       buttonRef.current.replaceChildren();
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (response) => onCredential(response.credential),
-      });
       window.google.accounts.id.renderButton(buttonRef.current, {
         type: "standard",
         theme: "outline",
@@ -72,10 +80,10 @@ function GoogleSignInButton({ disabled, onCredential, onError }: {
     script.async = true;
     script.defer = true;
     script.onload = render;
-    script.onerror = () => onError("Google sign-in could not be loaded. Check your connection and try again.");
+    script.onerror = () => onErrorRef.current("Google sign-in could not be loaded. Check your connection and try again.");
     document.head.appendChild(script);
     return () => { cancelled = true; };
-  }, [disabled, onCredential, onError]);
+  }, [disabled]);
 
   if (!GOOGLE_CLIENT_ID) {
     return <button className="auth-google-disabled" type="button" disabled title="Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in">Google sign-in is not configured</button>;

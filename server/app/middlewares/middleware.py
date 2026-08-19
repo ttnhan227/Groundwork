@@ -47,7 +47,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if not request.url.path.startswith("/api/"):
+        if request.method == "OPTIONS" or not request.url.path.startswith("/api/"):
             return await call_next(request)
         settings = get_settings()
         forwarded = request.headers.get("x-forwarded-for", "")
