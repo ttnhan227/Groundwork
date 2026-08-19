@@ -70,7 +70,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limit = settings.request_rate_limit_per_minute
             expiry = 70
             retry_after = "60"
-        redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        redis_kwargs = {"ssl_cert_reqs": None} if settings.redis_url.startswith("rediss://") else {}
+        redis = Redis.from_url(settings.redis_url, decode_responses=True, **redis_kwargs)
         try:
             count = await redis.incr(key)
             if count == 1:
