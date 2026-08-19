@@ -417,6 +417,7 @@ export function WorkspaceApp({
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">(() =>
     document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light",
   );
+  const [isInitialLoading, setIsInitialLoading] = useState(Boolean(initialAuth));
 
   const authForm = useForm<AuthFields>({
     resolver: zodResolver(authSchema),
@@ -599,14 +600,24 @@ export function WorkspaceApp({
   }
 
   useEffect(() => {
-    if (!initialAuth) return;
-    const timer = window.setTimeout(() => {
-      Promise.all([
-        loadDocuments(initialAuth.access_token),
-        loadStats(initialAuth.access_token),
-        loadWorkspaces(initialAuth.access_token),
-        loadAllNativeDocs(initialAuth.access_token),
-      ]).catch(() => undefined);
+    if (!initialAuth) {
+      setIsInitialLoading(false);
+      return;
+    }
+    setIsInitialLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        await Promise.all([
+          loadDocuments(initialAuth.access_token),
+          loadStats(initialAuth.access_token),
+          loadWorkspaces(initialAuth.access_token),
+          loadAllNativeDocs(initialAuth.access_token),
+        ]);
+      } catch (err) {
+        console.error("Initial workspace data load error", err);
+      } finally {
+        setIsInitialLoading(false);
+      }
       if (pendingUpload) {
         onPendingUploadHandled();
         const safeName = pendingUpload.name.replace(/\.[^/.]+$/, "").trim().slice(0, 120) || "Workspace";
@@ -803,6 +814,7 @@ export function WorkspaceApp({
           documents={documents}
           nativeDocs={nativeDocs}
           activeTheme={activeTheme}
+          isLoading={isInitialLoading}
           onSelectWorkspace={(wsId) => {
             setActiveWorkspaceId(wsId);
             setWorkspaceView("workspace");

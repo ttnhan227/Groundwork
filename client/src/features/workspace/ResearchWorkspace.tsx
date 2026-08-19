@@ -125,10 +125,14 @@ export function ResearchWorkspace({
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isRunningAudit, setIsRunningAudit] = useState(false);
+  const [isLoadingArtifactDetails, setIsLoadingArtifactDetails] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isUploadingSource, setIsUploadingSource] = useState(false);
 
   // Initial load of conversation
   useEffect(() => {
     async function loadWorkspaceData() {
+      setIsLoadingConversation(true);
       try {
         const convs = await api<Array<{ id: string }>>(`/conversations?workspace_id=${workspace.id}`, auth.access_token);
         if (convs && convs.length > 0) {
@@ -141,6 +145,8 @@ export function ResearchWorkspace({
         }
       } catch (err) {
         console.error("Failed to load workspace conversation", err);
+      } finally {
+        setIsLoadingConversation(false);
       }
     }
     loadWorkspaceData();
@@ -155,6 +161,7 @@ export function ResearchWorkspace({
       setEditableBlocks([]);
       return;
     }
+    setIsLoadingArtifactDetails(true);
     try {
       const [reqs, fnds, rdn, blocks] = await Promise.all([
         api<DeliverableRequirement[]>(
@@ -180,6 +187,8 @@ export function ResearchWorkspace({
       setEditableBlocks(blocks || activeArtifact.content?.blocks || []);
     } catch (err) {
       console.error("Failed to load artifact details", err);
+    } finally {
+      setIsLoadingArtifactDetails(false);
     }
   };
 
@@ -539,7 +548,7 @@ export function ResearchWorkspace({
           </div>
         </div>
 
-        {/* Center: Grounding Evidence Status */}
+        {/* Center: Grounding Evidence Status & Active Agent Status */}
         <div className="topbar-center">
           <div className="grounding-status-pill">
             <ShieldCheck size={14} className="icon-emerald" />
@@ -547,6 +556,14 @@ export function ResearchWorkspace({
               <strong>{selectedSourceIds.length}</strong> of {workspaceSources.length} sources grounded
             </span>
           </div>
+          {isAgentRunning && (
+            <div className="topbar-agent-live-badge" role="status" aria-live="polite">
+              <RefreshCw size={12} className="spin" />
+              <span>
+                {activeSteps.find((s) => s.status === "in_progress")?.label || "Agent working across sources…"}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right: Readiness Score + Export Gate */}
@@ -642,20 +659,23 @@ export function ResearchWorkspace({
               <span className="count-tag">{workspaceSources.length} files</span>
             </div>
 
-            <label className="btn-add-evidence" title="Upload new source document">
-              <Plus size={13} />
-              <span>Add</span>
+            <label className={`btn-add-evidence ${isUploadingSource ? "disabled" : ""}`} title="Upload new source document">
+              <RefreshCw size={13} className={isUploadingSource ? "spin" : ""} />
+              <span>{isUploadingSource ? "Uploading…" : "Add"}</span>
               <input
                 type="file"
+                disabled={isUploadingSource}
                 style={{ display: "none" }}
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (f) {
+                    setIsUploadingSource(true);
                     try {
                       await onUploadDocument(f, workspace.id);
                     } catch (err: unknown) {
                       alert((err as Error)?.message || "Failed to upload document");
                     } finally {
+                      setIsUploadingSource(false);
                       e.target.value = "";
                     }
                   }
@@ -780,20 +800,23 @@ export function ResearchWorkspace({
 
           {/* Quick Dropzone */}
           <div className="sources-dropzone-footer">
-            <label className="dropzone-box">
-              <Upload size={14} />
-              <span>Attach PDF or specification</span>
+            <label className={`dropzone-box ${isUploadingSource ? "disabled" : ""}`}>
+              <RefreshCw size={14} className={isUploadingSource ? "spin" : ""} />
+              <span>{isUploadingSource ? "Uploading & indexing file…" : "Attach PDF or specification"}</span>
               <input
                 type="file"
+                disabled={isUploadingSource}
                 style={{ display: "none" }}
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (f) {
+                    setIsUploadingSource(true);
                     try {
                       await onUploadDocument(f, workspace.id);
                     } catch (err: unknown) {
                       alert((err as Error)?.message || "Upload failed");
                     } finally {
+                      setIsUploadingSource(false);
                       e.target.value = "";
                     }
                   }
@@ -843,7 +866,24 @@ export function ResearchWorkspace({
           {/* Draft Document Paper Canvas */}
           <div className="draft-paper-canvas">
             <div className="draft-paper-sheet">
-              {editableBlocks.length === 0 && (
+              {isLoadingArtifactDetails && editableBlocks.length === 0 ? (
+                <div className="deliverable-skeleton-wrap" role="status" aria-live="polite">
+                  <div className="deliverable-skeleton-header">
+                    <RefreshCw size={14} className="spin" />
+                    <span>Loading deliverable draft, structure & verification status…</span>
+                  </div>
+                  <div className="skeleton-shimmer deliverable-skeleton-title" />
+                  <div className="skeleton-shimmer deliverable-skeleton-meta" />
+                  <div className="skeleton-shimmer deliverable-skeleton-heading" />
+                  <div className="skeleton-shimmer deliverable-skeleton-line" />
+                  <div className="skeleton-shimmer deliverable-skeleton-line medium" />
+                  <div className="skeleton-shimmer deliverable-skeleton-line short" />
+                  <div className="skeleton-shimmer deliverable-skeleton-heading" />
+                  <div className="skeleton-shimmer deliverable-skeleton-line" />
+                  <div className="skeleton-shimmer deliverable-skeleton-line medium" />
+                  <div className="skeleton-shimmer deliverable-skeleton-line short" />
+                </div>
+              ) : editableBlocks.length === 0 ? (
                 <div className="draft-empty-state">
                   <div className="empty-icon-wrap">
                     <FileText size={32} />
@@ -869,7 +909,7 @@ export function ResearchWorkspace({
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null}
               {editableBlocks.map((block, index) => {
                 // Check if this block contains any open finding
                 const matchedFinding = openFindings.find(
@@ -1032,7 +1072,12 @@ export function ResearchWorkspace({
             {isAgentExpanded && (
               <div className="agent-conversation-drawer">
                 <div className="messages-stream-list">
-                  {messages.length === 0 && !isAgentRunning ? (
+                  {isLoadingConversation && messages.length === 0 ? (
+                    <div className="chat-loading-indicator" role="status" aria-live="polite">
+                      <RefreshCw size={15} className="spin" />
+                      <span>Loading conversation history…</span>
+                    </div>
+                  ) : messages.length === 0 && !isAgentRunning ? (
                     <div className="agent-empty-notice">
                       <p>Groundwork agent acts directly on your deliverable draft, requirements matrix, and evidence sources.</p>
                     </div>
@@ -1064,7 +1109,7 @@ export function ResearchWorkspace({
                   {isAgentRunning && (
                     <div className="agent-executing-card">
                       <div className="exec-header">
-                        <div className="step-spinner" />
+                        <RefreshCw size={13} className="spin text-accent" />
                         <strong>Multi-Step Task Execution</strong>
                         <button onClick={handleStopAgent} className="btn-stop-stream">
                           <Square size={11} /> Stop
@@ -1076,7 +1121,7 @@ export function ResearchWorkspace({
                             {s.status === "completed" ? (
                               <Check size={13} className="text-emerald" />
                             ) : (
-                              <div className="small-spinner" />
+                              <RefreshCw size={12} className="spin text-accent" />
                             )}
                             <span className={s.status === "completed" ? "step-done" : "step-active"}>
                               {s.label}
@@ -1104,7 +1149,12 @@ export function ResearchWorkspace({
                     handleSendPrompt();
                   }
                 }}
-                placeholder={`Ask agent to draft, verify, or resolve claims across ${selectedSourceIds.length} sources…`}
+                disabled={isAgentRunning}
+                placeholder={
+                  isAgentRunning
+                    ? "Agent is executing instructions across sources…"
+                    : `Ask agent to draft, verify, or resolve claims across ${selectedSourceIds.length} sources…`
+                }
                 className="dock-prompt-input"
                 aria-label="Agent prompt input"
               />
@@ -1112,10 +1162,10 @@ export function ResearchWorkspace({
                 onClick={() => handleSendPrompt()}
                 disabled={!promptInput.trim() || isAgentRunning}
                 className="btn-dock-send"
-                title="Send command to agent"
+                title={isAgentRunning ? "Agent is processing…" : "Send command to agent"}
               >
-                <Send size={14} />
-                <span>Execute</span>
+                {isAgentRunning ? <RefreshCw size={14} className="spin" /> : <Send size={14} />}
+                <span>{isAgentRunning ? "Working…" : "Execute"}</span>
               </button>
             </div>
           </div>
@@ -1214,7 +1264,12 @@ export function ResearchWorkspace({
                   </button>
                 </div>
 
-                {openFindings.length > 0 ? (
+                {isLoadingArtifactDetails && findings.length === 0 ? (
+                  <div className="chat-loading-indicator" role="status" aria-live="polite">
+                    <RefreshCw size={15} className="spin" />
+                    <span>Auditing deliverable claims against active evidence…</span>
+                  </div>
+                ) : openFindings.length > 0 ? (
                   <div className="findings-cards-list">
                     {openFindings.map((finding) => (
                       <div key={finding.id} className="finding-detail-card">
@@ -1308,57 +1363,64 @@ export function ResearchWorkspace({
               </div>
 
               <div className="requirements-matrix-list">
-                {requirements.map((req, rIdx) => {
-                  const isCovered = req.status === "covered";
-                  return (
-                    <div key={req.id || rIdx} className={`req-matrix-card ${isCovered ? "covered" : "unverified"}`}>
-                      <div className="req-card-top">
-                        <div className="req-status-indicator">
-                          {isCovered ? (
-                            <CheckCircle2 size={16} className="text-emerald" />
-                          ) : (
-                            <AlertCircle size={16} className="text-amber" />
-                          )}
-                        </div>
-                        <div className="req-text-wrap">
-                          <strong className="req-title">{req.text}</strong>
-                          {req.linked_sections && req.linked_sections.length > 0 && (
-                            <span className="req-section-tag">
-                              Section: {req.linked_sections[0]}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Requirement Evidence & Quick Actions */}
-                      <div className="req-card-footer">
-                        {req.evidence && req.evidence.length > 0 && (
-                          <div className="req-evidence-row">
-                            <span className="evidence-badge-item">
-                              <ExternalLink size={10} />
-                              <span>{req.evidence[0].document_name}</span>
-                              <strong>(p. {req.evidence[0].page_number})</strong>
-                            </span>
+                {isLoadingArtifactDetails && requirements.length === 0 ? (
+                  <div className="chat-loading-indicator" role="status" aria-live="polite">
+                    <RefreshCw size={15} className="spin" />
+                    <span>Extracting and mapping acceptance requirements…</span>
+                  </div>
+                ) : (
+                  requirements.map((req, rIdx) => {
+                    const isCovered = req.status === "covered";
+                    return (
+                      <div key={req.id || rIdx} className={`req-matrix-card ${isCovered ? "covered" : "unverified"}`}>
+                        <div className="req-card-top">
+                          <div className="req-status-indicator">
+                            {isCovered ? (
+                              <CheckCircle2 size={16} className="text-emerald" />
+                            ) : (
+                              <AlertCircle size={16} className="text-amber" />
+                            )}
                           </div>
-                        )}
-                        {!isCovered && (
-                          <button
-                            className="btn-req-solve"
-                            onClick={() =>
-                              handleSendPrompt(
-                                `Investigate requirement "${req.text}". Find supporting evidence in active sources and draft a section to satisfy it.`,
-                              )
-                            }
-                            title="Ask agent to satisfy requirement"
-                          >
-                            <Sparkles size={11} />
-                            <span>Ask Agent to Satisfy Requirement</span>
-                          </button>
-                        )}
+                          <div className="req-text-wrap">
+                            <strong className="req-title">{req.text}</strong>
+                            {req.linked_sections && req.linked_sections.length > 0 && (
+                              <span className="req-section-tag">
+                                Section: {req.linked_sections[0]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Requirement Evidence & Quick Actions */}
+                        <div className="req-card-footer">
+                          {req.evidence && req.evidence.length > 0 && (
+                            <div className="req-evidence-row">
+                              <span className="evidence-badge-item">
+                                <ExternalLink size={10} />
+                                <span>{req.evidence[0].document_name}</span>
+                                <strong>(p. {req.evidence[0].page_number})</strong>
+                              </span>
+                            </div>
+                          )}
+                          {!isCovered && (
+                            <button
+                              className="btn-req-solve"
+                              onClick={() =>
+                                handleSendPrompt(
+                                  `Investigate requirement "${req.text}". Find supporting evidence in active sources and draft a section to satisfy it.`,
+                                )
+                              }
+                              title="Ask agent to satisfy requirement"
+                            >
+                              <Sparkles size={11} />
+                              <span>Ask Agent to Satisfy Requirement</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

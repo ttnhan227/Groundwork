@@ -21,6 +21,7 @@ import {
   Sparkles,
   Lock,
   FileCheck2,
+  RefreshCw,
 } from "lucide-react";
 import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
@@ -31,6 +32,7 @@ interface WorkspaceLibraryProps {
   documents: DocumentItem[];
   nativeDocs: NativeDocument[];
   activeTheme: "light" | "dark";
+  isLoading?: boolean;
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: (name: string, template?: string) => Promise<string | null>;
   onDeleteWorkspace: (workspaceId: string) => Promise<void>;
@@ -53,6 +55,7 @@ export function WorkspaceLibrary({
   documents,
   nativeDocs,
   activeTheme,
+  isLoading = false,
   onSelectWorkspace,
   onCreateWorkspace,
   onDeleteWorkspace,
@@ -339,8 +342,35 @@ export function WorkspaceLibrary({
             </div>
           </div>
 
+          {/* Loading Banner when connecting/fetching */}
+          {isLoading && (
+            <div className="workspace-loading-banner" role="status" aria-live="polite">
+              <RefreshCw size={15} className="spin" />
+              <span>Connecting to Groundwork cloud · Loading workspaces & evidence indices (may take ~5s on cold wake)…</span>
+            </div>
+          )}
+
           {/* Workspace Cards Grid */}
-          {filteredWorkspaces.length > 0 ? (
+          {isLoading ? (
+            <div className="notebook-grid workspace-grid" aria-busy="true" aria-label="Loading workspaces">
+              {[1, 2, 3, 4].map((idx) => (
+                <div key={idx} className="skeleton-workspace-card">
+                  <div className="skeleton-card-top">
+                    <div className="skeleton-shimmer skeleton-avatar" />
+                    <div className="skeleton-text-group">
+                      <div className="skeleton-shimmer skeleton-title-bar" />
+                      <div className="skeleton-shimmer skeleton-subtitle-bar" />
+                    </div>
+                  </div>
+                  <div className="skeleton-meta-row">
+                    <div className="skeleton-shimmer skeleton-pill" />
+                    <div className="skeleton-shimmer skeleton-pill" />
+                  </div>
+                  <div className="skeleton-shimmer skeleton-footer-bar" />
+                </div>
+              ))}
+            </div>
+          ) : filteredWorkspaces.length > 0 ? (
             <div className="notebook-grid workspace-grid">
               {filteredWorkspaces.map((ws) => {
                 const stats = workspaceStats[ws.id] || { sourcesCount: 0, deliverablesCount: 0, hasVerified: false };

@@ -127,10 +127,13 @@ class AIOrchestrator:
         temperature: float = 0.1,
     ) -> str:
         settings = get_settings()
+        target_model = model or settings.llm_model
+        if not target_model:
+            raise AIProviderError("LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file.")
         response = await self._post(
             "chat/completions",
             {
-                "model": model or settings.llm_model,
+                "model": target_model,
                 "temperature": temperature,
                 "messages": messages,
             },
@@ -153,10 +156,13 @@ class AIOrchestrator:
         temperature: float = 0.1,
     ) -> dict[str, Any]:
         settings = get_settings()
+        target_model = model or settings.llm_model
+        if not target_model:
+            raise AIProviderError("LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file.")
         response = await self._post(
             "chat/completions",
             {
-                "model": model or settings.llm_model,
+                "model": target_model,
                 "temperature": temperature,
                 "response_format": {"type": "json_object"},
                 "messages": messages,
@@ -173,6 +179,8 @@ class AIOrchestrator:
         if not texts:
             return []
         settings = get_settings()
+        if not settings.embedding_model:
+            raise AIProviderError("EMBEDDING_MODEL is not configured. Please set EMBEDDING_MODEL in your environment variables or .env file.")
         vectors: list[list[float]] = []
         for start in range(0, len(texts), 64):
             response = await self._post(
@@ -193,6 +201,8 @@ class AIOrchestrator:
         if not texts:
             return []
         settings = get_settings()
+        if not settings.embedding_model:
+            raise AIProviderError("EMBEDDING_MODEL is not configured. Please set EMBEDDING_MODEL in your environment variables or .env file.")
         vectors: list[list[float]] = []
         started = time.monotonic()
         with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
@@ -234,8 +244,11 @@ class AIOrchestrator:
         temperature: float = 0.1,
     ) -> AsyncIterator[str]:
         settings = get_settings()
+        target_model = model or settings.llm_model
+        if not target_model:
+            raise AIProviderError("LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file.")
         payload = {
-            "model": model or settings.llm_model,
+            "model": target_model,
             "messages": messages,
             "temperature": temperature,
             "stream": True,

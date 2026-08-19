@@ -81,3 +81,22 @@ async def test_complete_raises_provider_error_without_fallback() -> None:
             with pytest.raises(AIProviderError) as exc_info:
                 await ai_orchestrator.complete([{"role": "user", "content": "hi"}], operation="test")
             assert "AI provider error (401): Invalid API Key" in str(exc_info.value)
+
+
+def test_settings_production_validation() -> None:
+    from app.configs.config import Settings
+
+    # In development, missing jwt_secret automatically uses a safe dev fallback
+    dev_settings = Settings(environment="development", jwt_secret="")
+    assert dev_settings.jwt_secret == "dev-insecure-jwt-secret-for-local-development-only"
+    assert dev_settings.minio_access_key == "groundwork"
+
+    # In production, missing or default jwt_secret raises a ValueError
+    with pytest.raises(ValueError, match="JWT_SECRET must be set"):
+        Settings(environment="production", jwt_secret="")
+
+    with pytest.raises(ValueError, match="JWT_SECRET must be set"):
+        Settings(environment="production", jwt_secret="change-me-in-production")
+
+    prod_settings = Settings(environment="production", jwt_secret="super-secure-production-random-secret-key-12345")
+    assert prod_settings.jwt_secret == "super-secure-production-random-secret-key-12345"
