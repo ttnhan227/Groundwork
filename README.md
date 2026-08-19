@@ -1,76 +1,79 @@
-# Groundwork
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Groundwork Banner" width="100%">
+</p>
 
-> **Verification-Gated Document Studio for High-Stakes Deliverables.**  
-> Create proposals, specifications, and client reports with AI — deterministically audited and grounded against source evidence before export.
+<p align="center">
+  <strong>An AI-powered document workspace that drafts proposals, reports, and deliverables grounded in your source documents and verifies claims before export.</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python Version">
+  <img src="https://img.shields.io/badge/React-19-61dafb.svg" alt="React 19">
+  <img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg" alt="FastAPI">
+  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-336791.svg" alt="PostgreSQL pgvector">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+</p>
 
 ---
 
-```
-Sources (PDF/Docx) ──► Agentic Drafting ──► Requirements Matrix ──► Verification Engine ──► Export Gate
- (Indexed in pgvector)  (Section Structure)   (Traceability)        (Claim Auditing)      (Blocked / Ready)
-```
+## Features
 
----
+- **Document Ingestion & RAG**: Extract text and page numbers from PDFs with vector search (`pgvector`).
+- **Context-Aware AI Assistant**: Drafts and edits sections directly inside the workspace with live context.
+- **Traceability & Auditing**: Tracks acceptance requirements and verifies numbers/claims against source pages.
+- **Multi-Language Support**: 9 interface languages (English, Vietnamese, Spanish, Japanese, German, French, Chinese, Korean, Portuguese).
+- **Export Formats**: Export verified documents to PDF, DOCX, or Markdown.
 
-## ⚡ Quick Start (3 Steps)
+## Tech Stack
 
-### 1. Clone & Set Environment
+- **Frontend**: React 19, TypeScript, Vite
+- **Backend**: FastAPI, SQLAlchemy Async, Pydantic v2
+- **Database & Queue**: PostgreSQL (`pgvector`), Redis, Celery
+- **Storage**: MinIO (S3-compatible)
+
+## Getting Started
+
+### 1. Clone repository & configure `.env`
+
 ```bash
 git clone https://github.com/ttnhan227/Groundwork.git
 cd Groundwork
 cp .env.example .env
 ```
 
-### 2. Add Your AI API Key in `.env`
-```dotenv
-LLM_API_KEY=your-gemini-or-openai-api-key
-LLM_MODEL=gemini-flash-latest
-```
+Add your `LLM_API_KEY` in `.env`.
 
-### 3. Launch Services
+### 2. Start services
+
 ```bash
 docker compose up -d --build
 ```
 
-Access the app at **http://localhost:8080** (API docs at **http://localhost:8000/docs**).
+- Web App: http://localhost:8080
+- API Docs: http://localhost:8000/docs
+- MinIO Console: http://localhost:9001
 
----
+## Development & Testing
 
-## 🎯 Core Capabilities
-
-* **📑 Source-Grounded Drafting**: Upload RFP briefs, technical specs, and whitepapers. Groundwork extracts acceptance requirements and drafts structured sections with exact page citations.
-* **🛡️ Whole-Document Claim Auditing**: The verification engine scans every numeric metric, SLA claim, and statement against physical source pages.
-* **🚫 Policy-Enforced Export Gate**: Deliverable exports (PDF, DOCX, Markdown) remain strictly blocked until all unverified claims are resolved.
-* **⚡ 1-Click Evidence Alignment**: Resolve audit findings in one click to bring the readiness meter to 100% and unlock exports with an attached provenance ledger.
-* **🌐 9-Language Localization**: Full native interface and generation support for English, Vietnamese, Spanish, Japanese, German, French, Chinese, Korean, and Portuguese.
-
----
-
-## 📚 Detailed Documentation
-
-For comprehensive guides and technical specifications, see the [`docs/`](docs/) directory:
-
-* 🏛️ **[System Architecture & Constraints](docs/ARCHITECTURE.md)**: Component topology, multi-tenant data access guards, and code-level citation contracts.
-* 🚀 **[Deployment Guide](docs/DEPLOYMENT.md)**: Production deployment, Docker orchestration, and security operational guidance.
-* 🔍 **[Verification Workflow](docs/VERIFICATION_WORKFLOW.md)**: In-depth guide on evidence grounding, claim auditing, and the export gate lifecycle.
-
----
-
-## 🧪 Testing
-
-Run backend tests:
+Backend tests:
 ```bash
 cd server
 python -m pytest
 ```
 
-Run frontend build:
+Frontend build:
 ```bash
 cd client
+npm install
 npm run build
 ```
 
----
+## Documentation
 
-## 📄 License
-MIT License.
+- [Architecture & Constraints](docs/ARCHITECTURE.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Verification Workflow](docs/VERIFICATION_WORKFLOW.md)
+
+## License
+
+MIT
