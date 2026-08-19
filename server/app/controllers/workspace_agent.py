@@ -38,6 +38,7 @@ from app.deliverables import (
 )
 from app.dependencies import current_user
 from app.models import (
+    AIUsageRecord,
     Citation,
     Conversation,
     DeliverableRequirement,
@@ -55,6 +56,41 @@ from app.models import (
     Workspace,
     WorkspaceMemory,
 )
+
+
+async def _record_ai_usage(
+    session: AsyncSession,
+    owner_id: uuid.UUID,
+    workspace_id: uuid.UUID | None,
+    feature: str,
+    prompt: str,
+    completion: str,
+    latency_ms: int,
+    idempotency_key: str | None = None,
+    model: str = "gemini-2.5",
+) -> None:
+    """Log token usage, latency, and estimated cost for workspace governance."""
+    try:
+        p_tokens = max(1, len(prompt.split()) * 2)
+        c_tokens = max(1, len(completion.split()) * 2)
+        total = p_tokens + c_tokens
+        cost = round(total * 0.0000015, 6)
+
+        record = AIUsageRecord(
+            owner_id=owner_id,
+            workspace_id=workspace_id,
+            feature=feature,
+            model=model,
+            prompt_tokens=p_tokens,
+            completion_tokens=c_tokens,
+            total_tokens=total,
+            latency_ms=latency_ms,
+            cost_usd=cost,
+            idempotency_key=idempotency_key,
+        )
+        session.add(record)
+    except Exception as exc:
+        logger.warning("Failed to record AI usage telemetry: %s", exc)
 from app.rag import (
     build_retrieval_query,
     clean_user_answer,
@@ -68,6 +104,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Workspace agent"])
 
 
+import hashlib
+import time
+
 class WorkspaceAgentRequest(BaseModel):
     workspace_id: uuid.UUID
     prompt: str = Field(min_length=1, max_length=8000)
@@ -75,6 +114,19 @@ class WorkspaceAgentRequest(BaseModel):
     conversation_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     action_type: str | None = None  # "chat" | "report" | "proposal" | "presentation" | "summary" | "technical_doc" | "verify" | "edit" | "note"
+    idempotency_key: str | None = Field(default=None, max_length=128)
+
+
+# In-memory execution registry for task deduplication
+_ACTIVE_AGENT_EXECUTIONS: dict[str, float] = {}
+
+
+def _generate_idempotency_key(payload: WorkspaceAgentRequest, user_id: uuid.UUID) -> str:
+    if payload.idempotency_key:
+        return payload.idempotency_key
+    sorted_sources = ",".join(str(s) for s in sorted(payload.source_document_ids))
+    raw = f"{user_id}:{payload.workspace_id}:{payload.action_type or 'chat'}:{payload.prompt.strip()}:{sorted_sources}"
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 # Backward-compatibility alias
@@ -102,6 +154,98 @@ def _content_to_blocks(text: str) -> list[dict[str, str]]:
         else:
             blocks.append({"type": "paragraph", "text": chunk})
     return blocks or [{"type": "paragraph", "text": text}]
+
+
+async def _build_workspace_context_snapshot(
+    workspace: Workspace,
+    artifact_id: uuid.UUID | None,
+    sources: list[Document],
+    session: AsyncSession,
+    user: User | None = None,
+) -> dict[str, Any]:
+    """Build a comprehensive, live context snapshot of the entire workspace."""
+    target_artifact: NativeDocument | None = None
+    if artifact_id:
+        target_artifact = await session.scalar(
+            select(NativeDocument).where(NativeDocument.id == artifact_id, NativeDocument.workspace_id == workspace.id)
+        )
+    if target_artifact is None:
+        target_artifact = await session.scalar(
+            select(NativeDocument).where(NativeDocument.workspace_id == workspace.id).order_by(NativeDocument.updated_at.desc())
+        )
+
+    reqs: list[DeliverableRequirement] = []
+    open_findings: list[DeliverableReviewFinding] = []
+    if target_artifact:
+        reqs = list(await session.scalars(
+            select(DeliverableRequirement)
+            .where(DeliverableRequirement.native_document_id == target_artifact.id)
+            .order_by(DeliverableRequirement.position.asc())
+        ))
+        open_findings = list(await session.scalars(
+            select(DeliverableReviewFinding)
+            .where(DeliverableReviewFinding.native_document_id == target_artifact.id, DeliverableReviewFinding.status == "open")
+        ))
+
+    memories = list(await session.scalars(
+        select(WorkspaceMemory)
+        .where(WorkspaceMemory.workspace_id == workspace.id)
+        .order_by(WorkspaceMemory.created_at.desc())
+        .limit(10)
+    ))
+
+    sources_summary = "\n".join(
+        f"- {s.filename} ({s.page_count or 'N/A'} pages, status: {s.status.value if hasattr(s.status, 'value') else s.status})"
+        for s in sources
+    ) or "No sources attached yet."
+
+    artifact_summary = "No deliverable drafted yet."
+    if target_artifact:
+        content_preview = native_text(target_artifact)[:4000]
+        artifact_summary = (
+            f"Title: {target_artifact.title} (Revision {target_artifact.revision}, Status: {target_artifact.status})\n"
+            f"Content Preview:\n{content_preview}"
+        )
+
+    covered_count = len([r for r in reqs if r.status in ("covered", "waived")])
+    reqs_summary = "\n".join(
+        f"- [{r.status.upper()}] {r.text} ({'Required' if r.is_required else 'Optional'})"
+        for r in reqs[:15]
+    ) or "No requirements mapped."
+
+    findings_summary = "\n".join(
+        f"- [{f.severity.upper()}] Claim: \"{f.claim_text}\" | Issue: {f.explanation}"
+        for f in open_findings[:10]
+    ) or "All claims verified (0 open review findings)."
+
+    notes_summary = "\n".join(
+        f"- {m.key}: {m.value}" for m in memories
+    ) or "No workspace notes recorded."
+
+    user_lang = "en"
+    if user and user.preferences:
+        user_lang = user.preferences.get("language") or user.preferences.get("document_language") or "en"
+
+    formatted_context = (
+        f"=== WORKSPACE CONTEXT SNAPSHOT ===\n"
+        f"Workspace: {workspace.name}\n"
+        f"User Language Preference: {user_lang}\n\n"
+        f"Active Sources ({len(sources)} documents):\n{sources_summary}\n\n"
+        f"Active Deliverable Draft:\n{artifact_summary}\n\n"
+        f"Requirements Traceability Matrix ({covered_count}/{len(reqs)} covered):\n{reqs_summary}\n\n"
+        f"Open Verification Findings ({len(open_findings)} unverified claims):\n{findings_summary}\n\n"
+        f"Workspace Memory & Notes:\n{notes_summary}\n"
+        f"==================================="
+    )
+
+    return {
+        "artifact": target_artifact,
+        "requirements": reqs,
+        "open_findings": open_findings,
+        "memories": memories,
+        "formatted_context": formatted_context,
+        "user_lang": user_lang,
+    }
 
 
 def _classify_intent(prompt: str, action_type: str | None) -> str:
@@ -185,6 +329,10 @@ async def execute_workspace_agent(
     conversation_id = conversation.id
     workspace_id = workspace.id
     intent = _classify_intent(payload.prompt, payload.action_type)
+    idempotency_key = _generate_idempotency_key(payload, user.id)
+
+    now = time.time()
+    _ACTIVE_AGENT_EXECUTIONS[idempotency_key] = now
 
     async def event_generator() -> AsyncIterator[str]:
         async with SessionLocal() as db_session:
@@ -200,6 +348,7 @@ async def execute_workspace_agent(
                     source_query = source_query.where(Document.id.in_(payload.source_document_ids))
                 sources_list = list(await db_session.scalars(source_query))
 
+                yield _sse_event("idempotency", {"idempotency_key": idempotency_key})
                 yield _sse_event("conversation", {"conversation_id": str(conversation_id)})
 
                 if intent == "generate_artifact":
@@ -301,11 +450,21 @@ async def _orchestrate_artifact_generation(
     except Exception:
         artifact_title = f"Verified {doc_type.title()}"
 
+    context_data = await _build_workspace_context_snapshot(
+        workspace, None, sources, session, user
+    )
+    user_prefs = user.preferences or {}
+    doc_lang = user_prefs.get("document_language") or user_prefs.get("language") or "English"
+    tone = user_prefs.get("default_tone") or "professional"
+
     system_prompt = (
-        f"You are Groundwork AI, generating an export-ready, verified {doc_type}.\n"
+        f"You are Groundwork AI, generating an export-ready, verified {doc_type} for workspace '{workspace.name}'.\n"
+        f"Language requirement: Write the deliverable in {doc_lang}.\n"
+        f"Tone: {tone.capitalize()}.\n"
         "Draft a complete, thorough document using Markdown headings (# Heading), paragraphs, and bullet points.\n"
         "Ground every key claim, metric, and finding directly in the provided sources with explicit source citations like [Source: filename.pdf, p. 1].\n"
-        "Do not invent facts or numbers. If information is missing from the sources, explicitly mark it as [Missing from brief / Needs client confirmation].\n"
+        "Do not invent facts or numbers. If information is missing from the sources, explicitly mark it as [Missing from brief / Needs client confirmation].\n\n"
+        f"{context_data['formatted_context']}"
     )
 
     user_content = (
@@ -314,6 +473,7 @@ async def _orchestrate_artifact_generation(
         f"Key requirements to address:\n" + "\n".join(f"- {r.get('text')}" for r in extracted_reqs[:10])
     )
 
+    t0 = time.time()
     draft_text = await ai_orchestrator.complete(
         [
             {"role": "system", "content": system_prompt},
@@ -321,6 +481,18 @@ async def _orchestrate_artifact_generation(
         ],
         operation="workspace_agent.draft",
         temperature=0.2,
+    )
+    latency_ms = int((time.time() - t0) * 1000)
+
+    await _record_ai_usage(
+        session=session,
+        owner_id=user.id,
+        workspace_id=workspace.id,
+        feature="workspace_agent.draft",
+        prompt=payload.prompt,
+        completion=draft_text,
+        latency_ms=latency_ms,
+        idempotency_key=payload.idempotency_key,
     )
 
     blocks = _content_to_blocks(draft_text)
@@ -475,16 +647,23 @@ async def _orchestrate_artifact_modification(
 
     yield _sse_event("status", {"step": "drafting", "label": f"Applying updates to '{target_artifact.title}'..."})
 
+    context_data = await _build_workspace_context_snapshot(
+        workspace, target_artifact.id, sources, session, user
+    )
+
     system_prompt = (
-        "You are Groundwork AI editing an existing deliverable.\n"
+        f"You are Groundwork AI editing an existing deliverable '{target_artifact.title}' in workspace '{workspace.name}'.\n"
         "Apply the user's requested changes faithfully, preserving overall structure and citations where appropriate.\n"
-        "Output the full updated document in Markdown format (# Heading, paragraphs, bullets).\n"
+        "Ensure any resolved findings or fulfilled requirements are properly integrated.\n"
+        "Output the full updated document in Markdown format (# Heading, paragraphs, bullets).\n\n"
+        f"{context_data['formatted_context']}"
     )
     user_content = (
         f"Current Document Text:\n{current_text}\n\n"
         f"Requested Change: {payload.prompt}\n"
     )
 
+    t0 = time.time()
     updated_text = await ai_orchestrator.complete(
         [
             {"role": "system", "content": system_prompt},
@@ -492,6 +671,18 @@ async def _orchestrate_artifact_modification(
         ],
         operation="workspace_agent.modify_draft",
         temperature=0.2,
+    )
+    latency_ms = int((time.time() - t0) * 1000)
+
+    await _record_ai_usage(
+        session=session,
+        owner_id=user.id,
+        workspace_id=workspace.id,
+        feature="workspace_agent.modify_draft",
+        prompt=payload.prompt,
+        completion=updated_text,
+        latency_ms=latency_ms,
+        idempotency_key=payload.idempotency_key,
     )
 
     blocks = _content_to_blocks(updated_text)
@@ -692,20 +883,67 @@ async def _orchestrate_grounded_qa(
             )
             chunks = list(await session.scalars(stmt))
 
-    yield _sse_event("status", {"step": "drafting", "label": "Synthesizing source-grounded response..."})
+    yield _sse_event("status", {"step": "drafting", "label": "Synthesizing context-aware response..."})
 
     retrieved_items = [
         (c.document_id, c.page_number, c.text, next((s.filename for s in sources if s.id == c.document_id), "Document"), c.id)
         for c in chunks
     ]
 
-    answer_text = await generate_answer(
-        payload.prompt,
-        [c.text for c in chunks],
-        history_tuples[-4:],
+    context_data = await _build_workspace_context_snapshot(
+        workspace, payload.artifact_id, sources, session, user
     )
 
+    retrieved_context_str = "\n\n".join(
+        f"[Source {idx + 1}: {next((s.filename for s in sources if s.id == c.document_id), 'Document')}, page {c.page_number}]\n{c.text}"
+        for idx, c in enumerate(chunks)
+    ) if chunks else "No additional semantic chunks retrieved."
+
+    system_prompt = (
+        "You are Groundwork AI, the intelligent, context-aware co-pilot embedded inside this workspace.\n"
+        "You possess complete awareness of the workspace metadata, active deliverable draft, "
+        "traceability requirements matrix, audit findings, and source evidence.\n\n"
+        "Instructions:\n"
+        "1. Respond directly, accurately, and professionally based on the workspace context and retrieved sources.\n"
+        "2. If the user asks about the draft, requirements, or audit findings, reference the active deliverable, sections, and requirements matrix.\n"
+        "3. When referencing evidence from source documents, cite them with [Source: filename.pdf, p. 1].\n"
+        "4. If the user writes in or prefers a language (e.g. Vietnamese, Spanish, Japanese, French, German), respond fluently in that language.\n"
+        "5. Do not invent ungrounded facts. If information is missing from both the draft and sources, state so clearly.\n\n"
+        f"{context_data['formatted_context']}"
+    )
+
+    ai_messages = [
+        {"role": "system", "content": system_prompt},
+        *[
+            {"role": m.get("role", "user"), "content": m.get("content", "")}
+            for m in chat_history[-6:]
+        ],
+        {
+            "role": "user",
+            "content": f"Retrieved Evidence Chunks:\n{retrieved_context_str}\n\nUser Question/Instruction: {payload.prompt}",
+        },
+    ]
+
+    t0 = time.time()
+    answer_text = await ai_orchestrator.complete(
+        ai_messages,
+        operation="workspace_agent.grounded_qa",
+        temperature=0.2,
+    )
+    latency_ms = int((time.time() - t0) * 1000)
+
     clean_answer = clean_user_answer(answer_text)
+
+    await _record_ai_usage(
+        session=session,
+        owner_id=user.id,
+        workspace_id=workspace.id,
+        feature="workspace_agent.grounded_qa",
+        prompt=payload.prompt,
+        completion=clean_answer,
+        latency_ms=latency_ms,
+        idempotency_key=payload.idempotency_key,
+    )
 
     # Save citations
     asst_msg = Message(

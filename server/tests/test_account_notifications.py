@@ -8,6 +8,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_account_preferences_cover_documents_notifications_appearance_and_privacy() -> None:
     preferences = UserPreferences()
+    assert preferences.language == "en"
     assert preferences.document_language == "English"
     assert preferences.default_tone == "professional"
     assert preferences.notify_processing_completed

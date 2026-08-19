@@ -185,6 +185,62 @@ async def extract_requirements(source_context: str) -> ExtractedRequirementSet:
     return ExtractedRequirementSet(requirements=grounded)
 
 
+def _validate_physical_citations(
+    plan: ReviewPlan,
+    draft: str,
+    source_context: str,
+) -> ReviewPlan:
+    """Hardened code-level validator preventing phantom citations or hallucinated page references."""
+    pages = [match.groupdict() for match in SOURCE_PAGE.finditer(source_context)]
+    valid_doc_ids = {p["id"] for p in pages}
+    valid_doc_pages = {(p["id"], int(p["page"])) for p in pages}
+    valid_doc_names = {p["name"].strip().casefold() for p in pages}
+
+    # 1. Validate coverage citations
+    for item in plan.coverage:
+        sanitized_citations = []
+        for c in item.citations:
+            doc_id_str = str(c.document_id)
+            if (doc_id_str, c.page_number) in valid_doc_pages or c.document_name.strip().casefold() in valid_doc_names:
+                sanitized_citations.append(c)
+            else:
+                # Dropped phantom citation at code layer
+                item.covered = False
+        item.citations = sanitized_citations
+
+    # 2. Validate finding citations
+    for finding in plan.findings:
+        sanitized_citations = []
+        for c in finding.citations:
+            doc_id_str = str(c.document_id)
+            if (doc_id_str, c.page_number) in valid_doc_pages or c.document_name.strip().casefold() in valid_doc_names:
+                sanitized_citations.append(c)
+        finding.citations = sanitized_citations
+
+    # 3. Detect phantom inline citations in the draft text when sources are linked
+    if pages:
+        inline_matches = re.finditer(r"\[(?:source|evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]", draft, re.IGNORECASE)
+        for match in inline_matches:
+            cited_name = match.group(1).strip()
+            cited_page = int(match.group(2)) if match.group(2) else None
+
+            name_match = cited_name.casefold() in valid_doc_names or any(cited_name.casefold() in n for n in valid_doc_names)
+            page_match = cited_page is None or any(p["page"] == str(cited_page) for p in pages if cited_name.casefold() in p["name"].casefold())
+
+            if not name_match or not page_match:
+                plan.findings.append(ReviewFindingPlan(
+                    kind="source_conflict",
+                    claim_type="other",
+                    severity="high",
+                    claim_text=match.group(0),
+                    explanation=f"Inline citation '{match.group(0)}' references a document or page not physically present in the workspace evidence.",
+                    proposed_text="[Missing source citation / unverified]",
+                    citations=[],
+                ))
+
+    return plan
+
+
 async def review_deliverable(
     draft: str,
     requirements: list[dict],
@@ -239,4 +295,5 @@ async def review_deliverable(
         if finding.claim_type == "other" and finding.kind == "unsupported_claim" and NUMERIC_TOKEN.search(finding.claim_text):
             finding.claim_type = "number_stat"
     result.findings.extend(_numeric_claim_findings(draft, source_context, result.findings))
+    result = _validate_physical_citations(result, draft, source_context)
     return result

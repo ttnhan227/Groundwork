@@ -1,24 +1,14 @@
 import {
   BarChart3, Bell, CheckCircle2, ChevronRight, Database, FileCog, LogOut,
-  Shield, ShieldCheck, Trash2, UserRound, Users, X,
+  Shield, ShieldCheck, Trash2, UserRound, Users, X, Globe,
 } from "lucide-react";
-import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadTextFile } from "../../api/client";
 import type { AdminUser, AuthResult, SecuritySession, Stats, UsageDetail, Workspace, WorkspaceMember } from "../../types";
 import { applyPreferences, storedPreferences, type UserPreferences } from "./preferences";
+import { useTranslation, type Language } from "../../i18n";
 
 type AccountTab = "profile" | "security" | "defaults" | "notifications" | "privacy" | "usage" | "team" | "admin";
-
-const tabs: Array<{ id: AccountTab; label: string; detail: string; icon: ReactNode; admin?: boolean }> = [
-  { id: "profile", label: "Profile", detail: "Identity and account", icon: <UserRound size={17} /> },
-  { id: "security", label: "Security", detail: "Password and sessions", icon: <Shield size={17} /> },
-  { id: "defaults", label: "Document Defaults", detail: "Writing and exports", icon: <FileCog size={17} /> },
-  { id: "notifications", label: "Notifications", detail: "What keeps you informed", icon: <Bell size={17} /> },
-  { id: "privacy", label: "Privacy & Data", detail: "History and account data", icon: <Database size={17} /> },
-  { id: "usage", label: "Usage", detail: "Storage and AI activity", icon: <BarChart3 size={17} /> },
-  { id: "team", label: "Team", detail: "Workspace access", icon: <Users size={17} /> },
-  { id: "admin", label: "Admin", detail: "Manage all users", icon: <ShieldCheck size={17} />, admin: true },
-];
 
 function Toggle({ checked, onChange, title, detail }: { checked: boolean; onChange: (checked: boolean) => void; title: string; detail: string }) {
   return <label className="settings-toggle"><span><strong>{title}</strong><small>{detail}</small></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><i /></label>;
@@ -36,7 +26,19 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
   onClose: () => void;
   onSignOut: () => void;
 }) {
+  const { t, language, setLanguage, languageOptions } = useTranslation();
   const [tab, setTab] = useState<AccountTab>("profile");
+
+  const tabsList = useMemo<Array<{ id: AccountTab; label: string; detail: string; icon: ReactNode; admin?: boolean }>>(() => [
+    { id: "profile", label: t("tabs.profile"), detail: t("tabs.profile_detail"), icon: <UserRound size={17} /> },
+    { id: "security", label: t("tabs.security"), detail: t("tabs.security_detail"), icon: <Shield size={17} /> },
+    { id: "defaults", label: t("tabs.defaults"), detail: t("tabs.defaults_detail"), icon: <FileCog size={17} /> },
+    { id: "notifications", label: t("tabs.notifications"), detail: t("tabs.notifications_detail"), icon: <Bell size={17} /> },
+    { id: "privacy", label: t("tabs.privacy"), detail: t("tabs.privacy_detail"), icon: <Database size={17} /> },
+    { id: "usage", label: t("tabs.usage"), detail: t("tabs.usage_detail"), icon: <BarChart3 size={17} /> },
+    { id: "team", label: t("tabs.team"), detail: t("tabs.team_detail"), icon: <Users size={17} /> },
+    { id: "admin", label: t("tabs.admin"), detail: t("tabs.admin_detail"), icon: <ShieldCheck size={17} />, admin: true },
+  ], [t]);
   const [preferences, setPreferences] = useState<UserPreferences>(storedPreferences);
   const [sessions, setSessions] = useState<SecuritySession[]>([]);
   const [usage, setUsage] = useState<UsageDetail | null>(null);
@@ -90,7 +92,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(preferences),
       });
       setPreferences(updated); applyPreferences(updated);
-    }, "Settings saved and applied.");
+    }, t("settings.saved_toast"));
   }
 
   async function updateProfile(event: FormEvent<HTMLFormElement>) {
@@ -159,7 +161,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
         <div className="account-layout">
           <aside className="account-settings-nav">
             <nav className="account-nav-list">
-              {tabs
+              {tabsList
                 .filter((item) => !item.admin || user.role === "admin")
                 .map((item) => (
                   <button
@@ -177,7 +179,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                 ))}
             </nav>
             <button className="account-signout" onClick={onSignOut}>
-              <LogOut size={16} /> Sign out
+              <LogOut size={16} /> {t("nav.sign_out")}
             </button>
           </aside>
           <main className="account-settings-main">
@@ -189,7 +191,71 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
             )}
             {tab === "profile" && (
               <>
-                <Heading eyebrow="Profile" title="Your account" detail="Keep your identity clear wherever you collaborate or export work." />
+                <Heading eyebrow={t("settings.eyebrow_profile")} title={t("settings.profile_title")} detail={t("settings.profile_desc")} />
+                
+                {/* Language & Appearance Card */}
+                <section className="settings-card language-appearance-card">
+                  <div className="settings-card-header">
+                    <div>
+                      <h3>{t("settings.language_heading")}</h3>
+                      <p>{t("settings.language_desc")}</p>
+                    </div>
+                  </div>
+
+                  <div className="settings-fields two">
+                    <label>
+                      {t("settings.language_label")}
+                      <select
+                        value={preferences.language || language || "en"}
+                        onChange={async (e) => {
+                          const nextLang = e.target.value as Language;
+                          const updated = { ...preferences, language: nextLang };
+                          setPreferences(updated);
+                          applyPreferences(updated);
+                          setLanguage(nextLang);
+                          await perform(async () => {
+                            await api<UserPreferences>("/profile/preferences", token, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(updated),
+                            });
+                          }, t("settings.saved_toast"));
+                        }}
+                      >
+                        {languageOptions.map((opt) => (
+                          <option key={opt.code} value={opt.code}>
+                            {opt.flag} {opt.nativeName} ({opt.label})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      {t("settings.theme_label")}
+                      <select
+                        value={preferences.theme}
+                        onChange={async (e) => {
+                          const nextTheme = e.target.value as UserPreferences["theme"];
+                          const updated = { ...preferences, theme: nextTheme };
+                          setPreferences(updated);
+                          applyPreferences(updated);
+                          await perform(async () => {
+                            await api<UserPreferences>("/profile/preferences", token, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(updated),
+                            });
+                          }, t("settings.saved_toast"));
+                        }}
+                      >
+                        <option value="light">{t("nav.light_mode")}</option>
+                        <option value="dark">{t("nav.dark_mode")}</option>
+                        <option value="system">System Preference</option>
+                      </select>
+                    </label>
+                  </div>
+                </section>
+
                 <div className="settings-grid profile-settings-grid">
                   <section className="settings-card profile-card">
                     <div className="profile-avatar">{user.display_name.slice(0, 2).toUpperCase()}</div>
@@ -288,10 +354,13 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                       <select value={preferences.document_language} onChange={(event) => setPreferences({ ...preferences, document_language: event.target.value })}>
                         <option>English</option>
                         <option>Vietnamese</option>
-                        <option>French</option>
-                        <option>German</option>
                         <option>Spanish</option>
                         <option>Japanese</option>
+                        <option>German</option>
+                        <option>French</option>
+                        <option>Chinese (Simplified)</option>
+                        <option>Korean</option>
+                        <option>Portuguese</option>
                       </select>
                     </label>
                     <label>

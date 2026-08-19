@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
+import { useTranslation } from "../../i18n";
 
 interface WorkspaceLibraryProps {
   auth: AuthResult;
@@ -70,6 +71,7 @@ export function WorkspaceLibrary({
   onRenameNotebook,
   onUploadToNewNotebook,
 }: WorkspaceLibraryProps) {
+  const { t } = useTranslation();
   const selectWorkspace = onSelectWorkspace || onSelectNotebook || (() => {});
   const createWorkspace = onCreateWorkspace || onCreateNotebook || (async () => null);
   const deleteWorkspace = onDeleteWorkspace || onDeleteNotebook || (async () => {});
@@ -90,33 +92,33 @@ export function WorkspaceLibrary({
   const TEMPLATES = [
     {
       id: "proposal",
-      title: "Technical Proposal",
+      title: t("library.template_proposal_title"),
       icon: ShieldCheck,
-      description: "Extract requirements, cross-reference source specs, and draft a verified technical proposal.",
+      description: t("library.template_proposal_desc"),
       color: "var(--accent)",
       bg: "var(--accent-subtle)",
     },
     {
       id: "report",
-      title: "Client Research Report",
+      title: t("library.template_report_title"),
       icon: FileText,
-      description: "Analyze market data, financial statements, or research papers into an executive brief.",
+      description: t("library.template_report_desc"),
       color: "#059669",
       bg: "#ecfdf5",
     },
     {
       id: "presentation",
-      title: "Executive Presentation",
+      title: t("library.template_presentation_title"),
       icon: Layers,
-      description: "Structure source content into an audience-tailored executive deck and narrative.",
+      description: t("library.template_presentation_desc"),
       color: "#7c3aed",
       bg: "#f5f3ff",
     },
     {
       id: "blank",
-      title: "Blank Workspace",
+      title: t("library.template_blank_title"),
       icon: BookOpen,
-      description: "Start fresh with an empty workspace and ground queries on your custom files.",
+      description: t("library.template_blank_desc"),
       color: "var(--text-primary)",
       bg: "var(--bg-subtle)",
     },
@@ -228,7 +230,7 @@ export function WorkspaceLibrary({
           <Search size={15} />
           <input
             type="text"
-            placeholder="Search workspaces..."
+            placeholder={t("nav.search_placeholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label="Search workspaces"
@@ -238,7 +240,7 @@ export function WorkspaceLibrary({
 
         {/* Action Controls */}
         <div className="notebook-nav-actions">
-          <button className="btn-theme-toggle" onClick={onToggleTheme} title={`Switch to ${activeTheme === "dark" ? "light" : "dark"} mode`} aria-label="Toggle theme">
+          <button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
             {activeTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
           </button>
 
@@ -249,16 +251,16 @@ export function WorkspaceLibrary({
               setNewWorkspaceName("");
               setIsCreateOpen(true);
             }}
-            title="Create New Workspace"
+            title={t("nav.new_workspace")}
           >
             <Plus size={15} />
-            <span>New Workspace</span>
+            <span>{t("nav.new_workspace")}</span>
           </button>
 
           <button
             className="btn-account-chip"
             onClick={onOpenAccount}
-            title="Account & Workspace Settings"
+            title={t("nav.profile_settings")}
           >
             <UserIcon size={14} />
             <span>{auth.user.display_name}</span>
@@ -272,8 +274,8 @@ export function WorkspaceLibrary({
         {/* Recommended Workflows */}
         <section className="notebook-workflows-section">
           <div className="section-header-compact">
-            <h2>Recommended Workflows</h2>
-            <span>Fast templates grounded on your source files</span>
+            <h2>{t("library.templates_heading")}</h2>
+            <span>{t("library.templates_subheading")}</span>
           </div>
 
           <div className="notebook-templates-grid">
@@ -314,9 +316,9 @@ export function WorkspaceLibrary({
         <section className="notebook-list-section">
           <div className="notebook-section-header">
             <div className="notebook-header-title">
-              <h2>Research Workspaces ({filteredWorkspaces.length})</h2>
+              <h2>{t("nav.workspaces")} ({filteredWorkspaces.length})</h2>
               <span className="notebook-header-meta">
-                {documents.length} source file{documents.length === 1 ? "" : "s"} indexed across {workspaces.length} workspace{workspaces.length === 1 ? "" : "s"}
+                {documents.length} {t(documents.length === 1 ? "library.sources_count" : "library.sources_count_plural", { count: documents.length })} · {workspaces.length} {t("nav.workspaces").toLowerCase()}
               </span>
             </div>
 
@@ -325,19 +327,19 @@ export function WorkspaceLibrary({
                 className={filterCategory === "all" ? "active" : ""}
                 onClick={() => setFilterCategory("all")}
               >
-                All Workspaces
+                {t("library.category_all")}
               </button>
               <button
                 className={filterCategory === "proposals" ? "active" : ""}
                 onClick={() => setFilterCategory("proposals")}
               >
-                Proposals
+                {t("library.category_proposals")}
               </button>
               <button
                 className={filterCategory === "reports" ? "active" : ""}
                 onClick={() => setFilterCategory("reports")}
               >
-                Reports
+                {t("library.category_reports")}
               </button>
             </div>
           </div>
@@ -346,7 +348,7 @@ export function WorkspaceLibrary({
           {isLoading && (
             <div className="workspace-loading-banner" role="status" aria-live="polite">
               <RefreshCw size={15} className="spin" />
-              <span>Connecting to Groundwork cloud · Loading workspaces & evidence indices (may take ~5s on cold wake)…</span>
+              <span>{t("library.loading_banner")}</span>
             </div>
           )}
 
@@ -396,7 +398,7 @@ export function WorkspaceLibrary({
                                 }}
                               />
                               <button className="btn-rename-save" onClick={() => handleSaveRename(ws.id)}>
-                                Save
+                                {t("library.btn_save")}
                               </button>
                             </div>
                           ) : (
@@ -437,7 +439,7 @@ export function WorkspaceLibrary({
                               }}
                             >
                               <Edit3 size={13} />
-                              <span>Rename</span>
+                              <span>{t("library.action_rename")}</span>
                             </button>
                             <button
                               className="danger"
@@ -448,7 +450,7 @@ export function WorkspaceLibrary({
                               }}
                             >
                               <Trash2 size={13} />
-                              <span>Delete</span>
+                              <span>{t("library.action_delete")}</span>
                             </button>
                           </div>
                         )}
@@ -458,19 +460,19 @@ export function WorkspaceLibrary({
                     {/* Metadata & Status */}
                     <div className="notebook-card-meta">
                       <div className="meta-stats">
-                        <span><FileText size={13} /> {stats.sourcesCount} source{stats.sourcesCount === 1 ? "" : "s"}</span>
-                        <span><Layers size={13} /> {stats.deliverablesCount} deliverable{stats.deliverablesCount === 1 ? "" : "s"}</span>
+                        <span><FileText size={13} /> {t(stats.sourcesCount === 1 ? "library.sources_count" : "library.sources_count_plural", { count: stats.sourcesCount })}</span>
+                        <span><Layers size={13} /> {t(stats.deliverablesCount === 1 ? "library.deliverables_count" : "library.deliverables_count_plural", { count: stats.deliverablesCount })}</span>
                       </div>
                       {stats.hasVerified ? (
-                        <span className="badge-verified-pill"><CheckCircle2 size={12} /> Verified</span>
+                        <span className="badge-verified-pill"><CheckCircle2 size={12} /> {t("library.badge_verified")}</span>
                       ) : (
-                        <span className="badge-draft-pill"><ShieldCheck size={12} /> In Review</span>
+                        <span className="badge-draft-pill"><ShieldCheck size={12} /> {t("library.badge_in_review")}</span>
                       )}
                     </div>
 
                     {/* Footer / Open Button */}
                     <div className="notebook-card-footer" onClick={() => selectWorkspace(ws.id)}>
-                      <span>Open deliverable workspace</span>
+                      <span>{t("library.open_workspace")}</span>
                       <ArrowRight size={14} />
                     </div>
                   </div>
@@ -480,11 +482,11 @@ export function WorkspaceLibrary({
           ) : (
             <div className="notebook-empty-state">
               <FolderPlus size={36} className="empty-icon" />
-              <h3>{searchQuery ? "No matching workspaces found" : "No workspaces created yet"}</h3>
+              <h3>{searchQuery ? t("library.empty_search_title") : t("library.empty_title")}</h3>
               <p>
                 {searchQuery
-                  ? "Try adjusting your search terms or view all workspaces."
-                  : "Create your first workspace to organize source documents, draft deliverables, and enforce verification audits."}
+                  ? t("library.empty_search_desc")
+                  : t("library.empty_desc")}
               </p>
               <button
                 className="btn-primary-gradient"
@@ -495,7 +497,7 @@ export function WorkspaceLibrary({
                 }}
               >
                 <Plus size={15} />
-                <span>Create New Workspace</span>
+                <span>{t("library.btn_create")}</span>
               </button>
             </div>
           )}
@@ -508,8 +510,8 @@ export function WorkspaceLibrary({
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="create-workspace-title">
             <header className="modal-header">
               <div>
-                <p className="modal-eyebrow">Workspace Setup</p>
-                <h3 id="create-workspace-title">Create Deliverable Workspace</h3>
+                <p className="modal-eyebrow">{t("app.name")}</p>
+                <h3 id="create-workspace-title">{t("library.create_modal_title")}</h3>
               </div>
               <button className="btn-modal-close" onClick={() => setIsCreateOpen(false)} aria-label="Close dialog">
                 <X size={16} />
@@ -532,8 +534,8 @@ export function WorkspaceLibrary({
               >
                 <Upload size={18} className="dropzone-icon" />
                 <div className="dropzone-text">
-                  <strong>Drop file here to start new workspace</strong>
-                  <span>Upload PDF, Word, or Markdown to automatically name & ground workspace</span>
+                  <strong>{t("library.drag_drop_title")}</strong>
+                  <span>{t("library.drag_drop_desc")}</span>
                 </div>
                 <label className="btn-dropzone-browse">
                   Browse file
@@ -558,10 +560,10 @@ export function WorkspaceLibrary({
 
               <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <label className="form-field">
-                  <span>Workspace Name</span>
+                  <span>{t("library.workspace_name_label")}</span>
                   <input
                     type="text"
-                    placeholder="e.g. Technical Proposal & Security Audit"
+                    placeholder={t("library.workspace_name_placeholder")}
                     value={newWorkspaceName}
                     onChange={(e) => setNewWorkspaceName(e.target.value)}
                     autoFocus
@@ -570,7 +572,7 @@ export function WorkspaceLibrary({
                 </label>
 
                 <div className="form-field">
-                  <span>Starter Template</span>
+                  <span>{t("library.template_select_label")}</span>
                   <div className="template-selection-grid">
                     {TEMPLATES.map((tmpl) => (
                       <label
@@ -584,7 +586,10 @@ export function WorkspaceLibrary({
                           checked={selectedTemplate === tmpl.id}
                           onChange={() => setSelectedTemplate(tmpl.id)}
                         />
-                        <div>
+                        <div className="option-icon" style={{ background: tmpl.bg, color: tmpl.color }}>
+                          <tmpl.icon size={16} />
+                        </div>
+                        <div className="option-text">
                           <strong>{tmpl.title}</strong>
                           <small>{tmpl.description}</small>
                         </div>
@@ -593,14 +598,14 @@ export function WorkspaceLibrary({
                   </div>
                 </div>
 
-                <footer className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
-                  <button type="button" className="btn-secondary-white" onClick={() => setIsCreateOpen(false)}>
-                    Cancel
+                <div className="modal-actions-footer">
+                  <button type="button" className="btn-modal-cancel" onClick={() => setIsCreateOpen(false)}>
+                    {t("library.btn_cancel")}
                   </button>
                   <button type="submit" className="btn-primary-gradient" disabled={!newWorkspaceName.trim() || isCreating}>
-                    {isCreating ? "Creating…" : "Create Workspace"}
+                    {isCreating ? t("library.btn_creating") : t("library.btn_create")}
                   </button>
-                </footer>
+                </div>
               </form>
             </div>
           </div>

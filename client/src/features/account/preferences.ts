@@ -1,4 +1,7 @@
+export type AppLanguage = "en" | "vi" | "es" | "ja" | "de" | "fr" | "zh" | "ko" | "pt";
+
 export type UserPreferences = {
+  language: AppLanguage;
   compact_sidebar: boolean;
   reduced_motion: boolean;
   default_export_format: "pdf" | "docx" | "markdown";
@@ -18,6 +21,7 @@ export type UserPreferences = {
 };
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
+  language: "en",
   compact_sidebar: false,
   reduced_motion: false,
   default_export_format: "pdf",
@@ -51,6 +55,7 @@ export function storedPreferences(): UserPreferences {
 export function applyPreferences(preferences: UserPreferences) {
   localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
   const root = document.documentElement;
+  root.lang = preferences.language || "en";
   root.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
   root.toggleAttribute("data-high-contrast", preferences.high_contrast);
   root.dataset.theme = preferences.theme;

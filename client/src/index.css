@@ -4749,6 +4749,26 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
 }
+.agent-context-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.agent-context-summary-bar .ctx-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+.agent-context-summary-bar .ctx-item strong {
+  color: var(--text-primary);
+}
 .messages-stream-list {
   display: flex;
   flex-direction: column;

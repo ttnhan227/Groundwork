@@ -43,6 +43,8 @@ import type {
 } from "../../types";
 import { API, api, streamWorkspaceAgent, downloadTextFile, authenticatedFetch } from "../../api/client";
 import { BrandMark } from "../../components/common/BrandMark";
+import { useTranslation } from "../../i18n";
+import { getContextualSuggestions } from "./contextualSuggestions";
 
 export interface ResearchWorkspaceProps {
   auth: AuthResult;
@@ -73,6 +75,7 @@ export function ResearchWorkspace({
   onToggleTheme,
   onOpenViewer,
 }: ResearchWorkspaceProps) {
+  const { t, language } = useTranslation();
   // Sources state
   const workspaceSources = useMemo(() => {
     return documents.filter((d) => d.workspace_id === workspace.id);
@@ -483,6 +486,18 @@ export function ResearchWorkspace({
 
   const isExportBlocked = readiness?.status !== "ready" && (openFindings.length > 0 || readinessScore < 100);
 
+  // Dynamic context-aware agent suggestion chips based on active documents, findings, and requirements
+  const contextualSuggestions = useMemo(() => {
+    return getContextualSuggestions({
+      workspace,
+      sources: workspaceSources,
+      requirements,
+      openFindings,
+      activeArtifact,
+      language,
+    });
+  }, [workspace, workspaceSources, requirements, openFindings, activeArtifact, language]);
+
   // Helper to parse citations from draft text and make them clickable
   function renderBlockContentWithCitations(text: string, isFlagged: boolean) {
     const citationRegex = /\[(?:Source|Evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]/gi;
@@ -533,9 +548,9 @@ export function ResearchWorkspace({
       {/* ================= TOP WORKSPACE HEADER ================= */}
       <header className="groundwork-topbar">
         <div className="topbar-left">
-          <button className="btn-back-workspaces" onClick={onBackToLibrary} title="Back to Workspace Library">
+          <button className="btn-back-workspaces" onClick={onBackToLibrary} title={t("workspace.back_to_library")}>
             <ArrowLeft size={14} />
-            <span>Workspaces</span>
+            <span>{t("workspace.back_to_library")}</span>
           </button>
           <div className="topbar-sep" />
           <div className="topbar-project-meta">
@@ -553,14 +568,14 @@ export function ResearchWorkspace({
           <div className="grounding-status-pill">
             <ShieldCheck size={14} className="icon-emerald" />
             <span>
-              <strong>{selectedSourceIds.length}</strong> of {workspaceSources.length} sources grounded
+              {t("workspace.sources_grounded", { selected: selectedSourceIds.length, total: workspaceSources.length })}
             </span>
           </div>
           {isAgentRunning && (
             <div className="topbar-agent-live-badge" role="status" aria-live="polite">
               <RefreshCw size={12} className="spin" />
               <span>
-                {activeSteps.find((s) => s.status === "in_progress")?.label || "Agent working across sources…"}
+                {activeSteps.find((s) => s.status === "in_progress")?.label || t("agent.active_working")}
               </span>
             </div>
           )}
@@ -574,9 +589,9 @@ export function ResearchWorkspace({
               <span className="score-number">{readinessScore}%</span>
             </div>
             <div className="readiness-text-group">
-              <span className="readiness-label">Readiness Gate</span>
+              <span className="readiness-label">{t("workspace.readiness_gate")}</span>
               <span className="readiness-state">
-                {isExportBlocked ? `${openFindings.length} Issue${openFindings.length === 1 ? "" : "s"} Unresolved` : "✓ 100% Verified"}
+                {isExportBlocked ? t(openFindings.length === 1 ? "workspace.issues_unresolved" : "workspace.issues_unresolved_plural", { count: openFindings.length }) : t("workspace.verified_100")}
               </span>
             </div>
           </div>
@@ -601,12 +616,12 @@ export function ResearchWorkspace({
               {isExportBlocked ? (
                 <>
                   <Lock size={13} />
-                  <span>Export Blocked ({openFindings.length})</span>
+                  <span>{t(openFindings.length === 1 ? "workspace.issues_unresolved" : "workspace.issues_unresolved_plural", { count: openFindings.length })}</span>
                 </>
               ) : (
                 <>
                   <Unlock size={13} />
-                  <span>Export Deliverable</span>
+                  <span>{t("workspace.export_deliverable")}</span>
                 </>
               )}
             </button>
@@ -615,23 +630,23 @@ export function ResearchWorkspace({
             {isExportMenuOpen && !isExportBlocked && (
               <div className="export-dropdown-menu">
                 <div className="dropdown-header">
-                  <strong>Export Verified Deliverable</strong>
-                  <small>Includes evidence citations & audit appendix</small>
+                  <strong>{t("workspace.export_deliverable")}</strong>
+                  <small>{t("workspace.export_pdf_desc")}</small>
                 </div>
                 <div className="dropdown-options">
                   <button onClick={() => handleExport("pdf")} className="export-opt-btn">
                     <FileText size={14} />
-                    <span>Executive PDF (.pdf)</span>
+                    <span>{t("workspace.export_pdf")}</span>
                     <span className="pill-fmt">Ready</span>
                   </button>
                   <button onClick={() => handleExport("docx")} className="export-opt-btn">
                     <FileCheck2 size={14} />
-                    <span>Microsoft Word (.docx)</span>
+                    <span>{t("workspace.export_docx")}</span>
                     <span className="pill-fmt">Ready</span>
                   </button>
                   <button onClick={() => handleExport("md")} className="export-opt-btn">
                     <FileCode size={14} />
-                    <span>Markdown with Appendix (.md)</span>
+                    <span>{t("workspace.export_md")}</span>
                     <span className="pill-fmt">Ready</span>
                   </button>
                 </div>
@@ -639,7 +654,7 @@ export function ResearchWorkspace({
             )}
           </div>
 
-          <button className="btn-theme-toggle" onClick={onToggleTheme} title="Toggle theme" aria-label="Toggle theme">
+          <button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
             {activeTheme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
 
@@ -655,13 +670,13 @@ export function ResearchWorkspace({
         <aside className="groundwork-col-sources">
           <div className="sources-header-bar">
             <div className="sources-title-group">
-              <strong className="panel-heading">Sources & Evidence</strong>
-              <span className="count-tag">{workspaceSources.length} files</span>
+              <strong className="panel-heading">{t("sources.heading")}</strong>
+              <span className="count-tag">{t("sources.files_count", { count: workspaceSources.length })}</span>
             </div>
 
             <label className={`btn-add-evidence ${isUploadingSource ? "disabled" : ""}`} title="Upload new source document">
               <RefreshCw size={13} className={isUploadingSource ? "spin" : ""} />
-              <span>{isUploadingSource ? "Uploading…" : "Add"}</span>
+              <span>{isUploadingSource ? t("sources.btn_uploading") : t("sources.btn_add")}</span>
               <input
                 type="file"
                 disabled={isUploadingSource}
@@ -687,12 +702,12 @@ export function ResearchWorkspace({
           {/* Source Selection & Grounding Controls */}
           <div className="sources-controls-bar">
             <span className="grounding-info">
-              {selectedSourceIds.length} of {workspaceSources.length} active in grounding
+              {t("sources.active_in_grounding", { selected: selectedSourceIds.length, total: workspaceSources.length })}
             </span>
             <div className="grounding-toggles">
-              <button onClick={selectAllSources} className="btn-link-action">All</button>
+              <button onClick={selectAllSources} className="btn-link-action">{t("sources.btn_all")}</button>
               <span>·</span>
-              <button onClick={deselectAllSources} className="btn-link-action">None</button>
+              <button onClick={deselectAllSources} className="btn-link-action">{t("sources.btn_none")}</button>
             </div>
           </div>
 
@@ -721,15 +736,15 @@ export function ResearchWorkspace({
                         </span>
                         {doc.status === "failed" ? (
                           <span className="status-failed-badge" title={doc.error_message || "Document processing failed"}>
-                            <AlertTriangle size={10} /> Failed
+                            <AlertTriangle size={10} /> {t("sources.status_failed")}
                           </span>
                         ) : doc.status === "processing" || doc.status === "queued" ? (
                           <span className="status-processing-badge">
-                            <RefreshCw size={10} className="spin" /> Processing…
+                            <RefreshCw size={10} className="spin" /> {t("sources.status_indexing")}
                           </span>
                         ) : (
                           <span className="status-indexed-badge">
-                            <Check size={10} /> Ready to search
+                            <Check size={10} /> {t("sources.status_indexed")}
                           </span>
                         )}
                       </div>
@@ -792,8 +807,8 @@ export function ResearchWorkspace({
             ) : (
               <div className="sources-empty-state">
                 <FileText size={28} className="empty-icon" />
-                <strong>No sources attached</strong>
-                <small>Upload an RFP, technical specification, or brief to ground this workspace.</small>
+                <strong>{t("sources.empty_title")}</strong>
+                <small>{t("sources.empty_desc")}</small>
               </div>
             )}
           </div>
@@ -802,7 +817,7 @@ export function ResearchWorkspace({
           <div className="sources-dropzone-footer">
             <label className={`dropzone-box ${isUploadingSource ? "disabled" : ""}`}>
               <RefreshCw size={14} className={isUploadingSource ? "spin" : ""} />
-              <span>{isUploadingSource ? "Uploading & indexing file…" : "Attach PDF or specification"}</span>
+              <span>{isUploadingSource ? t("sources.attach_pdf_uploading") : t("sources.attach_pdf")}</span>
               <input
                 type="file"
                 disabled={isUploadingSource}
@@ -848,7 +863,7 @@ export function ResearchWorkspace({
                 onClick={() => (isEditingContent ? handleSaveBlocks() : setIsEditingContent(true))}
                 title={isEditingContent ? "Save draft edits" : "Edit draft text blocks"}
               >
-                {isEditingContent ? (isSavingDraft ? "Saving…" : "Save Draft") : "Edit Content"}
+                {isEditingContent ? (isSavingDraft ? t("editor.btn_saving") : t("editor.btn_save_draft")) : "Edit Content"}
               </button>
 
               <button
@@ -858,7 +873,7 @@ export function ResearchWorkspace({
                 title="Run automated verification audit across all claims and requirements"
               >
                 <RefreshCw size={13} className={isRunningAudit ? "spin" : ""} />
-                <span>{isRunningAudit ? "Verifying…" : "Re-Verify Draft"}</span>
+                <span>{isRunningAudit ? t("editor.btn_verifying") : t("editor.btn_reverify")}</span>
               </button>
             </div>
           </div>
@@ -870,7 +885,7 @@ export function ResearchWorkspace({
                 <div className="deliverable-skeleton-wrap" role="status" aria-live="polite">
                   <div className="deliverable-skeleton-header">
                     <RefreshCw size={14} className="spin" />
-                    <span>Loading deliverable draft, structure & verification status…</span>
+                    <span>{t("editor.loading")}</span>
                   </div>
                   <div className="skeleton-shimmer deliverable-skeleton-title" />
                   <div className="skeleton-shimmer deliverable-skeleton-meta" />
@@ -888,25 +903,21 @@ export function ResearchWorkspace({
                   <div className="empty-icon-wrap">
                     <FileText size={32} />
                   </div>
-                  <h3>No deliverable drafted yet</h3>
-                  <p>Upload client RFPs, specifications, or notes on the left, then instruct the agent to draft and verify your deliverable.</p>
+                  <h3>{t("editor.empty_title")}</h3>
+                  <p>{t("editor.empty_desc")}</p>
                   <div className="empty-action-chips">
-                    <button
-                      type="button"
-                      onClick={() => handleSendPrompt("Draft a comprehensive technical proposal based on the active sources.")}
-                      className="btn-empty-chip"
-                    >
-                      <Sparkles size={12} />
-                      <span>Draft Technical Proposal</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSendPrompt("Extract verifiable acceptance requirements from the uploaded brief.")}
-                      className="btn-empty-chip"
-                    >
-                      <ShieldCheck size={12} />
-                      <span>Extract Requirements</span>
-                    </button>
+                    {contextualSuggestions.slice(0, 2).map((suggestion) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        onClick={() => handleSendPrompt(suggestion.prompt)}
+                        className="btn-empty-chip"
+                        title={suggestion.prompt}
+                      >
+                        <Sparkles size={12} />
+                        <span>{suggestion.label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -959,8 +970,8 @@ export function ResearchWorkspace({
                         <div className="inline-finding-callout">
                           <div className="callout-header">
                             <AlertTriangle size={14} className="icon-amber" />
-                            <strong>Verification Finding: Unsupported Claim Detected</strong>
-                            <span className="badge-severity-high">High Severity</span>
+                            <strong>{t("editor.warning_unsupported")}</strong>
+                            <span className="badge-severity-high">{t("audit.high_severity")}</span>
                           </div>
                           <p className="callout-explanation">{matchedFinding.explanation}</p>
                           <div className="callout-action-row">
@@ -972,8 +983,8 @@ export function ResearchWorkspace({
                               <CheckCircle2 size={13} />
                               <span>
                                 {isResolvingFindingId === matchedFinding.id
-                                  ? "Applying verified revision…"
-                                  : "Apply Verified Revision (99.99% SLA)"}
+                                  ? t("audit.btn_applying_fix")
+                                  : t("audit.btn_apply_fix")}
                               </span>
                             </button>
                             <button
@@ -985,7 +996,7 @@ export function ResearchWorkspace({
                               }}
                             >
                               <Search size={13} />
-                              <span>Ask Agent to Find Evidence</span>
+                              <span>{t("editor.btn_fix_claim")}</span>
                             </button>
                           </div>
                         </div>
@@ -1029,57 +1040,64 @@ export function ResearchWorkspace({
             <div className="agent-dock-header">
               <div className="dock-title" onClick={() => setIsAgentExpanded((prev) => !prev)}>
                 <Sparkles size={15} className="icon-brand" />
-                <strong>Groundwork Grounded Agent</strong>
+                <strong>{t("agent.dock_title")}</strong>
                 <span className="dock-status-tag">
-                  {isAgentRunning ? "Running multi-step verification…" : "Ready for instructions"}
+                  {isAgentRunning ? t("agent.status_running") : t("agent.status_ready")}
                 </span>
               </div>
 
               <div className="dock-quick-chips">
-                <button
-                  className="btn-dock-chip"
-                  onClick={() => handleSendPrompt("Audit unsupported claims and check requirement coverage.")}
-                  disabled={isAgentRunning}
-                >
-                  Audit Claims
-                </button>
-                <button
-                  className="btn-dock-chip"
-                  onClick={() => handleSendPrompt("Find evidence for RFP-02 high availability requirement.")}
-                  disabled={isAgentRunning}
-                >
-                  Find SLA Evidence
-                </button>
-                <button
-                  className="btn-dock-chip"
-                  onClick={() => handleSendPrompt("Draft Executive Summary based on client RFP brief.")}
-                  disabled={isAgentRunning}
-                >
-                  Draft Section
-                </button>
+                {contextualSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    className="btn-dock-chip"
+                    onClick={() => handleSendPrompt(suggestion.prompt)}
+                    disabled={isAgentRunning}
+                    title={suggestion.prompt}
+                  >
+                    <span>{suggestion.label}</span>
+                  </button>
+                ))}
               </div>
 
               <button
                 className="btn-toggle-dock"
                 onClick={() => setIsAgentExpanded((prev) => !prev)}
-                title={isAgentExpanded ? "Minimize agent drawer" : "Expand agent conversation"}
+                title={isAgentExpanded ? t("agent.toggle_minimize") : t("agent.toggle_history")}
               >
-                {isAgentExpanded ? "Minimize" : "History"}
+                {isAgentExpanded ? t("agent.toggle_minimize") : t("agent.toggle_history")}
               </button>
             </div>
 
             {/* Expanded Agent Conversation Feed */}
             {isAgentExpanded && (
               <div className="agent-conversation-drawer">
+                <div className="agent-context-summary-bar">
+                  <span className="ctx-item">
+                    <Sparkles size={11} className="icon-brand" />
+                    <strong>{workspace.name}</strong>
+                  </span>
+                  {activeArtifact && (
+                    <span className="ctx-item">
+                      <FileText size={11} />
+                      <span>{activeArtifact.title}</span>
+                    </span>
+                  )}
+                  <span className="ctx-item">
+                    <CheckCircle2 size={11} className="text-emerald" />
+                    <span>{selectedSourceIds.length} {t("audit.metric_sources")}</span>
+                  </span>
+                </div>
+
                 <div className="messages-stream-list">
                   {isLoadingConversation && messages.length === 0 ? (
                     <div className="chat-loading-indicator" role="status" aria-live="polite">
                       <RefreshCw size={15} className="spin" />
-                      <span>Loading conversation history…</span>
+                      <span>{t("agent.loading_history")}</span>
                     </div>
                   ) : messages.length === 0 && !isAgentRunning ? (
                     <div className="agent-empty-notice">
-                      <p>Groundwork agent acts directly on your deliverable draft, requirements matrix, and evidence sources.</p>
+                      <p>{t("agent.empty_history")}</p>
                     </div>
                   ) : (
                     messages.map((msg, mIdx) => (
@@ -1110,9 +1128,9 @@ export function ResearchWorkspace({
                     <div className="agent-executing-card">
                       <div className="exec-header">
                         <RefreshCw size={13} className="spin text-accent" />
-                        <strong>Multi-Step Task Execution</strong>
+                        <strong>{t("agent.task_execution")}</strong>
                         <button onClick={handleStopAgent} className="btn-stop-stream">
-                          <Square size={11} /> Stop
+                          <Square size={11} /> {t("agent.btn_stop")}
                         </button>
                       </div>
                       <div className="exec-steps">
@@ -1152,8 +1170,12 @@ export function ResearchWorkspace({
                 disabled={isAgentRunning}
                 placeholder={
                   isAgentRunning
-                    ? "Agent is executing instructions across sources…"
-                    : `Ask agent to draft, verify, or resolve claims across ${selectedSourceIds.length} sources…`
+                    ? t("agent.placeholder_working")
+                    : activeArtifact?.title
+                    ? t("agent.placeholder_with_artifact", { artifact: activeArtifact.title, count: selectedSourceIds.length })
+                    : openFindings.length > 0
+                    ? t("agent.placeholder_with_findings", { count: openFindings.length })
+                    : t("agent.placeholder_ready", { count: selectedSourceIds.length })
                 }
                 className="dock-prompt-input"
                 aria-label="Agent prompt input"
@@ -1165,7 +1187,7 @@ export function ResearchWorkspace({
                 title={isAgentRunning ? "Agent is processing…" : "Send command to agent"}
               >
                 {isAgentRunning ? <RefreshCw size={14} className="spin" /> : <Send size={14} />}
-                <span>{isAgentRunning ? "Working…" : "Execute"}</span>
+                <span>{isAgentRunning ? t("agent.btn_working") : t("agent.btn_execute")}</span>
               </button>
             </div>
           </div>
@@ -1179,14 +1201,14 @@ export function ResearchWorkspace({
               className={`audit-segment-btn ${rightPanelTab === "audit" ? "active" : ""}`}
               onClick={() => setRightPanelTab("audit")}
             >
-              <span>Verification</span>
+              <span>{t("audit.tab_verification")}</span>
               {openFindings.length > 0 && <span className="badge-finding-count">{openFindings.length}</span>}
             </button>
             <button
               className={`audit-segment-btn ${rightPanelTab === "matrix" ? "active" : ""}`}
               onClick={() => setRightPanelTab("matrix")}
             >
-              <span>Requirements</span>
+              <span>{t("audit.tab_matrix")}</span>
               <span className="badge-req-count">
                 {coveredRequirementsCount}/{requirements.length}
               </span>
@@ -1195,7 +1217,7 @@ export function ResearchWorkspace({
               className={`audit-segment-btn ${rightPanelTab === "appendix" ? "active" : ""}`}
               onClick={() => setRightPanelTab("appendix")}
             >
-              <span>Appendix & Notes</span>
+              <span>{t("audit.tab_appendix")}</span>
             </button>
           </div>
 
@@ -1207,16 +1229,16 @@ export function ResearchWorkspace({
                 <div className="card-top">
                   <div className="readiness-gauge-large">
                     <span className="gauge-score">{readinessScore}%</span>
-                    <small>Readiness</small>
+                    <small>{t("workspace.readiness_gate")}</small>
                   </div>
                   <div className="readiness-meta-text">
                     <span className="gate-title">
-                      {isExportBlocked ? "Export Gate: Blocked" : "Export Gate: Passed"}
+                      {isExportBlocked ? `${t("workspace.readiness_gate")}: Blocked` : `${t("workspace.readiness_gate")}: Passed`}
                     </span>
                     <p className="gate-desc">
                       {isExportBlocked
-                        ? `${openFindings.length} unsupported claim(s) require evidence before document export is permitted.`
-                        : "All claims and requirements are verified against source evidence. Export unlocked."}
+                        ? t(openFindings.length === 1 ? "workspace.issues_unresolved" : "workspace.issues_unresolved_plural", { count: openFindings.length })
+                        : t("audit.all_cleared_desc")}
                     </p>
                   </div>
                 </div>
@@ -1231,18 +1253,18 @@ export function ResearchWorkspace({
 
                 <div className="readiness-metrics-row">
                   <div className="metric-col">
-                    <small>Requirements</small>
+                    <small>{t("audit.metric_requirements")}</small>
                     <strong>{coveredRequirementsCount}/{requirements.length}</strong>
                   </div>
                   <div className="metric-col">
-                    <small>Findings</small>
+                    <small>{t("audit.metric_findings")}</small>
                     <strong className={openFindings.length > 0 ? "text-danger" : "text-emerald"}>
-                      {openFindings.length} Open
+                      {t("audit.metric_open_findings", { count: openFindings.length })}
                     </strong>
                   </div>
                   <div className="metric-col">
-                    <small>Sources Used</small>
-                    <strong>{selectedSourceIds.length} Linked</strong>
+                    <small>{t("audit.metric_sources")}</small>
+                    <strong>{t("audit.metric_sources_linked", { count: selectedSourceIds.length })}</strong>
                   </div>
                 </div>
               </div>
@@ -1251,7 +1273,7 @@ export function ResearchWorkspace({
               <div className="findings-section-group">
                 <div className="section-title-row">
                   <strong className="subpanel-title">
-                    Review Findings ({openFindings.length})
+                    {t("audit.review_findings", { count: openFindings.length })}
                   </strong>
                   <button
                     className="btn-recheck-audit"
@@ -1260,22 +1282,22 @@ export function ResearchWorkspace({
                     title="Re-run audit scan"
                   >
                     <RefreshCw size={12} className={isRunningAudit ? "spin" : ""} />
-                    <span>Scan</span>
+                    <span>{isRunningAudit ? t("audit.btn_scanning") : t("audit.btn_scan")}</span>
                   </button>
                 </div>
 
                 {isLoadingArtifactDetails && findings.length === 0 ? (
                   <div className="chat-loading-indicator" role="status" aria-live="polite">
                     <RefreshCw size={15} className="spin" />
-                    <span>Auditing deliverable claims against active evidence…</span>
+                    <span>{t("audit.loading_findings")}</span>
                   </div>
                 ) : openFindings.length > 0 ? (
                   <div className="findings-cards-list">
                     {openFindings.map((finding) => (
                       <div key={finding.id} className="finding-detail-card">
                         <div className="finding-card-header">
-                          <span className="finding-severity-pill high">HIGH SEVERITY</span>
-                          <span className="finding-type-pill">Unsupported Claim</span>
+                          <span className="finding-severity-pill high">{t("audit.high_severity")}</span>
+                          <span className="finding-type-pill">{t("audit.unsupported_claim")}</span>
                         </div>
 
                         <div className="finding-claim-quote">
@@ -1290,7 +1312,7 @@ export function ResearchWorkspace({
                         {finding.citations && finding.citations.length > 0 && (
                           <div className="finding-evidence-matched">
                             <span className="evidence-header">
-                              <CheckCircle2 size={12} className="text-emerald" /> Supporting Evidence Available:
+                              <CheckCircle2 size={12} className="text-emerald" /> {t("audit.evidence_available")}
                             </span>
                             <div className="evidence-snippet-box">
                               <p>"{finding.citations[0].snippet}"</p>
@@ -1319,8 +1341,8 @@ export function ResearchWorkspace({
                             <CheckCheck size={13} />
                             <span>
                               {isResolvingFindingId === finding.id
-                                ? "Applying Revision…"
-                                : "Apply Verified Revision (99.99%)"}
+                                ? t("audit.btn_applying_fix")
+                                : t("audit.btn_apply_fix")}
                             </span>
                           </button>
 
@@ -1330,7 +1352,7 @@ export function ResearchWorkspace({
                             disabled={isResolvingFindingId === finding.id}
                             title="Waive this finding"
                           >
-                            Dismiss
+                            {t("audit.btn_waive")}
                           </button>
                         </div>
                       </div>
@@ -1339,14 +1361,14 @@ export function ResearchWorkspace({
                 ) : (
                   <div className="findings-cleared-card">
                     <CheckCircle2 size={28} className="icon-verified-cleared" />
-                    <strong>All Verification Findings Resolved</strong>
-                    <p>Every claim in this proposal is grounded in your source documentation. Export is fully unlocked.</p>
+                    <strong>{t("audit.all_cleared_title")}</strong>
+                    <p>{t("audit.all_cleared_desc")}</p>
                     <button
                       className="btn-primary-gradient btn-export-now"
                       onClick={() => handleExport("pdf")}
                     >
                       <Download size={14} />
-                      <span>Export Verified Deliverable</span>
+                      <span>{t("audit.btn_export_now")}</span>
                     </button>
                   </div>
                 )}
@@ -1358,15 +1380,15 @@ export function ResearchWorkspace({
           {rightPanelTab === "matrix" && (
             <div className="matrix-tab-pane">
               <div className="matrix-header-info">
-                <strong>Verifiable Requirements Traceability Matrix</strong>
-                <p>Track client RFP requirements against draft coverage and source grounding.</p>
+                <strong>{t("matrix.header_title")}</strong>
+                <p>{t("matrix.header_desc")}</p>
               </div>
 
               <div className="requirements-matrix-list">
                 {isLoadingArtifactDetails && requirements.length === 0 ? (
                   <div className="chat-loading-indicator" role="status" aria-live="polite">
                     <RefreshCw size={15} className="spin" />
-                    <span>Extracting and mapping acceptance requirements…</span>
+                    <span>{t("matrix.loading")}</span>
                   </div>
                 ) : (
                   requirements.map((req, rIdx) => {
@@ -1413,7 +1435,7 @@ export function ResearchWorkspace({
                               title="Ask agent to satisfy requirement"
                             >
                               <Sparkles size={11} />
-                              <span>Ask Agent to Satisfy Requirement</span>
+                              <span>{t("matrix.btn_ask_agent")}</span>
                             </button>
                           )}
                         </div>
@@ -1429,8 +1451,8 @@ export function ResearchWorkspace({
           {rightPanelTab === "appendix" && (
             <div className="appendix-tab-pane">
               <div className="appendix-header-info">
-                <strong>Verification & Audit Appendix Preview</strong>
-                <p>This evidence provenance ledger is compiled and attached when exporting the deliverable.</p>
+                <strong>{t("appendix.header_title")}</strong>
+                <p>{t("appendix.header_desc")}</p>
               </div>
 
               <div className="appendix-ledger-card">
@@ -1443,9 +1465,9 @@ export function ResearchWorkspace({
                   <table className="ledger-table">
                     <thead>
                       <tr>
-                        <th>Requirement / Claim</th>
-                        <th>Evidence Source</th>
-                        <th>Status</th>
+                        <th>{t("appendix.col_requirement")}</th>
+                        <th>{t("appendix.col_source")}</th>
+                        <th>{t("appendix.col_status")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1457,7 +1479,7 @@ export function ResearchWorkspace({
                           </td>
                           <td>
                             <span className={`status-pill-mini ${req.status}`}>
-                              {req.status === "covered" ? "Verified ✓" : "Unverified ⚠"}
+                              {req.status === "covered" ? t("appendix.status_verified") : t("appendix.status_unverified")}
                             </span>
                           </td>
                         </tr>
@@ -1468,7 +1490,7 @@ export function ResearchWorkspace({
 
                 <div className="ledger-footer-stamp">
                   <ShieldCheck size={14} className="text-emerald" />
-                  <span>Groundwork Cryptographic Provenance Audit Stamped</span>
+                  <span>{t("appendix.cryptographic_stamp")}</span>
                 </div>
               </div>
             </div>

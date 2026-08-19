@@ -24,6 +24,7 @@ class ProfileUpdateRequest(BaseModel):
 
 
 class UserPreferences(BaseModel):
+    language: str = Field(default="en", pattern="^(en|vi|es|ja|de|fr|zh|ko|pt)$")
     compact_sidebar: bool = False
     reduced_motion: bool = False
     default_export_format: str = Field(default="pdf", pattern="^(pdf|docx|markdown)$")
