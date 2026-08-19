@@ -43,3 +43,41 @@ def test_generation_runs_through_a_cancellable_background_job() -> None:
     assert '"ai_create"' in generation
     assert 'operation == "ai_create"' in tasks
     assert '@router.post("/status/{job_id}/cancel"' in jobs
+
+
+def test_extract_error_detail_formats_provider_errors() -> None:
+    import httpx
+    from app.ai_orchestration import _extract_error_detail
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(
+        400,
+        request=request,
+        json={"error": {"message": "Please pass a valid API key", "type": "invalid_request_error"}},
+    )
+    exc = httpx.HTTPStatusError("Bad Request", request=request, response=response)
+    detail = _extract_error_detail(exc)
+    assert "AI provider error (400): Please pass a valid API key" in detail
+
+
+@pytest.mark.asyncio
+async def test_complete_raises_provider_error_without_fallback() -> None:
+    from unittest.mock import patch
+    import httpx
+    from app.ai_orchestration import ai_orchestrator
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(
+        401,
+        request=request,
+        json={"detail": "Invalid API Key"},
+    )
+    with patch("httpx.AsyncClient.post", side_effect=httpx.HTTPStatusError("Unauthorized", request=request, response=response)):
+        with patch("app.services.ai_orchestration.get_settings") as mock_settings:
+            mock_settings.return_value.llm_api_key = "test-key"
+            mock_settings.return_value.llm_base_url = "https://api.openai.com/v1"
+            mock_settings.return_value.llm_model = "test-model"
+            mock_settings.return_value.llm_timeout_seconds = 5
+            with pytest.raises(AIProviderError) as exc_info:
+                await ai_orchestrator.complete([{"role": "user", "content": "hi"}], operation="test")
+            assert "AI provider error (401): Invalid API Key" in str(exc_info.value)

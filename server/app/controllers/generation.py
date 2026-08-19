@@ -277,7 +277,7 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
             temperature=.35,
         )
     except AIProviderError as exc:
-        raise HTTPException(status_code=502, detail="Groundwork could not generate this document") from exc
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     try:
         aliases = {"bill": "invoice", "memo": "policy", "pitch_deck": "presentation", "slide_deck": "presentation"}
         value["document_type"] = aliases.get(str(value.get("document_type", "")).lower(), str(value.get("document_type", "general")).lower())

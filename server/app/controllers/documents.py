@@ -475,7 +475,7 @@ async def upload_document(
                 storage.remove(original_object_key)
             except Exception:
                 pass
-        raise HTTPException(status_code=503, detail="Document storage is temporarily unavailable") from exc
+        raise HTTPException(status_code=503, detail=f"Document storage error: {str(exc)}") from exc
     document = Document(
         id=document_id,
         owner_id=user.id,
@@ -508,9 +508,9 @@ async def upload_document(
         task = process_document.delay(str(document.id))
         job.task_id = task.id
         await session.commit()
-    except Exception:
+    except Exception as exc:
         document.status = DocumentStatus.FAILED
-        document.error_message = "Processing worker is temporarily offline"
+        document.error_message = f"Processing worker offline: {str(exc)}"
         job.status = JobStatus.FAILED
         job.error_message = document.error_message
         await session.commit()
@@ -546,8 +546,9 @@ async def retry_document(
         await session.commit()
     except Exception as exc:
         job.status = JobStatus.FAILED
-        job.error_message = "Processing queue is temporarily unavailable"
+        job.error_message = f"Processing queue unavailable: {str(exc)}"
         document.status = DocumentStatus.FAILED
+        document.error_message = job.error_message
         await session.commit()
         raise HTTPException(status_code=503, detail=job.error_message) from exc
     return job

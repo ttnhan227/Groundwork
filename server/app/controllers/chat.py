@@ -469,12 +469,9 @@ async def stream_question(
                     citation.model_dump(mode="json") for citation in response_citations
                 ],
             })
-        except (RuntimeError, KeyError, IndexError, json.JSONDecodeError) as exc:
+        except Exception as exc:
             await session.rollback()
-            yield _sse("error", {"message": (
-                str(exc) if isinstance(exc, RuntimeError)
-                else "The configured language model is unavailable"
-            )})
+            yield _sse("error", {"message": str(exc) or f"Error: {type(exc).__name__}"})
 
     return StreamingResponse(
         events(),

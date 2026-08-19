@@ -234,12 +234,8 @@ async def execute_workspace_agent(
 
             except Exception as exc:
                 logger.exception("workspace_agent_error: %s", exc)
-                user_friendly = (
-                    str(exc)
-                    if isinstance(exc, (ValueError, RuntimeError)) and not any(k in str(exc).lower() for k in ["session", "lazy", "sqlalche", "parent instance", "detached"])
-                    else "Groundwork agent encountered an unexpected issue while executing this task. Please try again."
-                )
-                yield _sse_event("error", {"message": user_friendly})
+                error_msg = str(exc).strip() or f"Error: {type(exc).__name__}"
+                yield _sse_event("error", {"message": error_msg})
 
     return StreamingResponse(
         event_generator(),
