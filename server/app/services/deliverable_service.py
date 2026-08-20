@@ -50,23 +50,21 @@ class DeliverableService:
         if member is None and user.role != "admin":
             raise PermissionError("Access denied to this workspace.")
 
+        doc_blocks = blocks or ([{"type": "paragraph", "text": content_markdown}] if content_markdown else [{"type": "paragraph", "text": ""}])
         doc = NativeDocument(
             workspace_id=workspace_id,
-            author_id=user.id,
+            owner_id=user.id,
             title=title.strip() or "Untitled Document",
-            content_markdown=content_markdown,
-            blocks=blocks or [],
-            content_hash=hashlib.sha256(content_markdown.encode("utf-8")).hexdigest(),
+            content={"type": "doc", "blocks": doc_blocks},
         )
         created = await self.deliverable_repo.create(doc)
         initial_version = NativeDocumentVersion(
             native_document_id=created.id,
             version_number=1,
             title=created.title,
-            blocks=created.blocks,
-            content_markdown=created.content_markdown,
+            content=created.content,
             change_summary="Initial document creation",
-            created_by_id=user.id,
+            created_by=user.id,
         )
         await self.deliverable_repo.add_version(initial_version)
         return created
@@ -83,24 +81,23 @@ class DeliverableService:
         doc = await self.get_document(document_id, user)
         if title is not None:
             doc.title = title.strip() or doc.title
-        if content_markdown is not None:
-            doc.content_markdown = content_markdown
-            doc.content_hash = hashlib.sha256(content_markdown.encode("utf-8")).hexdigest()
         if blocks is not None:
-            doc.blocks = blocks
+            doc.content = {"type": "doc", "blocks": blocks}
+        elif content_markdown is not None:
+            doc.content = {"type": "doc", "blocks": [{"type": "paragraph", "text": content_markdown}]}
 
+        doc.revision += 1
         updated = await self.deliverable_repo.update(doc)
-        if change_summary or content_markdown is not None:
+        if change_summary or content_markdown is not None or blocks is not None:
             versions = await self.deliverable_repo.list_versions(document_id)
-            next_version = (versions[0].version_number + 1) if versions else 1
+            next_version = (versions[0].version_number + 1) if versions else doc.revision
             v = NativeDocumentVersion(
                 native_document_id=updated.id,
                 version_number=next_version,
                 title=updated.title,
-                blocks=updated.blocks,
-                content_markdown=updated.content_markdown,
+                content=updated.content,
                 change_summary=change_summary or "Saved edit",
-                created_by_id=user.id,
+                created_by=user.id,
             )
             await self.deliverable_repo.add_version(v)
         return updated

@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import select
 
-from app.models import User
+from app.models import User, UserRole
 from app.repositories.base import BaseRepository
 
 
@@ -20,14 +20,15 @@ class UserRepository(BaseRepository[User]):
     async def get_by_email(self, email: str) -> User | None:
         return await self.session.scalar(select(User).where(User.email == email.strip().lower()))
 
-    async def create(self, email: str, password_hash: str, display_name: str, role: str = "member", google_linked: bool = False) -> User:
+    async def create(self, email: str, password_hash: str, display_name: str, role: str | UserRole = UserRole.USER, google_sub: str | None = None) -> User:
+        user_role = role if isinstance(role, UserRole) else UserRole(role) if role in UserRole._value2member_map_ else UserRole.USER
         user = User(
             email=email.strip().lower(),
             password_hash=password_hash,
             display_name=display_name.strip(),
-            role=role,
+            role=user_role,
             is_active=True,
-            google_linked=google_linked,
+            google_sub=google_sub,
             preferences={},
         )
         self.session.add(user)

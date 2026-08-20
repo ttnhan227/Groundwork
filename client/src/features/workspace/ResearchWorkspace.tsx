@@ -846,7 +846,7 @@ export function ResearchWorkspace({
           {/* Draft Toolbar & Meta */}
           <div className="draft-top-toolbar studio-toolbar">
             <div className="draft-meta-title">
-              <span className="doc-category-tag">Deliverables, Artifacts & Studio</span>
+              <span className="doc-category-tag">Deliverables, Artifacts, Studio & Notes</span>
               <h2 className="draft-heading-title">{activeArtifact?.title || "Technical Proposal"}</h2>
               <div className="draft-submeta">
                 <span>Revision {activeArtifact?.revision || 1}</span>

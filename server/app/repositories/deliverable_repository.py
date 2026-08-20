@@ -73,10 +73,10 @@ class DeliverableRepository(BaseRepository[NativeDocument]):
         await self.session.refresh(version)
         return version
 
-    async def list_requirements(self, workspace_id: uuid.UUID) -> Sequence[DeliverableRequirement]:
+    async def list_requirements(self, document_id: uuid.UUID) -> Sequence[DeliverableRequirement]:
         result = await self.session.scalars(
             select(DeliverableRequirement)
-            .where(DeliverableRequirement.workspace_id == workspace_id)
+            .where(DeliverableRequirement.native_document_id == document_id)
             .order_by(DeliverableRequirement.position)
         )
         return result.all()

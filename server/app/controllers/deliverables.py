@@ -399,6 +399,15 @@ async def delete_workspace(
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     workspace, member = await workspace_access(workspace_id, user, session, {"owner"})
+    from app.storage import ObjectStorage
+    doc_keys = list(await session.scalars(select(Document.object_key).where(Document.workspace_id == workspace.id)))
+    orig_keys = list(await session.scalars(select(Document.original_object_key).where(Document.workspace_id == workspace.id, Document.original_object_key.is_not(None))))
+    storage = ObjectStorage()
+    for key in (*doc_keys, *orig_keys):
+        try:
+            storage.remove(key)
+        except Exception:
+            pass
     await session.delete(workspace)
     await session.commit()
     return Response(status_code=204)

@@ -19,7 +19,7 @@ export const TRANSLATIONS = {
   en: {
     // Topbar & Common Navigation
     "app.name": "Groundwork",
-    "nav.workspaces": "Workspaces",
+    "nav.workspaces": "Research Workspaces",
     "nav.search_placeholder": "Search workspaces, deliverables, or tags...",
     "nav.profile_settings": "Profile & Settings",
     "nav.light_mode": "Light Mode",
@@ -36,12 +36,12 @@ export const TRANSLATIONS = {
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Grounded Deliverable Workspaces",
     "library.hero_subtitle": "Transform client RFPs, specifications, and messy files into 100% verified, source-grounded technical proposals and deliverables.",
-    "library.templates_heading": "Quick Start Templates",
+    "library.templates_heading": "Recommended Workflows",
     "library.templates_subheading": "Choose a deliverable workflow tailored for your engagement",
     "library.category_all": "All Workspaces",
     "library.category_proposals": "Proposals",
     "library.category_reports": "Reports",
-    "library.template_proposal_title": "Technical Proposal & RFP",
+    "library.template_proposal_title": "Technical Proposal",
     "library.template_proposal_desc": "Draft compliant technical bids mapped directly to client requirements and SLAs.",
     "library.template_report_title": "Client Research Report",
     "library.template_report_desc": "Analyze market data, financial statements, or research papers into an executive brief.",
