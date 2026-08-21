@@ -12,20 +12,18 @@ import {
   ShieldCheck,
   ArrowRight,
   MoreVertical,
-  PlayCircle,
   X,
   Upload,
   Sun,
   Moon,
   CheckCircle2,
-  Sparkles,
-  Lock,
   FileCheck2,
   RefreshCw,
 } from "lucide-react";
 import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
 import { useTranslation } from "../../i18n";
+import { Button } from '../../components/ui/Button';
 
 interface WorkspaceLibraryProps {
   auth: AuthResult;
@@ -64,7 +62,7 @@ export function WorkspaceLibrary({
   onUploadToNewWorkspace,
   onOpenAccount,
   onToggleTheme,
-  onOpenTwoMinuteDemo,
+  onOpenTwoMinuteDemo: _onOpenTwoMinuteDemo,
   onSelectNotebook,
   onCreateNotebook,
   onDeleteNotebook,
@@ -103,16 +101,16 @@ export function WorkspaceLibrary({
       title: t("library.template_report_title"),
       icon: FileText,
       description: t("library.template_report_desc"),
-      color: "#059669",
-      bg: "#ecfdf5",
+      color: "var(--accent)",
+      bg: "var(--accent-subtle)",
     },
     {
       id: "presentation",
       title: t("library.template_presentation_title"),
       icon: Layers,
       description: t("library.template_presentation_desc"),
-      color: "#7c3aed",
-      bg: "#f5f3ff",
+      color: "var(--accent)",
+      bg: "var(--accent-subtle)",
     },
     {
       id: "blank",
@@ -240,11 +238,11 @@ export function WorkspaceLibrary({
 
         {/* Action Controls */}
         <div className="notebook-nav-actions">
-          <button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
+          <Button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
             {activeTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
+          </Button>
 
-          <button
+          <Button
             className="btn-primary-gradient"
             onClick={() => {
               setSelectedTemplate("proposal");
@@ -255,16 +253,16 @@ export function WorkspaceLibrary({
           >
             <Plus size={15} />
             <span>{t("nav.new_workspace")}</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
             className="btn-account-chip"
             onClick={onOpenAccount}
             title={t("nav.profile_settings")}
           >
             <UserIcon size={14} />
             <span>{auth.user.display_name}</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -323,24 +321,24 @@ export function WorkspaceLibrary({
             </div>
 
             <div className="notebook-category-tabs">
-              <button
+              <Button
                 className={filterCategory === "all" ? "active" : ""}
                 onClick={() => setFilterCategory("all")}
               >
                 {t("library.category_all")}
-              </button>
-              <button
+              </Button>
+              <Button
                 className={filterCategory === "proposals" ? "active" : ""}
                 onClick={() => setFilterCategory("proposals")}
               >
                 {t("library.category_proposals")}
-              </button>
-              <button
+              </Button>
+              <Button
                 className={filterCategory === "reports" ? "active" : ""}
                 onClick={() => setFilterCategory("reports")}
               >
                 {t("library.category_reports")}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -397,9 +395,9 @@ export function WorkspaceLibrary({
                                   if (e.key === "Escape") setEditingWorkspaceId(null);
                                 }}
                               />
-                              <button className="btn-rename-save" onClick={() => handleSaveRename(ws.id)}>
+                              <Button className="btn-rename-save" onClick={() => handleSaveRename(ws.id)}>
                                 {t("library.btn_save")}
-                              </button>
+                              </Button>
                             </div>
                           ) : (
                             <div
@@ -417,7 +415,7 @@ export function WorkspaceLibrary({
                       </div>
 
                       <div className="notebook-actions-dropdown">
-                        <button
+                        <Button
                           className="btn-dropdown-trigger"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -426,11 +424,11 @@ export function WorkspaceLibrary({
                           aria-label="Workspace options"
                         >
                           <MoreVertical size={15} />
-                        </button>
+                        </Button>
 
                         {activeDropdownId === ws.id && (
                           <div className="dropdown-menu">
-                            <button
+                            <Button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingWorkspaceId(ws.id);
@@ -440,8 +438,8 @@ export function WorkspaceLibrary({
                             >
                               <Edit3 size={13} />
                               <span>{t("library.action_rename")}</span>
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               className="danger"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -451,7 +449,7 @@ export function WorkspaceLibrary({
                             >
                               <Trash2 size={13} />
                               <span>{t("library.action_delete")}</span>
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -488,7 +486,7 @@ export function WorkspaceLibrary({
                   ? t("library.empty_search_desc")
                   : t("library.empty_desc")}
               </p>
-              <button
+              <Button
                 className="btn-primary-gradient"
                 onClick={() => {
                   setNewWorkspaceName("");
@@ -498,7 +496,7 @@ export function WorkspaceLibrary({
               >
                 <Plus size={15} />
                 <span>{t("library.btn_create")}</span>
-              </button>
+              </Button>
             </div>
           )}
         </section>
@@ -513,9 +511,9 @@ export function WorkspaceLibrary({
                 <p className="modal-eyebrow">{t("app.name")}</p>
                 <h3 id="create-workspace-title">{t("library.create_modal_title")}</h3>
               </div>
-              <button className="btn-modal-close" onClick={() => setIsCreateOpen(false)} aria-label="Close dialog">
+              <Button className="btn-modal-close" onClick={() => setIsCreateOpen(false)} aria-label="Close dialog">
                 <X size={16} />
-              </button>
+              </Button>
             </header>
 
             <div className="modal-form">
@@ -599,12 +597,12 @@ export function WorkspaceLibrary({
                 </div>
 
                 <div className="modal-actions-footer">
-                  <button type="button" className="btn-modal-cancel" onClick={() => setIsCreateOpen(false)}>
+                  <Button type="button" className="btn-modal-cancel" onClick={() => setIsCreateOpen(false)}>
                     {t("library.btn_cancel")}
-                  </button>
-                  <button type="submit" className="btn-primary-gradient" disabled={!newWorkspaceName.trim() || isCreating}>
+                  </Button>
+                  <Button type="submit" className="btn-primary-gradient" disabled={!newWorkspaceName.trim() || isCreating}>
                     {isCreating ? t("library.btn_creating") : t("library.btn_create")}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import {
   ArrowLeft,
   FileText,
-  Plus,
   Trash2,
   CheckCircle2,
   Send,
@@ -13,7 +12,6 @@ import {
   ExternalLink,
   CheckSquare,
   Square as SquareOutline,
-  Upload,
   Sun,
   Moon,
   Search,
@@ -28,6 +26,7 @@ import {
   AlertCircle,
   FileCode,
 } from "lucide-react";
+import { Button } from "../../components/ui/Button";
 import type {
   Workspace,
   DocumentItem,
@@ -104,12 +103,14 @@ export function ResearchWorkspace({
 
   // Right Panel Tabs: "audit" (findings + readiness), "matrix" (requirements), "appendix" (provenance)
   const [rightPanelTab, setRightPanelTab] = useState<"audit" | "matrix" | "appendix">("audit");
+  // Mobile responsive column view tab
+  const [mobileTab, setMobileTab] = useState<"sources" | "editor" | "audit">("editor");
 
   // Chat & Agent state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [promptInput, setPromptInput] = useState("");
-  const [actionType, setActionType] = useState<string>("auto");
+  const [actionType, _setActionType] = useState<string>("auto");
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [activeSteps, setActiveSteps] = useState<AgentTaskStep[]>([]);
   const [streamingText, setStreamingText] = useState("");
@@ -197,6 +198,7 @@ export function ResearchWorkspace({
 
   useEffect(() => {
     reloadArtifactDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeArtifact?.id, workspace.id, auth.access_token]);
 
   // Auto-scroll chat when active
@@ -499,7 +501,7 @@ export function ResearchWorkspace({
   }, [workspace, workspaceSources, requirements, openFindings, activeArtifact, language]);
 
   // Helper to parse citations from draft text and make them clickable
-  function renderBlockContentWithCitations(text: string, isFlagged: boolean) {
+  function renderBlockContentWithCitations(text: string, _isFlagged?: boolean) {
     const citationRegex = /\[(?:Source|Evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]/gi;
     const parts: (string | React.ReactNode)[] = [];
     let lastIndex = 0;
@@ -516,7 +518,7 @@ export function ResearchWorkspace({
       );
 
       parts.push(
-        <button
+        <Button
           key={match.index}
           className="inline-citation-badge"
           onClick={() => {
@@ -531,7 +533,7 @@ export function ResearchWorkspace({
           <ExternalLink size={10} />
           <span>{docName}</span>
           <strong>p. {pageNum}</strong>
-        </button>,
+        </Button>,
       );
       lastIndex = citationRegex.lastIndex;
     }
@@ -548,10 +550,10 @@ export function ResearchWorkspace({
       {/* ================= TOP WORKSPACE HEADER ================= */}
       <header className="groundwork-topbar">
         <div className="topbar-left">
-          <button className="btn-back-workspaces" onClick={onBackToLibrary} title={t("workspace.back_to_library")}>
+          <Button variant="secondary" className="btn-back-workspaces" onClick={onBackToLibrary} title={t("workspace.back_to_library")}>
             <ArrowLeft size={14} />
             <span>{t("workspace.back_to_library")}</span>
-          </button>
+          </Button>
           <div className="topbar-sep" />
           <div className="topbar-project-meta">
             <BrandMark size={16} />
@@ -598,7 +600,7 @@ export function ResearchWorkspace({
 
           {/* Export Gate Button */}
           <div className="export-gate-wrapper">
-            <button
+            <Button
               className={`btn-export-gate ${isExportBlocked ? "gate-blocked" : "gate-unlocked"}`}
               onClick={() => {
                 if (isExportBlocked) {
@@ -624,7 +626,7 @@ export function ResearchWorkspace({
                   <span>{t("workspace.export_deliverable")}</span>
                 </>
               )}
-            </button>
+            </Button>
 
             {/* Export Dropdown Menu */}
             {isExportMenuOpen && !isExportBlocked && (
@@ -634,40 +636,67 @@ export function ResearchWorkspace({
                   <small>{t("workspace.export_pdf_desc")}</small>
                 </div>
                 <div className="dropdown-options">
-                  <button onClick={() => handleExport("pdf")} className="export-opt-btn">
+                  <Button onClick={() => handleExport("pdf")} className="export-opt-btn">
                     <FileText size={14} />
                     <span>{t("workspace.export_pdf")}</span>
                     <span className="pill-fmt">Ready</span>
-                  </button>
-                  <button onClick={() => handleExport("docx")} className="export-opt-btn">
+                  </Button>
+                  <Button onClick={() => handleExport("docx")} className="export-opt-btn">
                     <FileCheck2 size={14} />
                     <span>{t("workspace.export_docx")}</span>
                     <span className="pill-fmt">Ready</span>
-                  </button>
-                  <button onClick={() => handleExport("md")} className="export-opt-btn">
+                  </Button>
+                  <Button onClick={() => handleExport("md")} className="export-opt-btn">
                     <FileCode size={14} />
                     <span>{t("workspace.export_md")}</span>
                     <span className="pill-fmt">Ready</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
           </div>
 
-          <button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
+          <Button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
             {activeTheme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
+          </Button>
 
-          <button className="btn-user-chip" onClick={onOpenAccount} title="Account Settings">
+          <Button className="btn-user-chip" onClick={onOpenAccount} title="Account Settings">
             <span>{auth.user.display_name}</span>
-          </button>
+          </Button>
         </div>
       </header>
 
       {/* ================= 3-COLUMN MAIN WORKSPACE ================= */}
+      {/* Mobile tab navigation bar (visible only at mobile viewport) */}
+      <nav className="workspace-mobile-nav-bar" aria-label="Workspace views">
+        <Button
+          className={`mobile-nav-tab ${mobileTab === "sources" ? "active" : ""}`}
+          onClick={() => setMobileTab("sources")}
+        >
+          <FileText size={13} />
+          <span>{t("sources.heading")}</span>
+          <span className="count-tag">{workspaceSources.length}</span>
+        </Button>
+        <Button
+          className={`mobile-nav-tab ${mobileTab === "editor" ? "active" : ""}`}
+          onClick={() => setMobileTab("editor")}
+        >
+          <FileCheck2 size={13} />
+          <span>{activeArtifact?.title || "Deliverable"}</span>
+        </Button>
+        <Button
+          className={`mobile-nav-tab ${mobileTab === "audit" ? "active" : ""}`}
+          onClick={() => setMobileTab("audit")}
+        >
+          <ShieldCheck size={13} />
+          <span>{t("audit.tab_verification")}</span>
+          {openFindings.length > 0 && <span className="badge-finding-count">{openFindings.length}</span>}
+        </Button>
+      </nav>
+
       <div className="groundwork-workspace-body">
-        {/* ================= COLUMN 1: SOURCES & EVIDENCE (Left 280px) ================= */}
-        <aside className="groundwork-col-sources">
+        {/* ================= COLUMN 1: SOURCES & EVIDENCE ================= */}
+        <aside className={`groundwork-col-sources ${mobileTab === "sources" ? "mobile-active" : ""}`}>
           <div className="sources-header-bar">
             <div className="sources-title-group">
               <strong className="panel-heading">{t("sources.heading")}</strong>
@@ -705,9 +734,9 @@ export function ResearchWorkspace({
               {t("sources.active_in_grounding", { selected: selectedSourceIds.length, total: workspaceSources.length })}
             </span>
             <div className="grounding-toggles">
-              <button onClick={selectAllSources} className="btn-link-action">{t("sources.btn_all")}</button>
+              <Button onClick={selectAllSources} className="btn-link-action">{t("sources.btn_all")}</Button>
               <span>·</span>
-              <button onClick={deselectAllSources} className="btn-link-action">{t("sources.btn_none")}</button>
+              <Button onClick={deselectAllSources} className="btn-link-action">{t("sources.btn_none")}</Button>
             </div>
           </div>
 
@@ -718,13 +747,13 @@ export function ResearchWorkspace({
                 const isSelected = selectedSourceIds.includes(doc.id);
                 return (
                   <div key={doc.id} className={`source-card-item ${isSelected ? "is-selected" : ""}`}>
-                    <button
+                    <Button
                       className="source-select-checkbox"
                       onClick={() => toggleSource(doc.id)}
                       aria-label={isSelected ? "Deselect source" : "Select source"}
                     >
                       {isSelected ? <CheckSquare size={14} /> : <SquareOutline size={14} />}
-                    </button>
+                    </Button>
 
                     <div className="source-info-wrap" onClick={() => toggleSource(doc.id)}>
                       <div className="source-title-text" title={doc.filename}>
@@ -752,24 +781,24 @@ export function ResearchWorkspace({
 
                     <div className="source-actions-group">
                       {doc.status === "failed" && (
-                        <button
+                        <Button
                           className="btn-source-action"
                           onClick={() => handleRetryDocument(doc.id)}
                           title="Retry processing"
                           aria-label="Retry processing"
                         >
                           <RefreshCw size={13} />
-                        </button>
+                        </Button>
                       )}
-                      <button
+                      <Button
                         className="btn-source-action"
                         onClick={() => onOpenViewer?.(doc.id, 1)}
                         title="Open document viewer & inspect pages"
                         aria-label="Preview document"
                       >
                         <Eye size={13} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         className="btn-source-action"
                         onClick={async () => {
                           try {
@@ -791,15 +820,15 @@ export function ResearchWorkspace({
                         aria-label="Download original"
                       >
                         <Download size={13} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         className="btn-source-action btn-danger-action"
                         onClick={() => onDeleteDocument(doc.id)}
                         title="Remove source"
                         aria-label="Delete source"
                       >
                         <Trash2 size={13} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -842,7 +871,7 @@ export function ResearchWorkspace({
         </aside>
 
         {/* ================= COLUMN 2: DELIVERABLE DRAFT & STUDIO (Center - Visually Dominant) ================= */}
-        <main className="groundwork-col-draft">
+        <main className={`groundwork-col-draft ${mobileTab === "editor" ? "mobile-active" : ""}`}>
           {/* Draft Toolbar & Meta */}
           <div className="draft-top-toolbar studio-toolbar">
             <div className="draft-meta-title">
@@ -858,15 +887,15 @@ export function ResearchWorkspace({
             </div>
 
             <div className="draft-action-buttons">
-              <button
+              <Button
                 className={`btn-toolbar-toggle ${isEditingContent ? "active" : ""}`}
                 onClick={() => (isEditingContent ? handleSaveBlocks() : setIsEditingContent(true))}
                 title={isEditingContent ? "Save draft edits" : "Edit draft text blocks"}
               >
                 {isEditingContent ? (isSavingDraft ? t("editor.btn_saving") : t("editor.btn_save_draft")) : "Edit Content"}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 className="btn-toolbar-audit"
                 onClick={handleRunAudit}
                 disabled={isRunningAudit}
@@ -874,7 +903,7 @@ export function ResearchWorkspace({
               >
                 <RefreshCw size={13} className={isRunningAudit ? "spin" : ""} />
                 <span>{isRunningAudit ? t("editor.btn_verifying") : t("editor.btn_reverify")}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -907,7 +936,7 @@ export function ResearchWorkspace({
                   <p>{t("editor.empty_desc")}</p>
                   <div className="empty-action-chips">
                     {contextualSuggestions.slice(0, 2).map((suggestion) => (
-                      <button
+                      <Button
                         key={suggestion.id}
                         type="button"
                         onClick={() => handleSendPrompt(suggestion.prompt)}
@@ -916,7 +945,7 @@ export function ResearchWorkspace({
                       >
                         <Sparkles size={12} />
                         <span>{suggestion.label}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -975,7 +1004,7 @@ export function ResearchWorkspace({
                           </div>
                           <p className="callout-explanation">{matchedFinding.explanation}</p>
                           <div className="callout-action-row">
-                            <button
+                            <Button
                               className="btn-callout-resolve"
                               onClick={() => handleResolveFinding(matchedFinding, "accept")}
                               disabled={isResolvingFindingId === matchedFinding.id}
@@ -986,8 +1015,8 @@ export function ResearchWorkspace({
                                   ? t("audit.btn_applying_fix")
                                   : t("audit.btn_apply_fix")}
                               </span>
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               className="btn-callout-explain"
                               onClick={() => {
                                 handleSendPrompt(
@@ -997,12 +1026,12 @@ export function ResearchWorkspace({
                             >
                               <Search size={13} />
                               <span>{t("editor.btn_fix_claim")}</span>
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ) : (
                         <div className="block-quick-actions">
-                          <button
+                          <Button
                             className="btn-block-action"
                             onClick={() =>
                               handleSendPrompt(
@@ -1013,8 +1042,8 @@ export function ResearchWorkspace({
                           >
                             <ShieldCheck size={11} />
                             <span>Explain Evidence</span>
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             className="btn-block-action"
                             onClick={() =>
                               handleSendPrompt(
@@ -1025,7 +1054,7 @@ export function ResearchWorkspace({
                           >
                             <Search size={11} />
                             <span>Audit Section</span>
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1048,7 +1077,7 @@ export function ResearchWorkspace({
 
               <div className="dock-quick-chips">
                 {contextualSuggestions.map((suggestion) => (
-                  <button
+                  <Button
                     key={suggestion.id}
                     className="btn-dock-chip"
                     onClick={() => handleSendPrompt(suggestion.prompt)}
@@ -1056,17 +1085,17 @@ export function ResearchWorkspace({
                     title={suggestion.prompt}
                   >
                     <span>{suggestion.label}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
 
-              <button
+              <Button
                 className="btn-toggle-dock"
                 onClick={() => setIsAgentExpanded((prev) => !prev)}
                 title={isAgentExpanded ? t("agent.toggle_minimize") : t("agent.toggle_history")}
               >
                 {isAgentExpanded ? t("agent.toggle_minimize") : t("agent.toggle_history")}
-              </button>
+              </Button>
             </div>
 
             {/* Expanded Agent Conversation Feed */}
@@ -1107,7 +1136,7 @@ export function ResearchWorkspace({
                         {msg.citations && msg.citations.length > 0 && (
                           <div className="msg-citations-row">
                             {msg.citations.map((c, cIdx) => (
-                              <button
+                              <Button
                                 key={cIdx}
                                 className="inline-citation-badge"
                                 onClick={() => onOpenViewer?.(c.document_id, c.page_number)}
@@ -1115,7 +1144,7 @@ export function ResearchWorkspace({
                                 <ExternalLink size={10} />
                                 <span>{c.document_name}</span>
                                 <strong>p. {c.page_number}</strong>
-                              </button>
+                              </Button>
                             ))}
                           </div>
                         )}
@@ -1129,9 +1158,9 @@ export function ResearchWorkspace({
                       <div className="exec-header">
                         <RefreshCw size={13} className="spin text-accent" />
                         <strong>{t("agent.task_execution")}</strong>
-                        <button onClick={handleStopAgent} className="btn-stop-stream">
+                        <Button onClick={handleStopAgent} className="btn-stop-stream">
                           <Square size={11} /> {t("agent.btn_stop")}
-                        </button>
+                        </Button>
                       </div>
                       <div className="exec-steps">
                         {activeSteps.map((s, sIdx) => (
@@ -1180,7 +1209,7 @@ export function ResearchWorkspace({
                 className="dock-prompt-input"
                 aria-label="Agent prompt input"
               />
-              <button
+              <Button
                 onClick={() => handleSendPrompt()}
                 disabled={!promptInput.trim() || isAgentRunning}
                 className="btn-dock-send"
@@ -1188,23 +1217,23 @@ export function ResearchWorkspace({
               >
                 {isAgentRunning ? <RefreshCw size={14} className="spin" /> : <Send size={14} />}
                 <span>{isAgentRunning ? t("agent.btn_working") : t("agent.btn_execute")}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </main>
 
-        {/* ================= COLUMN 3: AUDIT & VERIFICATION SUITE (Right 380px) ================= */}
-        <aside className="groundwork-col-audit">
+        {/* ================= COLUMN 3: AUDIT & VERIFICATION SUITE ================= */}
+        <aside className={`groundwork-col-audit ${mobileTab === "audit" ? "mobile-active" : ""}`}>
           {/* Segmented Audit Navigation */}
           <div className="audit-nav-segments">
-            <button
+            <Button
               className={`audit-segment-btn ${rightPanelTab === "audit" ? "active" : ""}`}
               onClick={() => setRightPanelTab("audit")}
             >
               <span>{t("audit.tab_verification")}</span>
               {openFindings.length > 0 && <span className="badge-finding-count">{openFindings.length}</span>}
-            </button>
-            <button
+            </Button>
+            <Button
               className={`audit-segment-btn ${rightPanelTab === "matrix" ? "active" : ""}`}
               onClick={() => setRightPanelTab("matrix")}
             >
@@ -1212,13 +1241,13 @@ export function ResearchWorkspace({
               <span className="badge-req-count">
                 {coveredRequirementsCount}/{requirements.length}
               </span>
-            </button>
-            <button
+            </Button>
+            <Button
               className={`audit-segment-btn ${rightPanelTab === "appendix" ? "active" : ""}`}
               onClick={() => setRightPanelTab("appendix")}
             >
               <span>{t("audit.tab_appendix")}</span>
-            </button>
+            </Button>
           </div>
 
           {/* TAB 1: AUDIT & VERIFICATION FINDINGS */}
@@ -1275,7 +1304,7 @@ export function ResearchWorkspace({
                   <strong className="subpanel-title">
                     {t("audit.review_findings", { count: openFindings.length })}
                   </strong>
-                  <button
+                  <Button
                     className="btn-recheck-audit"
                     onClick={handleRunAudit}
                     disabled={isRunningAudit}
@@ -1283,7 +1312,7 @@ export function ResearchWorkspace({
                   >
                     <RefreshCw size={12} className={isRunningAudit ? "spin" : ""} />
                     <span>{isRunningAudit ? t("audit.btn_scanning") : t("audit.btn_scan")}</span>
-                  </button>
+                  </Button>
                 </div>
 
                 {isLoadingArtifactDetails && findings.length === 0 ? (
@@ -1316,7 +1345,7 @@ export function ResearchWorkspace({
                             </span>
                             <div className="evidence-snippet-box">
                               <p>"{finding.citations[0].snippet}"</p>
-                              <button
+                              <Button
                                 className="evidence-link-btn"
                                 onClick={() =>
                                   onOpenViewer?.(finding.citations[0].document_id, finding.citations[0].page_number)
@@ -1325,14 +1354,14 @@ export function ResearchWorkspace({
                                 <ExternalLink size={10} />
                                 <span>{finding.citations[0].document_name}</span>
                                 <strong>(Page {finding.citations[0].page_number})</strong>
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         )}
 
                         {/* Direct Resolution Actions */}
                         <div className="finding-actions-footer">
-                          <button
+                          <Button
                             className="btn-action-apply-fix"
                             onClick={() => handleResolveFinding(finding, "accept")}
                             disabled={isResolvingFindingId === finding.id}
@@ -1344,16 +1373,16 @@ export function ResearchWorkspace({
                                 ? t("audit.btn_applying_fix")
                                 : t("audit.btn_apply_fix")}
                             </span>
-                          </button>
+                          </Button>
 
-                          <button
+                          <Button
                             className="btn-action-waive"
                             onClick={() => handleResolveFinding(finding, "reject")}
                             disabled={isResolvingFindingId === finding.id}
                             title="Waive this finding"
                           >
                             {t("audit.btn_waive")}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -1363,13 +1392,13 @@ export function ResearchWorkspace({
                     <CheckCircle2 size={28} className="icon-verified-cleared" />
                     <strong>{t("audit.all_cleared_title")}</strong>
                     <p>{t("audit.all_cleared_desc")}</p>
-                    <button
+                    <Button
                       className="btn-primary-gradient btn-export-now"
                       onClick={() => handleExport("pdf")}
                     >
                       <Download size={14} />
                       <span>{t("audit.btn_export_now")}</span>
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1425,7 +1454,7 @@ export function ResearchWorkspace({
                             </div>
                           )}
                           {!isCovered && (
-                            <button
+                            <Button
                               className="btn-req-solve"
                               onClick={() =>
                                 handleSendPrompt(
@@ -1436,7 +1465,7 @@ export function ResearchWorkspace({
                             >
                               <Sparkles size={11} />
                               <span>{t("matrix.btn_ask_agent")}</span>
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </div>

@@ -19,7 +19,6 @@ export function getContextualSuggestions(params: {
 
   const wsName = workspace?.name || "Workspace";
   const firstDoc = sources[0]?.display_title || sources[0]?.filename || "";
-  const sourceCount = sources.length;
   const uncoveredReqs = requirements.filter((r) => r.status !== "covered" && r.status !== "waived");
 
   const suggestions: ContextualSuggestion[] = [];

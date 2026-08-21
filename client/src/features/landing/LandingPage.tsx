@@ -8,17 +8,15 @@ import {
   FileText,
   LockKeyhole,
   PenLine,
-  Search,
   ShieldCheck,
   Upload,
   ExternalLink,
-  Layers,
   Lock,
-  FileSpreadsheet,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BrandMark } from "../../components/common/BrandMark";
 import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, getStoredAuth } from "../../api/client";
+import { Button } from '../../components/ui/Button';
 
 const DOCUMENT_UPLOAD_ACCEPT = ".pdf,.docx,.pptx,.md,.markdown,.txt,.rtf,.png,.jpg,.jpeg,.webp";
 
@@ -29,7 +27,6 @@ export function LandingPage({
   onOpen: () => void;
   onUpload: (file: File) => void;
 }) {
-  const [prompt, setPrompt] = useState("");
   const [simulatorState, setSimulatorState] = useState<"blocked" | "resolved">("blocked");
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const saved = getStoredAuth();
@@ -51,13 +48,6 @@ export function LandingPage({
     };
   }, []);
 
-  function submitPrompt(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!prompt.trim()) return;
-    sessionStorage.setItem("groundwork-pending-prompt", prompt.trim());
-    onOpen();
-  }
-
   return (
     <main className="ai-landing">
       {/* Navigation */}
@@ -71,10 +61,10 @@ export function LandingPage({
           <a href="#verification">Verification Engine</a>
           <a href="#security">Security & Isolation</a>
           <span className="nav-privacy-tag"><LockKeyhole size={13} /> Private workspace</span>
-          <button onClick={onOpen} className="btn-nav-action">
+          <Button onClick={onOpen} className="btn-nav-action">
             {isAuthenticated ? "Open Workspace" : "Sign In"}
             <ArrowRight size={14} />
-          </button>
+          </Button>
         </nav>
       </header>
 
@@ -93,10 +83,10 @@ export function LandingPage({
           </p>
 
           <div className="hero-cta-buttons-row">
-            <button onClick={onOpen} className="btn-hero-primary">
+            <Button onClick={onOpen} className="btn-hero-primary">
               <span>Open Workspace</span>
               <ArrowRight size={15} />
-            </button>
+            </Button>
             <label className="btn-hero-upload">
               <Upload size={15} />
               <span>Upload RFP or Spec</span>
@@ -111,23 +101,6 @@ export function LandingPage({
               />
             </label>
           </div>
-
-          {/* Quick Prompt Input */}
-          <form className="ai-hero-composer" onSubmit={submitPrompt}>
-            <div className="composer-input-row">
-              <Search size={16} className="composer-icon" />
-              <input
-                aria-label="Describe deliverable"
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Or describe a deliverable to draft & audit (e.g. Cloud Modernization Proposal, Compliance Audit)…"
-              />
-              <button type="submit" disabled={!prompt.trim()} className="btn-send">
-                <span>Start</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </form>
         </div>
 
         {/* ================= HIGH-FIDELITY PRODUCT SHOWCASE & SIMULATOR ================= */}
@@ -157,22 +130,22 @@ export function LandingPage({
                 <strong>Interactive Verification Gate Simulator:</strong> {simulatorState === "blocked" ? "1 unsupported claim detected in draft — export blocked." : "Claim resolved with cited 99.99% SLA — export unlocked."}
               </span>
               <div className="simulator-toggle-buttons">
-                <button
+                <Button
                   type="button"
                   className={`btn-sim-toggle ${simulatorState === "blocked" ? "active" : ""}`}
                   onClick={() => setSimulatorState("blocked")}
                 >
                   <Lock size={12} />
                   <span>1. Blocked State (83%)</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   className={`btn-sim-toggle ${simulatorState === "resolved" ? "active" : ""}`}
                   onClick={() => setSimulatorState("resolved")}
                 >
                   <CheckCircle2 size={12} />
                   <span>2. Resolved State (100%)</span>
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -213,7 +186,7 @@ export function LandingPage({
               {/* Column 2: Draft Document with Citations / Callouts */}
               <section className="preview-col-draft">
                 <div className="preview-draft-header">
-                  <span className="preview-doc-tag">Deliverables, Artifacts & Studio</span>
+                  <span className="preview-doc-tag">Deliverable Canvas</span>
                   <h4>Cloud Architecture & High Availability SLA</h4>
                 </div>
 
@@ -235,14 +208,14 @@ export function LandingPage({
                         <p className="callout-desc">
                           Security spec establishes 99.99% availability with sub-minute failover (p. 4). The 99.999% claim lacks source evidence.
                         </p>
-                        <button
+                        <Button
                           type="button"
                           className="btn-callout-quick-resolve"
                           onClick={() => setSimulatorState("resolved")}
                         >
                           <CheckCircle2 size={12} />
-                          <span>Apply Verified Revision (99.99% SLA)</span>
-                        </button>
+                          <span>Apply Verified Revision (99.99%)</span>
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -292,10 +265,10 @@ export function LandingPage({
                     <p className="finding-body-text">
                       All 6 RFP requirements verified against source evidence. Zero unsupported claims detected.
                     </p>
-                    <button className="btn-interactive-export" onClick={onOpen}>
+                    <Button className="btn-interactive-export" onClick={onOpen}>
                       <Download size={13} />
                       <span>Export Deliverable (.pdf, .docx) ✓</span>
-                    </button>
+                    </Button>
                     <div className="preview-footer-note">
                       <small>Includes Cryptographic Audit Provenance Appendix</small>
                     </div>
@@ -309,14 +282,14 @@ export function LandingPage({
                     <p className="finding-body-text">
                       1 high-severity finding requires evidence resolution before deliverable export is permitted.
                     </p>
-                    <button
+                    <Button
                       type="button"
                       className="btn-interactive-resolve"
                       onClick={() => setSimulatorState("resolved")}
                     >
                       <CheckCircle2 size={13} />
                       <span>Resolve 99.99% Finding</span>
-                    </button>
+                    </Button>
                     <div className="preview-footer-note">
                       <small>Policy Enforcement: Unverified claims blocked</small>
                     </div>
@@ -382,10 +355,10 @@ export function LandingPage({
         <p>
           Your documents are never used to train public models. Files are stored securely in your isolated workspace, processed with durable background jobs, and remain completely under your control with one-click data deletion and export.
         </p>
-        <button onClick={onOpen} className="btn-security-cta">
+        <Button onClick={onOpen} className="btn-security-cta">
           {isAuthenticated ? "Continue to your workspace" : "Get started with Groundwork"}
           <ArrowRight size={15} />
-        </button>
+        </Button>
       </section>
 
       {/* Footer */}
@@ -395,9 +368,9 @@ export function LandingPage({
           <span>Ground<b>work</b></span>
         </div>
         <p>Verification-gated agentic document workspace. Draft, audit, and ship evidence-backed deliverables.</p>
-        <button onClick={onOpen} className="footer-open-btn">
+        <Button onClick={onOpen} className="footer-open-btn">
           Open workspace <ArrowRight size={14} />
-        </button>
+        </Button>
       </footer>
     </main>
   );

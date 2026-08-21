@@ -14,6 +14,7 @@ import { NotificationCenter } from "../account/NotificationCenter";
 import { applyPreferences, storedPreferences, type UserPreferences } from "../account/preferences";
 import { WorkspaceLibrary } from "./WorkspaceLibrary";
 import { ResearchWorkspace } from "./ResearchWorkspace";
+import { Button } from '../../components/ui/Button';
 
 const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
 const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
@@ -40,10 +41,13 @@ function GoogleSignInButton({ disabled, onCredential, onError }: {
 }) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const onCredentialRef = useRef(onCredential);
-  onCredentialRef.current = onCredential;
   const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
   const initializedRef = useRef(false);
+
+  useEffect(() => {
+    onCredentialRef.current = onCredential;
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || disabled) return;
@@ -86,7 +90,7 @@ function GoogleSignInButton({ disabled, onCredential, onError }: {
   }, [disabled]);
 
   if (!GOOGLE_CLIENT_ID) {
-    return <button className="auth-google-disabled" type="button" disabled title="Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in">Google sign-in is not configured</button>;
+    return <Button className="auth-google-disabled" type="button" disabled title="Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in">Google sign-in is not configured</Button>;
   }
   return <div className={`auth-google-button ${disabled ? "disabled" : ""}`} ref={buttonRef} aria-label="Continue with Google" />;
 }
@@ -131,9 +135,9 @@ function PdfThumbnail({ pdf, pageNumber, current, onSelect }: { pdf: PDFDocument
   }, [pdf, pageNumber, visible]);
 
   return (
-    <button ref={button} className={`pdf-thumbnail ${current ? "current" : ""}`} onClick={onSelect}>
+    <Button ref={button} className={`pdf-thumbnail ${current ? "current" : ""}`} onClick={onSelect}>
       <canvas ref={canvas} /><span>Page {pageNumber}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -296,25 +300,25 @@ function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClo
     <div className="viewer-wrap" role="dialog" aria-modal="true" aria-label={`Preview ${document.filename}`}>
       <div className="viewer-toolbar">
         <strong>{document.filename}</strong>
-        <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
+        <Button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
         <span>{page} / {pdf?.numPages ?? document.page_count ?? "…"}</span>
-        <button disabled={page >= (pdf?.numPages ?? 1)} onClick={() => setPage((value) => value + 1)}>Next</button>
-        <button aria-label="Zoom out" onClick={() => setScale((value) => Math.max(0.6, value - 0.2))}><ZoomOut size={18} /></button>
-        <button aria-label="Zoom in" onClick={() => setScale((value) => Math.min(2.4, value + 0.2))}><ZoomIn size={18} /></button>
-        <form className="viewer-search" onSubmit={searchPdf}><Search size={15} /><input name="query" placeholder="Search PDF" aria-label="Search PDF" /><button aria-label="Run search">Search</button></form>
+        <Button disabled={page >= (pdf?.numPages ?? 1)} onClick={() => setPage((value) => value + 1)}>Next</Button>
+        <Button aria-label="Zoom out" onClick={() => setScale((value) => Math.max(0.6, value - 0.2))}><ZoomOut size={18} /></Button>
+        <Button aria-label="Zoom in" onClick={() => setScale((value) => Math.min(2.4, value + 0.2))}><ZoomIn size={18} /></Button>
+        <form className="viewer-search" onSubmit={searchPdf}><Search size={15} /><input name="query" placeholder="Search PDF" aria-label="Search PDF" /><Button aria-label="Run search">Search</Button></form>
         {activeSearch && citationStatus === "matched" && <span className="citation-locator matched">Source highlighted</span>}
         {activeSearch && citationStatus === "not-found" && <span className="citation-locator">Source page opened · exact text highlight unavailable</span>}
-        {pdfSource && <button onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> New tab</button>}
-        <button className="viewer-close" aria-label="Close viewer" onClick={onClose}><X size={20} /></button>
+        {pdfSource && <Button onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> New tab</Button>}
+        <Button className="viewer-close" aria-label="Close viewer" onClick={onClose}><X size={20} /></Button>
       </div>
       <div className="viewer-body">
         <aside className="viewer-sidebar">
-          <div className="viewer-side-tabs"><button className={sideMode === "pages" ? "active" : ""} onClick={() => setSideMode("pages")}>Pages</button><button className={sideMode === "search" ? "active" : ""} onClick={() => setSideMode("search")}>Results</button></div>
+          <div className="viewer-side-tabs"><Button className={sideMode === "pages" ? "active" : ""} onClick={() => setSideMode("pages")}>Pages</Button><Button className={sideMode === "search" ? "active" : ""} onClick={() => setSideMode("search")}>Results</Button></div>
           {sideMode === "pages" && pdf && <div className="thumbnail-list">{Array.from({ length: pdf.numPages }, (_, index) => <PdfThumbnail key={index + 1} pdf={pdf} pageNumber={index + 1} current={page === index + 1} onSelect={() => setPage(index + 1)} />)}</div>}
           {sideMode === "search" && <div className="search-results">
             {searching && <p><RefreshCw className="spin" size={14} /> Searching all pages…</p>}
             {!searching && !searchResults.length && <p>No matches found.</p>}
-            {searchResults.map((result) => <button key={result.page} onClick={() => setPage(result.page)}><b>Page {result.page}</b><span>{result.snippet}</span></button>)}
+            {searchResults.map((result) => <Button key={result.page} onClick={() => setPage(result.page)}><b>Page {result.page}</b><span>{result.snippet}</span></Button>)}
           </div>}
         </aside>
         <div className="viewer-stage">{error ? <p>{error}</p> : <>
@@ -364,17 +368,17 @@ function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void
   }
   return (
     <div className="jobs-wrap">
-      <button className="history-backdrop" aria-label="Close processing jobs" onClick={onClose} />
+      <Button className="history-backdrop" aria-label="Close processing jobs" onClick={onClose} />
       <section className="jobs-panel" role="dialog" aria-label="Processing jobs">
-        <header><div><p className="eyebrow">Background activity</p><h2>Processing jobs</h2></div><button aria-label="Close processing jobs" onClick={onClose}><X size={18} /></button></header>
+        <header><div><p className="eyebrow">Background activity</p><h2>Processing jobs</h2></div><Button aria-label="Close processing jobs" onClick={onClose}><X size={18} /></Button></header>
         <main>
           {error && <div className="form-error">{error}</div>}
           {items.map((job) => (
             <article key={job.id}>
               <div><strong>{(job.operation ?? "document processing").replaceAll("_", " ")}</strong><span>{job.created_at ? new Date(job.created_at).toLocaleString() : ""} · {job.progress}%</span></div>
               <b className={`job-state ${job.status}`}>{job.status}</b>
-              {["queued", "running"].includes(job.status) && <button onClick={() => cancel(job)}>Cancel</button>}
-              {job.status === "failed" && <button onClick={() => retry(job)}>Retry</button>}
+              {["queued", "running"].includes(job.status) && <Button onClick={() => cancel(job)}>Cancel</Button>}
+              {job.status === "failed" && <Button onClick={() => retry(job)}>Retry</Button>}
               {job.error_message && <small>{job.error_message}</small>}
             </article>
           ))}
@@ -760,7 +764,7 @@ export function WorkspaceApp({
           <label>Email<input {...authForm.register("email")} type="email" required /></label>
           <label>Password<input {...authForm.register("password")} type="password" minLength={8} required /></label>
           {error && <div className="form-error">{error}</div>}
-          <button disabled={busy}>{busy ? <><RefreshCw size={15} className="spin" /> {mode === "login" ? "Logging you in…" : "Creating your account…"}</> : mode === "login" ? "Sign in" : "Create account"}</button>
+          <Button disabled={busy}>{busy ? <><RefreshCw size={15} className="spin" /> {mode === "login" ? "Logging you in…" : "Creating your account…"}</> : mode === "login" ? "Sign in" : "Create account"}</Button>
         </form>
         {busy && <div className="auth-loading" role="status" aria-live="polite">
           <span className="auth-loading-spinner"><RefreshCw size={18} className="spin" /></span>
@@ -769,10 +773,10 @@ export function WorkspaceApp({
             <small>The demo server may take up to 30 seconds to wake if idle. Please keep this page open.</small>
           </div>
         </div>}
-        {(REGISTRATION_ENABLED || mode === "register") && <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
+        {(REGISTRATION_ENABLED || mode === "register") && <Button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
           {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
-        </button>}
-        <button className="auth-back-home" onClick={onExit}>← Back to home</button>
+        </Button>}
+        <Button className="auth-back-home" onClick={onExit}>← Back to home</Button>
       </section>
     </main>
   );
@@ -838,7 +842,7 @@ export function WorkspaceApp({
           onOpenTwoMinuteDemo={async () => {
             setBusy(true);
             try {
-              let demoWs = workspaces.find(
+              const demoWs = workspaces.find(
                 (w) => w.name.toLowerCase().includes("apex") || w.name.toLowerCase().includes("demo") || w.name.toLowerCase().includes("proposal"),
               );
               if (!demoWs) {

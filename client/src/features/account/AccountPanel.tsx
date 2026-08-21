@@ -1,12 +1,14 @@
 import {
   BarChart3, Bell, CheckCircle2, ChevronRight, Database, FileCog, LogOut,
-  Shield, ShieldCheck, Trash2, UserRound, Users, X, Globe,
+  Shield, ShieldCheck, Trash2, UserRound, Users, X,
 } from "lucide-react";
+import { Button } from "../../components/ui/Button";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadTextFile } from "../../api/client";
 import type { AdminUser, AuthResult, SecuritySession, Stats, UsageDetail, Workspace, WorkspaceMember } from "../../types";
 import { applyPreferences, storedPreferences, type UserPreferences } from "./preferences";
 import { useTranslation, type Language } from "../../i18n";
+
 
 type AccountTab = "profile" | "security" | "defaults" | "notifications" | "privacy" | "usage" | "team" | "admin";
 
@@ -146,7 +148,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
 
   return (
     <div className="account-modal-overlay">
-      <button className="modal-backdrop-blur" aria-label="Close account settings" onClick={onClose} />
+      <Button className="modal-backdrop-blur" aria-label="Close account settings" onClick={onClose} />
       <section className="account-panel-dialog" role="dialog" aria-label="Account settings">
         <header className="account-shell-header">
           <div className="account-header-info">
@@ -154,9 +156,10 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
             <strong>{user.display_name}</strong>
             <span className="account-email">{user.email}</span>
           </div>
-          <button className="btn-close-modal" aria-label="Close account settings" onClick={onClose}>
-            <X size={18} />
-          </button>
+          <Button className="btn-close-modal" aria-label="Close account settings" onClick={onClose}>
+  <X size={18} />
+</Button>
+
         </header>
         <div className="account-layout">
           <aside className="account-settings-nav">
@@ -164,7 +167,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
               {tabsList
                 .filter((item) => !item.admin || user.role === "admin")
                 .map((item) => (
-                  <button
+                  <Button
                     key={item.id}
                     className={`account-nav-btn ${tab === item.id ? "active" : ""}`}
                     onClick={() => selectTab(item.id)}
@@ -175,12 +178,12 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                       <small>{item.detail}</small>
                     </div>
                     <ChevronRight size={14} className="nav-arrow" />
-                  </button>
+                  </Button>
                 ))}
             </nav>
-            <button className="account-signout" onClick={onSignOut}>
+            <Button className="account-signout" onClick={onSignOut}>
               <LogOut size={16} /> {t("nav.sign_out")}
-            </button>
+            </Button>
           </aside>
           <main className="account-settings-main">
             {error && <div className="form-error">{error}</div>}
@@ -288,7 +291,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                     </label>
                   </div>
                   <footer>
-                    <button disabled={busy}>Save profile</button>
+                    <Button disabled={busy}>Save profile</Button>
                   </footer>
                 </form>
               </>
@@ -310,7 +313,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                     </label>
                   </div>
                   <footer>
-                    <button disabled={busy}>Update password</button>
+                    <Button disabled={busy}>Update password</Button>
                   </footer>
                 </form>
                 <section className="settings-card">
@@ -320,9 +323,9 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                       <p>Sessions are created when you sign in or refresh your access.</p>
                     </div>
                     {sessions.length > 0 && (
-                      <button className="secondary" onClick={() => perform(async () => { await api("/profile/sessions/revoke-all", token, { method: "POST" }); onSignOut(); })}>
+                      <Button className="secondary" onClick={() => perform(async () => { await api("/profile/sessions/revoke-all", token, { method: "POST" }); onSignOut(); })}>
                         Sign out everywhere
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <div className="settings-list">
@@ -333,9 +336,9 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                           <strong>{index === 0 ? "Recent session" : "Signed-in session"}</strong>
                           <small>Started {new Date(session.created_at).toLocaleString()} · Expires {new Date(session.expires_at).toLocaleDateString()}</small>
                         </span>
-                        <button onClick={() => perform(async () => { await api(`/profile/sessions/${session.id}`, token, { method: "DELETE" }); setSessions((current) => current.filter((item) => item.id !== session.id)); }, "Session revoked.")}>
+                        <Button onClick={() => perform(async () => { await api(`/profile/sessions/${session.id}`, token, { method: "DELETE" }); setSessions((current) => current.filter((item) => item.id !== session.id)); }, "Session revoked.")}>
                           Revoke
-                        </button>
+                        </Button>
                       </article>
                     ))}
                     {!sessions.length && <p className="settings-empty">No active refresh sessions are stored.</p>}
@@ -400,7 +403,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                     </label>
                   </div>
                   <footer>
-                    <button onClick={savePreferences} disabled={busy}>Save document defaults</button>
+                    <Button onClick={savePreferences} disabled={busy}>Save document defaults</Button>
                   </footer>
                 </section>
               </>
@@ -415,7 +418,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                   <Toggle checked={preferences.notify_comments} onChange={(value) => setPreferences({ ...preferences, notify_comments: value })} title="Team comments" detail="Notify me when another member comments on a deliverable." />
                   <Toggle checked={preferences.notify_reviews} onChange={(value) => setPreferences({ ...preferences, notify_reviews: value })} title="AI review results" detail="Tell me when review findings are ready to inspect." />
                   <footer>
-                    <button onClick={savePreferences} disabled={busy}>Save notification settings</button>
+                    <Button onClick={savePreferences} disabled={busy}>Save notification settings</Button>
                   </footer>
                 </section>
               </>
@@ -436,7 +439,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                     </select>
                   </label>
                   <footer>
-                    <button onClick={savePreferences} disabled={busy}>Save retention settings</button>
+                    <Button onClick={savePreferences} disabled={busy}>Save retention settings</Button>
                   </footer>
                 </section>
                 <section className="settings-card data-actions">
@@ -446,7 +449,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                       <h3>Download account data</h3>
                       <p>Export your profile, preferences, workspace list, and usage summary as JSON.</p>
                     </div>
-                    <button onClick={exportData}>Download</button>
+                    <Button onClick={exportData}>Download</Button>
                   </article>
                   <article>
                     <Trash2 size={20} />
@@ -454,9 +457,9 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                       <h3>Clear activity and AI history</h3>
                       <p>Removes conversations, AI results, usage records, notifications, and activity you authored.</p>
                     </div>
-                    <button className="danger" onClick={() => { const confirmation = window.prompt('Type "clear history" to continue'); if (confirmation) perform(async () => api("/profile/history", token, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation }) }), "Account history cleared."); }}>
+                    <Button className="danger" onClick={() => { const confirmation = window.prompt('Type "clear history" to continue'); if (confirmation) perform(async () => api("/profile/history", token, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation }) }), "Account history cleared."); }}>
                       Clear history
-                    </button>
+                    </Button>
                   </article>
                   <article className="danger-zone">
                     <Trash2 size={20} />
@@ -464,9 +467,9 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                       <h3>Delete Groundwork account</h3>
                       <p>Permanently removes your account and stored files. This cannot be undone.</p>
                     </div>
-                    <button className="danger" onClick={() => { const confirmation = window.prompt(`Type ${user.email} to permanently delete your account`); if (confirmation) perform(async () => { await api("/profile/account", token, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation }) }); onSignOut(); }); }}>
+                    <Button className="danger" onClick={() => { const confirmation = window.prompt(`Type ${user.email} to permanently delete your account`); if (confirmation) perform(async () => { await api("/profile/account", token, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation }) }); onSignOut(); }); }}>
                       Delete account
-                    </button>
+                    </Button>
                   </article>
                 </section>
               </>
@@ -535,7 +538,7 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                     <form className="team-invite" onSubmit={inviteMember}>
                       <label>Member email<input name="email" type="email" placeholder="teammate@company.com" required /></label>
                       <label>Access<select name="role" defaultValue="editor"><option value="editor">Editor</option><option value="viewer">Viewer</option></select></label>
-                      <button disabled={busy}>Add member</button>
+                      <Button disabled={busy}>Add member</Button>
                     </form>
                   )}
                 </section>
@@ -559,9 +562,9 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                               <option value="editor">Editor</option>
                               <option value="viewer">Viewer</option>
                             </select>
-                            <button className="danger-link" onClick={() => { if (window.confirm(`Remove ${member.display_name} from this workspace?`)) perform(async () => { await api(`/workspaces/${workspaceId}/members/${member.id}`, token, { method: "DELETE" }); setMembers((current) => current.filter((item) => item.id !== member.id)); }, "Member removed."); }}>
+                            <Button className="danger-link" onClick={() => { if (window.confirm(`Remove ${member.display_name} from this workspace?`)) perform(async () => { await api(`/workspaces/${workspaceId}/members/${member.id}`, token, { method: "DELETE" }); setMembers((current) => current.filter((item) => item.id !== member.id)); }, "Member removed."); }}>
                               Remove
-                            </button>
+                            </Button>
                           </>
                         )}
                       </article>
@@ -589,9 +592,9 @@ export function AccountPanel({ user, token, stats, onUser, onClose, onSignOut }:
                         <span>{item.email} · {item.role}</span>
                       </div>
                       <small>{item.document_count} docs · {item.ai_requests} AI requests</small>
-                      <button className={item.is_active ? "danger-link" : "enable"} disabled={item.id === user.id} onClick={() => perform(async () => { const updated = await api<AuthResult["user"]>(`/admin/users/${item.id}/status`, token, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !item.is_active }) }); setAdmins((current) => current.map((value) => value.id === item.id ? { ...value, is_active: updated.is_active } : value)); }, `Account ${item.is_active ? "disabled" : "enabled"}.`)}>
+                      <Button className={item.is_active ? "danger-link" : "enable"} disabled={item.id === user.id} onClick={() => perform(async () => { const updated = await api<AuthResult["user"]>(`/admin/users/${item.id}/status`, token, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !item.is_active }) }); setAdmins((current) => current.map((value) => value.id === item.id ? { ...value, is_active: updated.is_active } : value)); }, `Account ${item.is_active ? "disabled" : "enabled"}.`)}>
                         {item.id === user.id ? "Current user" : item.is_active ? "Disable" : "Enable"}
-                      </button>
+                      </Button>
                     </article>
                   ))}
                 </section>
