@@ -7,12 +7,67 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python Version">
+  <img src="https://img.shields.io/badge/Python-3.12-blue.svg" alt="Python Version">
   <img src="https://img.shields.io/badge/React-19-61dafb.svg" alt="React 19">
   <img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg" alt="FastAPI">
   <img src="https://img.shields.io/badge/PostgreSQL-pgvector-336791.svg" alt="PostgreSQL pgvector">
+  <img src="https://github.com/ttnhan227/Groundwork/actions/workflows/ci.yml/badge.svg" alt="CI">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
 </p>
+
+---
+
+## DevOps & Infrastructure
+
+Groundwork is containerized and deployed through a full CI/CD pipeline to Google Cloud Run.
+
+### CI/CD Pipeline
+
+```
+GitHub (push / pull request)
+        │
+        ▼
+  GitHub Actions
+        │
+        ├── backend ─── ruff lint + 102 pytest tests
+        │                  (includes AST-level data-isolation guard)
+        │
+        ├── frontend ── ESLint + Vitest unit tests
+        │
+        ├── docker ──── docker compose build smoke-test
+        │               (gated on backend + frontend passing)
+        │
+        └── e2e ──────── Playwright browser tests against full stack
+                         (docker compose up --build)
+
+  On merge to main → deploy.yml
+        │
+        ├── Build & push to Artifact Registry (with layer caching)
+        │
+        ├── Deploy API → Cloud Run   ──► POST-deploy /health check
+        │
+        └── Deploy Worker → Cloud Run Jobs
+```
+
+### Services
+
+| Service | Technology | Role |
+|---|---|---|
+| API | FastAPI + Uvicorn | REST API, SSE streaming, auth |
+| Worker | Celery + Redis | PDF OCR, async embedding generation |
+| Database | PostgreSQL 16 + pgvector | Relational data + vector search |
+| Object Storage | MinIO (S3-compatible) | Uploaded source documents |
+| Reverse Proxy | Nginx | TLS termination, routing |
+| Frontend | React 19 + Vite | Single-page application |
+
+### Key Infrastructure Decisions
+
+- **Workload Identity Federation** — CI/CD authenticates to GCP without long-lived service account keys
+- **Secret Manager** — All credentials injected at runtime via Cloud Run's `--secrets` flag
+- **Health-check–gated deploys** — `deploy.yml` calls `GET /health` after each deploy; failures block the workflow
+- **Layer-cached Docker builds** — Artifact Registry cache halves average build time
+- **Zero-downtime rollout** — Cloud Run traffic-splitting enables instant rollback to any prior revision
+- **Multi-stage healthchecks** — Every service in `docker-compose.yml` uses `healthcheck` + `depends_on: condition: service_healthy`
 
 ---
 
@@ -24,12 +79,17 @@
 - **Multi-Language Support**: 9 interface languages (English, Vietnamese, Spanish, Japanese, German, French, Chinese, Korean, Portuguese).
 - **Export Formats**: Export verified documents to PDF, DOCX, or Markdown.
 
+---
+
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite
 - **Backend**: FastAPI, SQLAlchemy Async, Pydantic v2
-- **Database & Queue**: PostgreSQL (`pgvector`), Redis, Celery
+- **Database & Queue**: PostgreSQL 16 (`pgvector`), Redis 7, Celery
 - **Storage**: MinIO (S3-compatible)
+- **Infrastructure**: Docker, Docker Compose, Google Cloud Run, GitHub Actions
+
+---
 
 ## Getting Started
 
@@ -43,15 +103,17 @@ cp .env.example .env
 
 Configure your `LLM_API_KEY` and settings in `.env`.
 
-### 2. Start with Docker Compose (Recommended)
+### 2. Start with Docker Compose
 
 ```bash
 docker compose up -d --build
 ```
 
-- **Web Application**: http://localhost:8080
-- **API Documentation**: http://localhost:8000/docs
-- **MinIO Console**: http://localhost:9001 (User: `groundwork`, Pass: `groundwork-secret`)
+| Endpoint | URL |
+|---|---|
+| Web Application | http://localhost:8080 |
+| API Documentation | http://localhost:8000/docs |
+| MinIO Console | http://localhost:9001 |
 
 ---
 
@@ -77,9 +139,34 @@ docker compose up -d --build
 
 ---
 
+## Testing & Quality Assurance
+
+### Backend Tests
+
+```bash
+cd server
+python -m pytest tests/ -v
+```
+
+102 tests across 19 test files covering:
+- Multi-tenant data isolation (AST-level static analysis guard)
+- AI orchestration & hallucination detection
+- Deliverable generation & verification lifecycle
+- Background job processing
+
+### Frontend Tests
+
+```bash
+cd client
+npm test        # Unit tests (Vitest)
+npm run test:e2e  # Playwright end-to-end
+```
+
+---
+
 ## Local Development (Without Docker)
 
-### Backend & Worker Setup
+### Backend & Worker
 
 ```bash
 cd server
@@ -87,18 +174,17 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Run migrations and seed data
 alembic upgrade head
 python -m app.seeders.seed
 
-# Start FastAPI API server
+# API server
 uvicorn app.main:app --reload --port 8000
 
-# Start Celery async worker (in a separate terminal)
+# Celery worker (separate terminal)
 celery -A app.tasks.celery_app.celery_app worker --loglevel=info
 ```
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd client
@@ -108,28 +194,11 @@ npm run dev
 
 ---
 
-## Testing & Quality Assurance
-
-### Run Backend Unit & Integration Tests
-
-```bash
-cd server
-python -m pytest tests/ -v
-```
-
-### Run Frontend Unit Tests & Production Build
-
-```bash
-cd client
-npm test
-```
-
----
-
 ## Documentation
 
 - [System Architecture & Multi-Tenant Isolation](docs/ARCHITECTURE.md)
 - [Production Deployment Guide](docs/DEPLOYMENT.md)
+- [Troubleshooting Runbook](docs/TROUBLESHOOTING.md)
 - [Verification & Audit Workflow](docs/VERIFICATION_WORKFLOW.md)
 
 ## License

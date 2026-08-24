@@ -1,0 +1,175 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  API_IMAGE: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/api
+  WORKER_IMAGE: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/worker
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Build & push container images to Artifact Registry
+  # ──────────────────────────────────────────────
+  build:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:${{ github.sha }}
+            ${{ env.API_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.API_IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.API_IMAGE }}:cache,mode=max
+
+      - name: Build & push Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.WORKER_IMAGE }}:${{ github.sha }}
+            ${{ env.WORKER_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.WORKER_IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.WORKER_IMAGE }}:cache,mode=max
+
+  # ──────────────────────────────────────────────
+  # 2. Deploy API to Cloud Run
+  # ──────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API → Cloud Run
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy API service
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: groundwork-api
+          region: ${{ env.REGION }}
+          image: ${{ env.API_IMAGE }}:${{ github.sha }}
+          # Override start.sh (which bundles both API + worker) to run only uvicorn
+          command: uvicorn
+          args: app.main:app,--host,0.0.0.0,--port,8000
+          env_vars: |
+            ENVIRONMENT=production
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            LLM_MODEL=gemini-flash-latest
+            LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+            EMBEDDING_MODEL=gemini-embedding-001
+            MINIO_ENDPOINT=${{ secrets.MINIO_ENDPOINT }}
+            MINIO_BUCKET_ORIGINALS=original-documents
+            CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          secrets: |
+            JWT_SECRET=groundwork-jwt-secret:latest
+            LLM_API_KEY=groundwork-llm-api-key:latest
+            MINIO_ACCESS_KEY=groundwork-minio-access-key:latest
+            MINIO_SECRET_KEY=groundwork-minio-secret-key:latest
+          flags: |
+            --min-instances=0
+            --max-instances=5
+            --memory=1Gi
+            --cpu=1
+            --concurrency=80
+            --timeout=300
+            --port=8000
+
+      - name: Verify deployment health
+        run: |
+          URL=$(gcloud run services describe groundwork-api \
+            --region ${{ env.REGION }} --format 'value(status.url)')
+          echo "Service URL: $URL"
+          curl --fail --retry 5 --retry-delay 5 "$URL/health"
+
+  # ──────────────────────────────────────────────
+  # 3. Deploy Celery Worker to Cloud Run (Service)
+  #
+  # NOTE: Cloud Run Jobs run to completion — they are NOT suited for persistent
+  # Celery daemons. The worker runs as a Cloud Run Service with min-instances=1
+  # so it stays alive to consume the Redis task queue.
+  #
+  # Alternative: Use a managed Celery broker (e.g. Redis on Upstash) + a
+  # separate Compute Engine VM or GKE node for the worker if more control
+  # over concurrency is needed.
+  # ──────────────────────────────────────────────
+  deploy-worker:
+    name: Deploy Worker → Cloud Run Service
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy worker service
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: groundwork-worker
+          region: ${{ env.REGION }}
+          image: ${{ env.WORKER_IMAGE }}:${{ github.sha }}
+          command: celery
+          args: -A,app.tasks.celery_app:celery_app,worker,--loglevel=INFO,--pool=solo,--concurrency=1
+          env_vars: |
+            ENVIRONMENT=production
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            MINIO_ENDPOINT=${{ secrets.MINIO_ENDPOINT }}
+            MINIO_BUCKET_ORIGINALS=original-documents
+          secrets: |
+            LLM_API_KEY=groundwork-llm-api-key:latest
+            MINIO_ACCESS_KEY=groundwork-minio-access-key:latest
+            MINIO_SECRET_KEY=groundwork-minio-secret-key:latest
+          flags: |
+            --min-instances=1
+            --max-instances=2
+            --memory=2Gi
+            --cpu=2
+            --timeout=3600
+            --no-allow-unauthenticated
