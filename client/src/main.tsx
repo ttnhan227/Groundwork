@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import Providers from "./Providers";
-import "./index.css";
+import "./styles/globals.css";
 
 // Render may suspend the free API while it is idle. Wake it as soon as the
 // static client loads so the cold start happens while the visitor reads the

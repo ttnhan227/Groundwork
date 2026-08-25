@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -12,11 +13,16 @@ import {
   Upload,
   ExternalLink,
   Lock,
+  Sparkles,
+  BookOpen,
+  BarChart3,
+  ArrowUpRight,
+  Scale,
+  Cpu,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { BrandMark } from "../../components/common/BrandMark";
+import { Button } from "../../components/ui/Button";
 import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, getStoredAuth } from "../../api/client";
-import { Button } from '../../components/ui/Button';
 
 const DOCUMENT_UPLOAD_ACCEPT = ".pdf,.docx,.pptx,.md,.markdown,.txt,.rtf,.png,.jpg,.jpeg,.webp";
 
@@ -49,53 +55,68 @@ export function LandingPage({
   }, []);
 
   return (
-    <main className="ai-landing">
+    <main className="min-h-screen w-full bg-[var(--paper)] text-[var(--ink)] flex flex-col select-none overflow-x-hidden">
       {/* Navigation */}
-      <header className="ai-landing-nav">
-        <a className="ai-landing-brand" href="/" aria-label="Groundwork home">
+      <header className="h-14 border-b border-[var(--hairline)] bg-[var(--surface)] px-4 sm:px-6 flex items-center justify-between w-full min-w-0 z-20">
+        <a href="/" className="flex items-center gap-2 text-decoration-none min-w-0 flex-shrink-0">
           <BrandMark size={20} />
-          <span>Ground<b>work</b></span>
+          <span className="font-serif text-sm font-bold text-[var(--ink)]">
+            Ground<span className="text-[var(--ink-blue)]">work</span>
+          </span>
         </a>
-        <nav aria-label="Landing navigation">
-          <a href="#workflow">Architecture</a>
-          <a href="#verification">Verification Engine</a>
-          <a href="#security">Security & Isolation</a>
-          <span className="nav-privacy-tag"><LockKeyhole size={13} /> Private workspace</span>
-          <Button onClick={onOpen} className="btn-nav-action">
-            {isAuthenticated ? "Open Workspace" : "Sign In"}
-            <ArrowRight size={14} />
+
+        <nav className="flex items-center gap-3 sm:gap-6 text-xs text-[var(--ink-secondary)] font-medium min-w-0">
+          <a href="#simulator" className="hidden md:inline hover:text-[var(--ink)] transition-colors">
+            Simulator
+          </a>
+          <a href="#workflow" className="hidden md:inline hover:text-[var(--ink)] transition-colors">
+            Architecture
+          </a>
+          <a href="#insights" className="hidden sm:inline hover:text-[var(--ink)] text-[var(--ink-blue)] font-semibold transition-colors">
+            Research & Insights
+          </a>
+          <span className="hidden lg:inline-flex items-center gap-1 text-[11px] font-mono text-[var(--ink-muted)] px-2 py-0.5 rounded bg-[var(--paper-subtle)]">
+            <LockKeyhole size={11} /> Private Workspace
+          </span>
+          <Button variant="human" size="sm" onClick={onOpen} className="flex-shrink-0">
+            <span>{isAuthenticated ? "Open Workspace" : "Sign In"}</span>
+            <ArrowRight size={13} />
           </Button>
         </nav>
       </header>
 
       {/* Hero Section */}
-      <section className="ai-landing-hero">
-        <div className="ai-landing-copy">
-          <div className="ai-eyebrow">
-            <ShieldCheck size={14} /> Deterministic Deliverable Verification
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-20 space-y-8 sm:space-y-12 w-full min-w-0">
+        <div className="max-w-3xl space-y-4 sm:space-y-6 min-w-0 w-full">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-full)] bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)] text-xs text-[var(--ink-blue)] font-mono font-medium max-w-full truncate">
+            <ShieldCheck size={13} className="flex-shrink-0" />
+            <span className="truncate">Deterministic Deliverable Verification</span>
           </div>
-          <h1>
-            AI drafts your deliverables.<br />
-            <span>Groundwork audits them before you ship.</span>
+
+          <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[var(--ink)] leading-[1.18] break-words overflow-wrap-anywhere max-w-full">
+            AI drafts your proposal.{" "}
+            <span className="text-[var(--ink-blue)] block sm:inline">Groundwork audits every claim before you ship.</span>
           </h1>
-          <p>
-            Bring scattered RFPs, specifications, and research into one unified workspace. The agent drafts your proposal, continuous automated audits verify every claim against source documentation, and the export gate guarantees nothing unverified leaves the workspace.
+
+          <p className="text-sm sm:text-base md:text-lg text-[var(--ink-secondary)] leading-relaxed font-sans max-w-2xl break-words">
+            Bring scattered RFPs, specifications, and client documents into a calm manuscript canvas. The agent drafts sections with monospace suggestions, automated verification flags unsupported SLA numbers in the margin, and the export gate guarantees 100% evidence-grounded deliverables.
           </p>
 
-          <div className="hero-cta-buttons-row">
-            <Button onClick={onOpen} className="btn-hero-primary">
-              <span>Open Workspace</span>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button variant="human" size="lg" onClick={onOpen} className="w-full sm:w-auto">
+              <span>Open Document Workspace</span>
               <ArrowRight size={15} />
             </Button>
-            <label className="btn-hero-upload">
-              <Upload size={15} />
+
+            <label className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[var(--radius-sm)] border border-[var(--hairline-strong)] bg-[var(--surface)] text-sm font-medium text-[var(--ink)] hover:bg-[var(--surface-hover)] cursor-pointer shadow-[var(--shadow-subtle)] transition-all w-full sm:w-auto">
+              <Upload size={15} className="text-[var(--ink-blue)]" />
               <span>Upload RFP or Spec</span>
               <input
                 type="file"
                 accept={DOCUMENT_UPLOAD_ACCEPT}
                 style={{ display: "none" }}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
                   if (file) onUpload(file);
                 }}
               />
@@ -104,274 +125,410 @@ export function LandingPage({
         </div>
 
         {/* ================= HIGH-FIDELITY PRODUCT SHOWCASE & SIMULATOR ================= */}
-        <div className="ai-product-stage" id="verification" aria-label="Groundwork workspace preview">
-          <div className="preview-window">
-            <header className="preview-header">
-              <div className="preview-dots">
-                <span />
-                <span />
-                <span />
-              </div>
-              <div className="preview-title">
-                <BrandMark size={14} />
-                <span>Apex Horizon Cloud Modernization · Technical Proposal</span>
-              </div>
-              <div className="preview-meta">
-                <span className="badge-grounded">● 3 Evidence Sources Active</span>
-                <span className={`badge-readiness ${simulatorState === "resolved" ? "ready" : "blocked"}`}>
-                  {simulatorState === "resolved" ? "Readiness: 100% (Verified)" : "Readiness: 83% (Export Blocked)"}
-                </span>
-              </div>
-            </header>
+        <div
+          id="simulator"
+          className="rounded-[var(--radius-lg)] border border-[var(--hairline)] bg-[var(--surface)] shadow-[var(--shadow-modal)] overflow-hidden w-full min-w-0"
+        >
+          {/* Simulator Toolbar */}
+          <div className="px-4 sm:px-6 py-3 border-b border-[var(--hairline)] bg-[var(--paper-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles size={14} className="text-[var(--ink-sepia)] flex-shrink-0" />
+              <strong className="font-serif text-[13px] text-[var(--ink)] truncate">
+                Interactive Verification Gate Simulator
+              </strong>
+            </div>
 
-            {/* Interactive Simulator Toggle Bar */}
-            <div className="simulator-banner-bar">
-              <span className="simulator-banner-label">
-                <strong>Interactive Verification Gate Simulator:</strong> {simulatorState === "blocked" ? "1 unsupported claim detected in draft — export blocked." : "Claim resolved with cited 99.99% SLA — export unlocked."}
-              </span>
-              <div className="simulator-toggle-buttons">
-                <Button
-                  type="button"
-                  className={`btn-sim-toggle ${simulatorState === "blocked" ? "active" : ""}`}
-                  onClick={() => setSimulatorState("blocked")}
-                >
-                  <Lock size={12} />
-                  <span>1. Blocked State (83%)</span>
-                </Button>
-                <Button
-                  type="button"
-                  className={`btn-sim-toggle ${simulatorState === "resolved" ? "active" : ""}`}
-                  onClick={() => setSimulatorState("resolved")}
-                >
-                  <CheckCircle2 size={12} />
-                  <span>2. Resolved State (100%)</span>
-                </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant={simulatorState === "blocked" ? "agent" : "secondary"}
+                size="xs"
+                onClick={() => setSimulatorState("blocked")}
+              >
+                <Lock size={12} />
+                <span>1. Blocked State (83%)</span>
+              </Button>
+
+              <Button
+                variant={simulatorState === "resolved" ? "human" : "secondary"}
+                size="xs"
+                onClick={() => setSimulatorState("resolved")}
+              >
+                <CheckCircle2 size={12} />
+                <span>2. Resolved State (100%)</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* 3-Column Preview Stage */}
+          <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-[var(--hairline)] w-full min-w-0">
+            {/* Column 1: Evidence Sources */}
+            <div className="md:col-span-3 p-4 space-y-2.5 bg-[var(--paper)] min-w-0">
+              <div className="flex items-center justify-between text-[11px] font-mono uppercase text-[var(--ink-muted)] mb-2 font-semibold">
+                <span>Grounded Sources</span>
+                <span>3 linked</span>
+              </div>
+
+              <div className="p-2.5 rounded bg-[var(--surface)] border border-[var(--ink-blue-border)] text-xs flex items-center gap-2 min-w-0">
+                <FileText size={14} className="text-[var(--ink-blue)] flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <strong className="block truncate text-[var(--ink)]">Apex-Horizon-RFP.pdf</strong>
+                  <span className="text-[10px] text-[var(--ink-muted)] font-mono">Client Brief · Indexed</span>
+                </div>
+                <Check size={12} className="text-[var(--success)] flex-shrink-0" />
+              </div>
+
+              <div className="p-2.5 rounded bg-[var(--surface)] border border-[var(--ink-blue-border)] text-xs flex items-center gap-2 min-w-0">
+                <FileText size={14} className="text-[var(--ink-blue)] flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <strong className="block truncate text-[var(--ink)]">Cloud-Security-Spec.pdf</strong>
+                  <span className="text-[10px] text-[var(--ink-muted)] font-mono">99.99% SLA · p. 4</span>
+                </div>
+                <Check size={12} className="text-[var(--success)] flex-shrink-0" />
+              </div>
+
+              <div className="p-2.5 rounded bg-[var(--surface)] border border-[var(--ink-blue-border)] text-xs flex items-center gap-2 min-w-0">
+                <FileText size={14} className="text-[var(--ink-blue)] flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <strong className="block truncate text-[var(--ink)]">Benchmark-Report.pdf</strong>
+                  <span className="text-[10px] text-[var(--ink-muted)] font-mono">RTO &lt; 15m · Indexed</span>
+                </div>
+                <Check size={12} className="text-[var(--success)] flex-shrink-0" />
               </div>
             </div>
 
-            {/* 3-Column Professional Workspace Layout */}
-            <div className="preview-workspace-layout">
-              {/* Column 1: Sources */}
-              <aside className="preview-col-sources">
-                <div className="preview-section-title">
-                  <span>Evidence Sources</span>
-                  <span className="count-pill">3 linked</span>
-                </div>
-                <div className="preview-source-item active">
-                  <FileText size={13} />
-                  <div>
-                    <strong>Apex-Horizon-RFP.pdf</strong>
-                    <small>Client Brief · Indexed</small>
-                  </div>
-                  <Check size={11} className="text-success" />
-                </div>
-                <div className="preview-source-item active">
-                  <FileText size={13} />
-                  <div>
-                    <strong>Cloud-Security-Spec.pdf</strong>
-                    <small>99.99% SLA · p. 4</small>
-                  </div>
-                  <Check size={11} className="text-success" />
-                </div>
-                <div className="preview-source-item active">
-                  <FileText size={13} />
-                  <div>
-                    <strong>Benchmark-Report.pdf</strong>
-                    <small>RTO &lt; 15m · Indexed</small>
-                  </div>
-                  <Check size={11} className="text-success" />
-                </div>
-              </aside>
+            {/* Column 2: Document Canvas Draft */}
+            <div className="md:col-span-6 p-4 sm:p-6 space-y-4 bg-[var(--surface)] min-w-0">
+              <div className="min-w-0">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-muted)]">
+                  Deliverable Section 3.2
+                </span>
+                <h3 className="font-serif text-base sm:text-lg font-bold text-[var(--ink)] mt-0.5 break-words">
+                  High Availability SLA & Failover Architecture
+                </h3>
+              </div>
 
-              {/* Column 2: Draft Document with Citations / Callouts */}
-              <section className="preview-col-draft">
-                <div className="preview-draft-header">
-                  <span className="preview-doc-tag">Deliverable Canvas</span>
-                  <h4>Cloud Architecture & High Availability SLA</h4>
-                </div>
+              <p className="text-xs text-[var(--ink)] leading-relaxed font-sans break-words">
+                Apex Horizon requires zero-trust replication and automated regional failover across multi-region active clusters.
+              </p>
 
-                <div className="preview-draft-body">
-                  <p className="preview-normal-text">
-                    Apex Horizon requires a resilient, multi-region cloud architecture that delivers zero-trust data protection and automated failover across active-active cloud regions.
+              {simulatorState === "blocked" ? (
+                <div className="p-3 sm:p-3.5 rounded bg-[var(--warning-bg)] border border-[var(--warning-border)] space-y-2 min-w-0">
+                  <p className="text-xs font-mono text-[var(--ink)] break-words">
+                    "The modernized cloud infrastructure guarantees <strong>99.999% uptime</strong> with under 10-second failover."
                   </p>
-
-                  {simulatorState === "blocked" ? (
-                    <div className="preview-flagged-block">
-                      <p className="preview-claim-text-flagged">
-                        "The modernized cloud infrastructure guarantees <strong>99.999% uptime</strong> with under 10-second automated failover across all multi-region clusters."
-                      </p>
-                      <div className="preview-finding-inline-callout">
-                        <div className="callout-header">
-                          <AlertTriangle size={13} className="icon-amber" />
-                          <strong>Verification Finding: Unsupported SLA Metric</strong>
-                        </div>
-                        <p className="callout-desc">
-                          Security spec establishes 99.99% availability with sub-minute failover (p. 4). The 99.999% claim lacks source evidence.
-                        </p>
-                        <Button
-                          type="button"
-                          className="btn-callout-quick-resolve"
-                          onClick={() => setSimulatorState("resolved")}
-                        >
-                          <CheckCircle2 size={12} />
-                          <span>Apply Verified Revision (99.99%)</span>
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="preview-resolved-block">
-                      <p className="preview-claim-text">
-                        "The modernized cloud infrastructure guarantees <strong>99.99% high availability</strong> with sub-minute automated failover across all multi-region clusters."
-                      </p>
-                      <span className="preview-citation-chip">
-                        <ExternalLink size={10} />
-                        <span>Cloud-Security-Spec.pdf</span>
-                        <strong>p. 4</strong>
-                      </span>
-                    </div>
-                  )}
-
-                  <p className="preview-normal-text" style={{ marginTop: "8px" }}>
-                    Automated snapshot replication guarantees a Recovery Point Objective (RPO) under 1 minute and Recovery Time Objective (RTO) under 15 minutes. [Source: Benchmark-Report.pdf, p. 1]
-                  </p>
+                  <div className="text-[11px] text-[var(--warning)] flex items-start gap-1.5 font-semibold">
+                    <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+                    <span className="break-words">Unsupported SLA: Security spec specifies 99.99% availability (p. 4).</span>
+                  </div>
+                  <Button
+                    variant="agent"
+                    size="xs"
+                    onClick={() => setSimulatorState("resolved")}
+                  >
+                    <CheckCircle2 size={11} />
+                    <span>Apply Verified Revision (99.99%)</span>
+                  </Button>
                 </div>
-              </section>
+              ) : (
+                <div className="p-3 sm:p-3.5 rounded bg-[var(--ink-sepia-subtle)] border border-[var(--ink-sepia-border)] space-y-2 ink-dried min-w-0">
+                  <p className="text-xs font-sans text-[var(--ink)] break-words">
+                    "The modernized cloud infrastructure guarantees <strong>99.99% high availability</strong> with sub-minute automated failover."
+                  </p>
+                  <span className="inline-flex items-center gap-1 font-mono text-[10px] text-[var(--ink-blue)] px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--hairline)] max-w-full truncate">
+                    <ExternalLink size={9} className="flex-shrink-0" />
+                    <span className="truncate">Cloud-Security-Spec.pdf</span>
+                    <strong className="flex-shrink-0">p. 4</strong>
+                  </span>
+                </div>
+              )}
 
-              {/* Column 3: Verification & Export Gate */}
-              <aside className="preview-col-audit">
-                <div className="preview-section-title">
+              <p className="text-xs text-[var(--ink-secondary)] leading-relaxed font-sans break-words">
+                Automated snapshot replication guarantees Recovery Point Objective (RPO) &lt; 1 min and Recovery Time Objective (RTO) &lt; 15 min. [Source: Benchmark-Report.pdf, p. 1]
+              </p>
+            </div>
+
+            {/* Column 3: Verification Gate */}
+            <div className="md:col-span-3 p-4 sm:p-5 space-y-4 bg-[var(--paper)] flex flex-col justify-between min-w-0">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center justify-between text-xs font-serif font-bold text-[var(--ink)]">
                   <span>Verification Gate</span>
-                  <span className={`gate-status-pill ${simulatorState === "resolved" ? "unlocked" : "blocked"}`}>
-                    {simulatorState === "resolved" ? (
-                      <>
-                        <ShieldCheck size={11} />
-                        <span>Audit Passed (100%)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lock size={11} />
-                        <span>Export Blocked (83%)</span>
-                      </>
-                    )}
+                  <span
+                    className={`font-mono text-[11px] font-semibold px-2 py-0.5 rounded flex-shrink-0 ${
+                      simulatorState === "resolved"
+                        ? "bg-[var(--success-bg)] text-[var(--success)] border border-[var(--success-border)]"
+                        : "bg-[var(--warning-bg)] text-[var(--warning)] border border-[var(--warning-border)]"
+                    }`}
+                  >
+                    {simulatorState === "resolved" ? "100% Passed" : "83% Blocked"}
                   </span>
                 </div>
 
+                <p className="text-xs text-[var(--ink-secondary)] leading-snug break-words">
+                  {simulatorState === "resolved"
+                    ? "All 6 RFP requirements verified against source evidence. Zero unsupported claims detected."
+                    : "1 high-severity claim lacks backing evidence. Export is deterministically blocked."}
+                </p>
+              </div>
+
+              <div className="pt-2">
                 {simulatorState === "resolved" ? (
-                  <div className="preview-passed-card">
-                    <div className="card-top-alert">
-                      <CheckCircle2 size={16} className="text-emerald" />
-                      <strong>100% Verified Readiness</strong>
-                    </div>
-                    <p className="finding-body-text">
-                      All 6 RFP requirements verified against source evidence. Zero unsupported claims detected.
-                    </p>
-                    <Button className="btn-interactive-export" onClick={onOpen}>
-                      <Download size={13} />
-                      <span>Export Deliverable (.pdf, .docx) ✓</span>
-                    </Button>
-                    <div className="preview-footer-note">
-                      <small>Includes Cryptographic Audit Provenance Appendix</small>
-                    </div>
-                  </div>
+                  <Button variant="human" size="sm" onClick={onOpen} className="w-full">
+                    <Download size={13} />
+                    <span>Export Deliverable (.pdf, .docx)</span>
+                  </Button>
                 ) : (
-                  <div className="preview-blocked-card">
-                    <div className="card-top-alert alert-blocked">
-                      <Lock size={16} className="text-danger" />
-                      <strong>Export Gate: Blocked</strong>
-                    </div>
-                    <p className="finding-body-text">
-                      1 high-severity finding requires evidence resolution before deliverable export is permitted.
-                    </p>
-                    <Button
-                      type="button"
-                      className="btn-interactive-resolve"
-                      onClick={() => setSimulatorState("resolved")}
-                    >
-                      <CheckCircle2 size={13} />
-                      <span>Resolve 99.99% Finding</span>
-                    </Button>
-                    <div className="preview-footer-note">
-                      <small>Policy Enforcement: Unverified claims blocked</small>
-                    </div>
-                  </div>
+                  <Button
+                    variant="agent"
+                    size="sm"
+                    onClick={() => setSimulatorState("resolved")}
+                    className="w-full"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Resolve 99.99% Finding</span>
+                  </Button>
                 )}
-              </aside>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Trust Strip */}
-      <section className="ai-trust-strip" aria-label="Product guarantees">
-        <span><FileCheck2 size={15} /> Grounded in your uploaded sources</span>
-        <i />
-        <span><LockKeyhole size={15} /> Private, isolated workspace per account</span>
-        <i />
-        <span><ShieldCheck size={15} /> Continuous automated claim auditing</span>
-        <i />
-        <span><Download size={15} /> Clean exports with cryptographic audit appendix</span>
+      <section className="border-y border-[var(--hairline)] bg-[var(--surface)] py-4 px-4 sm:px-6 select-none w-full">
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs text-[var(--ink-secondary)] font-medium">
+          <span className="flex items-center gap-1.5">
+            <FileCheck2 size={14} className="text-[var(--ink-blue)] flex-shrink-0" /> Grounded in your uploaded sources
+          </span>
+          <span className="hidden sm:inline text-[var(--hairline-strong)]">·</span>
+          <span className="flex items-center gap-1.5">
+            <LockKeyhole size={14} className="text-[var(--ink-blue)] flex-shrink-0" /> Private, isolated workspace storage
+          </span>
+          <span className="hidden sm:inline text-[var(--hairline-strong)]">·</span>
+          <span className="flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-[var(--success)] flex-shrink-0" /> Continuous deterministic audit gate
+          </span>
+          <span className="hidden sm:inline text-[var(--hairline-strong)]">·</span>
+          <span className="flex items-center gap-1.5">
+            <Download size={14} className="text-[var(--ink-sepia)] flex-shrink-0" /> Clean exports with provenance appendix
+          </span>
+        </div>
       </section>
 
       {/* Workflow Section */}
-      <section className="ai-workflow-section" id="workflow">
-        <header>
-          <div className="ai-eyebrow"><ShieldCheck size={13} /> Verification-First Architecture</div>
-          <h2>From raw documentation to audited deliverables.</h2>
-          <p>Groundwork replaces risky, hallucinated AI text with an audited, evidence-backed deliverable workflow.</p>
-        </header>
+      <section id="workflow" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 space-y-8 sm:space-y-12 w-full min-w-0">
+        <div className="text-center space-y-2 max-w-2xl mx-auto min-w-0">
+          <span className="text-xs font-mono uppercase tracking-wider text-[var(--ink-blue)] font-semibold">
+            Verification-First Workflow
+          </span>
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)] break-words">
+            From raw client documentation to audited deliverables.
+          </h2>
+          <p className="text-sm text-[var(--ink-secondary)] font-sans break-words">
+            Replace hallucinated AI text with an evidence-grounded deliverable loop.
+          </p>
+        </div>
 
-        <div className="ai-workflow-grid">
-          <article>
-            <span className="step-num">01</span>
-            <div className="step-icon"><Upload size={20} /></div>
-            <h3>Ingest Sources</h3>
-            <p>Upload RFPs, technical specifications, and research notes. Text, page structure, and geometry are indexed into local vector storage.</p>
-          </article>
-          <article>
-            <span className="step-num">02</span>
-            <div className="step-icon"><PenLine size={20} /></div>
-            <h3>Agentic Drafting</h3>
-            <p>The workspace agent extracts acceptance criteria, structures the deliverable, and drafts sections grounded in evidence.</p>
-          </article>
-          <article>
-            <span className="step-num">03</span>
-            <div className="step-icon"><ShieldCheck size={20} /></div>
-            <h3>Automated Verification</h3>
-            <p>The audit engine checks every generated claim against source evidence, flags unsupported metrics, and blocks unverified export.</p>
-          </article>
-          <article>
-            <span className="step-num">04</span>
-            <div className="step-icon"><Download size={20} /></div>
-            <h3>Verified Export</h3>
-            <p>Once all issues are resolved, export clean PDF, Word (.docx), or Markdown deliverables with a stamped audit appendix.</p>
-          </article>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full min-w-0">
+          <div className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--hairline)] space-y-2 min-w-0">
+            <span className="text-[10px] font-mono text-[var(--ink-faint)] font-bold">01</span>
+            <div className="w-8 h-8 rounded bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center">
+              <Upload size={16} />
+            </div>
+            <h3 className="font-serif text-sm font-bold text-[var(--ink)] break-words">Ingest Sources</h3>
+            <p className="text-xs text-[var(--ink-secondary)] leading-relaxed break-words">
+              Upload RFPs, specs, and notes. Page structure, tables, and geometry are indexed.
+            </p>
+          </div>
+
+          <div className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--hairline)] space-y-2 min-w-0">
+            <span className="text-[10px] font-mono text-[var(--ink-faint)] font-bold">02</span>
+            <div className="w-8 h-8 rounded bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)] flex items-center justify-center">
+              <PenLine size={16} />
+            </div>
+            <h3 className="font-serif text-sm font-bold text-[var(--ink)] break-words">Agentic Drafting</h3>
+            <p className="text-xs text-[var(--ink-secondary)] leading-relaxed break-words">
+              Monospace streaming proposals draft sections with direct citation anchors.
+            </p>
+          </div>
+
+          <div className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--hairline)] space-y-2 min-w-0">
+            <span className="text-[10px] font-mono text-[var(--ink-faint)] font-bold">03</span>
+            <div className="w-8 h-8 rounded bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center">
+              <ShieldCheck size={16} />
+            </div>
+            <h3 className="font-serif text-sm font-bold text-[var(--ink)] break-words">Margin Auditing</h3>
+            <p className="text-xs text-[var(--ink-secondary)] leading-relaxed break-words">
+              Unsupported claims surface in the margin with 1-click verified SLA resolutions.
+            </p>
+          </div>
+
+          <div className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--hairline)] space-y-2 min-w-0">
+            <span className="text-[10px] font-mono text-[var(--ink-faint)] font-bold">04</span>
+            <div className="w-8 h-8 rounded bg-[var(--success-bg)] text-[var(--success)] flex items-center justify-center">
+              <Download size={16} />
+            </div>
+            <h3 className="font-serif text-sm font-bold text-[var(--ink)] break-words">Verified Export</h3>
+            <p className="text-xs text-[var(--ink-secondary)] leading-relaxed break-words">
+              Ship PDF, Word, or Markdown with attached cryptographic provenance appendix.
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* Security & Privacy Section */}
-      <section className="ai-security-section" id="security">
-        <div className="security-badge"><ShieldCheck size={20} /><span>Enterprise Workspace Storage</span></div>
-        <h2>Privacy and source integrity come first.</h2>
-        <p>
-          Your documents are never used to train public models. Files are stored securely in your isolated workspace, processed with durable background jobs, and remain completely under your control with one-click data deletion and export.
-        </p>
-        <Button onClick={onOpen} className="btn-security-cta">
-          {isAuthenticated ? "Continue to your workspace" : "Get started with Groundwork"}
-          <ArrowRight size={15} />
-        </Button>
+      {/* Research & Regulatory Insights Section */}
+      <section id="insights" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 space-y-8 sm:space-y-12 w-full min-w-0 border-t border-[var(--hairline)]">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 min-w-0">
+          <div className="space-y-2 max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--ink-sepia-subtle)] border border-[var(--ink-sepia-border)] text-[11px] font-mono text-[var(--ink-sepia)] font-semibold">
+              <BookOpen size={12} />
+              <span>RESEARCH &amp; REGULATORY BENCHMARKS</span>
+            </div>
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)] break-words">
+              Deterministic Verification vs. Naive RAG Baselines
+            </h2>
+            <p className="text-sm text-[var(--ink-secondary)] font-sans break-words">
+              Technical whitepapers, compliance mapping frameworks, and benchmark evaluations from the Groundwork engineering team.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-[var(--ink-muted)]">Grounding Accuracy:</span>
+            <span className="text-xs font-mono font-bold text-[var(--success)] px-2 py-0.5 rounded bg-[var(--success-bg)] border border-[var(--success-border)]">
+              99.8% Grounded
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full min-w-0">
+          {/* Article 1: Benchmark */}
+          <article className="p-5 sm:p-6 rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--ink-blue-border)] shadow-[var(--shadow-subtle)] space-y-4 flex flex-col justify-between transition-all group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-[var(--ink-muted)]">
+                <span className="px-2 py-0.5 rounded bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] font-medium">
+                  Benchmark Evaluation
+                </span>
+                <span>12 min read · Q2 2026</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
+                Zero Phantom Citations: Eliminating Hallucinated Page Numbers in SEC 10-K Proposal Workflows
+              </h3>
+              <p className="text-xs text-[var(--ink-secondary)] leading-relaxed font-sans">
+                Comparative analysis of deterministic page-geometry verification against standard cosine-similarity RAG across 1,200 financial and cybersecurity disclosure filings.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--hairline)] flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-[var(--ink-muted)]">Hallucinations: <strong className="text-[var(--success)]">0.0%</strong></span>
+                <span className="text-[var(--ink-muted)]">Baseline RAG: <strong className="text-[var(--warning)]">18.4%</strong></span>
+              </div>
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--ink-blue)]">
+                Read Whitepaper <ArrowUpRight size={13} />
+              </span>
+            </div>
+          </article>
+
+          {/* Article 2: Compliance Standard */}
+          <article className="p-5 sm:p-6 rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--ink-blue-border)] shadow-[var(--shadow-subtle)] space-y-4 flex flex-col justify-between transition-all group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-[var(--ink-muted)]">
+                <span className="px-2 py-0.5 rounded bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)] font-medium">
+                  Regulatory Framework
+                </span>
+                <span>15 min read · Q2 2026</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
+                Automating NIST AI RMF 1.0 &amp; ISO/IEC 42001 Regulatory Mapping for Enterprise RFPs
+              </h3>
+              <p className="text-xs text-[var(--ink-secondary)] leading-relaxed font-sans">
+                A formal guide to converting high-stakes government and defense RFP criteria into strict deterministic evidence verification gates with cryptographic provenance.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--hairline)] flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-[var(--ink-muted)]">Traceability: <strong className="text-[var(--ink)]">100% Matrix</strong></span>
+                <span className="text-[var(--ink-muted)]">Export Gate: <strong className="text-[var(--success)]">Enforced</strong></span>
+              </div>
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--ink-blue)]">
+                Read Framework <ArrowUpRight size={13} />
+              </span>
+            </div>
+          </article>
+
+          {/* Article 3: Architecture Deep Dive */}
+          <article className="p-5 sm:p-6 rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--ink-blue-border)] shadow-[var(--shadow-subtle)] space-y-4 flex flex-col justify-between transition-all group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-[var(--ink-muted)]">
+                <span className="px-2 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink)] font-medium border border-[var(--hairline)]">
+                  Architecture &amp; Data Layer
+                </span>
+                <span>8 min read · Q1 2026</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
+                Asynchronous Task Queues &amp; pgvector: Multi-Tenant Isolation with Celery and Redis
+              </h3>
+              <p className="text-xs text-[var(--ink-secondary)] leading-relaxed font-sans">
+                Deep dive into building non-blocking PDF OCR extraction pipelines with task revocation, chunk-level tenant boundaries, and HNSW cosine indexing.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--hairline)] flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-[var(--ink-muted)]">Query Latency: <strong className="text-[var(--success)]">&lt; 38ms</strong></span>
+                <span className="text-[var(--ink-muted)]">Pytest Coverage: <strong className="text-[var(--ink)]">102 tests</strong></span>
+              </div>
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--ink-blue)]">
+                Read Architecture <ArrowUpRight size={13} />
+              </span>
+            </div>
+          </article>
+
+          {/* Article 4: Enterprise Case Study */}
+          <article className="p-5 sm:p-6 rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--ink-blue-border)] shadow-[var(--shadow-subtle)] space-y-4 flex flex-col justify-between transition-all group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-[var(--ink-muted)]">
+                <span className="px-2 py-0.5 rounded bg-[var(--success-bg)] text-[var(--success)] font-medium border border-[var(--success-border)]">
+                  Enterprise Case Study
+                </span>
+                <span>10 min read · Q2 2026</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
+                Deterministic Verification vs. Probabilistic LLMs in Legal, Medical &amp; Defense Deliverables
+              </h3>
+              <p className="text-xs text-[var(--ink-secondary)] leading-relaxed font-sans">
+                How aerospace and healthcare contractors audit mission-critical deliverables against FDA and DoD specifications prior to stakeholder sign-off.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--hairline)] flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-[var(--ink-muted)]">Verification Gate: <strong className="text-[var(--success)]">Passed (100%)</strong></span>
+              </div>
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--ink-blue)]">
+                Read Case Study <ArrowUpRight size={13} />
+              </span>
+            </div>
+          </article>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="ai-landing-footer">
-        <div className="footer-brand">
-          <BrandMark size={16} />
-          <span>Ground<b>work</b></span>
+      <footer id="security" className="border-t border-[var(--hairline)] bg-[var(--surface)] py-8 px-4 sm:px-6 mt-auto w-full">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--ink-muted)]">
+          <div className="flex items-center gap-2">
+            <BrandMark size={16} />
+            <span className="font-serif font-bold text-[var(--ink)]">Groundwork</span>
+            <span>· Agentic Document Workspace</span>
+          </div>
+
+          <p className="text-center sm:text-right">
+            Verification-gated document intelligence. Draft, audit, and ship evidence-backed deliverables.
+          </p>
         </div>
-        <p>Verification-gated agentic document workspace. Draft, audit, and ship evidence-backed deliverables.</p>
-        <Button onClick={onOpen} className="footer-open-btn">
-          Open workspace <ArrowRight size={14} />
-        </Button>
       </footer>
     </main>
   );
 }
+
+export default LandingPage;

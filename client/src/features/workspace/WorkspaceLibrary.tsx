@@ -1,6 +1,5 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
-  BookOpen,
   Plus,
   Search,
   FileText,
@@ -8,30 +7,34 @@ import {
   Trash2,
   Edit3,
   FolderPlus,
-  User as UserIcon,
   ShieldCheck,
   ArrowRight,
   MoreVertical,
-  X,
   Upload,
   Sun,
   Moon,
   CheckCircle2,
   FileCheck2,
-  RefreshCw,
+  BookOpen,
+  PanelLeft,
+  PanelLeftClose,
 } from "lucide-react";
 import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
-import { useTranslation } from "../../i18n";
-import { Button } from '../../components/ui/Button';
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { Modal } from "../../components/ui/Modal";
+import { Input } from "../../components/ui/Input";
 
-interface WorkspaceLibraryProps {
+export interface WorkspaceLibraryProps {
   auth: AuthResult;
   workspaces: Workspace[];
   documents: DocumentItem[];
   nativeDocs: NativeDocument[];
   activeTheme: "light" | "dark";
+  isSidebarOpen?: boolean;
   isLoading?: boolean;
+  onToggleSidebar?: () => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: (name: string, template?: string) => Promise<string | null>;
   onDeleteWorkspace: (workspaceId: string) => Promise<void>;
@@ -40,12 +43,7 @@ interface WorkspaceLibraryProps {
   onOpenAccount: () => void;
   onToggleTheme: () => void;
   onOpenTwoMinuteDemo?: () => void;
-  // Backward-compatibility props
   onSelectNotebook?: (workspaceId: string) => void;
-  onCreateNotebook?: (name: string, template?: string) => Promise<string | null>;
-  onDeleteNotebook?: (workspaceId: string) => Promise<void>;
-  onRenameNotebook?: (workspaceId: string, newName: string) => Promise<void>;
-  onUploadToNewNotebook?: (file: File) => Promise<void>;
 }
 
 export function WorkspaceLibrary({
@@ -54,7 +52,9 @@ export function WorkspaceLibrary({
   documents,
   nativeDocs,
   activeTheme,
+  isSidebarOpen = true,
   isLoading = false,
+  onToggleSidebar = () => {},
   onSelectWorkspace,
   onCreateWorkspace,
   onDeleteWorkspace,
@@ -62,63 +62,51 @@ export function WorkspaceLibrary({
   onUploadToNewWorkspace,
   onOpenAccount,
   onToggleTheme,
-  onOpenTwoMinuteDemo: _onOpenTwoMinuteDemo,
   onSelectNotebook,
-  onCreateNotebook,
-  onDeleteNotebook,
-  onRenameNotebook,
-  onUploadToNewNotebook,
 }: WorkspaceLibraryProps) {
-  const { t } = useTranslation();
-  const selectWorkspace = onSelectWorkspace || onSelectNotebook || (() => {});
-  const createWorkspace = onCreateWorkspace || onCreateNotebook || (async () => null);
-  const deleteWorkspace = onDeleteWorkspace || onDeleteNotebook || (async () => {});
-  const renameWorkspace = onRenameWorkspace || onRenameNotebook || (async () => {});
-  const uploadToNewWorkspace = onUploadToNewWorkspace || onUploadToNewNotebook || (async () => {});
-
+  const selectWs = onSelectWorkspace || onSelectNotebook;
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("proposal");
+  const [selectedTemplate, setSelectedTemplate] = useState("proposal");
   const [isCreating, setIsCreating] = useState(false);
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const TEMPLATES = [
     {
       id: "proposal",
-      title: t("library.template_proposal_title"),
+      title: "Technical Proposal",
       icon: ShieldCheck,
-      description: t("library.template_proposal_desc"),
-      color: "var(--accent)",
-      bg: "var(--accent-subtle)",
+      description: "Grounded technical proposal with continuous SLA and claim verification.",
+      color: "var(--ink-blue)",
+      bg: "var(--ink-blue-subtle)",
     },
     {
       id: "report",
-      title: t("library.template_report_title"),
+      title: "Client Research Report",
       icon: FileText,
-      description: t("library.template_report_desc"),
-      color: "var(--accent)",
-      bg: "var(--accent-subtle)",
+      description: "Multi-document synthesis report with cited evidence appendix.",
+      color: "var(--ink-sepia)",
+      bg: "var(--ink-sepia-subtle)",
     },
     {
       id: "presentation",
-      title: t("library.template_presentation_title"),
+      title: "Executive Presentation",
       icon: Layers,
-      description: t("library.template_presentation_desc"),
-      color: "var(--accent)",
-      bg: "var(--accent-subtle)",
+      description: "Concise summary structured for stakeholders and review boards.",
+      color: "var(--ink-blue)",
+      bg: "var(--ink-blue-subtle)",
     },
     {
       id: "blank",
-      title: t("library.template_blank_title"),
+      title: "Blank Workspace",
       icon: BookOpen,
-      description: t("library.template_blank_desc"),
-      color: "var(--text-primary)",
-      bg: "var(--bg-subtle)",
+      description: "Empty workspace to draft and ground any custom deliverable.",
+      color: "var(--ink)",
+      bg: "var(--paper-subtle)",
     },
   ];
 
@@ -140,31 +128,20 @@ export function WorkspaceLibrary({
 
   // Filter workspaces
   const filteredWorkspaces = useMemo(() => {
-    return workspaces.filter((ws) => {
-      const matchSearch =
-        ws.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (ws.kind && ws.kind.toLowerCase().includes(searchQuery.toLowerCase()));
-      if (!matchSearch) return false;
-
-      if (filterCategory === "proposals") {
-        return ws.name.toLowerCase().includes("proposal");
-      }
-      if (filterCategory === "reports") {
-        return ws.name.toLowerCase().includes("report");
-      }
-      return true;
-    });
-  }, [workspaces, searchQuery, filterCategory]);
+    return workspaces.filter((ws) =>
+      ws.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [workspaces, searchQuery]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newWorkspaceName.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      const id = await createWorkspace(newWorkspaceName.trim(), selectedTemplate);
-      setIsCreateOpen(false);
+      const id = await onCreateWorkspace(newWorkspaceName.trim(), selectedTemplate);
+      setIsCreateModalOpen(false);
       setNewWorkspaceName("");
-      if (id) selectWorkspace(id);
+      if (id) selectWs(id);
     } finally {
       setIsCreating(false);
     }
@@ -175,7 +152,7 @@ export function WorkspaceLibrary({
       setEditingWorkspaceId(null);
       return;
     }
-    await renameWorkspace(wsId, renameValue.trim());
+    await onRenameWorkspace(wsId, renameValue.trim());
     setEditingWorkspaceId(null);
     setRenameValue("");
   }
@@ -185,13 +162,13 @@ export function WorkspaceLibrary({
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      uploadToNewWorkspace(files[0]).catch(() => undefined);
+      onUploadToNewWorkspace(files[0]).catch(() => undefined);
     }
   }
 
   return (
     <div
-      className="notebook-library-container workspace-library-container"
+      className="min-h-screen w-full bg-[var(--paper)] flex flex-col select-none overflow-x-hidden min-w-0 flex-1"
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);
@@ -207,411 +184,380 @@ export function WorkspaceLibrary({
       }}
     >
       {/* Full-Page Drag Overlay */}
-      {isDragging && !isCreateOpen && (
-        <div className="library-drag-overlay">
+      {isDragging && !isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[rgba(43,58,85,0.08)] backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none text-[var(--ink-blue)]">
           <Upload size={36} />
-          <strong>Drop file here to start new workspace</strong>
-          <span>We'll automatically initialize and index your document</span>
+          <strong className="text-sm font-serif font-bold mt-2">Drop file here to start new workspace</strong>
+          <span className="text-xs text-[var(--ink-muted)]">We'll automatically initialize and index your document</span>
         </div>
       )}
 
       {/* Top Navbar */}
-      <header className="notebook-nav workspace-nav">
-        <div className="notebook-brand-link">
-          <BrandMark size={20} />
-          <strong>Ground<span>work</span></strong>
-          <span className="hub-beta">Workspace</span>
+      <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-3 sm:px-6 flex items-center justify-between min-w-0 w-full z-20">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleSidebar}
+            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
+            title={isSidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+            aria-label={isSidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+          >
+            {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
+          </Button>
+
+          <BrandMark size={20} className="flex-shrink-0" />
+          <strong className="font-serif text-sm font-bold text-[var(--ink)] truncate">
+            Ground<span className="text-[var(--ink-blue)]">work</span>
+          </strong>
+          <span className="hidden xs:inline text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] ml-1 flex-shrink-0">
+            Workspaces
+          </span>
         </div>
 
-        {/* Global search */}
-        <div className="notebook-search-box">
-          <Search size={15} />
-          <input
-            type="text"
-            placeholder={t("nav.search_placeholder")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search workspaces"
-          />
-          <kbd>⌘K</kbd>
-        </div>
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <div className="relative w-36 sm:w-64 hidden xs:block">
+            <Input
+              icon={<Search size={13} />}
+              placeholder="Search workspaces… (⌘K)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 text-xs bg-[var(--paper)]"
+            />
+          </div>
 
-        {/* Action Controls */}
-        <div className="notebook-nav-actions">
-          <Button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
-            {activeTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleTheme}
+            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
+            title="Toggle color theme"
+          >
+            {activeTheme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </Button>
 
           <Button
-            className="btn-primary-gradient"
+            variant="human"
+            size="sm"
             onClick={() => {
-              setSelectedTemplate("proposal");
               setNewWorkspaceName("");
-              setIsCreateOpen(true);
+              setIsCreateModalOpen(true);
             }}
-            title={t("nav.new_workspace")}
+            className="flex-shrink-0"
           >
-            <Plus size={15} />
-            <span>{t("nav.new_workspace")}</span>
+            <Plus size={13} />
+            <span className="hidden sm:inline">New Workspace</span>
+            <span className="sm:hidden">New</span>
           </Button>
 
           <Button
-            className="btn-account-chip"
+            variant="secondary"
+            size="sm"
             onClick={onOpenAccount}
-            title={t("nav.profile_settings")}
+            title="Account profile & preferences"
+            className="flex-shrink-0 max-w-[120px] truncate"
           >
-            <UserIcon size={14} />
-            <span>{auth.user.display_name}</span>
+            <span className="truncate">{auth.user.display_name}</span>
           </Button>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="notebook-library-body">
-
-        {/* Recommended Workflows */}
-        <section className="notebook-workflows-section">
-          <div className="section-header-compact">
-            <h2>{t("library.templates_heading")}</h2>
-            <span>{t("library.templates_subheading")}</span>
+      {/* Main Body */}
+      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6 sm:space-y-8 notebook-library-container min-w-0">
+        {/* Templates Banner */}
+        <section className="space-y-3 min-w-0 w-full">
+          <div className="flex items-center justify-between min-w-0">
+            <h2 className="font-serif text-base sm:text-lg font-bold text-[var(--ink)] truncate">
+              Recommended Workflows
+            </h2>
+            <span className="hidden sm:inline text-xs text-[var(--ink-muted)] truncate">
+              Preconfigured with grounded evidence workflows
+            </span>
           </div>
 
-          <div className="notebook-templates-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full min-w-0">
             {TEMPLATES.map((tmpl) => {
               const Icon = tmpl.icon;
               return (
                 <div
                   key={tmpl.id}
-                  className="notebook-template-card"
                   onClick={() => {
                     setSelectedTemplate(tmpl.id);
                     setNewWorkspaceName(tmpl.title);
-                    setIsCreateOpen(true);
+                    setIsCreateModalOpen(true);
                   }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedTemplate(tmpl.id);
-                      setNewWorkspaceName(tmpl.title);
-                      setIsCreateOpen(true);
-                    }
-                  }}
+                  className="p-4 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--hairline-strong)] hover:shadow-[var(--shadow-card)] cursor-pointer transition-all flex flex-col justify-between group notebook-template-card min-w-0"
                 >
-                  <div className="template-icon" style={{ background: tmpl.bg, color: tmpl.color }}>
-                    <Icon size={20} />
+                  <div className="min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-[var(--radius-sm)] flex items-center justify-center mb-3 flex-shrink-0"
+                      style={{ background: tmpl.bg, color: tmpl.color }}
+                    >
+                      <Icon size={16} />
+                    </div>
+                    <h3 className="font-serif text-sm font-bold text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors break-words">
+                      {tmpl.title}
+                    </h3>
+                    <p className="text-xs text-[var(--ink-secondary)] mt-1 line-clamp-2 leading-snug break-words">
+                      {tmpl.description}
+                    </p>
                   </div>
-                  <strong>{tmpl.title}</strong>
-                  <p>{tmpl.description}</p>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--ink-blue)] font-medium mt-3">
+                    Use template →
+                  </span>
                 </div>
               );
             })}
           </div>
         </section>
 
-        {/* Workspace Library List Section */}
-        <section className="notebook-list-section">
-          <div className="notebook-section-header">
-            <div className="notebook-header-title">
-              <h2>{t("nav.workspaces")} ({filteredWorkspaces.length})</h2>
-              <span className="notebook-header-meta">
-                {documents.length} {t(documents.length === 1 ? "library.sources_count" : "library.sources_count_plural", { count: documents.length })} · {workspaces.length} {t("nav.workspaces").toLowerCase()}
-              </span>
-            </div>
-
-            <div className="notebook-category-tabs">
-              <Button
-                className={filterCategory === "all" ? "active" : ""}
-                onClick={() => setFilterCategory("all")}
-              >
-                {t("library.category_all")}
-              </Button>
-              <Button
-                className={filterCategory === "proposals" ? "active" : ""}
-                onClick={() => setFilterCategory("proposals")}
-              >
-                {t("library.category_proposals")}
-              </Button>
-              <Button
-                className={filterCategory === "reports" ? "active" : ""}
-                onClick={() => setFilterCategory("reports")}
-              >
-                {t("library.category_reports")}
-              </Button>
-            </div>
+        {/* Workspaces List Grid */}
+        <section className="space-y-4 min-w-0 w-full">
+          <div className="flex items-center justify-between border-b border-[var(--hairline)] pb-2 min-w-0">
+            <h2 className="font-serif text-base sm:text-lg font-bold text-[var(--ink)] truncate">
+              Research Workspaces ({filteredWorkspaces.length})
+            </h2>
+            <span className="text-xs text-[var(--ink-muted)] font-mono flex-shrink-0">
+              {documents.length} sources · {workspaces.length} workspaces
+            </span>
           </div>
 
-          {/* Loading Banner when connecting/fetching */}
-          {isLoading && (
-            <div className="workspace-loading-banner" role="status" aria-live="polite">
-              <RefreshCw size={15} className="spin" />
-              <span>{t("library.loading_banner")}</span>
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full min-w-0">
+            {filteredWorkspaces.map((ws) => {
+              const stats = workspaceStats[ws.id] || {
+                sourcesCount: 0,
+                deliverablesCount: 0,
+                hasVerified: false,
+              };
+              const isEditing = editingWorkspaceId === ws.id;
 
-          {/* Workspace Cards Grid */}
-          {isLoading ? (
-            <div className="notebook-grid workspace-grid" aria-busy="true" aria-label="Loading workspaces">
-              {[1, 2, 3, 4].map((idx) => (
-                <div key={idx} className="skeleton-workspace-card">
-                  <div className="skeleton-card-top">
-                    <div className="skeleton-shimmer skeleton-avatar" />
-                    <div className="skeleton-text-group">
-                      <div className="skeleton-shimmer skeleton-title-bar" />
-                      <div className="skeleton-shimmer skeleton-subtitle-bar" />
-                    </div>
-                  </div>
-                  <div className="skeleton-meta-row">
-                    <div className="skeleton-shimmer skeleton-pill" />
-                    <div className="skeleton-shimmer skeleton-pill" />
-                  </div>
-                  <div className="skeleton-shimmer skeleton-footer-bar" />
-                </div>
-              ))}
-            </div>
-          ) : filteredWorkspaces.length > 0 ? (
-            <div className="notebook-grid workspace-grid">
-              {filteredWorkspaces.map((ws) => {
-                const stats = workspaceStats[ws.id] || { sourcesCount: 0, deliverablesCount: 0, hasVerified: false };
-                const isEditing = editingWorkspaceId === ws.id;
-
-                return (
-                  <div key={ws.id} className="notebook-card workspace-card">
-                    <div className="notebook-card-header">
-                      <div className="notebook-card-info">
-                        <div className="notebook-card-icon">
-                          <FileCheck2 size={17} />
-                        </div>
-                        <div className="notebook-title-wrap">
-                          {isEditing ? (
-                            <div className="notebook-rename-form">
-                              <input
-                                autoFocus
-                                value={renameValue}
-                                onChange={(e) => setRenameValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveRename(ws.id);
-                                  if (e.key === "Escape") setEditingWorkspaceId(null);
-                                }}
-                              />
-                              <Button className="btn-rename-save" onClick={() => handleSaveRename(ws.id)}>
-                                {t("library.btn_save")}
-                              </Button>
-                            </div>
-                          ) : (
-                            <div
-                              className="notebook-card-title"
-                              onClick={() => selectWorkspace(ws.id)}
-                              title={ws.name}
+              return (
+                <div
+                  key={ws.id}
+                  className="p-4 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--hairline-strong)] hover:shadow-[var(--shadow-card)] transition-all flex flex-col justify-between group notebook-card min-w-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileCheck2 size={16} className="text-[var(--ink-blue)] flex-shrink-0" />
+                        {isEditing ? (
+                          <div className="flex items-center gap-1 min-w-0 flex-1">
+                            <input
+                              autoFocus
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveRename(ws.id);
+                                if (e.key === "Escape") setEditingWorkspaceId(null);
+                              }}
+                              className="w-full px-1.5 py-0.5 text-xs bg-[var(--paper)] border border-[var(--ink-blue)] rounded outline-none text-[var(--ink)] min-w-0"
+                            />
+                            <Button
+                              variant="human"
+                              size="xs"
+                              onClick={() => handleSaveRename(ws.id)}
+                              className="flex-shrink-0"
                             >
-                              {ws.name}
-                            </div>
-                          )}
-                          <span className="notebook-type-tag">
-                            {ws.kind === "personal" ? "Personal workspace" : ws.kind || "Research"}
-                          </span>
-                        </div>
+                              Save
+                            </Button>
+                          </div>
+                        ) : (
+                          <h3
+                            onClick={() => selectWs(ws.id)}
+                            className="font-serif text-sm font-bold text-[var(--ink)] truncate cursor-pointer hover:text-[var(--ink-blue)] flex-1 min-w-0"
+                            title={ws.name}
+                          >
+                            {ws.name}
+                          </h3>
+                        )}
                       </div>
 
-                      <div className="notebook-actions-dropdown">
+                      {/* Dropdown Options */}
+                      <div className="relative flex-shrink-0">
                         <Button
-                          className="btn-dropdown-trigger"
+                          variant="ghost"
+                          size="xs"
+                          className="opacity-0 group-hover:opacity-100 text-[var(--ink-muted)] hover:text-[var(--ink)]"
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveDropdownId(activeDropdownId === ws.id ? null : ws.id);
                           }}
-                          aria-label="Workspace options"
                         >
-                          <MoreVertical size={15} />
+                          <MoreVertical size={13} />
                         </Button>
 
                         {activeDropdownId === ws.id && (
-                          <div className="dropdown-menu">
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingWorkspaceId(ws.id);
-                                setRenameValue(ws.name);
-                                setActiveDropdownId(null);
-                              }}
-                            >
-                              <Edit3 size={13} />
-                              <span>{t("library.action_rename")}</span>
-                            </Button>
-                            <Button
-                              className="danger"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveDropdownId(null);
-                                deleteWorkspace(ws.id);
-                              }}
-                            >
-                              <Trash2 size={13} />
-                              <span>{t("library.action_delete")}</span>
-                            </Button>
-                          </div>
+                          <>
+                            <div
+                              className="fixed inset-0 z-20"
+                              onClick={() => setActiveDropdownId(null)}
+                            />
+                            <div className="absolute right-0 mt-1 w-32 bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-sm)] shadow-[var(--shadow-popover)] p-1 z-30">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingWorkspaceId(ws.id);
+                                  setRenameValue(ws.name);
+                                  setActiveDropdownId(null);
+                                }}
+                                className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-[var(--ink)] hover:bg-[var(--surface-hover)] rounded"
+                              >
+                                <Edit3 size={12} />
+                                <span>Rename</span>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveDropdownId(null);
+                                  onDeleteWorkspace(ws.id);
+                                }}
+                                className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-[var(--danger)] hover:bg-[var(--danger-bg)] rounded"
+                              >
+                                <Trash2 size={12} />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
 
-                    {/* Metadata & Status */}
-                    <div className="notebook-card-meta">
-                      <div className="meta-stats">
-                        <span><FileText size={13} /> {t(stats.sourcesCount === 1 ? "library.sources_count" : "library.sources_count_plural", { count: stats.sourcesCount })}</span>
-                        <span><Layers size={13} /> {t(stats.deliverablesCount === 1 ? "library.deliverables_count" : "library.deliverables_count_plural", { count: stats.deliverablesCount })}</span>
-                      </div>
-                      {stats.hasVerified ? (
-                        <span className="badge-verified-pill"><CheckCircle2 size={12} /> {t("library.badge_verified")}</span>
-                      ) : (
-                        <span className="badge-draft-pill"><ShieldCheck size={12} /> {t("library.badge_in_review")}</span>
-                      )}
-                    </div>
-
-                    {/* Footer / Open Button */}
-                    <div className="notebook-card-footer" onClick={() => selectWorkspace(ws.id)}>
-                      <span>{t("library.open_workspace")}</span>
-                      <ArrowRight size={14} />
+                    <div className="flex items-center gap-2 text-xs font-mono text-[var(--ink-muted)] my-3">
+                      <span>{stats.sourcesCount} sources</span>
+                      <span>·</span>
+                      <span>{stats.deliverablesCount} deliverables</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="notebook-empty-state">
-              <FolderPlus size={36} className="empty-icon" />
-              <h3>{searchQuery ? t("library.empty_search_title") : t("library.empty_title")}</h3>
-              <p>
-                {searchQuery
-                  ? t("library.empty_search_desc")
-                  : t("library.empty_desc")}
+
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--hairline-subtle)] text-xs min-w-0">
+                    {stats.hasVerified ? (
+                      <span className="inline-flex items-center gap-1 text-[var(--success)] font-mono text-[11px] font-semibold truncate">
+                        <CheckCircle2 size={12} className="flex-shrink-0" />
+                        <span>100% Verified</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[var(--warning)] font-mono text-[11px] truncate">
+                        <ShieldCheck size={12} className="flex-shrink-0" />
+                        <span>In Review</span>
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() => selectWs(ws.id)}
+                      className="inline-flex items-center gap-1 text-[var(--ink-blue)] font-medium hover:underline cursor-pointer flex-shrink-0 ml-2"
+                    >
+                      <span>Open</span>
+                      <ArrowRight size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredWorkspaces.length === 0 && (
+            <div className="py-16 text-center text-xs text-[var(--ink-muted)] space-y-2">
+              <FolderPlus size={32} className="mx-auto text-[var(--ink-faint)]" />
+              <p className="font-serif text-sm font-semibold text-[var(--ink)]">
+                No Workspaces Found
               </p>
               <Button
-                className="btn-primary-gradient"
+                variant="human"
+                size="sm"
                 onClick={() => {
                   setNewWorkspaceName("");
-                  setSelectedTemplate("proposal");
-                  setIsCreateOpen(true);
+                  setIsCreateModalOpen(true);
                 }}
               >
-                <Plus size={15} />
-                <span>{t("library.btn_create")}</span>
+                <Plus size={13} />
+                <span>Create Workspace</span>
               </Button>
             </div>
           )}
         </section>
       </main>
 
-      {/* Create Workspace Modal Dialog */}
-      {isCreateOpen && (
-        <div className="modal-backdrop" onClick={() => setIsCreateOpen(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="create-workspace-title">
-            <header className="modal-header">
-              <div>
-                <p className="modal-eyebrow">{t("app.name")}</p>
-                <h3 id="create-workspace-title">{t("library.create_modal_title")}</h3>
-              </div>
-              <Button className="btn-modal-close" onClick={() => setIsCreateOpen(false)} aria-label="Close dialog">
-                <X size={16} />
+      {/* Create Workspace Modal */}
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Create New Workspace"
+        eyebrow="Agentic Workspace"
+      >
+        <div className="space-y-4">
+          {/* Dropzone */}
+          <div
+            className="p-6 rounded-[var(--radius-md)] border-2 border-dashed border-[var(--hairline-strong)] bg-[var(--paper)] text-center space-y-1.5 cursor-pointer hover:border-[var(--ink-blue)] transition-colors"
+            onClick={() => {}}
+          >
+            <Upload size={20} className="mx-auto text-[var(--ink-muted)]" />
+            <p className="text-xs font-semibold text-[var(--ink)]">
+              Drop RFP, Spec, or Documentation here
+            </p>
+            <p className="text-[11px] text-[var(--ink-muted)]">
+              We'll automatically initialize and index the workspace from your document.
+            </p>
+            <label className="inline-block mt-2">
+              <Button variant="secondary" size="xs" type="button">
+                Browse file
               </Button>
-            </header>
-
-            <div className="modal-form">
-              {/* Option A: Drop / Select Document to Start */}
-              <div
-                className={`notebook-dropzone modal-dropzone ${isDragging ? "dragging" : ""}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
+              <input
+                type="file"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setIsCreateModalOpen(false);
+                    onUploadToNewWorkspace(file).catch(() => undefined);
+                  }
                 }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  handleFileDrop(e);
-                  setIsCreateOpen(false);
-                }}
-              >
-                <Upload size={18} className="dropzone-icon" />
-                <div className="dropzone-text">
-                  <strong>{t("library.drag_drop_title")}</strong>
-                  <span>{t("library.drag_drop_desc")}</span>
-                </div>
-                <label className="btn-dropzone-browse">
-                  Browse file
-                  <input
-                    type="file"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        setIsCreateOpen(false);
-                        uploadToNewWorkspace(f).catch(() => undefined);
-                      }
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
-
-              <div className="modal-form-divider">
-                <span>or configure manually</span>
-              </div>
-
-              <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <label className="form-field">
-                  <span>{t("library.workspace_name_label")}</span>
-                  <input
-                    type="text"
-                    placeholder={t("library.workspace_name_placeholder")}
-                    value={newWorkspaceName}
-                    onChange={(e) => setNewWorkspaceName(e.target.value)}
-                    autoFocus
-                    required
-                  />
-                </label>
-
-                <div className="form-field">
-                  <span>{t("library.template_select_label")}</span>
-                  <div className="template-selection-grid">
-                    {TEMPLATES.map((tmpl) => (
-                      <label
-                        key={tmpl.id}
-                        className={`template-option ${selectedTemplate === tmpl.id ? "selected" : ""}`}
-                      >
-                        <input
-                          type="radio"
-                          name="template"
-                          value={tmpl.id}
-                          checked={selectedTemplate === tmpl.id}
-                          onChange={() => setSelectedTemplate(tmpl.id)}
-                        />
-                        <div className="option-icon" style={{ background: tmpl.bg, color: tmpl.color }}>
-                          <tmpl.icon size={16} />
-                        </div>
-                        <div className="option-text">
-                          <strong>{tmpl.title}</strong>
-                          <small>{tmpl.description}</small>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="modal-actions-footer">
-                  <Button type="button" className="btn-modal-cancel" onClick={() => setIsCreateOpen(false)}>
-                    {t("library.btn_cancel")}
-                  </Button>
-                  <Button type="submit" className="btn-primary-gradient" disabled={!newWorkspaceName.trim() || isCreating}>
-                    {isCreating ? t("library.btn_creating") : t("library.btn_create")}
-                  </Button>
-                </div>
-              </form>
-            </div>
+              />
+            </label>
           </div>
+
+          <div className="flex items-center gap-3">
+            <span className="flex-1 h-px bg-[var(--hairline)]" />
+            <span className="text-[10px] font-mono text-[var(--ink-faint)] uppercase">or start empty</span>
+            <span className="flex-1 h-px bg-[var(--hairline)]" />
+          </div>
+
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink)] mb-1">
+                Workspace Name
+              </label>
+              <Input
+                placeholder="e.g. Apex Horizon RFP Technical Proposal"
+                value={newWorkspaceName}
+                onChange={(e) => setNewWorkspaceName(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="human"
+                size="sm"
+                type="submit"
+                disabled={!newWorkspaceName.trim() || isCreating}
+              >
+                {isCreating ? "Creating…" : "Create Workspace"}
+              </Button>
+            </div>
+          </form>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
 
-// Backward-compatibility alias
-export const NotebookLibrary = WorkspaceLibrary;
+export default WorkspaceLibrary;

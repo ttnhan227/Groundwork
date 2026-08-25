@@ -1,32 +1,28 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
-  ArrowLeft,
-  FileText,
-  Trash2,
-  CheckCircle2,
-  Send,
-  Square,
   ShieldCheck,
-  Download,
-  Eye,
-  ExternalLink,
-  CheckSquare,
-  Square as SquareOutline,
-  Sun,
-  Moon,
-  Search,
-  Check,
-  AlertTriangle,
-  Lock,
-  Unlock,
+  FileText,
   FileCheck2,
-  RefreshCw,
+  Layers,
   Sparkles,
-  CheckCheck,
-  AlertCircle,
-  FileCode,
+  RefreshCw,
+  Eye,
+  PanelRightClose,
+  PanelRight,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { Tabs } from "../../components/ui/Tabs";
+import { TopBar } from "../../components/layout/TopBar";
+import { SourcesSidebar } from "../sources/SourcesSidebar";
+import { BlockItem } from "../editor/BlockItem";
+import { MarginColumn } from "../agent/MarginColumn";
+import { AgentBottomBar } from "../agent/AgentBottomBar";
+import { AgentReasoningDrawer } from "../agent/AgentReasoningDrawer";
+import { ReviewFindingsAudit } from "../change-log/ReviewFindingsAudit";
+import { TraceabilityMatrix } from "../verification/TraceabilityMatrix";
+import { ProvenanceAppendix } from "../verification/ProvenanceAppendix";
+import { getContextualSuggestions } from "./contextualSuggestions";
+import { API, api, streamWorkspaceAgent, downloadTextFile } from "../../api/client";
 import type {
   Workspace,
   DocumentItem,
@@ -40,10 +36,12 @@ import type {
   AgentTaskStep,
   AuthResult,
 } from "../../types";
-import { API, api, streamWorkspaceAgent, downloadTextFile, authenticatedFetch } from "../../api/client";
-import { BrandMark } from "../../components/common/BrandMark";
-import { useTranslation } from "../../i18n";
-import { getContextualSuggestions } from "./contextualSuggestions";
+
+// Groundwork Agentic Workspace Architecture:
+// - Multi-Step Task Execution with SSE streaming
+// - Verifiable Requirements Traceability Matrix & Review Findings Audit
+// - Unsupported claim detection with deterministic Export Deliverable gate
+// - Sources, Grounded Agent, Artifacts, Studio & Notes
 
 export interface ResearchWorkspaceProps {
   auth: AuthResult;
@@ -51,6 +49,8 @@ export interface ResearchWorkspaceProps {
   documents: DocumentItem[];
   nativeDocs: NativeDocument[];
   activeTheme: "light" | "dark";
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
   onBackToLibrary: () => void;
   onUploadDocument: (file: File, workspaceId: string) => Promise<DocumentItem | null>;
   onDeleteDocument: (docId: string) => Promise<void>;
@@ -59,14 +59,14 @@ export interface ResearchWorkspaceProps {
   onOpenViewer?: (docId: string, pageNumber?: number) => void;
 }
 
-export type NotebookWorkspaceProps = ResearchWorkspaceProps;
-
 export function ResearchWorkspace({
   auth,
   workspace,
   documents,
   nativeDocs,
   activeTheme,
+  isSidebarOpen = true,
+  onToggleSidebar = () => {},
   onBackToLibrary,
   onUploadDocument,
   onDeleteDocument,
@@ -74,8 +74,7 @@ export function ResearchWorkspace({
   onToggleTheme,
   onOpenViewer,
 }: ResearchWorkspaceProps) {
-  const { t, language } = useTranslation();
-  // Sources state
+  // Filter sources for this workspace
   const workspaceSources = useMemo(() => {
     return documents.filter((d) => d.workspace_id === workspace.id);
   }, [documents, workspace.id]);
@@ -85,7 +84,21 @@ export function ResearchWorkspace({
     setSelectedSourceIds(workspaceSources.map((s) => s.id));
   }, [workspaceSources]);
 
-  // Active deliverable / artifact
+  function toggleSource(sourceId: string) {
+    setSelectedSourceIds((prev) =>
+      prev.includes(sourceId) ? prev.filter((id) => id !== sourceId) : [...prev, sourceId],
+    );
+  }
+
+  function selectAllSources() {
+    setSelectedSourceIds(workspaceSources.map((s) => s.id));
+  }
+
+  function deselectAllSources() {
+    setSelectedSourceIds([]);
+  }
+
+  // Active artifact / deliverable
   const workspaceArtifacts = useMemo(() => {
     return nativeDocs.filter((n) => n.workspace_id === workspace.id);
   }, [nativeDocs, workspace.id]);
@@ -101,22 +114,20 @@ export function ResearchWorkspace({
     return workspaceArtifacts.find((a) => a.id === activeArtifactId) || workspaceArtifacts[0] || null;
   }, [workspaceArtifacts, activeArtifactId]);
 
-  // Right Panel Tabs: "audit" (findings + readiness), "matrix" (requirements), "appendix" (provenance)
+  // Layout panels
+  const [isSourcesOpen, setIsSourcesOpen] = useState(true);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<"audit" | "matrix" | "appendix">("audit");
-  // Mobile responsive column view tab
-  const [mobileTab, setMobileTab] = useState<"sources" | "editor" | "audit">("editor");
 
-  // Chat & Agent state
+  // Agent & Execution state
+  const [promptInput, setPromptInput] = useState("");
+  const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [promptInput, setPromptInput] = useState("");
-  const [actionType, _setActionType] = useState<string>("auto");
-  const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [activeSteps, setActiveSteps] = useState<AgentTaskStep[]>([]);
   const [streamingText, setStreamingText] = useState("");
-  const [isAgentExpanded, setIsAgentExpanded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   // Deliverable details state
   const [requirements, setRequirements] = useState<DeliverableRequirement[]>([]);
@@ -126,37 +137,10 @@ export function ResearchWorkspace({
   const [editableBlocks, setEditableBlocks] = useState<NativeBlock[]>([]);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isResolvingFindingId, setIsResolvingFindingId] = useState<string | null>(null);
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [isRunningAudit, setIsRunningAudit] = useState(false);
-  const [isLoadingArtifactDetails, setIsLoadingArtifactDetails] = useState(false);
-  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
 
-  // Initial load of conversation
-  useEffect(() => {
-    async function loadWorkspaceData() {
-      setIsLoadingConversation(true);
-      try {
-        const convs = await api<Array<{ id: string }>>(`/conversations?workspace_id=${workspace.id}`, auth.access_token);
-        if (convs && convs.length > 0) {
-          const latestConv = convs[0];
-          setConversationId(latestConv.id);
-          const fullConv = await api<{ messages?: ChatMessage[] }>(`/conversations/${latestConv.id}`, auth.access_token);
-          if (fullConv?.messages) {
-            setMessages(fullConv.messages);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load workspace conversation", err);
-      } finally {
-        setIsLoadingConversation(false);
-      }
-    }
-    loadWorkspaceData();
-  }, [workspace.id, auth.access_token]);
-
-  // Load deliverable details whenever active artifact changes
+  // Load deliverable details
   const reloadArtifactDetails = async () => {
     if (!activeArtifact) {
       setRequirements([]);
@@ -165,7 +149,6 @@ export function ResearchWorkspace({
       setEditableBlocks([]);
       return;
     }
-    setIsLoadingArtifactDetails(true);
     try {
       const [reqs, fnds, rdn, blocks] = await Promise.all([
         api<DeliverableRequirement[]>(
@@ -191,8 +174,6 @@ export function ResearchWorkspace({
       setEditableBlocks(blocks || activeArtifact.content?.blocks || []);
     } catch (err) {
       console.error("Failed to load artifact details", err);
-    } finally {
-      setIsLoadingArtifactDetails(false);
     }
   };
 
@@ -201,45 +182,39 @@ export function ResearchWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeArtifact?.id, workspace.id, auth.access_token]);
 
-  // Auto-scroll chat when active
+  // Initial load of conversation
   useEffect(() => {
-    if (isAgentExpanded || isAgentRunning) {
-      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    async function loadWorkspaceData() {
+      try {
+        const convs = await api<Array<{ id: string }>>(
+          `/conversations?workspace_id=${workspace.id}`,
+          auth.access_token,
+        );
+        if (convs && convs.length > 0) {
+          const latestConv = convs[0];
+          setConversationId(latestConv.id);
+          const fullConv = await api<{ messages?: ChatMessage[] }>(
+            `/conversations/${latestConv.id}`,
+            auth.access_token,
+          );
+          if (fullConv?.messages) {
+            setMessages(fullConv.messages);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load workspace conversation", err);
+      }
     }
-  }, [messages, streamingText, activeSteps, isAgentExpanded, isAgentRunning]);
-
-  // Toggle source selection
-  function toggleSource(sourceId: string) {
-    setSelectedSourceIds((prev) =>
-      prev.includes(sourceId) ? prev.filter((id) => id !== sourceId) : [...prev, sourceId],
-    );
-  }
-
-  function selectAllSources() {
-    setSelectedSourceIds(workspaceSources.map((s) => s.id));
-  }
-
-  function deselectAllSources() {
-    setSelectedSourceIds([]);
-  }
-
-  async function handleRetryDocument(docId: string) {
-    try {
-      await api(`/documents/${docId}/retry`, auth.access_token, { method: "POST" });
-      await reloadArtifactDetails();
-    } catch (err: unknown) {
-      alert((err as Error)?.message || "Failed to retry document processing");
-    }
-  }
+    loadWorkspaceData();
+  }, [workspace.id, auth.access_token]);
 
   // Handle agent streaming execution
-  async function handleSendPrompt(customPrompt?: string, customAction?: string) {
+  async function handleSendPrompt(customPrompt?: string) {
     const textToSend = customPrompt || promptInput;
     if (!textToSend.trim() || isAgentRunning) return;
 
-    const currentAction = customAction || actionType;
     setPromptInput("");
-    setIsAgentExpanded(true);
+    setIsDrawerOpen(true);
 
     const userMessage: ChatMessage = {
       role: "user",
@@ -263,7 +238,7 @@ export function ResearchWorkspace({
         {
           workspace_id: workspace.id,
           prompt: textToSend,
-          action_type: currentAction,
+          action_type: "auto",
           source_document_ids: selectedSourceIds,
           conversation_id: conversationId ?? undefined,
           artifact_id: activeArtifactId ?? undefined,
@@ -302,9 +277,7 @@ export function ResearchWorkspace({
             reloadArtifactDetails();
           },
           onComplete: (data) => {
-            if (data.conversation_id) {
-              setConversationId(data.conversation_id);
-            }
+            if (data.conversation_id) setConversationId(data.conversation_id);
             setActiveSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
             const aiMessage: ChatMessage = {
               role: "assistant",
@@ -320,15 +293,18 @@ export function ResearchWorkspace({
           onError: (errStr) => {
             setActiveSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
             const rawMessage = (errStr || "").replace(/^⚠️\s*/, "").replace(/^Error during execution:\s*/i, "");
-            const friendly = rawMessage.includes("sqlalche.me") || rawMessage.includes("Session") || rawMessage.includes("DetachedInstance")
-              ? "A momentary synchronization error occurred. Please try resending your prompt."
-              : rawMessage || "An unexpected error occurred during execution. Please try again.";
-            const errorMessage: ChatMessage = {
-              role: "assistant",
-              content: `⚠️ ${friendly}`,
-              created_at: new Date().toISOString(),
-            };
-            setMessages((prev) => [...prev, errorMessage]);
+            const friendly =
+              rawMessage.includes("sqlalche.me") || rawMessage.includes("Session")
+                ? "A momentary synchronization error occurred. Please try resending your prompt."
+                : rawMessage || "An unexpected error occurred during execution.";
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: `⚠️ ${friendly}`,
+                created_at: new Date().toISOString(),
+              },
+            ]);
             setStreamingText("");
             setIsAgentRunning(false);
           },
@@ -337,16 +313,11 @@ export function ResearchWorkspace({
       );
     } catch (err: unknown) {
       if ((err as Error)?.name !== "AbortError") {
-        setActiveSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
-        const rawMessage = (err as Error)?.message || "";
-        const friendly = rawMessage.includes("sqlalche.me") || rawMessage.includes("Session")
-          ? "A momentary synchronization error occurred. Please try resending your prompt."
-          : rawMessage || "Failed to execute task. Please try again.";
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `⚠️ ${friendly}`,
+            content: `⚠️ ${(err as Error)?.message || "Failed to execute task"}`,
             created_at: new Date().toISOString(),
           },
         ]);
@@ -367,7 +338,7 @@ export function ResearchWorkspace({
     }
   }
 
-  // Save modified deliverable blocks
+  // Save modified blocks
   async function handleSaveBlocks() {
     if (!activeArtifact) return;
     setIsSavingDraft(true);
@@ -390,22 +361,21 @@ export function ResearchWorkspace({
     }
   }
 
-  // One-click Resolution of Review Finding (The flagship interactive moment)
-  async function handleResolveFinding(finding: DeliverableReviewFinding, action: "accept" | "resolve" | "reject" = "accept") {
+  // 1-Click Resolve Review Finding (Signature Interaction)
+  async function handleResolveFinding(
+    finding: DeliverableReviewFinding,
+    action: "accept" | "reject" = "accept",
+  ) {
     if (!activeArtifact || isResolvingFindingId) return;
     setIsResolvingFindingId(finding.id);
     try {
-      await api(
-        `/review-findings/${finding.id}/decision`,
-        auth.access_token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }),
-        },
-      );
+      await api(`/review-findings/${finding.id}/decision`, auth.access_token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
 
-      // Optimistically update local blocks if accepting proposed text
+      // Optimistically update local block text with proposed revision
       if (action === "accept" && finding.proposed_text && finding.claim_text) {
         setEditableBlocks((prev) =>
           prev.map((b) => {
@@ -417,7 +387,6 @@ export function ResearchWorkspace({
         );
       }
 
-      // Refresh backend readiness and details
       await reloadArtifactDetails();
     } catch (err) {
       console.error("Failed to resolve finding", err);
@@ -426,20 +395,16 @@ export function ResearchWorkspace({
     }
   }
 
-  // Trigger Whole-Deliverable Verification
+  // Run whole-deliverable verification audit
   async function handleRunAudit() {
     if (!activeArtifact || isRunningAudit) return;
     setIsRunningAudit(true);
     try {
-      await api(
-        `/workspaces/${workspace.id}/native-documents/${activeArtifact.id}/review`,
-        auth.access_token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "full" }),
-        },
-      );
+      await api(`/workspaces/${workspace.id}/native-documents/${activeArtifact.id}/review`, auth.access_token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "full" }),
+      });
       await reloadArtifactDetails();
     } catch (err) {
       console.error("Audit run failed", err);
@@ -449,10 +414,8 @@ export function ResearchWorkspace({
   }
 
   // Export Deliverable
-  async function handleExport(format: "pdf" | "docx" | "md" | "txt") {
-    if (!activeArtifact || isExporting) return;
-    setIsExporting(true);
-    setIsExportMenuOpen(false);
+  async function handleExport(format: "pdf" | "docx" | "md") {
+    if (!activeArtifact) return;
     try {
       const exportData = await api<{ download_url?: string; content?: string }>(
         `/workspaces/${workspace.id}/native-documents/${activeArtifact.id}/export?format=${format}`,
@@ -464,21 +427,16 @@ export function ResearchWorkspace({
         downloadTextFile(`${activeArtifact.title || "deliverable"}.${format}`, exportData.content);
       }
     } catch (err: unknown) {
-      alert((err as Error)?.message || "Export failed. Please ensure all verification findings are resolved.");
-    } finally {
-      setIsExporting(false);
+      alert((err as Error)?.message || "Export failed. Please verify all claims.");
     }
   }
 
   // Calculate open findings & readiness
-  const openFindings = useMemo(() => {
-    return findings.filter((f) => f.status === "open");
-  }, [findings]);
-
-  const coveredRequirementsCount = useMemo(() => {
-    return requirements.filter((r) => r.status === "covered" || r.status === "waived").length;
-  }, [requirements]);
-
+  const openFindings = useMemo(() => findings.filter((f) => f.status === "open"), [findings]);
+  const coveredRequirementsCount = useMemo(
+    () => requirements.filter((r) => r.status === "covered" || r.status === "waived").length,
+    [requirements],
+  );
   const readinessScore = useMemo(() => {
     if (requirements.length === 0) return 0;
     const reqRatio = coveredRequirementsCount / requirements.length;
@@ -488,7 +446,6 @@ export function ResearchWorkspace({
 
   const isExportBlocked = readiness?.status !== "ready" && (openFindings.length > 0 || readinessScore < 100);
 
-  // Dynamic context-aware agent suggestion chips based on active documents, findings, and requirements
   const contextualSuggestions = useMemo(() => {
     return getContextualSuggestions({
       workspace,
@@ -496,1039 +453,297 @@ export function ResearchWorkspace({
       requirements,
       openFindings,
       activeArtifact,
-      language,
+      language: "en",
     });
-  }, [workspace, workspaceSources, requirements, openFindings, activeArtifact, language]);
-
-  // Helper to parse citations from draft text and make them clickable
-  function renderBlockContentWithCitations(text: string, _isFlagged?: boolean) {
-    const citationRegex = /\[(?:Source|Evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]/gi;
-    const parts: (string | React.ReactNode)[] = [];
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = citationRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(text.slice(lastIndex, match.index));
-      }
-      const docName = match[1]?.trim();
-      const pageNum = match[2] ? parseInt(match[2], 10) : 1;
-      const matchedDoc = workspaceSources.find(
-        (s) => s.filename.toLowerCase().includes(docName.toLowerCase()) || docName.toLowerCase().includes(s.filename.toLowerCase()),
-      );
-
-      parts.push(
-        <Button
-          key={match.index}
-          className="inline-citation-badge"
-          onClick={() => {
-            if (matchedDoc) {
-              onOpenViewer?.(matchedDoc.id, pageNum);
-            } else if (workspaceSources.length > 0) {
-              onOpenViewer?.(workspaceSources[0].id, pageNum);
-            }
-          }}
-          title={`View evidence on page ${pageNum} of ${docName}`}
-        >
-          <ExternalLink size={10} />
-          <span>{docName}</span>
-          <strong>p. {pageNum}</strong>
-        </Button>,
-      );
-      lastIndex = citationRegex.lastIndex;
-    }
-
-    if (lastIndex < text.length) {
-      parts.push(text.slice(lastIndex));
-    }
-
-    return parts;
-  }
+  }, [workspace, workspaceSources, requirements, openFindings, activeArtifact]);
 
   return (
-    <div className="groundwork-workspace-root research-workspace-3col notebook-workspace-3col">
-      {/* ================= TOP WORKSPACE HEADER ================= */}
-      <header className="groundwork-topbar">
-        <div className="topbar-left">
-          <Button variant="secondary" className="btn-back-workspaces" onClick={onBackToLibrary} title={t("workspace.back_to_library")}>
-            <ArrowLeft size={14} />
-            <span>{t("workspace.back_to_library")}</span>
-          </Button>
-          <div className="topbar-sep" />
-          <div className="topbar-project-meta">
-            <BrandMark size={16} />
-            <strong className="topbar-workspace-name">{workspace.name}</strong>
-            <span className="topbar-badge-deliverable">
-              <FileCheck2 size={12} />
-              {activeArtifact?.title || "Technical Deliverable"}
-            </span>
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col h-full bg-[var(--paper)] overflow-hidden research-workspace-3col notebook-workspace-3col min-w-0 w-full">
+      {/* TopBar */}
+      <TopBar
+        workspace={workspace}
+        activeDoc={activeArtifact}
+        sourcesCount={workspaceSources.length}
+        selectedSourcesCount={selectedSourceIds.length}
+        isAgentRunning={isAgentRunning}
+        activeAgentStepLabel={activeSteps.find((s) => s.status === "in_progress")?.label}
+        readinessScore={readinessScore}
+        isExportBlocked={isExportBlocked}
+        openFindingsCount={openFindings.length}
+        isSidebarOpen={isSidebarOpen}
+        isSourcesOpen={isSourcesOpen}
+        isRightPanelOpen={isRightPanelOpen}
+        onToggleSidebar={onToggleSidebar}
+        onToggleSources={() => setIsSourcesOpen((v) => !v)}
+        onToggleRightPanel={() => setIsRightPanelOpen((v) => !v)}
+        onOpenAudit={() => {
+          setIsRightPanelOpen(true);
+          setRightPanelTab("audit");
+        }}
+        onExport={handleExport}
+      />
 
-        {/* Center: Grounding Evidence Status & Active Agent Status */}
-        <div className="topbar-center">
-          <div className="grounding-status-pill">
-            <ShieldCheck size={14} className="icon-emerald" />
-            <span>
-              {t("workspace.sources_grounded", { selected: selectedSourceIds.length, total: workspaceSources.length })}
-            </span>
-          </div>
-          {isAgentRunning && (
-            <div className="topbar-agent-live-badge" role="status" aria-live="polite">
-              <RefreshCw size={12} className="spin" />
-              <span>
-                {activeSteps.find((s) => s.status === "in_progress")?.label || t("agent.active_working")}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Readiness Score + Export Gate */}
-        <div className="topbar-right">
-          {/* Readiness Score Widget */}
-          <div className={`readiness-topbar-widget ${isExportBlocked ? "status-blocked" : "status-ready"}`}>
-            <div className="readiness-meter-ring">
-              <span className="score-number">{readinessScore}%</span>
-            </div>
-            <div className="readiness-text-group">
-              <span className="readiness-label">{t("workspace.readiness_gate")}</span>
-              <span className="readiness-state">
-                {isExportBlocked ? t(openFindings.length === 1 ? "workspace.issues_unresolved" : "workspace.issues_unresolved_plural", { count: openFindings.length }) : t("workspace.verified_100")}
-              </span>
-            </div>
-          </div>
-
-          {/* Export Gate Button */}
-          <div className="export-gate-wrapper">
-            <Button
-              className={`btn-export-gate ${isExportBlocked ? "gate-blocked" : "gate-unlocked"}`}
-              onClick={() => {
-                if (isExportBlocked) {
-                  setRightPanelTab("audit");
-                } else {
-                  setIsExportMenuOpen((prev) => !prev);
-                }
-              }}
-              title={
-                isExportBlocked
-                  ? `Export is blocked: ${readiness?.blockers?.[0] || `${openFindings.length} unverified finding(s) remaining`}`
-                  : "All claims verified. Ready to export deliverable."
+      {/* Main 3-Column Document Body */}
+      <div className="flex-1 flex overflow-hidden min-w-0 w-full relative">
+        {/* Left: Sources & Grounding Sidebar */}
+        {isSourcesOpen ? (
+          <SourcesSidebar
+            sources={workspaceSources}
+            selectedSourceIds={selectedSourceIds}
+            isUploading={isUploadingSource}
+            onToggleSource={toggleSource}
+            onSelectAll={selectAllSources}
+            onDeselectAll={deselectAllSources}
+            onUploadFile={async (file) => {
+              setIsUploadingSource(true);
+              try {
+                await onUploadDocument(file, workspace.id);
+              } finally {
+                setIsUploadingSource(false);
               }
+            }}
+            onDeleteSource={(id) => onDeleteDocument(id)}
+            onRetrySource={async (id) => {
+              try {
+                await api(`/documents/${id}/retry`, auth.access_token, { method: "POST" });
+              } catch (err: unknown) {
+                alert((err as Error)?.message || "Retry failed");
+              }
+            }}
+            onOpenViewer={(id, page) => onOpenViewer?.(id, page)}
+          />
+        ) : (
+          <div className="w-11 border-r border-[var(--hairline)] bg-[var(--surface)] flex flex-col items-center py-3 gap-3 select-none flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setIsSourcesOpen(true)}
+              className="text-[var(--ink-muted)] hover:text-[var(--ink)]"
+              title="Expand Evidence Sources"
             >
-              {isExportBlocked ? (
-                <>
-                  <Lock size={13} />
-                  <span>{t(openFindings.length === 1 ? "workspace.issues_unresolved" : "workspace.issues_unresolved_plural", { count: openFindings.length })}</span>
-                </>
-              ) : (
-                <>
-                  <Unlock size={13} />
-                  <span>{t("workspace.export_deliverable")}</span>
-                </>
-              )}
+              <FileText size={15} />
             </Button>
-
-            {/* Export Dropdown Menu */}
-            {isExportMenuOpen && !isExportBlocked && (
-              <div className="export-dropdown-menu">
-                <div className="dropdown-header">
-                  <strong>{t("workspace.export_deliverable")}</strong>
-                  <small>{t("workspace.export_pdf_desc")}</small>
-                </div>
-                <div className="dropdown-options">
-                  <Button onClick={() => handleExport("pdf")} className="export-opt-btn">
-                    <FileText size={14} />
-                    <span>{t("workspace.export_pdf")}</span>
-                    <span className="pill-fmt">Ready</span>
-                  </Button>
-                  <Button onClick={() => handleExport("docx")} className="export-opt-btn">
-                    <FileCheck2 size={14} />
-                    <span>{t("workspace.export_docx")}</span>
-                    <span className="pill-fmt">Ready</span>
-                  </Button>
-                  <Button onClick={() => handleExport("md")} className="export-opt-btn">
-                    <FileCode size={14} />
-                    <span>{t("workspace.export_md")}</span>
-                    <span className="pill-fmt">Ready</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <Button className="btn-theme-toggle" onClick={onToggleTheme} title={activeTheme === "dark" ? t("nav.light_mode") : t("nav.dark_mode")} aria-label="Toggle theme">
-            {activeTheme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-          </Button>
-
-          <Button className="btn-user-chip" onClick={onOpenAccount} title="Account Settings">
-            <span>{auth.user.display_name}</span>
-          </Button>
-        </div>
-      </header>
-
-      {/* ================= 3-COLUMN MAIN WORKSPACE ================= */}
-      {/* Mobile tab navigation bar (visible only at mobile viewport) */}
-      <nav className="workspace-mobile-nav-bar" aria-label="Workspace views">
-        <Button
-          className={`mobile-nav-tab ${mobileTab === "sources" ? "active" : ""}`}
-          onClick={() => setMobileTab("sources")}
-        >
-          <FileText size={13} />
-          <span>{t("sources.heading")}</span>
-          <span className="count-tag">{workspaceSources.length}</span>
-        </Button>
-        <Button
-          className={`mobile-nav-tab ${mobileTab === "editor" ? "active" : ""}`}
-          onClick={() => setMobileTab("editor")}
-        >
-          <FileCheck2 size={13} />
-          <span>{activeArtifact?.title || "Deliverable"}</span>
-        </Button>
-        <Button
-          className={`mobile-nav-tab ${mobileTab === "audit" ? "active" : ""}`}
-          onClick={() => setMobileTab("audit")}
-        >
-          <ShieldCheck size={13} />
-          <span>{t("audit.tab_verification")}</span>
-          {openFindings.length > 0 && <span className="badge-finding-count">{openFindings.length}</span>}
-        </Button>
-      </nav>
-
-      <div className="groundwork-workspace-body">
-        {/* ================= COLUMN 1: SOURCES & EVIDENCE ================= */}
-        <aside className={`groundwork-col-sources ${mobileTab === "sources" ? "mobile-active" : ""}`}>
-          <div className="sources-header-bar">
-            <div className="sources-title-group">
-              <strong className="panel-heading">{t("sources.heading")}</strong>
-              <span className="count-tag">{t("sources.files_count", { count: workspaceSources.length })}</span>
-            </div>
-
-            <label className={`btn-add-evidence ${isUploadingSource ? "disabled" : ""}`} title="Upload new source document">
-              <RefreshCw size={13} className={isUploadingSource ? "spin" : ""} />
-              <span>{isUploadingSource ? t("sources.btn_uploading") : t("sources.btn_add")}</span>
-              <input
-                type="file"
-                disabled={isUploadingSource}
-                style={{ display: "none" }}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) {
-                    setIsUploadingSource(true);
-                    try {
-                      await onUploadDocument(f, workspace.id);
-                    } catch (err: unknown) {
-                      alert((err as Error)?.message || "Failed to upload document");
-                    } finally {
-                      setIsUploadingSource(false);
-                      e.target.value = "";
-                    }
-                  }
-                }}
-              />
-            </label>
-          </div>
-
-          {/* Source Selection & Grounding Controls */}
-          <div className="sources-controls-bar">
-            <span className="grounding-info">
-              {t("sources.active_in_grounding", { selected: selectedSourceIds.length, total: workspaceSources.length })}
+            <span className="text-[10px] font-mono font-bold text-[var(--ink-blue)] px-1 py-0.5 rounded bg-[var(--ink-blue-subtle)]">
+              {workspaceSources.length}
             </span>
-            <div className="grounding-toggles">
-              <Button onClick={selectAllSources} className="btn-link-action">{t("sources.btn_all")}</Button>
-              <span>·</span>
-              <Button onClick={deselectAllSources} className="btn-link-action">{t("sources.btn_none")}</Button>
-            </div>
           </div>
+        )}
 
-          {/* Sources List */}
-          <div className="sources-list-scroll">
-            {workspaceSources.length > 0 ? (
-              workspaceSources.map((doc) => {
-                const isSelected = selectedSourceIds.includes(doc.id);
-                return (
-                  <div key={doc.id} className={`source-card-item ${isSelected ? "is-selected" : ""}`}>
+        {/* Center: Block-Based Document Canvas */}
+        <main className="flex-1 flex flex-col min-w-0 bg-[var(--paper)] overflow-hidden groundwork-col-draft">
+          <div className="flex-1 flex overflow-y-auto justify-center px-4 sm:px-8 md:px-12 py-8 sm:py-12 min-w-0">
+            {/* Single-Column Document Paper Sheet */}
+            <div className="w-full max-w-[760px] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] p-8 sm:p-12 md:p-14 mb-16 min-h-[650px] h-fit flex flex-col min-w-0">
+              {/* Document Title Header */}
+              <div className="border-b border-[var(--hairline-subtle)] pb-6 mb-8 min-w-0">
+                {/* 1. Action Row */}
+                <div className="flex items-center justify-between gap-4 mb-6 min-w-0">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--ink-muted)] truncate">
+                    Deliverables, Artifacts &amp; Studio · Grounded Agent Canvas
+                  </span>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
-                      className="source-select-checkbox"
-                      onClick={() => toggleSource(doc.id)}
-                      aria-label={isSelected ? "Deselect source" : "Select source"}
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => (isEditingContent ? handleSaveBlocks() : setIsEditingContent(true))}
+                      className="text-[var(--ink-secondary)] hover:text-[var(--ink)]"
                     >
-                      {isSelected ? <CheckSquare size={14} /> : <SquareOutline size={14} />}
+                      {isEditingContent ? (isSavingDraft ? "Saving…" : "Save Changes") : "Edit Text"}
                     </Button>
 
-                    <div className="source-info-wrap" onClick={() => toggleSource(doc.id)}>
-                      <div className="source-title-text" title={doc.filename}>
-                        {doc.filename}
-                      </div>
-                      <div className="source-meta-row">
-                        <span className="page-count-badge">
-                          {doc.page_count ? `${doc.page_count} pgs` : "1 pg"}
-                        </span>
-                        {doc.status === "failed" ? (
-                          <span className="status-failed-badge" title={doc.error_message || "Document processing failed"}>
-                            <AlertTriangle size={10} /> {t("sources.status_failed")}
-                          </span>
-                        ) : doc.status === "processing" || doc.status === "queued" ? (
-                          <span className="status-processing-badge">
-                            <RefreshCw size={10} className="spin" /> {t("sources.status_indexing")}
-                          </span>
-                        ) : (
-                          <span className="status-indexed-badge">
-                            <Check size={10} /> {t("sources.status_indexed")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="source-actions-group">
-                      {doc.status === "failed" && (
-                        <Button
-                          className="btn-source-action"
-                          onClick={() => handleRetryDocument(doc.id)}
-                          title="Retry processing"
-                          aria-label="Retry processing"
-                        >
-                          <RefreshCw size={13} />
-                        </Button>
-                      )}
-                      <Button
-                        className="btn-source-action"
-                        onClick={() => onOpenViewer?.(doc.id, 1)}
-                        title="Open document viewer & inspect pages"
-                        aria-label="Preview document"
-                      >
-                        <Eye size={13} />
-                      </Button>
-                      <Button
-                        className="btn-source-action"
-                        onClick={async () => {
-                          try {
-                            const res = await authenticatedFetch(`${API}/documents/${doc.id}/download`, auth.access_token);
-                            if (res.ok) {
-                              const blob = await res.blob();
-                              const url = URL.createObjectURL(blob);
-                              const a = window.document.createElement("a");
-                              a.href = url;
-                              a.download = doc.filename;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }
-                          } catch {
-                            // ignore download error
-                          }
-                        }}
-                        title="Download file"
-                        aria-label="Download original"
-                      >
-                        <Download size={13} />
-                      </Button>
-                      <Button
-                        className="btn-source-action btn-danger-action"
-                        onClick={() => onDeleteDocument(doc.id)}
-                        title="Remove source"
-                        aria-label="Delete source"
-                      >
-                        <Trash2 size={13} />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="sources-empty-state">
-                <FileText size={28} className="empty-icon" />
-                <strong>{t("sources.empty_title")}</strong>
-                <small>{t("sources.empty_desc")}</small>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Dropzone */}
-          <div className="sources-dropzone-footer">
-            <label className={`dropzone-box ${isUploadingSource ? "disabled" : ""}`}>
-              <RefreshCw size={14} className={isUploadingSource ? "spin" : ""} />
-              <span>{isUploadingSource ? t("sources.attach_pdf_uploading") : t("sources.attach_pdf")}</span>
-              <input
-                type="file"
-                disabled={isUploadingSource}
-                style={{ display: "none" }}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) {
-                    setIsUploadingSource(true);
-                    try {
-                      await onUploadDocument(f, workspace.id);
-                    } catch (err: unknown) {
-                      alert((err as Error)?.message || "Upload failed");
-                    } finally {
-                      setIsUploadingSource(false);
-                      e.target.value = "";
-                    }
-                  }
-                }}
-              />
-            </label>
-          </div>
-        </aside>
-
-        {/* ================= COLUMN 2: DELIVERABLE DRAFT & STUDIO (Center - Visually Dominant) ================= */}
-        <main className={`groundwork-col-draft ${mobileTab === "editor" ? "mobile-active" : ""}`}>
-          {/* Draft Toolbar & Meta */}
-          <div className="draft-top-toolbar studio-toolbar">
-            <div className="draft-meta-title">
-              <span className="doc-category-tag">Deliverables, Artifacts, Studio & Notes</span>
-              <h2 className="draft-heading-title">{activeArtifact?.title || "Technical Proposal"}</h2>
-              <div className="draft-submeta">
-                <span>Revision {activeArtifact?.revision || 1}</span>
-                <span>·</span>
-                <span className="meta-sources-count">{selectedSourceIds.length} sources linked</span>
-                <span>·</span>
-                <span className="meta-blocks-count">{editableBlocks.length} sections</span>
-              </div>
-            </div>
-
-            <div className="draft-action-buttons">
-              <Button
-                className={`btn-toolbar-toggle ${isEditingContent ? "active" : ""}`}
-                onClick={() => (isEditingContent ? handleSaveBlocks() : setIsEditingContent(true))}
-                title={isEditingContent ? "Save draft edits" : "Edit draft text blocks"}
-              >
-                {isEditingContent ? (isSavingDraft ? t("editor.btn_saving") : t("editor.btn_save_draft")) : "Edit Content"}
-              </Button>
-
-              <Button
-                className="btn-toolbar-audit"
-                onClick={handleRunAudit}
-                disabled={isRunningAudit}
-                title="Run automated verification audit across all claims and requirements"
-              >
-                <RefreshCw size={13} className={isRunningAudit ? "spin" : ""} />
-                <span>{isRunningAudit ? t("editor.btn_verifying") : t("editor.btn_reverify")}</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Draft Document Paper Canvas */}
-          <div className="draft-paper-canvas">
-            <div className="draft-paper-sheet">
-              {isLoadingArtifactDetails && editableBlocks.length === 0 ? (
-                <div className="deliverable-skeleton-wrap" role="status" aria-live="polite">
-                  <div className="deliverable-skeleton-header">
-                    <RefreshCw size={14} className="spin" />
-                    <span>{t("editor.loading")}</span>
-                  </div>
-                  <div className="skeleton-shimmer deliverable-skeleton-title" />
-                  <div className="skeleton-shimmer deliverable-skeleton-meta" />
-                  <div className="skeleton-shimmer deliverable-skeleton-heading" />
-                  <div className="skeleton-shimmer deliverable-skeleton-line" />
-                  <div className="skeleton-shimmer deliverable-skeleton-line medium" />
-                  <div className="skeleton-shimmer deliverable-skeleton-line short" />
-                  <div className="skeleton-shimmer deliverable-skeleton-heading" />
-                  <div className="skeleton-shimmer deliverable-skeleton-line" />
-                  <div className="skeleton-shimmer deliverable-skeleton-line medium" />
-                  <div className="skeleton-shimmer deliverable-skeleton-line short" />
-                </div>
-              ) : editableBlocks.length === 0 ? (
-                <div className="draft-empty-state">
-                  <div className="empty-icon-wrap">
-                    <FileText size={32} />
-                  </div>
-                  <h3>{t("editor.empty_title")}</h3>
-                  <p>{t("editor.empty_desc")}</p>
-                  <div className="empty-action-chips">
-                    {contextualSuggestions.slice(0, 2).map((suggestion) => (
-                      <Button
-                        key={suggestion.id}
-                        type="button"
-                        onClick={() => handleSendPrompt(suggestion.prompt)}
-                        className="btn-empty-chip"
-                        title={suggestion.prompt}
-                      >
-                        <Sparkles size={12} />
-                        <span>{suggestion.label}</span>
-                      </Button>
-                    ))}
+                    <Button
+                      variant="agent"
+                      size="xs"
+                      onClick={handleRunAudit}
+                      disabled={isRunningAudit}
+                    >
+                      <RefreshCw size={11} className={isRunningAudit ? "spin" : ""} />
+                      <span>{isRunningAudit ? "Verifying…" : "Re-Verify"}</span>
+                    </Button>
                   </div>
                 </div>
-              ) : null}
-              {editableBlocks.map((block, index) => {
-                // Check if this block contains any open finding
-                const matchedFinding = openFindings.find(
-                  (f) => f.claim_text && block.text.toLowerCase().includes(f.claim_text.toLowerCase()),
-                );
 
-                if (block.type === "heading") {
-                  return (
-                    <div key={index} className="draft-section-heading">
-                      <h3>{block.text}</h3>
-                    </div>
+                {/* 2. Document Title Heading */}
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)] tracking-tight leading-[1.25] break-normal mb-3">
+                  {activeArtifact?.title || "Enterprise AI Security & Governance Strategy"}
+                </h1>
+
+                {/* 3. Metadata Line */}
+                <div className="flex items-center gap-3 text-xs text-[var(--ink-muted)] font-mono flex-wrap">
+                  <span>Revision {activeArtifact?.revision || 3}</span>
+                  <span>·</span>
+                  <span>{selectedSourceIds.length || 4} sources linked</span>
+                  <span>·</span>
+                  <span>{editableBlocks.length || 6} sections</span>
+                </div>
+              </div>
+
+              {/* Document Blocks List */}
+              <div className="space-y-4 flex-1 min-w-0">
+                {editableBlocks.map((block, idx) => {
+                  const matchedFinding = openFindings.find(
+                    (f) => f.claim_text && block.text.toLowerCase().includes(f.claim_text.toLowerCase()),
                   );
-                }
 
-                if (isEditingContent) {
                   return (
-                    <div key={index} className="draft-block-editor">
-                      <textarea
-                        value={block.text}
-                        onChange={(e) => {
-                          const next = [...editableBlocks];
-                          next[index] = { ...block, text: e.target.value };
-                          setEditableBlocks(next);
-                        }}
-                        rows={3}
-                        className="draft-textarea-input"
-                      />
-                    </div>
+                    <BlockItem
+                      key={idx}
+                      block={block}
+                      index={idx}
+                      isEditing={isEditingContent}
+                      matchedFinding={matchedFinding}
+                      sources={workspaceSources}
+                      isResolvingFinding={isResolvingFindingId === matchedFinding?.id}
+                      onUpdateText={(newText) => {
+                        const next = [...editableBlocks];
+                        next[idx] = { ...block, text: newText };
+                        setEditableBlocks(next);
+                      }}
+                      onOpenViewer={(docId, page) => onOpenViewer?.(docId, page)}
+                      onResolveFinding={handleResolveFinding}
+                      onPromptSection={(prompt) => handleSendPrompt(prompt)}
+                    />
                   );
-                }
+                })}
 
-                return (
-                  <div
-                    key={index}
-                    className={`draft-block-row ${block.type === "bullet" ? "is-bullet" : "is-paragraph"} ${
-                      matchedFinding ? "has-unsupported-finding" : ""
-                    }`}
-                  >
-                    {block.type === "bullet" && <span className="bullet-dot">•</span>}
-                    <div className="block-content-body">
-                      <p className="block-text-body">
-                        {renderBlockContentWithCitations(block.text, Boolean(matchedFinding))}
-                      </p>
-
-                      {/* Inline Finding Alert Callout on Flagged Claim */}
-                      {matchedFinding ? (
-                        <div className="inline-finding-callout">
-                          <div className="callout-header">
-                            <AlertTriangle size={14} className="icon-amber" />
-                            <strong>{t("editor.warning_unsupported")}</strong>
-                            <span className="badge-severity-high">{t("audit.high_severity")}</span>
-                          </div>
-                          <p className="callout-explanation">{matchedFinding.explanation}</p>
-                          <div className="callout-action-row">
-                            <Button
-                              className="btn-callout-resolve"
-                              onClick={() => handleResolveFinding(matchedFinding, "accept")}
-                              disabled={isResolvingFindingId === matchedFinding.id}
-                            >
-                              <CheckCircle2 size={13} />
-                              <span>
-                                {isResolvingFindingId === matchedFinding.id
-                                  ? t("audit.btn_applying_fix")
-                                  : t("audit.btn_apply_fix")}
-                              </span>
-                            </Button>
-                            <Button
-                              className="btn-callout-explain"
-                              onClick={() => {
-                                handleSendPrompt(
-                                  `Investigate unsupported claim: "${matchedFinding.claim_text}". Find matching evidence in active sources.`,
-                                );
-                              }}
-                            >
-                              <Search size={13} />
-                              <span>{t("editor.btn_fix_claim")}</span>
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="block-quick-actions">
-                          <Button
-                            className="btn-block-action"
-                            onClick={() =>
-                              handleSendPrompt(
-                                `Analyze and explain the evidence supporting this paragraph: "${block.text.slice(0, 100)}..."`,
-                              )
-                            }
-                            title="Ask agent to explain evidence for this section"
-                          >
-                            <ShieldCheck size={11} />
-                            <span>Explain Evidence</span>
-                          </Button>
-                          <Button
-                            className="btn-block-action"
-                            onClick={() =>
-                              handleSendPrompt(
-                                `Audit this section for ungrounded claims or missing requirements: "${block.text.slice(0, 100)}..."`,
-                              )
-                            }
-                            title="Ask agent to audit this section"
-                          >
-                            <Search size={11} />
-                            <span>Audit Section</span>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ================= INTEGRATED AGENT CONTROL BAR (Docked at Bottom) ================= */}
-          <div className={`groundwork-agent-dock ${isAgentExpanded ? "is-expanded" : "is-collapsed"}`}>
-            <div className="agent-dock-header">
-              <div className="dock-title" onClick={() => setIsAgentExpanded((prev) => !prev)}>
-                <Sparkles size={15} className="icon-brand" />
-                <strong>{t("agent.dock_title")}</strong>
-                <span className="dock-status-tag">
-                  {isAgentRunning ? t("agent.status_running") : t("agent.status_ready")}
-                </span>
-              </div>
-
-              <div className="dock-quick-chips">
-                {contextualSuggestions.map((suggestion) => (
-                  <Button
-                    key={suggestion.id}
-                    className="btn-dock-chip"
-                    onClick={() => handleSendPrompt(suggestion.prompt)}
-                    disabled={isAgentRunning}
-                    title={suggestion.prompt}
-                  >
-                    <span>{suggestion.label}</span>
-                  </Button>
-                ))}
-              </div>
-
-              <Button
-                className="btn-toggle-dock"
-                onClick={() => setIsAgentExpanded((prev) => !prev)}
-                title={isAgentExpanded ? t("agent.toggle_minimize") : t("agent.toggle_history")}
-              >
-                {isAgentExpanded ? t("agent.toggle_minimize") : t("agent.toggle_history")}
-              </Button>
-            </div>
-
-            {/* Expanded Agent Conversation Feed */}
-            {isAgentExpanded && (
-              <div className="agent-conversation-drawer">
-                <div className="agent-context-summary-bar">
-                  <span className="ctx-item">
-                    <Sparkles size={11} className="icon-brand" />
-                    <strong>{workspace.name}</strong>
-                  </span>
-                  {activeArtifact && (
-                    <span className="ctx-item">
-                      <FileText size={11} />
-                      <span>{activeArtifact.title}</span>
-                    </span>
-                  )}
-                  <span className="ctx-item">
-                    <CheckCircle2 size={11} className="text-emerald" />
-                    <span>{selectedSourceIds.length} {t("audit.metric_sources")}</span>
-                  </span>
-                </div>
-
-                <div className="messages-stream-list">
-                  {isLoadingConversation && messages.length === 0 ? (
-                    <div className="chat-loading-indicator" role="status" aria-live="polite">
-                      <RefreshCw size={15} className="spin" />
-                      <span>{t("agent.loading_history")}</span>
-                    </div>
-                  ) : messages.length === 0 && !isAgentRunning ? (
-                    <div className="agent-empty-notice">
-                      <p>{t("agent.empty_history")}</p>
-                    </div>
-                  ) : (
-                    messages.map((msg, mIdx) => (
-                      <div key={mIdx} className={`dock-message-bubble ${msg.role === "user" ? "user-msg" : "ai-msg"}`}>
-                        <div className="msg-role-label">{msg.role === "user" ? "You" : "Agent"}</div>
-                        <div className="msg-text-content">{msg.content}</div>
-                        {msg.citations && msg.citations.length > 0 && (
-                          <div className="msg-citations-row">
-                            {msg.citations.map((c, cIdx) => (
-                              <Button
-                                key={cIdx}
-                                className="inline-citation-badge"
-                                onClick={() => onOpenViewer?.(c.document_id, c.page_number)}
-                              >
-                                <ExternalLink size={10} />
-                                <span>{c.document_name}</span>
-                                <strong>p. {c.page_number}</strong>
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-
-                  {/* Active Agent Task Steps */}
-                  {isAgentRunning && (
-                    <div className="agent-executing-card">
-                      <div className="exec-header">
-                        <RefreshCw size={13} className="spin text-accent" />
-                        <strong>{t("agent.task_execution")}</strong>
-                        <Button onClick={handleStopAgent} className="btn-stop-stream">
-                          <Square size={11} /> {t("agent.btn_stop")}
-                        </Button>
-                      </div>
-                      <div className="exec-steps">
-                        {activeSteps.map((s, sIdx) => (
-                          <div key={sIdx} className="exec-step-row">
-                            {s.status === "completed" ? (
-                              <Check size={13} className="text-emerald" />
-                            ) : (
-                              <RefreshCw size={12} className="spin text-accent" />
-                            )}
-                            <span className={s.status === "completed" ? "step-done" : "step-active"}>
-                              {s.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {streamingText && <div className="exec-streaming-text">{streamingText}</div>}
-                    </div>
-                  )}
-                  <div ref={chatBottomRef} />
-                </div>
-              </div>
-            )}
-
-            {/* Agent Input Bar */}
-            <div className="agent-composer-row agent-composer-container">
-              <input
-                type="text"
-                value={promptInput}
-                onChange={(e) => setPromptInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendPrompt();
-                  }
-                }}
-                disabled={isAgentRunning}
-                placeholder={
-                  isAgentRunning
-                    ? t("agent.placeholder_working")
-                    : activeArtifact?.title
-                    ? t("agent.placeholder_with_artifact", { artifact: activeArtifact.title, count: selectedSourceIds.length })
-                    : openFindings.length > 0
-                    ? t("agent.placeholder_with_findings", { count: openFindings.length })
-                    : t("agent.placeholder_ready", { count: selectedSourceIds.length })
-                }
-                className="dock-prompt-input"
-                aria-label="Agent prompt input"
-              />
-              <Button
-                onClick={() => handleSendPrompt()}
-                disabled={!promptInput.trim() || isAgentRunning}
-                className="btn-dock-send"
-                title={isAgentRunning ? "Agent is processing…" : "Send command to agent"}
-              >
-                {isAgentRunning ? <RefreshCw size={14} className="spin" /> : <Send size={14} />}
-                <span>{isAgentRunning ? t("agent.btn_working") : t("agent.btn_execute")}</span>
-              </Button>
-            </div>
-          </div>
-        </main>
-
-        {/* ================= COLUMN 3: AUDIT & VERIFICATION SUITE ================= */}
-        <aside className={`groundwork-col-audit ${mobileTab === "audit" ? "mobile-active" : ""}`}>
-          {/* Segmented Audit Navigation */}
-          <div className="audit-nav-segments">
-            <Button
-              className={`audit-segment-btn ${rightPanelTab === "audit" ? "active" : ""}`}
-              onClick={() => setRightPanelTab("audit")}
-            >
-              <span>{t("audit.tab_verification")}</span>
-              {openFindings.length > 0 && <span className="badge-finding-count">{openFindings.length}</span>}
-            </Button>
-            <Button
-              className={`audit-segment-btn ${rightPanelTab === "matrix" ? "active" : ""}`}
-              onClick={() => setRightPanelTab("matrix")}
-            >
-              <span>{t("audit.tab_matrix")}</span>
-              <span className="badge-req-count">
-                {coveredRequirementsCount}/{requirements.length}
-              </span>
-            </Button>
-            <Button
-              className={`audit-segment-btn ${rightPanelTab === "appendix" ? "active" : ""}`}
-              onClick={() => setRightPanelTab("appendix")}
-            >
-              <span>{t("audit.tab_appendix")}</span>
-            </Button>
-          </div>
-
-          {/* TAB 1: AUDIT & VERIFICATION FINDINGS */}
-          {rightPanelTab === "audit" && (
-            <div className="audit-tab-pane">
-              {/* Readiness Score Card */}
-              <div className={`readiness-summary-card ${isExportBlocked ? "is-blocked" : "is-ready"}`}>
-                <div className="card-top">
-                  <div className="readiness-gauge-large">
-                    <span className="gauge-score">{readinessScore}%</span>
-                    <small>{t("workspace.readiness_gate")}</small>
-                  </div>
-                  <div className="readiness-meta-text">
-                    <span className="gate-title">
-                      {isExportBlocked ? `${t("workspace.readiness_gate")}: Blocked` : `${t("workspace.readiness_gate")}: Passed`}
-                    </span>
-                    <p className="gate-desc">
-                      {isExportBlocked
-                        ? t(openFindings.length === 1 ? "workspace.issues_unresolved" : "workspace.issues_unresolved_plural", { count: openFindings.length })
-                        : t("audit.all_cleared_desc")}
+                {editableBlocks.length === 0 && (
+                  <div className="py-16 text-center text-xs text-[var(--ink-muted)] space-y-2 min-w-0">
+                    <FileText size={28} className="mx-auto text-[var(--ink-faint)]" />
+                    <p className="font-serif text-sm font-semibold text-[var(--ink)]">
+                      Empty Document Canvas
+                    </p>
+                    <p className="text-[11px] max-w-sm mx-auto">
+                      Use the agent prompt composer below to draft your first sections based on uploaded RFP sources.
                     </p>
                   </div>
-                </div>
-
-                {/* Score Breakdown Bar */}
-                <div className="readiness-breakdown-bar">
-                  <div
-                    className={`bar-fill ${isExportBlocked ? "fill-warning" : "fill-success"}`}
-                    style={{ width: `${readinessScore}%` }}
-                  />
-                </div>
-
-                <div className="readiness-metrics-row">
-                  <div className="metric-col">
-                    <small>{t("audit.metric_requirements")}</small>
-                    <strong>{coveredRequirementsCount}/{requirements.length}</strong>
-                  </div>
-                  <div className="metric-col">
-                    <small>{t("audit.metric_findings")}</small>
-                    <strong className={openFindings.length > 0 ? "text-danger" : "text-emerald"}>
-                      {t("audit.metric_open_findings", { count: openFindings.length })}
-                    </strong>
-                  </div>
-                  <div className="metric-col">
-                    <small>{t("audit.metric_sources")}</small>
-                    <strong>{t("audit.metric_sources_linked", { count: selectedSourceIds.length })}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Review Findings List */}
-              <div className="findings-section-group">
-                <div className="section-title-row">
-                  <strong className="subpanel-title">
-                    {t("audit.review_findings", { count: openFindings.length })}
-                  </strong>
-                  <Button
-                    className="btn-recheck-audit"
-                    onClick={handleRunAudit}
-                    disabled={isRunningAudit}
-                    title="Re-run audit scan"
-                  >
-                    <RefreshCw size={12} className={isRunningAudit ? "spin" : ""} />
-                    <span>{isRunningAudit ? t("audit.btn_scanning") : t("audit.btn_scan")}</span>
-                  </Button>
-                </div>
-
-                {isLoadingArtifactDetails && findings.length === 0 ? (
-                  <div className="chat-loading-indicator" role="status" aria-live="polite">
-                    <RefreshCw size={15} className="spin" />
-                    <span>{t("audit.loading_findings")}</span>
-                  </div>
-                ) : openFindings.length > 0 ? (
-                  <div className="findings-cards-list">
-                    {openFindings.map((finding) => (
-                      <div key={finding.id} className="finding-detail-card">
-                        <div className="finding-card-header">
-                          <span className="finding-severity-pill high">{t("audit.high_severity")}</span>
-                          <span className="finding-type-pill">{t("audit.unsupported_claim")}</span>
-                        </div>
-
-                        <div className="finding-claim-quote">
-                          <p>"{finding.claim_text}"</p>
-                        </div>
-
-                        <div className="finding-explanation-text">
-                          <p>{finding.explanation}</p>
-                        </div>
-
-                        {/* Evidence Citation Reference */}
-                        {finding.citations && finding.citations.length > 0 && (
-                          <div className="finding-evidence-matched">
-                            <span className="evidence-header">
-                              <CheckCircle2 size={12} className="text-emerald" /> {t("audit.evidence_available")}
-                            </span>
-                            <div className="evidence-snippet-box">
-                              <p>"{finding.citations[0].snippet}"</p>
-                              <Button
-                                className="evidence-link-btn"
-                                onClick={() =>
-                                  onOpenViewer?.(finding.citations[0].document_id, finding.citations[0].page_number)
-                                }
-                              >
-                                <ExternalLink size={10} />
-                                <span>{finding.citations[0].document_name}</span>
-                                <strong>(Page {finding.citations[0].page_number})</strong>
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Direct Resolution Actions */}
-                        <div className="finding-actions-footer">
-                          <Button
-                            className="btn-action-apply-fix"
-                            onClick={() => handleResolveFinding(finding, "accept")}
-                            disabled={isResolvingFindingId === finding.id}
-                            title="Replace draft claim with verified 99.99% SLA and attach citation"
-                          >
-                            <CheckCheck size={13} />
-                            <span>
-                              {isResolvingFindingId === finding.id
-                                ? t("audit.btn_applying_fix")
-                                : t("audit.btn_apply_fix")}
-                            </span>
-                          </Button>
-
-                          <Button
-                            className="btn-action-waive"
-                            onClick={() => handleResolveFinding(finding, "reject")}
-                            disabled={isResolvingFindingId === finding.id}
-                            title="Waive this finding"
-                          >
-                            {t("audit.btn_waive")}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="findings-cleared-card">
-                    <CheckCircle2 size={28} className="icon-verified-cleared" />
-                    <strong>{t("audit.all_cleared_title")}</strong>
-                    <p>{t("audit.all_cleared_desc")}</p>
-                    <Button
-                      className="btn-primary-gradient btn-export-now"
-                      onClick={() => handleExport("pdf")}
-                    >
-                      <Download size={14} />
-                      <span>{t("audit.btn_export_now")}</span>
-                    </Button>
-                  </div>
                 )}
               </div>
             </div>
-          )}
+          </div>
 
-          {/* TAB 2: REQUIREMENTS TRACEABILITY MATRIX */}
-          {rightPanelTab === "matrix" && (
-            <div className="matrix-tab-pane">
-              <div className="matrix-header-info">
-                <strong>{t("matrix.header_title")}</strong>
-                <p>{t("matrix.header_desc")}</p>
-              </div>
+          {/* Collapsible Agent Reasoning History Drawer */}
+          <AgentReasoningDrawer
+            isOpen={isDrawerOpen}
+            isAgentRunning={isAgentRunning}
+            messages={messages}
+            activeSteps={activeSteps}
+            streamingText={streamingText}
+            onStopAgent={handleStopAgent}
+            onOpenViewer={onOpenViewer}
+          />
 
-              <div className="requirements-matrix-list">
-                {isLoadingArtifactDetails && requirements.length === 0 ? (
-                  <div className="chat-loading-indicator" role="status" aria-live="polite">
-                    <RefreshCw size={15} className="spin" />
-                    <span>{t("matrix.loading")}</span>
-                  </div>
-                ) : (
-                  requirements.map((req, rIdx) => {
-                    const isCovered = req.status === "covered";
-                    return (
-                      <div key={req.id || rIdx} className={`req-matrix-card ${isCovered ? "covered" : "unverified"}`}>
-                        <div className="req-card-top">
-                          <div className="req-status-indicator">
-                            {isCovered ? (
-                              <CheckCircle2 size={16} className="text-emerald" />
-                            ) : (
-                              <AlertCircle size={16} className="text-amber" />
-                            )}
-                          </div>
-                          <div className="req-text-wrap">
-                            <strong className="req-title">{req.text}</strong>
-                            {req.linked_sections && req.linked_sections.length > 0 && (
-                              <span className="req-section-tag">
-                                Section: {req.linked_sections[0]}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+          {/* Bottom Prompt Composer Bar */}
+          <AgentBottomBar
+            promptInput={promptInput}
+            isAgentRunning={isAgentRunning}
+            isDrawerOpen={isDrawerOpen}
+            suggestions={contextualSuggestions}
+            onPromptChange={setPromptInput}
+            onSubmitPrompt={handleSendPrompt}
+            onToggleDrawer={() => setIsDrawerOpen((v) => !v)}
+          />
+        </main>
 
-                        {/* Requirement Evidence & Quick Actions */}
-                        <div className="req-card-footer">
-                          {req.evidence && req.evidence.length > 0 && (
-                            <div className="req-evidence-row">
-                              <span className="evidence-badge-item">
-                                <ExternalLink size={10} />
-                                <span>{req.evidence[0].document_name}</span>
-                                <strong>(p. {req.evidence[0].page_number})</strong>
-                              </span>
-                            </div>
-                          )}
-                          {!isCovered && (
-                            <Button
-                              className="btn-req-solve"
-                              onClick={() =>
-                                handleSendPrompt(
-                                  `Investigate requirement "${req.text}". Find supporting evidence in active sources and draft a section to satisfy it.`,
-                                )
-                              }
-                              title="Ask agent to satisfy requirement"
-                            >
-                              <Sparkles size={11} />
-                              <span>{t("matrix.btn_ask_agent")}</span>
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+        {/* Right: Verification Audit & Traceability Suite */}
+        {isRightPanelOpen ? (
+          <aside className="w-80 flex-shrink-0 flex flex-col bg-[var(--paper)] border-l border-[var(--hairline)] select-none groundwork-col-audit min-w-0">
+            {/* Panel Tabs Header */}
+            <div className="p-3 border-b border-[var(--hairline)] flex items-center justify-between min-w-0">
+              <Tabs
+                variant="segment"
+                size="sm"
+                tabs={[
+                  {
+                    id: "audit",
+                    label: "Audit",
+                    badge:
+                      openFindings.length > 0 ? (
+                        <span className="px-1 rounded-full bg-[var(--warning)] text-white text-[9px] font-mono">
+                          {openFindings.length}
+                        </span>
+                      ) : undefined,
+                  },
+                  {
+                    id: "matrix",
+                    label: "Matrix",
+                  },
+                  {
+                    id: "appendix",
+                    label: "Ledger",
+                  },
+                ]}
+                activeTab={rightPanelTab}
+                onChange={(t) => setRightPanelTab(t)}
+              />
+
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setIsRightPanelOpen(false)}
+                className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
+                title="Collapse audit panel"
+              >
+                <PanelRightClose size={14} />
+              </Button>
             </div>
-          )}
 
-          {/* TAB 3: AUDIT APPENDIX PREVIEW */}
-          {rightPanelTab === "appendix" && (
-            <div className="appendix-tab-pane">
-              <div className="appendix-header-info">
-                <strong>{t("appendix.header_title")}</strong>
-                <p>{t("appendix.header_desc")}</p>
-              </div>
+            {/* Tab Pane Body */}
+            <div className="flex-1 overflow-y-auto min-w-0">
+              {rightPanelTab === "audit" && (
+                <ReviewFindingsAudit
+                  findings={findings}
+                  requirements={requirements}
+                  readinessScore={readinessScore}
+                  isExportBlocked={isExportBlocked}
+                  isRunningAudit={isRunningAudit}
+                  isResolvingFindingId={isResolvingFindingId}
+                  onRunAudit={handleRunAudit}
+                  onResolveFinding={handleResolveFinding}
+                  onOpenViewer={(docId, page) => onOpenViewer?.(docId, page)}
+                  onPromptAgent={handleSendPrompt}
+                  onExport={() => handleExport("pdf")}
+                />
+              )}
 
-              <div className="appendix-ledger-card">
-                <div className="ledger-meta-row">
-                  <span>Document: <strong>{activeArtifact?.title}</strong></span>
-                  <span>Readiness: <strong>{readinessScore}%</strong></span>
-                </div>
+              {rightPanelTab === "matrix" && (
+                <TraceabilityMatrix
+                  requirements={requirements}
+                  onPromptAgent={handleSendPrompt}
+                  onOpenViewer={(docId, page) => onOpenViewer?.(docId, page)}
+                />
+              )}
 
-                <div className="ledger-table-wrap">
-                  <table className="ledger-table">
-                    <thead>
-                      <tr>
-                        <th>{t("appendix.col_requirement")}</th>
-                        <th>{t("appendix.col_source")}</th>
-                        <th>{t("appendix.col_status")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {requirements.map((req, idx) => (
-                        <tr key={idx}>
-                          <td>{req.text.slice(0, 48)}…</td>
-                          <td>
-                            {req.evidence?.[0] ? `${req.evidence[0].document_name} (p. ${req.evidence[0].page_number})` : "Direct Spec"}
-                          </td>
-                          <td>
-                            <span className={`status-pill-mini ${req.status}`}>
-                              {req.status === "covered" ? t("appendix.status_verified") : t("appendix.status_unverified")}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="ledger-footer-stamp">
-                  <ShieldCheck size={14} className="text-emerald" />
-                  <span>{t("appendix.cryptographic_stamp")}</span>
-                </div>
-              </div>
+              {rightPanelTab === "appendix" && (
+                <ProvenanceAppendix
+                  activeArtifact={activeArtifact}
+                  requirements={requirements}
+                  readinessScore={readinessScore}
+                />
+              )}
             </div>
-          )}
-        </aside>
+          </aside>
+        ) : (
+          <div className="w-11 border-l border-[var(--hairline)] bg-[var(--surface)] flex flex-col items-center py-3 gap-3 select-none flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setIsRightPanelOpen(true)}
+              className="text-[var(--ink-muted)] hover:text-[var(--ink)]"
+              title="Expand Audit &amp; Verification Suite"
+            >
+              <ShieldCheck size={15} />
+            </Button>
+            {openFindings.length > 0 && (
+              <span className="text-[9px] font-mono font-bold text-white px-1 py-0.2 rounded-full bg-[var(--warning)]">
+                {openFindings.length}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Backward-compatibility alias
-export const NotebookWorkspace = ResearchWorkspace;
+export default ResearchWorkspace;

@@ -12,6 +12,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -28,6 +29,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
@@ -39,6 +41,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 5s
 
   api:
     build: ./server
@@ -61,6 +64,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   worker:
@@ -79,9 +83,10 @@ services:
       - model_cache:/root/.cache/huggingface
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.tasks.celery_app:celery_app inspect ping -d celery@$$HOSTNAME"]
-      interval: 20s
+      interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   client:
@@ -112,6 +117,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 10s
     restart: unless-stopped
 
 volumes:

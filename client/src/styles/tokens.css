@@ -1,0 +1,190 @@
+/* ==========================================================================
+   GROUNDWORK DESIGN TOKENS (Agentic Document Workspace)
+   Notion's bones with a signature of its own:
+   - Two inks: ink-blue (human) & ink-sepia (agent)
+   - Warm-neutral paper canvas & flat manuscript surface
+   - Three-role typography: Serif display, Sans body, Mono agent drafting hand
+   ========================================================================== */
+
+:root {
+  /* ================= CORE PALETTE ================= */
+  --paper: #F7F6F3;
+  --paper-subtle: #EFECE6;
+  --surface: #FDFCFA;
+  --surface-hover: #F5F2EB;
+  --surface-active: #EAE6DD;
+  
+  --ink: #211F1C;
+  --ink-secondary: #57534E;
+  --ink-muted: #78716C;
+  --ink-faint: #A8A29E;
+  
+  --hairline: #E4E2DC;
+  --hairline-subtle: #EFECE6;
+  --hairline-strong: #D1CFC7;
+
+  /* Human Accent: ink-blue */
+  --ink-blue: #2B3A55;
+  --ink-blue-hover: #1E2B40;
+  --ink-blue-subtle: #EDF1F7;
+  --ink-blue-border: #C4D1E5;
+  --ink-blue-faint: rgba(43, 58, 85, 0.08);
+
+  /* Agent Accent: ink-sepia */
+  --ink-sepia: #8A6D4B;
+  --ink-sepia-hover: #73593B;
+  --ink-sepia-subtle: #F7F2EB;
+  --ink-sepia-border: #E1D3C1;
+  --ink-sepia-faint: rgba(138, 109, 75, 0.10);
+
+  /* Semantic Feedback (Restrained & Warm) */
+  --success: #2F6B4F;
+  --success-bg: #F0F7F3;
+  --success-border: #C8E3D4;
+  
+  --warning: #9A6717;
+  --warning-bg: #FDF7EC;
+  --warning-border: #F1DDB5;
+  
+  --danger: #9E332B;
+  --danger-bg: #FDF2F1;
+  --danger-border: #F3C9C5;
+
+  --info: #2B556B;
+  --info-bg: #EFF6F9;
+  --info-border: #C4DFEC;
+
+  /* ================= TYPOGRAPHY ================= */
+  --font-serif: "Newsreader", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-sans: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Scale */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 38px;
+
+  --leading-tight: 1.22;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
+
+  /* ================= SPACING & DIMENSIONS ================= */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Layout Widths */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 0px;
+  --canvas-max-width: 720px;
+  --margin-column-width: 280px;
+  --right-panel-width: 340px;
+
+  /* ================= SHADOWS (Flat & Tactile) ================= */
+  --shadow-subtle: 0 1px 2px rgba(33, 31, 28, 0.04);
+  --shadow-card: 0 1px 3px rgba(33, 31, 28, 0.06), 0 1px 2px rgba(33, 31, 28, 0.04);
+  --shadow-popover: 0 4px 16px -2px rgba(33, 31, 28, 0.08), 0 2px 6px -1px rgba(33, 31, 28, 0.04);
+  --shadow-modal: 0 12px 36px -4px rgba(33, 31, 28, 0.12), 0 4px 12px -2px rgba(33, 31, 28, 0.06);
+
+  /* Legacy variable aliases to ensure complete backwards compatibility during migration */
+  --bg-app: var(--paper);
+  --bg-surface: var(--surface);
+  --bg-subtle: var(--paper-subtle);
+  --bg-muted: var(--hairline);
+  --bg-hover: var(--surface-hover);
+  --border-default: var(--hairline);
+  --border-subtle: var(--hairline-subtle);
+  --border-strong: var(--hairline-strong);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-secondary);
+  --text-muted: var(--ink-muted);
+  --text-faint: var(--ink-faint);
+  --accent: var(--ink-blue);
+  --accent-hover: var(--ink-blue-hover);
+  --accent-subtle: var(--ink-blue-subtle);
+  --accent-border: var(--ink-blue-border);
+  --control-height: 34px;
+  --control-radius: var(--radius-sm);
+  --panel-radius: var(--radius-md);
+  --modal-radius: var(--radius-lg);
+  --shadow-sm: var(--shadow-subtle);
+  --shadow-md: var(--shadow-card);
+  --shadow-lg: var(--shadow-popover);
+}
+
+/* ================= DARK MODE ================= */
+html[data-theme="dark"],
+[data-theme="dark"] {
+  --paper: #161514;
+  --paper-subtle: #1D1C1A;
+  --surface: #201F1D;
+  --surface-hover: #282724;
+  --surface-active: #32302C;
+  
+  --ink: #EDEAE4;
+  --ink-secondary: #B5B0A6;
+  --ink-muted: #8E8980;
+  --ink-faint: #67635C;
+  
+  --hairline: #2C2A27;
+  --hairline-subtle: #242220;
+  --hairline-strong: #3A3834;
+
+  /* Human Accent Dark: luminous ink-blue */
+  --ink-blue: #708BB5;
+  --ink-blue-hover: #8EA7CE;
+  --ink-blue-subtle: rgba(112, 139, 181, 0.15);
+  --ink-blue-border: rgba(112, 139, 181, 0.32);
+  --ink-blue-faint: rgba(112, 139, 181, 0.08);
+
+  /* Agent Accent Dark: luminous ink-sepia */
+  --ink-sepia: #C7A47D;
+  --ink-sepia-hover: #D8B995;
+  --ink-sepia-subtle: rgba(199, 164, 125, 0.15);
+  --ink-sepia-border: rgba(199, 164, 125, 0.32);
+  --ink-sepia-faint: rgba(199, 164, 125, 0.08);
+
+  /* Semantic Feedback Dark */
+  --success: #4E9A75;
+  --success-bg: rgba(78, 154, 117, 0.15);
+  --success-border: rgba(78, 154, 117, 0.30);
+  
+  --warning: #CFA04E;
+  --warning-bg: rgba(207, 160, 78, 0.15);
+  --warning-border: rgba(207, 160, 78, 0.30);
+  
+  --danger: #D45F56;
+  --danger-bg: rgba(212, 95, 86, 0.15);
+  --danger-border: rgba(212, 95, 86, 0.30);
+
+  --info: #64A3C2;
+  --info-bg: rgba(100, 163, 194, 0.15);
+  --info-border: rgba(100, 163, 194, 0.30);
+
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-popover: 0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+}

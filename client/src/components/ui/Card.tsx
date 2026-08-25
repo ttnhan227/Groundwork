@@ -1,23 +1,27 @@
-// src/components/ui/Card.tsx
 import React from "react";
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  className?: string;
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  interactive?: boolean;
+  padded?: boolean;
   children: React.ReactNode;
 }
 
-/**
- * Simple card component that uses the design-system surface background,
- * border, and subtle shadow. It also provides a focus-visible style for
- * keyboard navigation when used as an interactive container.
- */
-export const Card: React.FC<CardProps> = ({ className = "", children, ...rest }) => {
+export const Card: React.FC<CardProps> = ({
+  interactive = false,
+  padded = true,
+  className = "",
+  children,
+  ...rest
+}) => {
   const baseClasses =
-    "bg-[var(--bg-surface)] border border-[var(--border-default)] rounded shadow-sm p-4" +
-    " focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2";
-  const combined = `${baseClasses} ${className}`;
+    "bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] transition-all";
+  const interactiveClasses = interactive
+    ? "cursor-pointer hover:border-[var(--hairline-strong)] hover:shadow-[var(--shadow-popover)] active:bg-[var(--surface-hover)]"
+    : "";
+  const paddingClass = padded ? "p-4" : "";
+
   return (
-    <div className={combined} {...rest}>
+    <div className={`${baseClasses} ${interactiveClasses} ${paddingClass} ${className}`} {...rest}>
       {children}
     </div>
   );

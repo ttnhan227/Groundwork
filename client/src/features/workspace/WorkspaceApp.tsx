@@ -1,23 +1,47 @@
-import { Activity, ExternalLink, FileText, RefreshCw, Search, X, ZoomIn, ZoomOut } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { AuthResult, DocumentItem, Job, NativeDocument, Stats, Workspace } from "../../types";
+import {
+  Activity,
+  FileText,
+  RefreshCw,
+  X,
+  Plus,
+} from "lucide-react";
+import type {
+  AuthResult,
+  DocumentItem,
+  Job,
+  NativeDocument,
+  Stats,
+  Workspace,
+} from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Modal } from "../../components/ui/Modal";
+import { Sidebar } from "../../components/layout/Sidebar";
 import { CommandPalette, type WorkspaceCommand } from "./CommandPalette";
-import { API, AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT, api, authenticatedFetch, expireSession, getStoredAuth, setStoredAuth } from "../../api/client";
+import {
+  API,
+  AUTH_EXPIRED_EVENT,
+  AUTH_REFRESHED_EVENT,
+  api,
+  authenticatedFetch,
+  expireSession,
+  getStoredAuth,
+  setStoredAuth,
+} from "../../api/client";
 import { AccountPanel as AccountSettingsPanel } from "../account/AccountPanel";
 import { NotificationCenter } from "../account/NotificationCenter";
 import { applyPreferences, storedPreferences, type UserPreferences } from "../account/preferences";
 import { WorkspaceLibrary } from "./WorkspaceLibrary";
 import { ResearchWorkspace } from "./ResearchWorkspace";
-import { Button } from '../../components/ui/Button';
+import { PdfViewerModal } from "../pdf-viewer/PdfViewerModal";
 
-const PDF_WORKER_URL = `${pdfWorkerUrl}?worker=v2`;
-const REGISTRATION_ENABLED = (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
+const REGISTRATION_ENABLED =
+  (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
 
 type GoogleCredentialResponse = { credential: string };
@@ -26,7 +50,10 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void;
+          initialize: (options: {
+            client_id: string;
+            callback: (response: GoogleCredentialResponse) => void;
+          }) => void;
           renderButton: (element: HTMLElement, options: Record<string, string | number>) => void;
         };
       };
@@ -34,7 +61,11 @@ declare global {
   }
 }
 
-function GoogleSignInButton({ disabled, onCredential, onError }: {
+function GoogleSignInButton({
+  disabled,
+  onCredential,
+  onError,
+}: {
   disabled: boolean;
   onCredential: (credential: string) => void;
   onError: (message: string) => void;
@@ -72,11 +103,16 @@ function GoogleSignInButton({ disabled, onCredential, onError }: {
       });
     };
 
-    const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
     if (existing) {
       if (window.google) render();
       else existing.addEventListener("load", render, { once: true });
-      return () => { cancelled = true; existing.removeEventListener("load", render); };
+      return () => {
+        cancelled = true;
+        existing.removeEventListener("load", render);
+      };
     }
 
     const script = document.createElement("script");
@@ -84,15 +120,23 @@ function GoogleSignInButton({ disabled, onCredential, onError }: {
     script.async = true;
     script.defer = true;
     script.onload = render;
-    script.onerror = () => onErrorRef.current("Google sign-in could not be loaded. Check your connection and try again.");
+    script.onerror = () =>
+      onErrorRef.current("Google sign-in could not be loaded. Check connection.");
     document.head.appendChild(script);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [disabled]);
 
-  if (!GOOGLE_CLIENT_ID) {
-    return <Button className="auth-google-disabled" type="button" disabled title="Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in">Google sign-in is not configured</Button>;
-  }
-  return <div className={`auth-google-button ${disabled ? "disabled" : ""}`} ref={buttonRef} aria-label="Continue with Google" />;
+  if (!GOOGLE_CLIENT_ID) return null;
+
+  return (
+    <div
+      className={`w-full flex justify-center ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+      ref={buttonRef}
+      aria-label="Continue with Google"
+    />
+  );
 }
 
 const authSchema = z.object({
@@ -102,290 +146,50 @@ const authSchema = z.object({
 });
 type AuthFields = z.infer<typeof authSchema>;
 
-function PdfThumbnail({ pdf, pageNumber, current, onSelect }: { pdf: PDFDocumentProxy; pageNumber: number; current: boolean; onSelect: () => void }) {
-  const button = useRef<HTMLButtonElement>(null);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (!button.current) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { setVisible(true); observer.disconnect(); }
-    }, { rootMargin: "160px" });
-    observer.observe(button.current);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!visible || !canvas.current) return;
-    let cancelled = false;
-    let task: RenderTask | undefined;
-    (async () => {
-      const pdfPage = await pdf.getPage(pageNumber);
-      if (cancelled || !canvas.current) return;
-      const viewport = pdfPage.getViewport({ scale: 0.2 });
-      const context = canvas.current.getContext("2d");
-      if (!context) return;
-      canvas.current.width = viewport.width;
-      canvas.current.height = viewport.height;
-      task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
-      await task.promise;
-    })().catch(() => undefined);
-    return () => { cancelled = true; task?.cancel(); };
-  }, [pdf, pageNumber, visible]);
-
-  return (
-    <Button ref={button} className={`pdf-thumbnail ${current ? "current" : ""}`} onClick={onSelect}>
-      <canvas ref={canvas} /><span>Page {pageNumber}</span>
-    </Button>
-  );
-}
-
-
-
-function PdfViewer({ document, token, initialPage = 1, initialSearch = "", onClose }: { document: DocumentItem; token: string; initialPage?: number; initialSearch?: string; onClose: () => void }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
-  const [pdfSource, setPdfSource] = useState("");
-  const [page, setPage] = useState(initialPage);
-  const [scale, setScale] = useState(1.2);
-  const [activeSearch, setActiveSearch] = useState(initialSearch);
-  const [highlightBoxes, setHighlightBoxes] = useState<{ left: number; top: number; width: number; height: number }[]>([]);
-  const [citationStatus, setCitationStatus] = useState<"idle" | "matched" | "not-found">("idle");
-  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
-  const [error, setError] = useState("");
-  const [searchResults, setSearchResults] = useState<{ page: number; snippet: string }[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [sideMode, setSideMode] = useState<"pages" | "search">("pages");
-  const [loadStage, setLoadStage] = useState<"downloading" | "opening" | "rendering" | "ready">("downloading");
-  const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl = "";
-    (async () => {
-      try {
-        const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
-        const response = await authenticatedFetch(`${API}/documents/${document.id}/content`, token);
-        if (response.status === 401) expireSession();
-        if (!response.ok) throw new Error("Could not load this PDF");
-        const total = Number(response.headers.get("content-length")) || 0;
-        let data: Uint8Array;
-        if (response.body && total) {
-          const reader = response.body.getReader();
-          const chunks: Uint8Array[] = [];
-          let received = 0;
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-            received += value.length;
-            if (!cancelled) setDownloadPercent(Math.round(received / total * 100));
-          }
-          data = new Uint8Array(received);
-          let offset = 0;
-          for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
-        } else {
-          data = new Uint8Array(await response.arrayBuffer());
-        }
-        objectUrl = URL.createObjectURL(new Blob([data.slice().buffer], { type: "application/pdf" }));
-        if (!cancelled) setPdfSource(objectUrl);
-        if (!cancelled) setLoadStage("opening");
-        const loaded = await pdfjs.getDocument({ data }).promise;
-        if (!cancelled) setPdf(loaded);
-        if (!cancelled) setLoadStage("rendering");
-        setPage(initialPage);
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "Could not load this PDF");
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [document.id, token, initialPage]);
-
-  useEffect(() => {
-    let task: RenderTask | undefined;
-    (async () => {
-      if (!pdf || !canvas.current) return;
-      const pdfPage = await pdf.getPage(page);
-      const viewport = pdfPage.getViewport({ scale });
-      const context = canvas.current.getContext("2d");
-      if (!context) return;
-      canvas.current.width = viewport.width;
-      canvas.current.height = viewport.height;
-      task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
-      await task.promise;
-      const content = await pdfPage.getTextContent();
-      const items = content.items.filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => "str" in item && Boolean(item.str));
-      const joined = items.map((item) => item.str).join(" ");
-      const normalized = joined.replace(/\s+/g, " ").toLowerCase();
-      const requested = activeSearch.replace(/^[\s\u2026.]+|[\s\u2026.]+$/g, "").replace(/\s+/g, " ").toLowerCase();
-      let matchStart = requested ? normalized.indexOf(requested) : -1;
-      let matchLength = requested.length;
-      if (matchStart < 0 && requested) {
-        const words = requested.split(" ").filter((word) => word.length > 2);
-        for (let width = Math.min(10, words.length); width >= 3 && matchStart < 0; width -= 1) {
-          for (let start = 0; start + width <= words.length; start += 1) {
-            const candidate = words.slice(start, start + width).join(" ");
-            const found = normalized.indexOf(candidate);
-            if (found >= 0) { matchStart = found; matchLength = candidate.length; break; }
-          }
-        }
-      }
-      const boxes: { left: number; top: number; width: number; height: number }[] = [];
-      if (matchStart >= 0) {
-        let cursor = 0;
-        for (const item of items) {
-          const itemStart = cursor;
-          const itemEnd = cursor + item.str.length;
-          cursor = itemEnd + 1;
-          if (itemEnd < matchStart || itemStart > matchStart + matchLength) continue;
-          const transform = viewport.transform;
-          const source = item.transform;
-          const tx = [
-            transform[0] * source[0] + transform[2] * source[1],
-            transform[1] * source[0] + transform[3] * source[1],
-            transform[0] * source[2] + transform[2] * source[3],
-            transform[1] * source[2] + transform[3] * source[3],
-            transform[0] * source[4] + transform[2] * source[5] + transform[4],
-            transform[1] * source[4] + transform[3] * source[5] + transform[5],
-          ];
-          const height = Math.max(8, Math.hypot(tx[2], tx[3]));
-          boxes.push({
-            left: tx[4],
-            top: tx[5] - height,
-            width: Math.max(4, item.width * scale),
-            height,
-          });
-        }
-      }
-      setPageSize({ width: viewport.width, height: viewport.height });
-      setHighlightBoxes(boxes);
-      setCitationStatus(activeSearch ? (boxes.length ? "matched" : "not-found") : "idle");
-      setLoadStage("ready");
-    })();
-    return () => task?.cancel();
-  }, [activeSearch, page, scale, pdf]);
-
-  useEffect(() => () => { pdf?.destroy(); }, [pdf]);
-
-  async function searchPdf(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!pdf) return;
-    const query = String(new FormData(event.currentTarget).get("query") ?? "").trim().toLowerCase();
-    if (!query) { setSearchResults([]); setSideMode("pages"); return; }
-    setActiveSearch(query);
-    setSearching(true);
-    setSideMode("search");
-    const matches: { page: number; snippet: string }[] = [];
-    try {
-      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-        const pdfPage = await pdf.getPage(pageNumber);
-        const content = await pdfPage.getTextContent();
-        const text = content.items.map((item) => "str" in item ? item.str : "").join(" ").replace(/\s+/g, " ");
-        const position = text.toLowerCase().indexOf(query);
-        if (position >= 0) {
-          const start = Math.max(0, position - 70);
-          matches.push({ page: pageNumber, snippet: `${start ? "…" : ""}${text.slice(start, position + query.length + 110)}${position + query.length + 110 < text.length ? "…" : ""}` });
-        }
-      }
-      setSearchResults(matches);
-    } finally { setSearching(false); }
-  }
-
-  return (
-    <div className="viewer-wrap" role="dialog" aria-modal="true" aria-label={`Preview ${document.filename}`}>
-      <div className="viewer-toolbar">
-        <strong>{document.filename}</strong>
-        <Button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-        <span>{page} / {pdf?.numPages ?? document.page_count ?? "…"}</span>
-        <Button disabled={page >= (pdf?.numPages ?? 1)} onClick={() => setPage((value) => value + 1)}>Next</Button>
-        <Button aria-label="Zoom out" onClick={() => setScale((value) => Math.max(0.6, value - 0.2))}><ZoomOut size={18} /></Button>
-        <Button aria-label="Zoom in" onClick={() => setScale((value) => Math.min(2.4, value + 0.2))}><ZoomIn size={18} /></Button>
-        <form className="viewer-search" onSubmit={searchPdf}><Search size={15} /><input name="query" placeholder="Search PDF" aria-label="Search PDF" /><Button aria-label="Run search">Search</Button></form>
-        {activeSearch && citationStatus === "matched" && <span className="citation-locator matched">Source highlighted</span>}
-        {activeSearch && citationStatus === "not-found" && <span className="citation-locator">Source page opened · exact text highlight unavailable</span>}
-        {pdfSource && <Button onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> New tab</Button>}
-        <Button className="viewer-close" aria-label="Close viewer" onClick={onClose}><X size={20} /></Button>
-      </div>
-      <div className="viewer-body">
-        <aside className="viewer-sidebar">
-          <div className="viewer-side-tabs"><Button className={sideMode === "pages" ? "active" : ""} onClick={() => setSideMode("pages")}>Pages</Button><Button className={sideMode === "search" ? "active" : ""} onClick={() => setSideMode("search")}>Results</Button></div>
-          {sideMode === "pages" && pdf && <div className="thumbnail-list">{Array.from({ length: pdf.numPages }, (_, index) => <PdfThumbnail key={index + 1} pdf={pdf} pageNumber={index + 1} current={page === index + 1} onSelect={() => setPage(index + 1)} />)}</div>}
-          {sideMode === "search" && <div className="search-results">
-            {searching && <p><RefreshCw className="spin" size={14} /> Searching all pages…</p>}
-            {!searching && !searchResults.length && <p>No matches found.</p>}
-            {searchResults.map((result) => <Button key={result.page} onClick={() => setPage(result.page)}><b>Page {result.page}</b><span>{result.snippet}</span></Button>)}
-          </div>}
-        </aside>
-        <div className="viewer-stage">{error ? <p>{error}</p> : <>
-          {loadStage !== "ready" && <div className="viewer-loading" role="status" aria-live="polite">
-            <span className="viewer-loading-icon"><RefreshCw className="spin" size={22} /></span>
-            <strong>{loadStage === "downloading" ? "Loading document" : loadStage === "opening" ? "Opening PDF" : "Rendering first page"}</strong>
-            <small>{loadStage === "downloading" && downloadPercent !== null ? `${downloadPercent}% downloaded` : "Preparing a clear preview…"}</small>
-            <i><b style={{ width: downloadPercent !== null && loadStage === "downloading" ? `${downloadPercent}%` : "38%" }} /></i>
-          </div>}
-          <div className="pdf-page-surface" style={{ width: pageSize.width || undefined, height: pageSize.height || undefined }}>
-            <canvas ref={canvas} className={loadStage === "ready" ? "" : "viewer-canvas-loading"} />
-            <div className="pdf-highlight-layer" aria-hidden="true">
-              {highlightBoxes.map((box, index) => <mark key={index} style={box} />)}
-            </div>
-          </div>
-        </>}</div>
-      </div>
-    </div>
-  );
-}
-
-
-function ProcessingJobs({ token, onClose }: { token: string; onClose: () => void }) {
+function ProcessingJobsModal({ token, onClose }: { token: string; onClose: () => void }) {
   const [items, setItems] = useState<Job[]>([]);
   const [error, setError] = useState("");
-  const load = useCallback(() => api<Job[]>("/jobs", token).then(setItems).catch((reason) => setError(reason.message)), [token]);
-  useEffect(() => { load(); const timer = window.setInterval(load, 2500); return () => window.clearInterval(timer); }, [load]);
-  async function retry(job: Job) {
-    if (!job.id) return;
-    try {
-      const params = job.parameters as Record<string, unknown> | undefined;
-      const docId = params?.document_id || params?.doc_id;
-      if (job.operation === "document_processing" && typeof docId === "string") {
-        await api(`/documents/${docId}/retry`, token, { method: "POST" });
-      } else {
-        await api(`/jobs/status/${job.id}/retry`, token, { method: "POST" });
-      }
-      await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Retry failed"); }
-  }
-  async function cancel(job: Job) {
-    if (!job.id) return;
-    try {
-      await api(`/jobs/status/${job.id}/cancel`, token, { method: "POST" });
-      await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Cancellation failed"); }
-  }
+  const load = useCallback(
+    () =>
+      api<Job[]>("/jobs", token)
+        .then(setItems)
+        .catch((reason) => setError(reason.message)),
+    [token],
+  );
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 2500);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
   return (
-    <div className="jobs-wrap">
-      <Button className="history-backdrop" aria-label="Close processing jobs" onClick={onClose} />
-      <section className="jobs-panel" role="dialog" aria-label="Processing jobs">
-        <header><div><p className="eyebrow">Background activity</p><h2>Processing jobs</h2></div><Button aria-label="Close processing jobs" onClick={onClose}><X size={18} /></Button></header>
-        <main>
-          {error && <div className="form-error">{error}</div>}
-          {items.map((job) => (
-            <article key={job.id}>
-              <div><strong>{(job.operation ?? "document processing").replaceAll("_", " ")}</strong><span>{job.created_at ? new Date(job.created_at).toLocaleString() : ""} · {job.progress}%</span></div>
-              <b className={`job-state ${job.status}`}>{job.status}</b>
-              {["queued", "running"].includes(job.status) && <Button onClick={() => cancel(job)}>Cancel</Button>}
-              {job.status === "failed" && <Button onClick={() => retry(job)}>Retry</Button>}
-              {job.error_message && <small>{job.error_message}</small>}
-            </article>
-          ))}
-          {!items.length && !error && <div className="empty-workspace"><RefreshCw size={30} /><h3>No processing jobs yet</h3></div>}
-        </main>
-      </section>
-    </div>
+    <Modal isOpen={true} onClose={onClose} title="Background Processing Jobs" eyebrow="Activity Monitor">
+      <div className="space-y-3 jobs-panel min-w-0">
+        {error && <div className="p-2 rounded bg-[var(--danger-bg)] text-xs text-[var(--danger)]">{error}</div>}
+        {items.map((job) => (
+          <div
+            key={job.id}
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] text-xs flex items-center justify-between gap-3 min-w-0"
+          >
+            <div className="min-w-0 flex-1">
+              <strong className="block font-medium text-[var(--ink)] truncate">
+                {(job.operation ?? "document processing").replaceAll("_", " ")}
+              </strong>
+              <span className="text-[11px] text-[var(--ink-muted)] font-mono">
+                {job.created_at ? new Date(job.created_at).toLocaleTimeString() : ""} · {job.progress}%
+              </span>
+            </div>
+            <span className="job-state font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] font-medium flex-shrink-0">
+              {job.status}
+            </span>
+          </div>
+        ))}
+        {items.length === 0 && !error && (
+          <p className="text-xs text-[var(--ink-muted)] text-center py-4">No processing jobs active.</p>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -418,6 +222,7 @@ export function WorkspaceApp({
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [nativeDocs, setNativeDocs] = useState<NativeDocument[]>([]);
   const [workspaceView, setWorkspaceView] = useState<"library" | "workspace">("library");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">(() =>
     document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light",
   );
@@ -434,22 +239,14 @@ export function WorkspaceApp({
 
   useEffect(() => {
     if (!token || !user) return;
-    const loadUnread = () => api<{ unread: number }>("/notifications/unread-count", token).then((value) => setNotificationUnread(value.unread)).catch(() => undefined);
+    const loadUnread = () =>
+      api<{ unread: number }>("/notifications/unread-count", token)
+        .then((v) => setNotificationUnread(v.unread))
+        .catch(() => undefined);
     loadUnread();
     const timer = window.setInterval(loadUnread, 10_000);
     return () => window.clearInterval(timer);
   }, [token, user]);
-
-  useEffect(() => {
-    const update = (event: Event) => {
-      const preferences = (event as CustomEvent<UserPreferences>).detail;
-      document.documentElement.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
-    };
-    window.addEventListener("groundwork-preferences-changed", update);
-    return () => {
-      window.removeEventListener("groundwork-preferences-changed", update);
-    };
-  }, []);
 
   useEffect(() => {
     function handleExpiredSession() {
@@ -491,10 +288,16 @@ export function WorkspaceApp({
         const starter = await api<Workspace>("/workspaces", accessToken, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Apex Horizon Cloud Modernization Proposal", kind: "personal", template: "proposal" }),
+          body: JSON.stringify({
+            name: "Apex Horizon Cloud Modernization Proposal",
+            kind: "personal",
+            template: "proposal",
+          }),
         }).catch(() => null);
         if (starter) {
-          await api(`/workspaces/${starter.id}/demo`, accessToken, { method: "POST" }).catch(() => undefined);
+          await api(`/workspaces/${starter.id}/demo`, accessToken, { method: "POST" }).catch(
+            () => undefined,
+          );
           items = [starter];
         }
       }
@@ -510,7 +313,10 @@ export function WorkspaceApp({
       const wsList = await api<Workspace[]>("/workspaces", accessToken);
       const allDocs: NativeDocument[] = [];
       for (const ws of wsList) {
-        const docs = await api<NativeDocument[]>(`/workspaces/${ws.id}/native-documents`, accessToken).catch(() => []);
+        const docs = await api<NativeDocument[]>(
+          `/workspaces/${ws.id}/native-documents`,
+          accessToken,
+        ).catch(() => []);
         allDocs.push(...docs);
       }
       setNativeDocs(allDocs);
@@ -548,7 +354,7 @@ export function WorkspaceApp({
   }
 
   async function handleDeleteWorkspace(wsId: string): Promise<void> {
-    if (!window.confirm("Delete this workspace? All attached deliverables and sources will be unlinked.")) return;
+    if (!window.confirm("Delete this workspace?")) return;
     try {
       await api(`/workspaces/${wsId}`, token, { method: "DELETE" });
       setWorkspaces((prev) => prev.filter((w) => w.id !== wsId));
@@ -574,7 +380,10 @@ export function WorkspaceApp({
     }
   }
 
-  async function handleUploadWorkspaceDocument(file: File, wsId: string): Promise<DocumentItem | null> {
+  async function handleUploadWorkspaceDocument(
+    file: File,
+    wsId: string,
+  ): Promise<DocumentItem | null> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("workspace_id", wsId);
@@ -585,18 +394,7 @@ export function WorkspaceApp({
     });
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      const message =
-        typeof body?.detail === "string"
-          ? body.detail
-          : body?.detail?.message ?? body?.error?.message ?? "Upload failed";
-      if (response.status === 409 && body?.detail?.document_id) {
-        await loadDocuments(token).catch(() => undefined);
-        const existing = documents.find((d) => d.id === body.detail.document_id);
-        if (existing) {
-          return existing;
-        }
-      }
-      throw new Error(message);
+      throw new Error(body?.detail || "Upload failed");
     }
     const uploaded = (await response.json()) as DocumentItem;
     setDocuments((prev) => [uploaded, ...prev]);
@@ -609,110 +407,52 @@ export function WorkspaceApp({
       return;
     }
     setIsInitialLoading(true);
-    const timer = window.setTimeout(async () => {
-      try {
-        await Promise.all([
-          loadDocuments(initialAuth.access_token),
-          loadStats(initialAuth.access_token),
-          loadWorkspaces(initialAuth.access_token),
-          loadAllNativeDocs(initialAuth.access_token),
-        ]);
-      } catch (err) {
-        console.error("Initial workspace data load error", err);
-      } finally {
-        setIsInitialLoading(false);
-      }
-      if (pendingUpload) {
-        onPendingUploadHandled();
-        const safeName = pendingUpload.name.replace(/\.[^/.]+$/, "").trim().slice(0, 120) || "Workspace";
-        handleCreateWorkspace(safeName).then((wsId) => {
-          if (wsId) {
-            handleUploadWorkspaceDocument(pendingUpload, wsId).catch((err: unknown) => {
-              setError(err instanceof Error ? err.message : "Failed to upload document");
-            });
-          }
-        });
-      }
-      const pendingPrompt = sessionStorage.getItem("groundwork-pending-prompt");
-      if (pendingPrompt) {
-        sessionStorage.removeItem("groundwork-pending-prompt");
-        const wsName = pendingPrompt.length > 4 ? pendingPrompt.slice(0, 45) : "Technical Proposal Workspace";
-        handleCreateWorkspace(wsName, "proposal").then(async (wsId) => {
-          if (wsId) {
-            await api(`/workspaces/${wsId}/demo`, initialAuth.access_token, { method: "POST" }).catch(() => undefined);
-            await Promise.all([
-              loadDocuments(initialAuth.access_token),
-              loadAllNativeDocs(initialAuth.access_token),
-            ]);
-            setActiveWorkspaceId(wsId);
-            setWorkspaceView("workspace");
-          }
-        });
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    Promise.all([
+      loadDocuments(initialAuth.access_token),
+      loadStats(initialAuth.access_token),
+      loadWorkspaces(initialAuth.access_token),
+      loadAllNativeDocs(initialAuth.access_token),
+    ]).finally(() => setIsInitialLoading(false));
   }, [initialAuth, loadDocuments, loadStats, loadWorkspaces, loadAllNativeDocs]);
 
-  useEffect(() => {
-    if (!token || !documents.some((item) => !["ready", "failed"].includes(item.status))) return;
-    const timer = window.setInterval(() => loadDocuments(token).catch(() => undefined), 2500);
-    return () => window.clearInterval(timer);
-  }, [token, documents, loadDocuments]);
-
+  // Keyboard shortcut ⌘K
   useEffect(() => {
     function keyboardShortcuts(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setCommandPaletteOpen((value) => !value); return; }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen((v) => !v);
+      }
       if (event.key === "Escape") {
-        setViewer(null); setCommandPaletteOpen(false);
+        setViewer(null);
+        setCommandPaletteOpen(false);
       }
     }
     window.addEventListener("keydown", keyboardShortcuts);
     return () => window.removeEventListener("keydown", keyboardShortcuts);
   }, []);
 
-  const workspaceCommands: WorkspaceCommand[] = user ? [
-    { id: "library", label: "Open Workspace Library", detail: "Browse all research workspaces", icon: <FileText size={16} />, run: () => setWorkspaceView("library") },
-    { id: "jobs", label: "View processing jobs", detail: "Inspect progress, retry failures, or cancel work", icon: <Activity size={16} />, run: () => setJobsOpen(true) },
-    { id: "settings", label: "Open account settings", detail: "Profile, security, preferences, and usage", icon: <BrandMark />, run: () => setAccountOpen(true) },
-  ] : [];
-
-  async function completeAuthentication(result: AuthResult) {
-    setStoredAuth(result);
-    setToken(result.access_token);
-    setUser(result.user);
-    await Promise.all([
-      loadDocuments(result.access_token),
-      loadStats(result.access_token),
-      loadWorkspaces(result.access_token),
-      loadAllNativeDocs(result.access_token),
-    ]);
-  }
-
-  async function authenticateGoogle(credential: string) {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api<AuthResult>("/auth/google", undefined, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-      });
-      await completeAuthentication(result);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Google sign-in failed");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const workspaceCommands: WorkspaceCommand[] = user
+    ? [
+        {
+          id: "library",
+          label: "Open Workspace Library",
+          detail: "Browse all research workspaces",
+          icon: <FileText size={16} />,
+          run: () => setWorkspaceView("library"),
+        },
+        {
+          id: "jobs",
+          label: "View processing jobs",
+          detail: "Inspect background task progress",
+          icon: <Activity size={16} />,
+          run: () => setJobsOpen(true),
+        },
+      ]
+    : [];
 
   async function authenticate(values: AuthFields) {
-    setBusy(true); setError("");
-    if (mode === "register" && !values.display_name?.trim()) {
-      setError("Display name must contain at least two characters.");
-      setBusy(false);
-      return;
-    }
+    setBusy(true);
+    setError("");
     try {
       const result = await api<AuthResult>(`/auth/${mode}`, undefined, {
         method: "POST",
@@ -723,160 +463,213 @@ export function WorkspaceApp({
           ...(mode === "register" ? { display_name: values.display_name } : {}),
         }),
       });
-      await completeAuthentication(result);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed"); }
-    finally { setBusy(false); }
+      setStoredAuth(result);
+      setToken(result.access_token);
+      setUser(result.user);
+      await Promise.all([
+        loadDocuments(result.access_token),
+        loadStats(result.access_token),
+        loadWorkspaces(result.access_token),
+        loadAllNativeDocs(result.access_token),
+      ]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Authentication failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function signOut() {
     setStoredAuth(null);
-    setToken(""); setUser(null); setDocuments([]); setNotificationsOpen(false); setNotificationUnread(0);
+    setToken("");
+    setUser(null);
+    setDocuments([]);
     onExit();
   }
 
-  async function removeDocument(document: DocumentItem) {
-    if (!window.confirm(`Delete ${document.filename}?`)) return;
-    try {
-      await api(`/documents/${document.id}`, token, { method: "DELETE" });
-      await Promise.all([loadDocuments(token), loadStats(token)]);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed"); }
+  // Login / Register Screen (Calm, Manuscript Styled)
+  if (!token || !user) {
+    return (
+      <main className="min-h-screen w-full bg-[var(--paper)] flex items-center justify-center p-4 min-w-0">
+        <div className="w-full max-w-sm bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-card)] p-6 sm:p-8 space-y-6 min-w-0">
+          <div className="text-center space-y-1.5 min-w-0">
+            <BrandMark size={28} className="mx-auto" />
+            <h1 className="font-serif text-2xl font-bold text-[var(--ink)] tracking-tight">
+              Ground<span className="text-[var(--ink-blue)]">work</span>
+            </h1>
+            <p className="text-xs text-[var(--ink-secondary)] break-words">
+              Grounded research & deterministic deliverable verification.
+            </p>
+          </div>
+
+          <GoogleSignInButton
+            disabled={busy}
+            onCredential={(cred) => {
+              api<AuthResult>("/auth/google", undefined, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ credential: cred }),
+              }).then((res) => {
+                setStoredAuth(res);
+                setToken(res.access_token);
+                setUser(res.user);
+              });
+            }}
+            onError={setError}
+          />
+
+          <form onSubmit={authForm.handleSubmit(authenticate)} className="space-y-3 min-w-0">
+            {mode === "register" && (
+              <div>
+                <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+                  Display Name
+                </label>
+                <Input {...authForm.register("display_name")} required />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+                Email
+              </label>
+              <Input type="email" {...authForm.register("email")} required />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+                Password
+              </label>
+              <Input type="password" {...authForm.register("password")} required />
+            </div>
+
+            {error && (
+              <div className="p-2 rounded bg-[var(--danger-bg)] border border-[var(--danger-border)] text-xs text-[var(--danger)] break-words">
+                {error}
+              </div>
+            )}
+
+            <Button
+              variant="human"
+              size="md"
+              type="submit"
+              disabled={busy}
+              className="w-full mt-2"
+            >
+              {busy ? "Connecting…" : mode === "login" ? "Sign In" : "Create Account"}
+            </Button>
+          </form>
+
+          <div className="text-center pt-2 border-t border-[var(--hairline-subtle)] space-y-2">
+            <button
+              onClick={() => {
+                setMode(mode === "login" ? "register" : "login");
+                setError("");
+              }}
+              className="text-xs text-[var(--ink-blue)] hover:underline cursor-pointer"
+            >
+              {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
+            </button>
+
+            <div>
+              <button
+                onClick={onExit}
+                className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] cursor-pointer"
+              >
+                ← Back to home
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
   }
 
-  if (!token || !user) return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <div className="auth-brand auth-brand-login"><BrandMark /><strong>Ground<b>work</b></strong></div>
-        <p className="eyebrow">Document Intelligence Workspace</p>
-        <h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
-        <p>Grounded research, document synthesis, and verified deliverable drafting.</p>
-        {pendingUpload && <div className="pending-upload-note">
-          <FileText size={16} />
-          <span><strong>{pendingUpload.name}</strong><small>Ready to upload securely after you sign in.</small></span>
-        </div>}
-        <GoogleSignInButton
-          disabled={busy}
-          onCredential={(credential) => { authenticateGoogle(credential).catch(() => undefined); }}
-          onError={setError}
-        />
-        <div className="auth-divider"><span>or continue with email</span></div>
-        <form onSubmit={authForm.handleSubmit(authenticate)}>
-          {mode === "register" && <label>Display name<input {...authForm.register("display_name")} minLength={2} required /></label>}
-          <label>Email<input {...authForm.register("email")} type="email" required /></label>
-          <label>Password<input {...authForm.register("password")} type="password" minLength={8} required /></label>
-          {error && <div className="form-error">{error}</div>}
-          <Button disabled={busy}>{busy ? <><RefreshCw size={15} className="spin" /> {mode === "login" ? "Logging you in…" : "Creating your account…"}</> : mode === "login" ? "Sign in" : "Create account"}</Button>
-        </form>
-        {busy && <div className="auth-loading" role="status" aria-live="polite">
-          <span className="auth-loading-spinner"><RefreshCw size={18} className="spin" /></span>
-          <div>
-            <strong>{mode === "login" ? "Connecting to your workspace" : "Preparing your workspace"}</strong>
-            <small>The demo server may take up to 30 seconds to wake if idle. Please keep this page open.</small>
-          </div>
-        </div>}
-        {(REGISTRATION_ENABLED || mode === "register") && <Button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
-          {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
-        </Button>}
-        <Button className="auth-back-home" onClick={onExit}>← Back to home</Button>
-      </section>
-    </main>
-  );
-
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0] || null;
+  const activeWorkspace =
+    workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0] || null;
 
   return (
-    <div className="groundwork-app-root h-screen w-screen overflow-hidden">
-      {workspaceView === "workspace" && activeWorkspace ? (
-        <ResearchWorkspace
-          auth={{ access_token: token, refresh_token: "", user }}
-          workspace={activeWorkspace}
-          documents={documents}
-          nativeDocs={nativeDocs}
-          activeTheme={activeTheme}
-          onBackToLibrary={() => setWorkspaceView("library")}
-          onUploadDocument={async (file, wsId) => {
-            return handleUploadWorkspaceDocument(file, wsId);
-          }}
-          onDeleteDocument={async (docId) => {
-            const doc = documents.find((d) => d.id === docId);
-            if (doc) await removeDocument(doc);
-          }}
-          onOpenAccount={() => setAccountOpen(true)}
-          onToggleTheme={() => toggleTheme()}
-          onOpenViewer={(docId, pageNumber) => {
-            const doc = documents.find((d) => d.id === docId);
-            if (doc) {
-              setViewerPage(pageNumber || 1);
-              setViewerSearch("");
-              setViewer(doc);
-            }
-          }}
-        />
-      ) : (
-        <WorkspaceLibrary
-          auth={{ access_token: token, refresh_token: "", user }}
-          workspaces={workspaces}
-          documents={documents}
-          nativeDocs={nativeDocs}
-          activeTheme={activeTheme}
-          isLoading={isInitialLoading}
-          onSelectWorkspace={(wsId) => {
-            setActiveWorkspaceId(wsId);
-            setWorkspaceView("workspace");
-          }}
-          onCreateWorkspace={handleCreateWorkspace}
-          onDeleteWorkspace={handleDeleteWorkspace}
-          onRenameWorkspace={handleRenameWorkspace}
-          onUploadToNewWorkspace={async (file) => {
-            try {
-              const safeName = file.name.replace(/\.[^/.]+$/, "").trim().slice(0, 120) || "Workspace";
-              const wsId = await handleCreateWorkspace(safeName);
-              if (wsId) {
-                await handleUploadWorkspaceDocument(file, wsId);
+    <div className="flex h-screen w-screen overflow-hidden bg-[var(--paper)] groundwork-app-root min-w-0">
+      {/* Collapsible Left Sidebar */}
+      <Sidebar
+        auth={{ access_token: token, refresh_token: "", user }}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        nativeDocs={nativeDocs}
+        activeDocId={null}
+        isOpen={isSidebarOpen}
+        activeTheme={activeTheme}
+        onToggleOpen={() => setIsSidebarOpen((v) => !v)}
+        onSelectWorkspace={(wsId) => {
+          setActiveWorkspaceId(wsId);
+          setWorkspaceView("workspace");
+        }}
+        onSelectDoc={(docId) => {
+          setWorkspaceView("workspace");
+        }}
+        onCreateWorkspace={() => handleCreateWorkspace("New Proposal Workspace")}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onOpenAccount={() => setAccountOpen(true)}
+        onToggleTheme={toggleTheme}
+      />
+
+      {/* Main View Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full">
+        {workspaceView === "workspace" && activeWorkspace ? (
+          <ResearchWorkspace
+            auth={{ access_token: token, refresh_token: "", user }}
+            workspace={activeWorkspace}
+            documents={documents}
+            nativeDocs={nativeDocs}
+            activeTheme={activeTheme}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
+            onBackToLibrary={() => setWorkspaceView("library")}
+            onUploadDocument={handleUploadWorkspaceDocument}
+            onDeleteDocument={async (docId) => {
+              await api(`/documents/${docId}`, token, { method: "DELETE" });
+              await loadDocuments(token);
+            }}
+            onOpenAccount={() => setAccountOpen(true)}
+            onToggleTheme={toggleTheme}
+            onOpenViewer={(docId, pageNumber) => {
+              const doc = documents.find((d) => d.id === docId);
+              if (doc) {
+                setViewerPage(pageNumber || 1);
+                setViewerSearch("");
+                setViewer(doc);
               }
-            } catch (err: unknown) {
-              setError(err instanceof Error ? err.message : "Failed to upload document to new workspace");
-            }
-          }}
-          onOpenAccount={() => setAccountOpen(true)}
-          onToggleTheme={() => toggleTheme()}
-          onOpenTwoMinuteDemo={async () => {
-            setBusy(true);
-            try {
-              const demoWs = workspaces.find(
-                (w) => w.name.toLowerCase().includes("apex") || w.name.toLowerCase().includes("demo") || w.name.toLowerCase().includes("proposal"),
-              );
-              if (!demoWs) {
-                const newWsId = await handleCreateWorkspace("Apex Horizon RFP & Verification Demo", "proposal");
-                if (newWsId) {
-                  await api(`/workspaces/${newWsId}/demo`, token, { method: "POST" }).catch(() => undefined);
-                  await Promise.all([
-                    loadDocuments(token),
-                    loadAllNativeDocs(token),
-                  ]);
-                  setActiveWorkspaceId(newWsId);
-                  setWorkspaceView("workspace");
-                }
-              } else {
-                await api(`/workspaces/${demoWs.id}/demo`, token, { method: "POST" }).catch(() => undefined);
-                await Promise.all([
-                  loadDocuments(token),
-                  loadAllNativeDocs(token),
-                ]);
-                setActiveWorkspaceId(demoWs.id);
-                setWorkspaceView("workspace");
-              }
-            } catch (err) {
-              console.error("Failed to load demo", err);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
-      )}
+            }}
+          />
+        ) : (
+          <WorkspaceLibrary
+            auth={{ access_token: token, refresh_token: "", user }}
+            workspaces={workspaces}
+            documents={documents}
+            nativeDocs={nativeDocs}
+            activeTheme={activeTheme}
+            isSidebarOpen={isSidebarOpen}
+            isLoading={isInitialLoading}
+            onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
+            onSelectWorkspace={(wsId) => {
+              setActiveWorkspaceId(wsId);
+              setWorkspaceView("workspace");
+            }}
+            onCreateWorkspace={handleCreateWorkspace}
+            onDeleteWorkspace={handleDeleteWorkspace}
+            onRenameWorkspace={handleRenameWorkspace}
+            onUploadToNewWorkspace={async (file) => {
+              const wsId = await handleCreateWorkspace(file.name.replace(/\.[^/.]+$/, ""));
+              if (wsId) await handleUploadWorkspaceDocument(file, wsId);
+            }}
+            onOpenAccount={() => setAccountOpen(true)}
+            onToggleTheme={toggleTheme}
+          />
+        )}
+      </div>
 
       {/* Dialog Overlays */}
       {viewer && (
-        <PdfViewer
+        <PdfViewerModal
           document={viewer}
           token={token}
           initialPage={viewerPage}
@@ -884,6 +677,7 @@ export function WorkspaceApp({
           onClose={() => setViewer(null)}
         />
       )}
+
       {accountOpen && (
         <AccountSettingsPanel
           user={user}
@@ -898,21 +692,23 @@ export function WorkspaceApp({
           onSignOut={signOut}
         />
       )}
+
       {notificationsOpen && (
         <NotificationCenter
           token={token}
           onClose={() => setNotificationsOpen(false)}
           onUnread={setNotificationUnread}
-          onNavigate={(action) => {
-            if (action === "processing") setJobsOpen(true);
-            setNotificationsOpen(false);
-          }}
+          onNavigate={() => setNotificationsOpen(false)}
         />
       )}
-      {jobsOpen && <ProcessingJobs token={token} onClose={() => setJobsOpen(false)} />}
+
+      {jobsOpen && <ProcessingJobsModal token={token} onClose={() => setJobsOpen(false)} />}
+
       {commandPaletteOpen && (
         <CommandPalette commands={workspaceCommands} onClose={() => setCommandPaletteOpen(false)} />
       )}
     </div>
   );
 }
+
+export default WorkspaceApp;

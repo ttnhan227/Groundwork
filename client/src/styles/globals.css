@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* ==========================================================================
+   GROUNDWORK GLOBAL STYLES & SIGNATURE MOTION
+   - Calm, flat, typography-led manuscript canvas
+   - Two-ink system: ink-blue (human) & ink-sepia (agent)
+   - "Wet ink settling & drying" signature animation
+   ========================================================================== */
+
+/* Global Box-Sizing & Word-Wrap Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Universal Text & Heading Overflow Protection */
+h1, h2, h3, h4, h5, h6, p, blockquote, span, a, div, li, td, th {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] ::before,
+[data-reduced-motion="true"] ::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Typography Role Helpers */
+.font-display, .font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-body, .font-sans {
+  font-family: var(--font-sans);
+}
+
+.font-agent, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ================= THE SIGNATURE ORCHESTRATED MOTION =================
+   1. "Wet ink settling": While agent streams in text, it uses the monospace
+      font face in ink-sepia with a subtle opacity settle.
+   2. "Ink drying": When an agent suggestion is accepted, it transitions
+      from monospace ink-sepia to body sans ink, visibly drying into the doc.
+   ====================================================================== */
+
+@keyframes inkSettle {
+  0% {
+    opacity: 0.4;
+    color: var(--ink-sepia);
+    background-color: var(--ink-sepia-faint);
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 1;
+    color: var(--ink-sepia);
+    background-color: transparent;
+  }
+}
+
+.agent-drafting {
+  font-family: var(--font-mono) !important;
+  color: var(--ink-sepia) !important;
+  background-color: var(--ink-sepia-subtle);
+  border-radius: var(--radius-xs);
+  padding: 1px 3px;
+  animation: inkSettle 1.2s ease-out infinite alternate;
+}
+
+.agent-proposed-block {
+  font-family: var(--font-mono);
+  color: var(--ink-sepia);
+  background-color: var(--ink-sepia-subtle);
+  border-left: 2px solid var(--ink-sepia);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: var(--space-2) var(--space-3);
+  transition: all 0.35s ease;
+}
+
+@keyframes inkDryTransition {
+  0% {
+    font-family: var(--font-mono);
+    color: var(--ink-sepia);
+    background-color: var(--ink-sepia-subtle);
+  }
+  60% {
+    font-family: var(--font-sans);
+    color: var(--ink-secondary);
+    background-color: var(--ink-blue-subtle);
+  }
+  100% {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background-color: transparent;
+  }
+}
+
+.ink-dried {
+  animation: inkDryTransition 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Minimal Tactile Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-muted);
+}
+
+/* Minimal Hover-Revealed Chrome (Notion-style) */
+.hover-reveal-group .hover-reveal-item {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.hover-reveal-group:hover .hover-reveal-item,
+.hover-reveal-group:focus-within .hover-reveal-item {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Focus Rings */
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--ink-blue);
+  outline-offset: 1px;
+}
+
+/* Standard animation utilities */
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
