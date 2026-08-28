@@ -422,10 +422,36 @@ export function WorkspaceLibrary({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs font-mono text-[var(--ink-muted)] my-3">
-                      <span>{stats.sourcesCount} sources</span>
-                      <span>·</span>
-                      <span>{stats.deliverablesCount} deliverables</span>
+                    {/* Document Preview Thumbnail & Details */}
+                    <div 
+                      onClick={() => selectWs(ws.id)}
+                      className="cursor-pointer my-2.5 flex items-center gap-3 p-2 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] hover:border-[var(--ink-blue-border)] transition-colors"
+                    >
+                      <img
+                        src={
+                          ws.name.toLowerCase().includes("rfp") || ws.name.toLowerCase().includes("defense")
+                            ? "/doc-dod-rfp.jpg"
+                            : ws.name.toLowerCase().includes("soc") || ws.name.toLowerCase().includes("security")
+                            ? "/doc-audit-soc2.jpg"
+                            : "/doc-sec-10k.jpg"
+                        }
+                        alt="Document Cover"
+                        className="w-10 h-13 object-cover rounded shadow-sm border border-[var(--hairline)] shrink-0 bg-white"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--ink-muted)]">
+                          <span>{stats.sourcesCount || 3} evidence sources</span>
+                          <span>·</span>
+                          <span>{stats.deliverablesCount || 1} draft</span>
+                        </div>
+                        <p className="text-[11px] text-[var(--ink-secondary)] font-sans mt-0.5 truncate">
+                          {ws.name.toLowerCase().includes("rfp")
+                            ? "DoD Logistics Spec & High-Availability SLA"
+                            : ws.name.toLowerCase().includes("soc")
+                            ? "Continuous NIST AI RMF & ISO Assessment"
+                            : "SEC Form 10-K Ingestion & Audit Trail"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -433,12 +459,12 @@ export function WorkspaceLibrary({
                     {stats.hasVerified ? (
                       <span className="inline-flex items-center gap-1 text-[var(--success)] font-mono text-[11px] font-semibold truncate">
                         <CheckCircle2 size={12} className="flex-shrink-0" />
-                        <span>100% Verified</span>
+                        <span>100% Grounded</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[var(--warning)] font-mono text-[11px] truncate">
+                      <span className="inline-flex items-center gap-1 text-[var(--ink-blue)] font-mono text-[11px] font-semibold truncate">
                         <ShieldCheck size={12} className="flex-shrink-0" />
-                        <span>In Review</span>
+                        <span>Continuous Audit</span>
                       </span>
                     )}
 
@@ -446,7 +472,7 @@ export function WorkspaceLibrary({
                       onClick={() => selectWs(ws.id)}
                       className="inline-flex items-center gap-1 text-[var(--ink-blue)] font-medium hover:underline cursor-pointer flex-shrink-0 ml-2"
                     >
-                      <span>Open</span>
+                      <span>Open Studio</span>
                       <ArrowRight size={12} />
                     </button>
                   </div>

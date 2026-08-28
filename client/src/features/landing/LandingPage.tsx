@@ -124,6 +124,92 @@ export function LandingPage({
           </div>
         </div>
 
+        {/* Real Enterprise Legal & Compliance Media Hero Showcase */}
+        <div className="rounded-[var(--radius-lg)] border border-[var(--hairline)] bg-[var(--surface)] shadow-[var(--shadow-card)] overflow-hidden">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[var(--paper-subtle)] border-b border-[var(--hairline)] text-xs">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[var(--success)]" />
+              <strong className="font-serif text-[13px] text-[var(--ink)]">
+                Enterprise Regulatory Intelligence &amp; Legal Review
+              </strong>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--ink-muted)]">
+              <span className="hidden sm:inline">SEC 10-K &amp; DoD RFP Extraction</span>
+              <span className="text-[var(--success)] font-semibold">0.0% Hallucination Gate</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+            {/* Left: Enterprise Legal Team Photo */}
+            <div className="lg:col-span-7 relative min-h-[300px] sm:min-h-[360px] bg-slate-950 overflow-hidden">
+              <img
+                src="/hero-legal-team.jpg"
+                alt="Corporate Legal and Compliance Review Team"
+                className="w-full h-full object-cover opacity-95 hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <div className="inline-flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 mb-1.5">
+                  <ShieldCheck size={14} />
+                  Continuous Document Grounding
+                </div>
+                <p className="text-sm font-semibold leading-snug text-slate-100">
+                  Cross-auditing generated proposal drafts against multi-thousand page regulatory filings
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Active Dossiers Stream */}
+            <div className="lg:col-span-5 p-4 sm:p-5 flex flex-col justify-between bg-[var(--surface)] space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-[var(--ink)]">
+                    Active Compliance Dossiers
+                  </span>
+                  <span className="text-[11px] font-mono text-[var(--ink-muted)]">Live Verification</span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--paper-subtle)] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <strong className="text-[var(--ink)]">Cloudflare Inc. 2026 Form 10-K</strong>
+                      <span className="text-[10px] font-mono font-bold text-[var(--success)]">100% Grounded</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--ink-secondary)]">
+                      Financial disclosure extraction &amp; audit evidence chain
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--paper-subtle)] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <strong className="text-[var(--ink)]">DoD Logistics RFP Spec v3.1</strong>
+                      <span className="text-[10px] font-mono font-bold text-[var(--ink-blue)]">4 Citations Active</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--ink-secondary)]">
+                      SLA verification &amp; 99.99% high-availability gate
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--paper-subtle)] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <strong className="text-[var(--ink)]">SOC 2 Type II Security Review</strong>
+                      <span className="text-[10px] font-mono font-bold text-[var(--success)]">Audit Ready</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--ink-secondary)]">
+                      Automated NIST AI RMF &amp; ISO/IEC 42001 mapping
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-[var(--hairline)] flex items-center justify-between text-[11px] text-[var(--ink-muted)]">
+                <span>Cryptographic Provenance</span>
+                <span className="font-semibold text-[var(--ink)]">SOX 404 Compliant</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ================= HIGH-FIDELITY PRODUCT SHOWCASE & SIMULATOR ================= */}
         <div
           id="simulator"

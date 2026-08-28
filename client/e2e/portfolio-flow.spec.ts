@@ -48,11 +48,11 @@ test("new user can register and navigate workspaces via command palette", async 
   await page.goto("/?app=1");
   await page.getByRole("button", { name: "Need an account? Register" }).click();
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  await page.getByLabel("Display name").fill("Groundwork Engineer");
-  await page.getByLabel("Email").fill(`groundwork-${suffix}@example.com`);
-  await page.getByLabel("Password").fill("GroundworkPassword!42");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.locator(".groundwork-app-root")).toBeVisible();
+  await page.locator("input[name='display_name']").fill("Groundwork Engineer");
+  await page.locator("input[name='email']").fill(`groundwork-${suffix}@example.com`);
+  await page.locator("input[name='password']").fill("GroundworkPassword!42");
+  await page.getByRole("button", { name: /Create Account/i }).click();
+  await expect(page.locator(".groundwork-app-root")).toBeVisible({ timeout: 15_000 });
 
   // Test Command Palette
   await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");

@@ -121,11 +121,24 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 )}
               </button>
 
+              {/* Document Cover Thumbnail */}
+              <img
+                src={
+                  doc.filename.toLowerCase().includes("rfp") || doc.filename.toLowerCase().includes("horizon")
+                    ? "/doc-dod-rfp.jpg"
+                    : doc.filename.toLowerCase().includes("security") || doc.filename.toLowerCase().includes("soc")
+                    ? "/doc-audit-soc2.jpg"
+                    : "/doc-sec-10k.jpg"
+                }
+                alt="Doc Cover"
+                className="w-7 h-9 object-cover rounded shadow-xs border border-[var(--hairline)] shrink-0 bg-white"
+              />
+
               <div
                 className="flex-1 min-w-0 cursor-pointer"
                 onClick={() => onToggleSource(doc.id)}
               >
-                <p className="font-medium text-[var(--ink)] truncate" title={doc.filename}>
+                <p className="font-medium text-[var(--ink)] truncate text-xs" title={doc.filename}>
                   {doc.filename}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[var(--ink-muted)] font-mono">
@@ -139,8 +152,8 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                       <RefreshCw size={9} className="spin" /> Indexing
                     </span>
                   ) : (
-                    <span className="text-[var(--success)] flex items-center gap-0.5 truncate">
-                      <Check size={9} /> Indexed
+                    <span className="text-[var(--success)] flex items-center gap-0.5 truncate font-semibold">
+                      <Check size={9} /> Grounded
                     </span>
                   )}
                 </div>

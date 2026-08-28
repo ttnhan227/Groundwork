@@ -152,6 +152,27 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
         }),
       });
     });
+    await page.route("**/auth/me**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "user-1",
+          email: "engineer@example.com",
+          display_name: "Lead Engineer",
+          role: "admin",
+          is_active: true,
+          google_linked: true,
+        }),
+      });
+    });
+    await page.route("**/members**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
     await page.route("**/documents**", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     });
@@ -177,8 +198,8 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
     });
     await page.goto("/?app=1");
 
-    // Open User Settings panel via sidebar settings button
-    const settingsBtn = page.getByRole("button", { name: "Settings" });
+    // Open User Settings panel via sidebar settings button or top header avatar
+    const settingsBtn = page.getByTitle(/Account profile & (preferences|settings)/i).or(page.getByRole("button", { name: /Settings|Lead Engineer/i })).first();
     await settingsBtn.click();
 
     // Verify Account Settings modal is displayed
@@ -190,15 +211,15 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
     await expect(page.getByText("Google Authentication")).toBeVisible();
 
     // Navigate to Security tab
-    await page.getByRole("button", { name: "Security" }).click();
+    await page.locator(".account-settings-nav button", { hasText: "Security" }).click();
     await expect(page.getByText("Password & Active Sessions")).toBeVisible();
 
     // Navigate to Document Defaults tab
-    await page.getByRole("button", { name: "Document Defaults" }).click();
+    await page.locator(".account-settings-nav button", { hasText: "Document Defaults" }).click();
     await expect(page.getByText("Deliverable & Writing Defaults")).toBeVisible();
 
     // Navigate to Usage tab
-    await page.getByRole("button", { name: "Usage" }).click();
+    await page.locator(".account-settings-nav button", { hasText: "Usage" }).click();
     await expect(page.getByText("Storage Allocation")).toBeVisible();
     await expect(page.getByText("Pages indexed")).toBeVisible();
 

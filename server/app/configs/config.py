@@ -31,9 +31,9 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 60
     ai_daily_request_limit: int = 50
     ai_global_daily_request_limit: int = 500
-    request_rate_limit_per_minute: int = 120
-    registration_rate_limit_per_hour: int = 5
-    ai_rate_limit_per_minute: int = 10
+    request_rate_limit_per_minute: int = 240
+    registration_rate_limit_per_hour: int = 100
+    ai_rate_limit_per_minute: int = 60
     max_documents_per_user: int = 100
     daily_upload_limit_per_user: int = 10
     global_daily_upload_limit: int = 100

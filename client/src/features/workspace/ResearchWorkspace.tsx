@@ -535,12 +535,15 @@ export function ResearchWorkspace({
             {/* Single-Column Document Paper Sheet */}
             <div className="w-full max-w-[760px] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] p-8 sm:p-12 md:p-14 mb-16 min-h-[650px] h-fit flex flex-col min-w-0">
               {/* Document Title Header */}
-              <div className="border-b border-[var(--hairline-subtle)] pb-6 mb-8 min-w-0">
+              <div className="border-b border-[var(--hairline-subtle)] pb-6 mb-8 min-w-0 space-y-4">
                 {/* 1. Action Row */}
-                <div className="flex items-center justify-between gap-4 mb-6 min-w-0">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--ink-muted)] truncate">
-                    Deliverables, Artifacts &amp; Studio · Grounded Agent Canvas
-                  </span>
+                <div className="flex items-center justify-between gap-4 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[var(--success)] px-2 py-0.5 rounded bg-[var(--success-bg)] border border-[var(--success-border)]">
+                      <ShieldCheck size={12} />
+                      v2.4 Final Draft · Legal Review Active
+                    </span>
+                  </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
@@ -565,17 +568,29 @@ export function ResearchWorkspace({
                 </div>
 
                 {/* 2. Document Title Heading */}
-                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)] tracking-tight leading-[1.25] break-normal mb-3">
-                  {activeArtifact?.title || "Enterprise AI Security & Governance Strategy"}
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)] tracking-tight leading-[1.25] break-normal">
+                  {activeArtifact?.title || "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Strategy"}
                 </h1>
 
-                {/* 3. Metadata Line */}
-                <div className="flex items-center gap-3 text-xs text-[var(--ink-muted)] font-mono flex-wrap">
-                  <span>Revision {activeArtifact?.revision || 3}</span>
-                  <span>·</span>
-                  <span>{selectedSourceIds.length || 4} sources linked</span>
-                  <span>·</span>
-                  <span>{editableBlocks.length || 6} sections</span>
+                {/* 3. Reviewers & Enterprise Compliance Strip */}
+                <div className="flex items-center justify-between gap-3 text-xs text-[var(--ink-muted)] flex-wrap pt-2 border-t border-[var(--hairline)]">
+                  <div className="flex items-center gap-2 font-sans">
+                    <span className="text-[11px] text-[var(--ink-secondary)]">Reviewers:</span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink)] px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Sarah Chen (Legal Counsel)
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink)] px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                      Marcus Vance (Compliance)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 font-mono text-[11px]">
+                    <span className="text-[var(--success)] font-semibold">✔ 0 Phantom Citations</span>
+                    <span>·</span>
+                    <span>SOX 404 Ready</span>
+                  </div>
                 </div>
               </div>
 
