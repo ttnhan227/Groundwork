@@ -140,18 +140,18 @@ export function LandingPage({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
-            {/* Left: Enterprise Legal Team Photo */}
+            {/* Left: Real Groundwork Studio & Verification Interface */}
             <div className="lg:col-span-7 relative min-h-[300px] sm:min-h-[360px] bg-slate-950 overflow-hidden">
               <img
-                src="/hero-legal-team.jpg"
-                alt="Corporate Legal and Compliance Review Team"
-                className="w-full h-full object-cover opacity-95 hover:scale-105 transition-transform duration-700"
+                src="/groundwork-studio.png"
+                alt="Groundwork Document Studio and Live Citation Audit Rail"
+                className="w-full h-full object-cover object-left-top opacity-95 hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
               <div className="absolute bottom-4 left-4 right-4 text-white">
                 <div className="inline-flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 mb-1.5">
                   <ShieldCheck size={14} />
-                  Continuous Document Grounding
+                  Live Grounded Verification Studio
                 </div>
                 <p className="text-sm font-semibold leading-snug text-slate-100">
                   Cross-auditing generated proposal drafts against multi-thousand page regulatory filings

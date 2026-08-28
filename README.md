@@ -17,6 +17,16 @@
 
 ---
 
+## Platform Visual Preview
+
+| Landing & Verification Simulator | Grounded Authoring Studio & Evidence Rail |
+|:---:|:---:|
+| ![Groundwork Landing & Simulator](docs/screenshots/groundwork-landing.png) | ![Grounded Studio & Assistant](docs/screenshots/groundwork-studio.png) |
+| **Document Library & Compliance Dossiers** | **Regulatory Insights & Citation Audit** |
+| ![Document Library & Dossiers](docs/screenshots/groundwork-library.png) | ![Regulatory Insights & Audit](docs/screenshots/groundwork-insights.png) |
+
+---
+
 ## DevOps & Infrastructure
 
 Groundwork is containerized and deployed through a full CI/CD pipeline to Google Cloud Run.
