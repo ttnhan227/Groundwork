@@ -48,9 +48,7 @@ class PlannerRun(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    conversation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
-    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), unique=True)
     command: Mapped[str] = mapped_column(Text)
     planner_kind: Mapped[str] = mapped_column(String(30), default="rules-v1")
@@ -65,12 +63,8 @@ class WorkflowRun(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    conversation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
-    )
-    planner_run_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("planner_runs.id", ondelete="CASCADE"), unique=True
-    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    planner_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("planner_runs.id", ondelete="CASCADE"), unique=True)
     job_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("processing_jobs.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -94,9 +88,7 @@ class WorkflowStepRun(Base):
     __table_args__ = (UniqueConstraint("workflow_id", "position"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workflow_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workflow_runs.id", ondelete="CASCADE"), index=True
-    )
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflow_runs.id", ondelete="CASCADE"), index=True)
     position: Mapped[int] = mapped_column(Integer)
     capability: Mapped[str] = mapped_column(String(80), index=True)
     capability_version: Mapped[str] = mapped_column(String(20), default="1")
@@ -107,9 +99,7 @@ class WorkflowStepRun(Base):
     status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
 
     workflow: Mapped[WorkflowRun] = relationship(back_populates="steps")
-    executions: Mapped[list["ToolExecution"]] = relationship(
-        back_populates="step", cascade="all, delete-orphan"
-    )
+    executions: Mapped[list["ToolExecution"]] = relationship(back_populates="step", cascade="all, delete-orphan")
 
 
 class ToolExecution(Base):
@@ -117,9 +107,7 @@ class ToolExecution(Base):
     __table_args__ = (UniqueConstraint("step_id", "attempt"), UniqueConstraint("idempotency_key"))
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    step_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workflow_step_runs.id", ondelete="CASCADE"), index=True
-    )
+    step_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflow_step_runs.id", ondelete="CASCADE"), index=True)
     attempt: Mapped[int] = mapped_column(Integer, default=1)
     idempotency_key: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(30), default="queued", index=True)
@@ -137,9 +125,7 @@ class WorkflowEvent(Base):
     __tablename__ = "workflow_events"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    workflow_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workflow_runs.id", ondelete="CASCADE"), index=True
-    )
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflow_runs.id", ondelete="CASCADE"), index=True)
     event_type: Mapped[str] = mapped_column(String(50), index=True)
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

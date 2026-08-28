@@ -39,7 +39,10 @@ def test_long_audit_text_is_wrapped_and_preserved_across_pdf_pages() -> None:
         f"- [x] Requirement {index}: include a detailed evidence-backed explanation with source notes and an accountable owner."
         for index in range(1, 31)
     )
-    data = text_to_pdf(f"Client report\n\n# Appendix: Verification audit\n\n{requirements}\n\nRequirement coverage complete", "Verified report")
+    data = text_to_pdf(
+        f"Client report\n\n# Appendix: Verification audit\n\n{requirements}\n\nRequirement coverage complete",
+        "Verified report",
+    )
     pdf = fitz.open(stream=data, filetype="pdf")
     try:
         extracted = "\n".join(page.get_text() for page in pdf)
@@ -110,22 +113,42 @@ def test_workspace_api_exposes_domain_routes() -> None:
 
 
 def test_verified_deliverable_migration_follows_current_head() -> None:
-    migration = Path(__file__).parents[1].joinpath("alembic", "versions", "0018_verified_deliverables.py").read_text(encoding="utf-8")
+    migration = (
+        Path(__file__)
+        .parents[1]
+        .joinpath("alembic", "versions", "0018_verified_deliverables.py")
+        .read_text(encoding="utf-8")
+    )
     assert 'down_revision = "0017_cancellable_jobs"' in migration
     assert '"deliverable_requirements"' in migration
     assert '"deliverable_review_findings"' in migration
 
-    repair = Path(__file__).parents[1].joinpath("alembic", "versions", "0019_normalize_generated_text.py").read_text(encoding="utf-8")
+    repair = (
+        Path(__file__)
+        .parents[1]
+        .joinpath("alembic", "versions", "0019_normalize_generated_text.py")
+        .read_text(encoding="utf-8")
+    )
     assert 'down_revision = "0018_verified_deliverables"' in repair
     assert '"native_document_versions"' in repair
     assert "normalize_generated_text" in repair
 
-    guided = Path(__file__).parents[1].joinpath("alembic", "versions", "0020_guided_verification.py").read_text(encoding="utf-8")
+    guided = (
+        Path(__file__)
+        .parents[1]
+        .joinpath("alembic", "versions", "0020_guided_verification.py")
+        .read_text(encoding="utf-8")
+    )
     assert 'down_revision = "0019_normalize_generated_text"' in guided
     assert '"linked_sections"' in guided
     assert '"claim_type"' in guided
 
-    account = Path(__file__).parents[1].joinpath("alembic", "versions", "0021_account_notifications.py").read_text(encoding="utf-8")
+    account = (
+        Path(__file__)
+        .parents[1]
+        .joinpath("alembic", "versions", "0021_account_notifications.py")
+        .read_text(encoding="utf-8")
+    )
     assert 'down_revision = "0020_guided_verification"' in account
     assert '"notifications"' in account
 
@@ -134,7 +157,7 @@ def test_readiness_requires_a_draft_and_completed_verification() -> None:
     source = Path(__file__).parents[1].joinpath("app", "controllers", "deliverables.py").read_text(encoding="utf-8")
     assert 'blockers.append("Write or generate the draft")' in source
     assert 'blockers.append("Run whole-deliverable verification")' in source
-    assert 'status_code=409' in source
+    assert "status_code=409" in source
     assert '"Export is blocked until this deliverable is verified"' in source
 
 

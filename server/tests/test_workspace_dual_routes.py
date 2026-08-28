@@ -57,10 +57,12 @@ def test_schema_instantiations() -> None:
     assert ws_req.name == "My Research Project"
     assert ws_req.kind == "personal"
 
-    blocks_req = NativeDocumentBlocksRequest(blocks=[
-        {"type": "heading", "text": "Overview"},
-        {"type": "paragraph", "text": "Details here"},
-    ])
+    blocks_req = NativeDocumentBlocksRequest(
+        blocks=[
+            {"type": "heading", "text": "Overview"},
+            {"type": "paragraph", "text": "Details here"},
+        ]
+    )
     assert len(blocks_req.blocks) == 2
 
     mem_req = WorkspaceMemoryCreate(key="note", value="Remember to verify claims")

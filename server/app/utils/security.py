@@ -23,7 +23,12 @@ def create_access_token(user_id: uuid.UUID) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     return jwt.encode(
-        {"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=settings.access_token_minutes), "type": "access"},
+        {
+            "sub": str(user_id),
+            "iat": now,
+            "exp": now + timedelta(minutes=settings.access_token_minutes),
+            "type": "access",
+        },
         settings.jwt_secret,
         algorithm="HS256",
     )

@@ -39,4 +39,3 @@ __all__ = [
     "validate_docx",
     "verify_password",
 ]
-

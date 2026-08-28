@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from collections.abc import Sequence
 
@@ -50,7 +49,11 @@ class DeliverableService:
         if member is None and user.role != "admin":
             raise PermissionError("Access denied to this workspace.")
 
-        doc_blocks = blocks or ([{"type": "paragraph", "text": content_markdown}] if content_markdown else [{"type": "paragraph", "text": ""}])
+        doc_blocks = blocks or (
+            [{"type": "paragraph", "text": content_markdown}]
+            if content_markdown
+            else [{"type": "paragraph", "text": ""}]
+        )
         doc = NativeDocument(
             workspace_id=workspace_id,
             owner_id=user.id,

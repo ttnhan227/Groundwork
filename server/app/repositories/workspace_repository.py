@@ -24,9 +24,7 @@ class WorkspaceRepository(BaseRepository[Workspace]):
         return result.all()
 
     async def get_by_id(self, workspace_id: uuid.UUID) -> Workspace | None:
-        return await self.session.scalar(
-            select(Workspace).where(Workspace.id == workspace_id)
-        )
+        return await self.session.scalar(select(Workspace).where(Workspace.id == workspace_id))
 
     async def create(self, owner_id: uuid.UUID, name: str, kind: str = "personal") -> Workspace:
         workspace = Workspace(owner_id=owner_id, name=name, kind=kind)

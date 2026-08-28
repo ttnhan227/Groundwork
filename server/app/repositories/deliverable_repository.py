@@ -63,9 +63,7 @@ class DeliverableRepository(BaseRepository[NativeDocument]):
         return result.all()
 
     async def get_version_by_id(self, version_id: uuid.UUID) -> NativeDocumentVersion | None:
-        return await self.session.scalar(
-            select(NativeDocumentVersion).where(NativeDocumentVersion.id == version_id)
-        )
+        return await self.session.scalar(select(NativeDocumentVersion).where(NativeDocumentVersion.id == version_id))
 
     async def add_version(self, version: NativeDocumentVersion) -> NativeDocumentVersion:
         self.session.add(version)

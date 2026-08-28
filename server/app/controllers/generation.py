@@ -47,38 +47,177 @@ THEMES = {
 }
 
 PRESENTATION_TEMPLATES = {
-    "startup-pitch": {"theme": "modern", "layout": "modern", "brief": "Build a startup pitch deck: problem, solution, market, product, traction, business model, go-to-market, and next step."},
-    "quarterly-review": {"theme": "executive", "layout": "compact", "brief": "Build a quarterly business review: executive summary, KPI scorecard, wins, misses, drivers, outlook, and decisions."},
-    "strategy-roadmap": {"theme": "minimal", "layout": "editorial", "brief": "Build a strategy roadmap: context, strategic pillars, initiatives, phased timeline, dependencies, risks, and owners."},
-    "product-launch": {"theme": "warm", "layout": "modern", "brief": "Build a product launch story: customer need, product promise, key capabilities, positioning, launch plan, channels, and success measures."},
-    "data-report": {"theme": "modern", "layout": "compact", "brief": "Build a data-led report: headline findings, KPI snapshots, trends, comparisons, implications, and recommended actions."},
-    "client-proposal": {"theme": "minimal", "layout": "formal", "brief": "Build a client proposal: understanding, proposed approach, workstreams, deliverables, timeline, proof, and next steps."},
+    "startup-pitch": {
+        "theme": "modern",
+        "layout": "modern",
+        "brief": "Build a startup pitch deck: problem, solution, market, product, traction, business model, go-to-market, and next step.",
+    },
+    "quarterly-review": {
+        "theme": "executive",
+        "layout": "compact",
+        "brief": "Build a quarterly business review: executive summary, KPI scorecard, wins, misses, drivers, outlook, and decisions.",
+    },
+    "strategy-roadmap": {
+        "theme": "minimal",
+        "layout": "editorial",
+        "brief": "Build a strategy roadmap: context, strategic pillars, initiatives, phased timeline, dependencies, risks, and owners.",
+    },
+    "product-launch": {
+        "theme": "warm",
+        "layout": "modern",
+        "brief": "Build a product launch story: customer need, product promise, key capabilities, positioning, launch plan, channels, and success measures.",
+    },
+    "data-report": {
+        "theme": "modern",
+        "layout": "compact",
+        "brief": "Build a data-led report: headline findings, KPI snapshots, trends, comparisons, implications, and recommended actions.",
+    },
+    "client-proposal": {
+        "theme": "minimal",
+        "layout": "formal",
+        "brief": "Build a client proposal: understanding, proposed approach, workstreams, deliverables, timeline, proof, and next steps.",
+    },
 }
 
 DOCUMENT_TEMPLATES = {
-    "verified-client-report": {"theme": "modern", "layout": "editorial", "type": "report", "brief": "Create a client-ready report driven by the engagement brief: executive summary, explicit acceptance criteria, evidence-backed situation analysis, key findings, recommendations, implementation plan, risks and assumptions, source notes, and a requirement-coverage appendix. Mark missing inputs clearly and never invent evidence."},
-    "annual-report": {"theme": "executive", "layout": "editorial", "type": "report", "brief": "Create an annual report with a letter from leadership, year in review, performance scorecard, operating highlights, risks, outlook, and priorities for the next year."},
-    "quarterly-business-review": {"theme": "modern", "layout": "compact", "type": "report", "brief": "Create a quarterly business review with an executive readout, KPI scorecard, wins, misses, customer signals, operating risks, decisions required, and next-quarter commitments."},
-    "incident-report": {"theme": "minimal", "layout": "business", "type": "report", "brief": "Create a production incident report with severity and ownership metadata, impact, detection, precise timeline, root cause, contributing factors, response assessment, corrective actions, and prevention measures."},
-    "audit-report": {"theme": "executive", "layout": "formal", "type": "report", "brief": "Create a formal audit report with scope, methodology, control assessment, evidence-backed findings, severity ratings, management responses, remediation owners, and due dates."},
-    "research-report": {"theme": "minimal", "layout": "editorial", "type": "report", "brief": "Create a rigorous research report with research question, methodology, evidence synthesis, findings, limitations, implications, recommendations, and source notes."},
-    "client-proposal-document": {"theme": "warm", "layout": "modern", "type": "proposal", "brief": "Create a persuasive client proposal with an understanding of the client's situation, objectives, proposed approach, workstreams, deliverables, timeline, team, commercial assumptions, success measures, and next steps."},
-    "product-requirements-document": {"theme": "modern", "layout": "business", "type": "general", "brief": "Create a product requirements document with problem statement, users and jobs, goals and non-goals, scope, user stories, functional requirements, UX principles, analytics, dependencies, risks, rollout, and acceptance criteria."},
-    "business-plan": {"theme": "executive", "layout": "editorial", "type": "proposal", "brief": "Create an investor-ready business plan with company thesis, market, customer, product, business model, competition, go-to-market, operations, milestones, financial assumptions, risks, and funding use."},
-    "status-report": {"theme": "minimal", "layout": "compact", "type": "report", "brief": "Create a concise status report with overall health, progress against plan, completed work, milestones, metrics, blockers, risks, decisions, owners, and next reporting-period priorities."},
-    "meeting-minutes": {"theme": "minimal", "layout": "compact", "type": "agenda", "brief": "Create decision-oriented meeting minutes with attendees, objective, discussion summary by topic, decisions and rationale, action items with owners and due dates, open questions, and next meeting."},
-    "offer-letter": {"theme": "warm", "layout": "formal", "type": "letter", "brief": "Create a professional offer letter with role, reporting line, location, start date, compensation, benefits, conditions, confidentiality reference, acceptance deadline, and signature blocks. Clearly mark any missing legal details for review."},
-    "employee-handbook": {"theme": "modern", "layout": "business", "type": "policy", "brief": "Create an employee handbook with company principles, employment basics, workplace conduct, compensation and benefits, time off, security, acceptable use, reporting channels, acknowledgements, and policy ownership."},
-    "performance-review": {"theme": "warm", "layout": "business", "type": "report", "brief": "Create a balanced performance review with role expectations, outcomes, competency evidence, strengths, development areas, feedback themes, rating rationale, goals, and manager support actions."},
-    "nda": {"theme": "executive", "layout": "formal", "type": "policy", "brief": "Create a mutual non-disclosure agreement draft with parties, purpose, definition of confidential information, exclusions, permitted use, safeguards, compelled disclosure, term, return or destruction, remedies, and governing law. Flag jurisdiction-specific clauses for legal review."},
-    "service-agreement": {"theme": "executive", "layout": "formal", "type": "policy", "brief": "Create a professional services agreement draft with parties, services, deliverables, fees, change control, responsibilities, acceptance, IP, confidentiality, warranties, liability, termination, disputes, and signatures. Flag legal-review items."},
-    "privacy-policy": {"theme": "minimal", "layout": "formal", "type": "policy", "brief": "Create a plain-language privacy policy with scope, data collected, purposes, legal bases where relevant, sharing, retention, security, international transfers, user rights, children, changes, and contact details. Flag jurisdiction-specific requirements."},
-    "software-requirements-specification": {"theme": "modern", "layout": "business", "type": "general", "brief": "Create a software requirements specification with system purpose, actors, assumptions, functional requirements with identifiers, interfaces, data requirements, non-functional requirements, constraints, traceability, and acceptance criteria."},
-    "architecture-design": {"theme": "modern", "layout": "editorial", "type": "general", "brief": "Create an architecture design document with context, requirements and quality attributes, system boundaries, component responsibilities, data flows, interfaces, security, deployment, observability, failure modes, trade-offs, decisions, and rollout."},
-    "api-documentation": {"theme": "minimal", "layout": "compact", "type": "general", "brief": "Create usable API documentation with overview, authentication, environments, conventions, endpoint reference, request and response examples, errors, pagination, rate limits, idempotency, security, and versioning."},
-    "test-plan": {"theme": "minimal", "layout": "business", "type": "general", "brief": "Create a release test plan with objectives, scope and exclusions, quality risks, environments, test data, test types, scenarios, entry and exit criteria, defect process, responsibilities, schedule, and reporting."},
-    "runbook": {"theme": "modern", "layout": "compact", "type": "general", "brief": "Create an operational runbook with service overview, ownership, dependencies, access prerequisites, health checks, alerts, standard procedures, incident triage, recovery, rollback, escalation, verification, and maintenance."},
-    "research-paper": {"theme": "minimal", "layout": "editorial", "type": "report", "brief": "Create an academic research paper structure with abstract, research question, related context, methodology, results, discussion, limitations, conclusion, and references placeholders. Never invent citations."},
+    "verified-client-report": {
+        "theme": "modern",
+        "layout": "editorial",
+        "type": "report",
+        "brief": "Create a client-ready report driven by the engagement brief: executive summary, explicit acceptance criteria, evidence-backed situation analysis, key findings, recommendations, implementation plan, risks and assumptions, source notes, and a requirement-coverage appendix. Mark missing inputs clearly and never invent evidence.",
+    },
+    "annual-report": {
+        "theme": "executive",
+        "layout": "editorial",
+        "type": "report",
+        "brief": "Create an annual report with a letter from leadership, year in review, performance scorecard, operating highlights, risks, outlook, and priorities for the next year.",
+    },
+    "quarterly-business-review": {
+        "theme": "modern",
+        "layout": "compact",
+        "type": "report",
+        "brief": "Create a quarterly business review with an executive readout, KPI scorecard, wins, misses, customer signals, operating risks, decisions required, and next-quarter commitments.",
+    },
+    "incident-report": {
+        "theme": "minimal",
+        "layout": "business",
+        "type": "report",
+        "brief": "Create a production incident report with severity and ownership metadata, impact, detection, precise timeline, root cause, contributing factors, response assessment, corrective actions, and prevention measures.",
+    },
+    "audit-report": {
+        "theme": "executive",
+        "layout": "formal",
+        "type": "report",
+        "brief": "Create a formal audit report with scope, methodology, control assessment, evidence-backed findings, severity ratings, management responses, remediation owners, and due dates.",
+    },
+    "research-report": {
+        "theme": "minimal",
+        "layout": "editorial",
+        "type": "report",
+        "brief": "Create a rigorous research report with research question, methodology, evidence synthesis, findings, limitations, implications, recommendations, and source notes.",
+    },
+    "client-proposal-document": {
+        "theme": "warm",
+        "layout": "modern",
+        "type": "proposal",
+        "brief": "Create a persuasive client proposal with an understanding of the client's situation, objectives, proposed approach, workstreams, deliverables, timeline, team, commercial assumptions, success measures, and next steps.",
+    },
+    "product-requirements-document": {
+        "theme": "modern",
+        "layout": "business",
+        "type": "general",
+        "brief": "Create a product requirements document with problem statement, users and jobs, goals and non-goals, scope, user stories, functional requirements, UX principles, analytics, dependencies, risks, rollout, and acceptance criteria.",
+    },
+    "business-plan": {
+        "theme": "executive",
+        "layout": "editorial",
+        "type": "proposal",
+        "brief": "Create an investor-ready business plan with company thesis, market, customer, product, business model, competition, go-to-market, operations, milestones, financial assumptions, risks, and funding use.",
+    },
+    "status-report": {
+        "theme": "minimal",
+        "layout": "compact",
+        "type": "report",
+        "brief": "Create a concise status report with overall health, progress against plan, completed work, milestones, metrics, blockers, risks, decisions, owners, and next reporting-period priorities.",
+    },
+    "meeting-minutes": {
+        "theme": "minimal",
+        "layout": "compact",
+        "type": "agenda",
+        "brief": "Create decision-oriented meeting minutes with attendees, objective, discussion summary by topic, decisions and rationale, action items with owners and due dates, open questions, and next meeting.",
+    },
+    "offer-letter": {
+        "theme": "warm",
+        "layout": "formal",
+        "type": "letter",
+        "brief": "Create a professional offer letter with role, reporting line, location, start date, compensation, benefits, conditions, confidentiality reference, acceptance deadline, and signature blocks. Clearly mark any missing legal details for review.",
+    },
+    "employee-handbook": {
+        "theme": "modern",
+        "layout": "business",
+        "type": "policy",
+        "brief": "Create an employee handbook with company principles, employment basics, workplace conduct, compensation and benefits, time off, security, acceptable use, reporting channels, acknowledgements, and policy ownership.",
+    },
+    "performance-review": {
+        "theme": "warm",
+        "layout": "business",
+        "type": "report",
+        "brief": "Create a balanced performance review with role expectations, outcomes, competency evidence, strengths, development areas, feedback themes, rating rationale, goals, and manager support actions.",
+    },
+    "nda": {
+        "theme": "executive",
+        "layout": "formal",
+        "type": "policy",
+        "brief": "Create a mutual non-disclosure agreement draft with parties, purpose, definition of confidential information, exclusions, permitted use, safeguards, compelled disclosure, term, return or destruction, remedies, and governing law. Flag jurisdiction-specific clauses for legal review.",
+    },
+    "service-agreement": {
+        "theme": "executive",
+        "layout": "formal",
+        "type": "policy",
+        "brief": "Create a professional services agreement draft with parties, services, deliverables, fees, change control, responsibilities, acceptance, IP, confidentiality, warranties, liability, termination, disputes, and signatures. Flag legal-review items.",
+    },
+    "privacy-policy": {
+        "theme": "minimal",
+        "layout": "formal",
+        "type": "policy",
+        "brief": "Create a plain-language privacy policy with scope, data collected, purposes, legal bases where relevant, sharing, retention, security, international transfers, user rights, children, changes, and contact details. Flag jurisdiction-specific requirements.",
+    },
+    "software-requirements-specification": {
+        "theme": "modern",
+        "layout": "business",
+        "type": "general",
+        "brief": "Create a software requirements specification with system purpose, actors, assumptions, functional requirements with identifiers, interfaces, data requirements, non-functional requirements, constraints, traceability, and acceptance criteria.",
+    },
+    "architecture-design": {
+        "theme": "modern",
+        "layout": "editorial",
+        "type": "general",
+        "brief": "Create an architecture design document with context, requirements and quality attributes, system boundaries, component responsibilities, data flows, interfaces, security, deployment, observability, failure modes, trade-offs, decisions, and rollout.",
+    },
+    "api-documentation": {
+        "theme": "minimal",
+        "layout": "compact",
+        "type": "general",
+        "brief": "Create usable API documentation with overview, authentication, environments, conventions, endpoint reference, request and response examples, errors, pagination, rate limits, idempotency, security, and versioning.",
+    },
+    "test-plan": {
+        "theme": "minimal",
+        "layout": "business",
+        "type": "general",
+        "brief": "Create a release test plan with objectives, scope and exclusions, quality risks, environments, test data, test types, scenarios, entry and exit criteria, defect process, responsibilities, schedule, and reporting.",
+    },
+    "runbook": {
+        "theme": "modern",
+        "layout": "compact",
+        "type": "general",
+        "brief": "Create an operational runbook with service overview, ownership, dependencies, access prerequisites, health checks, alerts, standard procedures, incident triage, recovery, rollback, escalation, verification, and maintenance.",
+    },
+    "research-paper": {
+        "theme": "minimal",
+        "layout": "editorial",
+        "type": "report",
+        "brief": "Create an academic research paper structure with abstract, research question, related context, methodology, results, discussion, limitations, conclusion, and references placeholders. Never invent citations.",
+    },
 }
 
 CREATION_TEMPLATES = {**DOCUMENT_TEMPLATES, **PRESENTATION_TEMPLATES}
@@ -195,11 +334,16 @@ def _guard_unsupported_metrics(plan: GeneratedContent, evidence: str) -> Generat
         def replacement(match: re.Match) -> str:
             metric = re.sub(r"\s+", " ", match.group(0)).lower()
             return match.group(0) if metric in normalized_evidence else "[confirm metric]"
+
         guarded = _METRIC_PATTERN.sub(replacement, value)
         sentences = re.split(r"(?<=[.!?])\s+", guarded)
         for index, sentence in enumerate(sentences):
             claim = _COMPLETED_CLAIM_PATTERN.search(sentence)
-            if claim and claim.group(1).lower() not in normalized_evidence and "[confirm claim]" not in sentence.lower():
+            if (
+                claim
+                and claim.group(1).lower() not in normalized_evidence
+                and "[confirm claim]" not in sentence.lower()
+            ):
                 sentences[index] = f"{sentence.rstrip()} [confirm claim]"
         return " ".join(sentences)
 
@@ -222,11 +366,36 @@ def _content(prompt: str, source: str) -> tuple[str, list[tuple[str, str]]]:
     source_sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", source) if len(part.strip()) > 35]
     seed = source_sentences[:8]
     sections = [
-        ("Executive summary", seed[0] if seed else f"This document presents a focused overview of {title.lower()}, the key considerations, and a practical path forward."),
-        ("Current context", seed[1] if len(seed) > 1 else f"The opportunity is to turn {title.lower()} into a clear, audience-ready narrative supported by concrete priorities."),
-        ("Key insights", seed[2] if len(seed) > 2 else "The strongest approach combines a concise message, evidence-led decisions, and a structure that makes the next action obvious."),
-        ("Recommended direction", seed[3] if len(seed) > 3 else "Prioritize the highest-value outcome, define ownership, and measure progress through a small set of meaningful indicators."),
-        ("Next steps", seed[4] if len(seed) > 4 else "Align stakeholders, confirm the first milestone, and begin with a focused implementation that can be reviewed and improved quickly."),
+        (
+            "Executive summary",
+            seed[0]
+            if seed
+            else f"This document presents a focused overview of {title.lower()}, the key considerations, and a practical path forward.",
+        ),
+        (
+            "Current context",
+            seed[1]
+            if len(seed) > 1
+            else f"The opportunity is to turn {title.lower()} into a clear, audience-ready narrative supported by concrete priorities.",
+        ),
+        (
+            "Key insights",
+            seed[2]
+            if len(seed) > 2
+            else "The strongest approach combines a concise message, evidence-led decisions, and a structure that makes the next action obvious.",
+        ),
+        (
+            "Recommended direction",
+            seed[3]
+            if len(seed) > 3
+            else "Prioritize the highest-value outcome, define ownership, and measure progress through a small set of meaningful indicators.",
+        ),
+        (
+            "Next steps",
+            seed[4]
+            if len(seed) > 4
+            else "Align stakeholders, confirm the first milestone, and begin with a focused implementation that can be reviewed and improved quickly.",
+        ),
     ]
     return title, sections
 
@@ -235,7 +404,9 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
     settings = get_settings()
     if not settings.llm_api_key:
         raise HTTPException(status_code=503, detail="Groundwork document generation is not configured")
-    format_name = {"docx": "Word document", "pdf": "PDF report", "pptx": "PowerPoint presentation"}[payload.output_format]
+    format_name = {"docx": "Word document", "pdf": "PDF report", "pptx": "PowerPoint presentation"}[
+        payload.output_format
+    ]
     source_rule = (
         "Use the supplied source text as evidence. Do not invent figures, names, dates, or claims that are absent from it."
         if source.strip()
@@ -274,23 +445,39 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
         value = await ai_orchestrator.complete_json(
             [{"role": "system", "content": system}, {"role": "user", "content": user_message}],
             operation="document_generation",
-            temperature=.35,
+            temperature=0.35,
         )
     except AIProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     try:
         aliases = {"bill": "invoice", "memo": "policy", "pitch_deck": "presentation", "slide_deck": "presentation"}
-        value["document_type"] = aliases.get(str(value.get("document_type", "")).lower(), str(value.get("document_type", "general")).lower())
-        if value["document_type"] not in {"invoice", "proposal", "report", "policy", "resume", "letter", "agenda", "presentation", "general"}:
+        value["document_type"] = aliases.get(
+            str(value.get("document_type", "")).lower(), str(value.get("document_type", "general")).lower()
+        )
+        if value["document_type"] not in {
+            "invoice",
+            "proposal",
+            "report",
+            "policy",
+            "resume",
+            "letter",
+            "agenda",
+            "presentation",
+            "general",
+        }:
             value["document_type"] = "general"
         if value.get("layout") not in {"business", "editorial", "compact", "formal", "modern"}:
             value["layout"] = "business"
         if not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(value.get("accent_color", ""))):
             value["accent_color"] = "#3154D8"
         if isinstance(value.get("metadata"), dict):
-            value["metadata"] = [{"label": key.replace("_", " ").title(), "value": item} for key, item in value["metadata"].items()]
+            value["metadata"] = [
+                {"label": key.replace("_", " ").title(), "value": item} for key, item in value["metadata"].items()
+            ]
         if isinstance(value.get("callout"), dict):
-            value["callout"] = " · ".join(f"{key.replace('_', ' ').title()}: {item}" for key, item in value["callout"].items())
+            value["callout"] = " · ".join(
+                f"{key.replace('_', ' ').title()}: {item}" for key, item in value["callout"].items()
+            )
         table = value.get("table")
         if isinstance(table, dict) and isinstance(table.get("headers"), list) and isinstance(table.get("rows"), list):
             width = len(table["headers"])
@@ -306,10 +493,10 @@ async def _ai_content(payload: CreateRequest, source: str) -> GeneratedContent:
 def _docx(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) -> bytes:
     document = WordDocument()
     section = document.sections[0]
-    section.top_margin = Inches(.72)
-    section.bottom_margin = Inches(.72)
-    section.left_margin = Inches(.82)
-    section.right_margin = Inches(.82)
+    section.top_margin = Inches(0.72)
+    section.bottom_margin = Inches(0.72)
+    section.left_margin = Inches(0.82)
+    section.right_margin = Inches(0.82)
     heading = document.add_heading(title, 0)
     heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
     heading.runs[0].font.color.rgb = RGBColor.from_string(theme["navy"])
@@ -331,8 +518,8 @@ def _docx(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) ->
 def _pdf(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) -> bytes:
     pdf = fitz.open()
     page = pdf.new_page()
-    accent = tuple(int(theme["accent"][index:index + 2], 16) / 255 for index in (0, 2, 4))
-    navy = tuple(int(theme["navy"][index:index + 2], 16) / 255 for index in (0, 2, 4))
+    accent = tuple(int(theme["accent"][index : index + 2], 16) / 255 for index in (0, 2, 4))
+    navy = tuple(int(theme["navy"][index : index + 2], 16) / 255 for index in (0, 2, 4))
     page.draw_rect(fitz.Rect(0, 0, 14, page.rect.height), color=accent, fill=accent)
     page.insert_textbox(fitz.Rect(48, 58, 545, 150), title, fontsize=26, fontname="hebo", color=navy)
     page.insert_text((48, 158), "Created with Groundwork AI", fontsize=9, color=accent)
@@ -340,7 +527,9 @@ def _pdf(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) -> 
     for index, (name, body) in enumerate(sections, 1):
         page.insert_text((48, y), f"{index:02d}  {name.upper()}", fontsize=11, fontname="hebo", color=navy)
         y += 18
-        used = page.insert_textbox(fitz.Rect(48, y, 545, y + 72), body, fontsize=10, lineheight=1.25, color=(.26, .3, .38))
+        used = page.insert_textbox(
+            fitz.Rect(48, y, 545, y + 72), body, fontsize=10, lineheight=1.25, color=(0.26, 0.3, 0.38)
+        )
         y += max(60, 78 - min(used, 0))
         if y > 730 and index < len(sections):
             page = pdf.new_page()
@@ -370,22 +559,22 @@ def _pptx(title: str, sections: list[tuple[str, str]], theme: dict[str, str]) ->
     title_slide = deck.slides.add_slide(deck.slide_layouts[6])
     title_slide.background.fill.solid()
     title_slide.background.fill.fore_color.rgb = colors["navy"]
-    add_text(title_slide, "GROUNDWORK PRESENTATION", .85, .75, 5, .35, 13, colors["accent"], True)
-    add_text(title_slide, title, .85, 2.0, 9.4, 2.0, 34, PptxRGBColor(255, 255, 255), True)
-    add_text(title_slide, "A clear, AI-created narrative", .85, 5.75, 6, .4, 18, PptxRGBColor(190, 200, 218))
+    add_text(title_slide, "GROUNDWORK PRESENTATION", 0.85, 0.75, 5, 0.35, 13, colors["accent"], True)
+    add_text(title_slide, title, 0.85, 2.0, 9.4, 2.0, 34, PptxRGBColor(255, 255, 255), True)
+    add_text(title_slide, "A clear, AI-created narrative", 0.85, 5.75, 6, 0.4, 18, PptxRGBColor(190, 200, 218))
     for index, (name, body) in enumerate(sections, 1):
         slide = deck.slides.add_slide(deck.slide_layouts[6])
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = PptxRGBColor(255, 255, 255)
-        accent = slide.shapes.add_shape(1, PptxInches(0), PptxInches(0), PptxInches(.16), deck.slide_height)
+        accent = slide.shapes.add_shape(1, PptxInches(0), PptxInches(0), PptxInches(0.16), deck.slide_height)
         accent.fill.solid()
         accent.fill.fore_color.rgb = colors["accent"]
         accent.line.fill.background()
-        add_text(slide, f"{index:02d} · {name.upper()}", .82, .72, 5, .35, 13, colors["accent"], True)
-        add_text(slide, name, .82, 1.45, 10.7, .85, 30, colors["navy"], True)
-        add_text(slide, body, .82, 2.65, 8.9, 2.2, 20, PptxRGBColor(62, 72, 91))
-        add_text(slide, "Groundwork", .82, 6.7, 2, .3, 10, PptxRGBColor(130, 140, 158), True)
-        add_text(slide, f"{index + 1:02d}", 11.8, 6.7, .5, .3, 10, PptxRGBColor(130, 140, 158))
+        add_text(slide, f"{index:02d} · {name.upper()}", 0.82, 0.72, 5, 0.35, 13, colors["accent"], True)
+        add_text(slide, name, 0.82, 1.45, 10.7, 0.85, 30, colors["navy"], True)
+        add_text(slide, body, 0.82, 2.65, 8.9, 2.2, 20, PptxRGBColor(62, 72, 91))
+        add_text(slide, "Groundwork", 0.82, 6.7, 2, 0.3, 10, PptxRGBColor(130, 140, 158), True)
+        add_text(slide, f"{index + 1:02d}", 11.8, 6.7, 0.5, 0.3, 10, PptxRGBColor(130, 140, 158))
     output = BytesIO()
     deck.save(output)
     return output.getvalue()
@@ -401,10 +590,10 @@ def _shade_cell(cell, color: str) -> None:
 def _docx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     document = WordDocument()
     section = document.sections[0]
-    section.top_margin = Inches(.68)
-    section.bottom_margin = Inches(.68)
-    section.left_margin = Inches(.78)
-    section.right_margin = Inches(.78)
+    section.top_margin = Inches(0.68)
+    section.bottom_margin = Inches(0.68)
+    section.left_margin = Inches(0.78)
+    section.right_margin = Inches(0.78)
     styles = document.styles
     styles["Normal"].font.name = "Aptos"
     styles["Normal"].font.size = Pt(10.5 if plan.layout == "compact" else 11)
@@ -416,7 +605,9 @@ def _docx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     if plan.document_type == "invoice":
         brand = document.add_paragraph()
         brand.paragraph_format.space_after = Pt(3)
-        run = brand.add_run(next((item.value for item in plan.metadata if item.label.lower() in {"seller", "from"}), "INVOICE"))
+        run = brand.add_run(
+            next((item.value for item in plan.metadata if item.label.lower() in {"seller", "from"}), "INVOICE")
+        )
         run.bold = True
         run.font.size = Pt(12)
         run.font.color.rgb = RGBColor.from_string(theme["navy"])
@@ -507,7 +698,9 @@ def _docx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         body.paragraph_format.line_spacing = 1.15 if plan.layout != "editorial" else 1.28
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer.add_run(f"Created with Groundwork AI · {plan.document_type.title()} · {plan.layout.title()} layout").font.size = Pt(8)
+    footer.add_run(
+        f"Created with Groundwork AI · {plan.document_type.title()} · {plan.layout.title()} layout"
+    ).font.size = Pt(8)
     output = BytesIO()
     document.save(output)
     return output.getvalue()
@@ -515,25 +708,29 @@ def _docx_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
 
 def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
     document = fitz.open()
-    accent = tuple(int(plan.accent_color[index:index + 2], 16) / 255 for index in (1, 3, 5))
-    navy = tuple(int(theme["navy"][index:index + 2], 16) / 255 for index in (0, 2, 4))
-    soft = tuple(int(theme["soft"][index:index + 2], 16) / 255 for index in (0, 2, 4))
+    accent = tuple(int(plan.accent_color[index : index + 2], 16) / 255 for index in (1, 3, 5))
+    navy = tuple(int(theme["navy"][index : index + 2], 16) / 255 for index in (0, 2, 4))
+    soft = tuple(int(theme["soft"][index : index + 2], 16) / 255 for index in (0, 2, 4))
     if plan.document_type != "invoice":
-        muted = (.35, .39, .47)
-        light_ink = (.77, .8, .86)
+        muted = (0.35, 0.39, 0.47)
+        light_ink = (0.77, 0.8, 0.86)
 
         def footer(target, number: int) -> None:
-            target.draw_line(fitz.Point(48, 795), fitz.Point(545, 795), color=(.86, .87, .9), width=.5)
-            target.insert_text((48, 815), plan.title[:70], fontsize=7, color=(.55, .58, .64))
+            target.draw_line(fitz.Point(48, 795), fitz.Point(545, 795), color=(0.86, 0.87, 0.9), width=0.5)
+            target.insert_text((48, 815), plan.title[:70], fontsize=7, color=(0.55, 0.58, 0.64))
             target.insert_text((526, 815), f"{number:02d}", fontsize=7, fontname="hebo", color=accent)
 
         cover = document.new_page()
         cover.draw_rect(fitz.Rect(0, 0, cover.rect.width, 245), color=navy, fill=navy)
         cover.draw_rect(fitz.Rect(0, 0, 15, cover.rect.height), color=accent, fill=accent)
         cover.insert_text((48, 55), plan.document_type.upper(), fontsize=9, fontname="hebo", color=accent)
-        cover.insert_textbox(fitz.Rect(48, 82, 545, 188), plan.title, fontsize=29, fontname="hebo", lineheight=1.05, color=(1, 1, 1))
+        cover.insert_textbox(
+            fitz.Rect(48, 82, 545, 188), plan.title, fontsize=29, fontname="hebo", lineheight=1.05, color=(1, 1, 1)
+        )
         if plan.subtitle:
-            cover.insert_textbox(fitz.Rect(48, 190, 520, 232), plan.subtitle, fontsize=10, lineheight=1.25, color=light_ink)
+            cover.insert_textbox(
+                fitz.Rect(48, 190, 520, 232), plan.subtitle, fontsize=10, lineheight=1.25, color=light_ink
+            )
         cover.insert_text((48, 284), "DOCUMENT BRIEF", fontsize=7, fontname="hebo", color=accent)
         y = 306
         for index, item in enumerate(plan.metadata[:6]):
@@ -547,7 +744,9 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
             cover.draw_rect(fitz.Rect(48, y, 545, min(y + 72, 745)), color=soft, fill=soft)
             cover.draw_rect(fitz.Rect(48, y, 53, min(y + 72, 745)), color=accent, fill=accent)
             cover.insert_text((67, y + 20), "KEY TAKEAWAY", fontsize=7, fontname="hebo", color=accent)
-            cover.insert_textbox(fitz.Rect(67, y + 27, 525, min(y + 65, 740)), plan.callout, fontsize=9.5, lineheight=1.2, color=navy)
+            cover.insert_textbox(
+                fitz.Rect(67, y + 27, 525, min(y + 65, 740)), plan.callout, fontsize=9.5, lineheight=1.2, color=navy
+            )
         footer(cover, 1)
 
         page_number = 2
@@ -559,13 +758,28 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
             column_width = 497 / len(plan.table.headers)
             page.draw_rect(fitz.Rect(48, table_y, 545, table_y + 29), color=accent, fill=accent)
             for index, header in enumerate(plan.table.headers):
-                page.insert_textbox(fitz.Rect(54 + index * column_width, table_y + 9, 48 + (index + 1) * column_width - 4, table_y + 27), header, fontsize=7.5, fontname="hebo", color=(1, 1, 1))
+                page.insert_textbox(
+                    fitz.Rect(
+                        54 + index * column_width, table_y + 9, 48 + (index + 1) * column_width - 4, table_y + 27
+                    ),
+                    header,
+                    fontsize=7.5,
+                    fontname="hebo",
+                    color=(1, 1, 1),
+                )
             table_y += 29
             for row_index, row in enumerate(plan.table.rows[:18]):
                 if row_index % 2 == 0:
                     page.draw_rect(fitz.Rect(48, table_y, 545, table_y + 31), color=soft, fill=soft)
                 for index, value in enumerate(row):
-                    page.insert_textbox(fitz.Rect(54 + index * column_width, table_y + 9, 48 + (index + 1) * column_width - 4, table_y + 29), value, fontsize=7.5, color=navy)
+                    page.insert_textbox(
+                        fitz.Rect(
+                            54 + index * column_width, table_y + 9, 48 + (index + 1) * column_width - 4, table_y + 29
+                        ),
+                        value,
+                        fontsize=7.5,
+                        color=navy,
+                    )
                 table_y += 31
             footer(page, page_number)
             page_number += 1
@@ -573,15 +787,38 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         for section_index in range(0, len(plan.sections), 2):
             page = document.new_page()
             page.draw_rect(fitz.Rect(0, 0, 9, page.rect.height), color=accent, fill=accent)
-            page.insert_text((48, 52), f"{section_index + 1:02d} / {len(plan.sections):02d}", fontsize=8, fontname="hebo", color=accent)
+            page.insert_text(
+                (48, 52),
+                f"{section_index + 1:02d} / {len(plan.sections):02d}",
+                fontsize=8,
+                fontname="hebo",
+                color=accent,
+            )
             section_y = 92
-            for offset, item in enumerate(plan.sections[section_index:section_index + 2]):
-                page.insert_text((48, section_y), f"{section_index + offset + 1:02d}", fontsize=10, fontname="hebo", color=accent)
-                page.insert_textbox(fitz.Rect(80, section_y - 17, 545, section_y + 32), item.heading, fontsize=20, fontname="hebo", lineheight=1.05, color=navy)
+            for offset, item in enumerate(plan.sections[section_index : section_index + 2]):
+                page.insert_text(
+                    (48, section_y), f"{section_index + offset + 1:02d}", fontsize=10, fontname="hebo", color=accent
+                )
+                page.insert_textbox(
+                    fitz.Rect(80, section_y - 17, 545, section_y + 32),
+                    item.heading,
+                    fontsize=20,
+                    fontname="hebo",
+                    lineheight=1.05,
+                    color=navy,
+                )
                 section_y += 48
-                page.insert_textbox(fitz.Rect(80, section_y, 535, section_y + 245), item.body, fontsize=10.5, lineheight=1.35, color=muted)
+                page.insert_textbox(
+                    fitz.Rect(80, section_y, 535, section_y + 245),
+                    item.body,
+                    fontsize=10.5,
+                    lineheight=1.35,
+                    color=muted,
+                )
                 if offset == 0 and section_index + 1 < len(plan.sections):
-                    page.draw_line(fitz.Point(80, section_y + 265), fitz.Point(535, section_y + 265), color=soft, width=2)
+                    page.draw_line(
+                        fitz.Point(80, section_y + 265), fitz.Point(535, section_y + 265), color=soft, width=2
+                    )
                 section_y += 330
             footer(page, page_number)
             page_number += 1
@@ -596,7 +833,7 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         page.insert_text((48, 54), plan.document_type.upper(), fontsize=9, fontname="hebo", color=accent)
         page.insert_textbox(fitz.Rect(48, 72, 545, 145), plan.title, fontsize=25, fontname="hebo", color=navy)
         if plan.subtitle:
-            page.insert_textbox(fitz.Rect(48, 140, 545, 180), plan.subtitle, fontsize=10, color=(.38, .42, .5))
+            page.insert_textbox(fitz.Rect(48, 140, 545, 180), plan.subtitle, fontsize=10, color=(0.38, 0.42, 0.5))
     y = 130 if plan.document_type == "invoice" else 190
     if plan.metadata:
         for index, item in enumerate(plan.metadata):
@@ -611,7 +848,13 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
         column_width = 497 / len(plan.table.headers)
         page.draw_rect(fitz.Rect(48, y, 545, y + 25), color=accent, fill=accent)
         for index, header in enumerate(plan.table.headers):
-            page.insert_textbox(fitz.Rect(52 + index * column_width, y + 7, 48 + (index + 1) * column_width - 4, y + 23), header, fontsize=8, fontname="hebo", color=(1, 1, 1))
+            page.insert_textbox(
+                fitz.Rect(52 + index * column_width, y + 7, 48 + (index + 1) * column_width - 4, y + 23),
+                header,
+                fontsize=8,
+                fontname="hebo",
+                color=(1, 1, 1),
+            )
         y += 25
         for row_index, row in enumerate(plan.table.rows):
             if y > 720:
@@ -620,20 +863,39 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
             if row_index % 2 == 0:
                 page.draw_rect(fitz.Rect(48, y, 545, y + 27), color=soft, fill=soft)
             for index, value in enumerate(row):
-                page.insert_textbox(fitz.Rect(52 + index * column_width, y + 7, 48 + (index + 1) * column_width - 4, y + 26), value, fontsize=8, color=navy)
+                page.insert_textbox(
+                    fitz.Rect(52 + index * column_width, y + 7, 48 + (index + 1) * column_width - 4, y + 26),
+                    value,
+                    fontsize=8,
+                    color=navy,
+                )
             y += 27
         y += 12
     if plan.callout:
         callout_text = plan.callout.replace(" · ", "\n")
         callout_height = 66 if plan.document_type == "invoice" else 48
         page.draw_rect(fitz.Rect(315, y, 545, y + callout_height), color=soft, fill=soft)
-        page.insert_textbox(fitz.Rect(328, y + 9, 533, y + callout_height - 7), callout_text, fontsize=9, fontname="hebo", lineheight=1.15, align=2, color=navy)
+        page.insert_textbox(
+            fitz.Rect(328, y + 9, 533, y + callout_height - 7),
+            callout_text,
+            fontsize=9,
+            fontname="hebo",
+            lineheight=1.15,
+            align=2,
+            color=navy,
+        )
         y += callout_height + 18
     if plan.document_type == "invoice":
         for index, item in enumerate(plan.sections[:2]):
             x = 48 + index * 250
             page.insert_text((x, y), item.heading.upper(), fontsize=9, fontname="hebo", color=accent)
-            page.insert_textbox(fitz.Rect(x, y + 12, x + 225, min(page.rect.height - 42, y + 105)), item.body, fontsize=8.5, lineheight=1.18, color=(.25, .29, .36))
+            page.insert_textbox(
+                fitz.Rect(x, y + 12, x + 225, min(page.rect.height - 42, y + 105)),
+                item.body,
+                fontsize=8.5,
+                lineheight=1.18,
+                color=(0.25, 0.29, 0.36),
+            )
         return document.tobytes(garbage=4, deflate=True)
     for item in plan.sections:
         if y > 700:
@@ -641,7 +903,9 @@ def _pdf_dynamic(plan: GeneratedContent, theme: dict[str, str]) -> bytes:
             y = 58
         page.insert_text((48, y), item.heading.upper(), fontsize=10, fontname="hebo", color=accent)
         y += 15
-        page.insert_textbox(fitz.Rect(48, y, 545, y + 74), item.body, fontsize=9.5, lineheight=1.25, color=(.25, .29, .36))
+        page.insert_textbox(
+            fitz.Rect(48, y, 545, y + 74), item.body, fontsize=9.5, lineheight=1.25, color=(0.25, 0.29, 0.36)
+        )
         y += 77
     return document.tobytes(garbage=4, deflate=True)
 
@@ -650,54 +914,74 @@ def _shorten_slide_text(value: str, limit: int) -> str:
     value = re.sub(r"\s+", " ", value).strip()
     if len(value) <= limit:
         return value
-    candidate = value[:limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:-")
-    return f"{candidate or value[:limit - 1].rstrip()}…"
+    candidate = value[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return f"{candidate or value[: limit - 1].rstrip()}…"
 
 
 def _pptx_preview_slides(plan: GeneratedContent) -> list[dict[str, str]]:
-    slides = [{
-        "eyebrow": _shorten_slide_text(plan.document_type.upper(), 34),
-        "title": _shorten_slide_text(plan.title, 76),
-        "body": _shorten_slide_text(plan.subtitle or "Created with Groundwork AI", 130),
-        "variant": "title",
-    }]
+    slides = [
+        {
+            "eyebrow": _shorten_slide_text(plan.document_type.upper(), 34),
+            "title": _shorten_slide_text(plan.title, 76),
+            "body": _shorten_slide_text(plan.subtitle or "Created with Groundwork AI", 130),
+            "variant": "title",
+        }
+    ]
     limits = {1: (64, 330), 2: (48, 250), 3: (68, 310)}
     for index, section in enumerate(plan.sections, 1):
         variant = ((index - 1) % 3) + 1
         heading_limit, body_limit = limits[variant]
-        slides.append({
-            "eyebrow": f"{index:02d}",
-            "title": _shorten_slide_text(section.heading, heading_limit),
-            "body": _shorten_slide_text(section.body, body_limit),
-            "variant": f"section-{variant}",
-        })
+        slides.append(
+            {
+                "eyebrow": f"{index:02d}",
+                "title": _shorten_slide_text(section.heading, heading_limit),
+                "body": _shorten_slide_text(section.body, body_limit),
+                "variant": f"section-{variant}",
+            }
+        )
     return slides
 
 
 def _document_preview_pages(plan: GeneratedContent) -> list[dict]:
     """Return the same structured content the renderer used, grouped into preview pages."""
-    pages: list[dict] = [{
-        "kind": "cover",
-        "eyebrow": plan.document_type.upper(),
-        "title": plan.title,
-        "subtitle": plan.subtitle,
-        "metadata": [item.model_dump() for item in plan.metadata[:6]],
-        "callout": plan.callout,
-    }]
-    if plan.table:
-        pages.append({
-            "kind": "table",
-            "eyebrow": "AT A GLANCE",
-            "title": next((section.heading for section in plan.sections if any(word in section.heading.lower() for word in ("summary", "overview", "scorecard", "timeline", "action"))), "Structured overview"),
-            "table": plan.table.model_dump(),
+    pages: list[dict] = [
+        {
+            "kind": "cover",
+            "eyebrow": plan.document_type.upper(),
+            "title": plan.title,
+            "subtitle": plan.subtitle,
+            "metadata": [item.model_dump() for item in plan.metadata[:6]],
             "callout": plan.callout,
-        })
+        }
+    ]
+    if plan.table:
+        pages.append(
+            {
+                "kind": "table",
+                "eyebrow": "AT A GLANCE",
+                "title": next(
+                    (
+                        section.heading
+                        for section in plan.sections
+                        if any(
+                            word in section.heading.lower()
+                            for word in ("summary", "overview", "scorecard", "timeline", "action")
+                        )
+                    ),
+                    "Structured overview",
+                ),
+                "table": plan.table.model_dump(),
+                "callout": plan.callout,
+            }
+        )
     for index in range(0, len(plan.sections), 2):
-        pages.append({
-            "kind": "sections",
-            "eyebrow": f"{index + 1:02d} / {len(plan.sections):02d}",
-            "sections": [item.model_dump() for item in plan.sections[index:index + 2]],
-        })
+        pages.append(
+            {
+                "kind": "sections",
+                "eyebrow": f"{index + 1:02d} / {len(plan.sections):02d}",
+                "sections": [item.model_dump() for item in plan.sections[index : index + 2]],
+            }
+        )
     return pages
 
 
@@ -708,19 +992,23 @@ def _native_blocks(plan: GeneratedContent) -> list[dict[str, str]]:
     for item in plan.metadata:
         blocks.append({"type": "bullet", "text": f"{item.label}: {item.value}"})
     if plan.callout:
-        blocks.extend([
-            {"type": "heading", "text": "Key takeaway"},
-            {"type": "paragraph", "text": plan.callout},
-        ])
+        blocks.extend(
+            [
+                {"type": "heading", "text": "Key takeaway"},
+                {"type": "paragraph", "text": plan.callout},
+            ]
+        )
     if plan.table:
         blocks.append({"type": "heading", "text": "Structured overview"})
         blocks.append({"type": "paragraph", "text": " | ".join(plan.table.headers)})
         blocks.extend({"type": "bullet", "text": " | ".join(row)} for row in plan.table.rows)
     for item in plan.sections:
-        blocks.extend([
-            {"type": "heading", "text": item.heading},
-            {"type": "paragraph", "text": item.body},
-        ])
+        blocks.extend(
+            [
+                {"type": "heading", "text": item.heading},
+                {"type": "paragraph", "text": item.body},
+            ]
+        )
     return blocks or [{"type": "paragraph", "text": ""}]
 
 
@@ -734,8 +1022,9 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: byt
     accent = PptxRGBColor.from_string(plan.accent_color.removeprefix("#"))
     soft = PptxRGBColor.from_string(theme["soft"])
 
-    def text(slide, value, left, top, width, height, size, color, bold=False,
-             align=PP_ALIGN.LEFT, vertical=MSO_ANCHOR.TOP):
+    def text(
+        slide, value, left, top, width, height, size, color, bold=False, align=PP_ALIGN.LEFT, vertical=MSO_ANCHOR.TOP
+    ):
         shape = slide.shapes.add_textbox(PptxInches(left), PptxInches(top), PptxInches(width), PptxInches(height))
         frame = shape.text_frame
         frame.clear()
@@ -759,13 +1048,27 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: byt
     title_data = slide_data[0]
     if hero_image:
         try:
-            title_slide.shapes.add_picture(BytesIO(hero_image), PptxInches(8.7), PptxInches(0), width=PptxInches(4.633), height=PptxInches(7.5))
+            title_slide.shapes.add_picture(
+                BytesIO(hero_image), PptxInches(8.7), PptxInches(0), width=PptxInches(4.633), height=PptxInches(7.5)
+            )
         except Exception:
             hero_image = None
-    text(title_slide, title_data["eyebrow"], .85, .72, 5, .3, 14, accent, True)
-    text(title_slide, title_data["title"], .85, 1.65, 7.35 if hero_image else 11.25, 2.25, 50, PptxRGBColor(255, 255, 255), True,
-         vertical=MSO_ANCHOR.MIDDLE)
-    text(title_slide, title_data["body"], .85, 5.55, 7.15 if hero_image else 9.5, .85, 19, PptxRGBColor(190, 200, 218))
+    text(title_slide, title_data["eyebrow"], 0.85, 0.72, 5, 0.3, 14, accent, True)
+    text(
+        title_slide,
+        title_data["title"],
+        0.85,
+        1.65,
+        7.35 if hero_image else 11.25,
+        2.25,
+        50,
+        PptxRGBColor(255, 255, 255),
+        True,
+        vertical=MSO_ANCHOR.MIDDLE,
+    )
+    text(
+        title_slide, title_data["body"], 0.85, 5.55, 7.15 if hero_image else 9.5, 0.85, 19, PptxRGBColor(190, 200, 218)
+    )
     for index, (heading, body) in enumerate(sections, 1):
         slide = deck.slides.add_slide(deck.slide_layouts[6])
         slide.background.fill.solid()
@@ -773,9 +1076,9 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: byt
         ink = navy if index % 3 else PptxRGBColor(255, 255, 255)
         muted = PptxRGBColor(62, 72, 91) if index % 3 else PptxRGBColor(195, 204, 219)
         if index % 3 == 1:
-            text(slide, f"{index:02d}", .8, .65, 1, .35, 18, accent, True)
-            text(slide, heading, .8, 1.35, 9.25, 1.15, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
-            text(slide, body, .8, 2.95, 8.95, 2.55, 19, muted)
+            text(slide, f"{index:02d}", 0.8, 0.65, 1, 0.35, 18, accent, True)
+            text(slide, heading, 0.8, 1.35, 9.25, 1.15, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
+            text(slide, body, 0.8, 2.95, 8.95, 2.55, 19, muted)
             marker = slide.shapes.add_shape(1, PptxInches(10.75), PptxInches(1.35), PptxInches(1.65), PptxInches(4.85))
             marker.fill.solid()
             marker.fill.fore_color.rgb = accent
@@ -789,10 +1092,10 @@ def _pptx_dynamic(plan: GeneratedContent, theme: dict[str, str], hero_image: byt
             text(slide, heading, 5.75, 1.2, 6.55, 1.45, 35, ink, True, vertical=MSO_ANCHOR.MIDDLE)
             text(slide, body, 5.75, 3.0, 6.35, 2.4, 18, muted)
         else:
-            text(slide, f"{index:02d}  /  INSIGHT", .85, .78, 4, .3, 14, accent, True)
-            text(slide, heading, .85, 1.75, 11.45, 1.35, 37, ink, True, vertical=MSO_ANCHOR.MIDDLE)
-            text(slide, body, .85, 3.5, 10.9, 2.25, 19, muted)
-        text(slide, "Groundwork", .8, 6.8, 2, .25, 10, muted, True)
+            text(slide, f"{index:02d}  /  INSIGHT", 0.85, 0.78, 4, 0.3, 14, accent, True)
+            text(slide, heading, 0.85, 1.75, 11.45, 1.35, 37, ink, True, vertical=MSO_ANCHOR.MIDDLE)
+            text(slide, body, 0.85, 3.5, 10.9, 2.25, 19, muted)
+        text(slide, "Groundwork", 0.8, 6.8, 2, 0.25, 10, muted, True)
     output = BytesIO()
     deck.save(output)
     return output.getvalue()
@@ -814,44 +1117,64 @@ async def create_file(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> GeneratedArtifact:
-    source_ids = list(dict.fromkeys([
-        *payload.source_document_ids,
-        *([payload.source_document_id] if payload.source_document_id else []),
-    ]))[:12]
+    source_ids = list(
+        dict.fromkeys(
+            [
+                *payload.source_document_ids,
+                *([payload.source_document_id] if payload.source_document_id else []),
+            ]
+        )
+    )[:12]
     source_parts: list[str] = []
     for source_id in source_ids:
         document = await owned_document(source_id, user, session)
-        pages = list(await session.scalars(
-            select(DocumentPage).where(DocumentPage.document_id == source_id).order_by(DocumentPage.page_number)
-        ))
-        source_parts.append(f"[SOURCE: {document.display_title or document.filename}]\n" + " ".join(page.text for page in pages))
+        pages = list(
+            await session.scalars(
+                select(DocumentPage).where(DocumentPage.document_id == source_id).order_by(DocumentPage.page_number)
+            )
+        )
+        source_parts.append(
+            f"[SOURCE: {document.display_title or document.filename}]\n" + " ".join(page.text for page in pages)
+        )
     source_text = "\n\n".join(source_parts)[:24_000]
     from app.deliverables import ensure_personal_workspace
+
     workspace = await ensure_personal_workspace(user, session)
     server_context: list[str] = []
     if payload.conversation_id:
         from app.chat import owned_conversation
+
         conversation = await owned_conversation(payload.conversation_id, user, session)
         server_context.append(f"Active research thread: {conversation.title}")
         server_context.extend(
-            f"{message.role.value}: {message.content[:1200]}"
-            for message in conversation.messages[-8:]
+            f"{message.role.value}: {message.content[:1200]}" for message in conversation.messages[-8:]
         )
     from app.models import WorkspaceMemory
-    memories = list(await session.scalars(
-        select(WorkspaceMemory).where(
-            WorkspaceMemory.workspace_id == workspace.id,
-            WorkspaceMemory.owner_id == user.id,
-        ).order_by(WorkspaceMemory.updated_at.desc()).limit(20)
-    ))
+
+    memories = list(
+        await session.scalars(
+            select(WorkspaceMemory)
+            .where(
+                WorkspaceMemory.workspace_id == workspace.id,
+                WorkspaceMemory.owner_id == user.id,
+            )
+            .order_by(WorkspaceMemory.updated_at.desc())
+            .limit(20)
+        )
+    )
     if memories:
         server_context.append("Workspace memory:\n" + "\n".join(f"- {item.key}: {item.value}" for item in memories))
-    recent_deliverables = list(await session.scalars(
-        select(NativeDocument).where(
-            NativeDocument.workspace_id == workspace.id,
-            NativeDocument.owner_id == user.id,
-        ).order_by(NativeDocument.updated_at.desc()).limit(8)
-    ))
+    recent_deliverables = list(
+        await session.scalars(
+            select(NativeDocument)
+            .where(
+                NativeDocument.workspace_id == workspace.id,
+                NativeDocument.owner_id == user.id,
+            )
+            .order_by(NativeDocument.updated_at.desc())
+            .limit(8)
+        )
+    )
     if recent_deliverables:
         server_context.append("Recent deliverables: " + ", ".join(item.title for item in recent_deliverables))
     effective_context = "\n\n".join([payload.workspace_context.strip(), *server_context]).strip()[:12000]
@@ -869,12 +1192,14 @@ async def create_file(
         )
         content_request = payload.model_copy(update={"prompt": template_prompt})
     plan = await _ai_content(content_request, source_text)
-    grounding_evidence = "\n".join([
-        payload.prompt,
-        payload.workspace_context,
-        source_text,
-        *payload.template_answers.values(),
-    ])
+    grounding_evidence = "\n".join(
+        [
+            payload.prompt,
+            payload.workspace_context,
+            source_text,
+            *payload.template_answers.values(),
+        ]
+    )
     plan = _guard_unsupported_metrics(plan, grounding_evidence)
     await record_ai_usage(user, f"create_{payload.output_format}", session, cached=False)
     selected_theme = template["theme"] if template else payload.theme
@@ -883,8 +1208,14 @@ async def create_file(
         if payload.output_format != "pptx":
             plan.document_type = template["type"]
     theme = THEMES[selected_theme]
-    data = _pptx_dynamic(plan, theme) if payload.output_format == "pptx" else {"docx": _docx_dynamic, "pdf": _pdf_dynamic}[payload.output_format](plan, theme)
-    filename = safe_filename(re.sub(r"[^a-zA-Z0-9 -]", "", plan.title).strip().replace(" ", "-").lower()[:70] or "insight-document")
+    data = (
+        _pptx_dynamic(plan, theme)
+        if payload.output_format == "pptx"
+        else {"docx": _docx_dynamic, "pdf": _pdf_dynamic}[payload.output_format](plan, theme)
+    )
+    filename = safe_filename(
+        re.sub(r"[^a-zA-Z0-9 -]", "", plan.title).strip().replace(" ", "-").lower()[:70] or "insight-document"
+    )
     filename = f"{filename}.{payload.output_format}"
     content_types = {
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -907,14 +1238,16 @@ async def create_file(
         content=native_content,
     )
     session.add(native_document)
-    session.add(NativeDocumentVersion(
-        native_document_id=native_identifier,
-        version_number=1,
-        title=plan.title,
-        content=native_content,
-        change_summary=f"Generated from {payload.template_id or 'custom brief'}",
-        created_by=user.id,
-    ))
+    session.add(
+        NativeDocumentVersion(
+            native_document_id=native_identifier,
+            version_number=1,
+            title=plan.title,
+            content=native_content,
+            change_summary=f"Generated from {payload.template_id or 'custom brief'}",
+            created_by=user.id,
+        )
+    )
     for source_id in source_ids:
         session.add(NativeDocumentSource(native_document_id=native_identifier, document_id=source_id))
     artifact = GeneratedArtifact(
@@ -950,15 +1283,17 @@ async def create_file(
         },
     )
     session.add(artifact)
-    session.add(ArtifactVersion(
-        artifact_id=identifier,
-        version_number=1,
-        object_key=key,
-        content_type=content_types[payload.output_format],
-        size_bytes=len(data),
-        change_prompt=payload.prompt,
-        metadata_json={"operation": artifact.operation, "theme": selected_theme},
-    ))
+    session.add(
+        ArtifactVersion(
+            artifact_id=identifier,
+            version_number=1,
+            object_key=key,
+            content_type=content_types[payload.output_format],
+            size_bytes=len(data),
+            change_prompt=payload.prompt,
+            metadata_json={"operation": artifact.operation, "theme": selected_theme},
+        )
+    )
     await session.commit()
     await session.refresh(artifact)
     return artifact
@@ -971,15 +1306,20 @@ async def create_file_job(
     session: AsyncSession = Depends(get_session),
 ):
     """Queue generation so it survives navigation and exposes progress/cancellation."""
-    source_ids = list(dict.fromkeys([
-        *payload.source_document_ids,
-        *([payload.source_document_id] if payload.source_document_id else []),
-    ]))[:12]
+    source_ids = list(
+        dict.fromkeys(
+            [
+                *payload.source_document_ids,
+                *([payload.source_document_id] if payload.source_document_id else []),
+            ]
+        )
+    )[:12]
     for source_id in source_ids:
         await owned_document(source_id, user, session)
     if payload.template_id and payload.template_id not in CREATION_TEMPLATES:
         raise HTTPException(status_code=422, detail="Unknown document template")
     from app.jobs import create_job_without_documents
+
     return await create_job_without_documents(
         "ai_create",
         {"request": payload.model_dump(mode="json")},

@@ -38,9 +38,7 @@ class DocumentRepository(BaseRepository[Document]):
 
     async def get_by_id_with_pages(self, document_id: uuid.UUID) -> Document | None:
         return await self.session.scalar(
-            select(Document)
-            .options(selectinload(Document.pages))
-            .where(Document.id == document_id)
+            select(Document).options(selectinload(Document.pages)).where(Document.id == document_id)
         )
 
     async def create(self, document: Document) -> Document:
@@ -61,16 +59,12 @@ class DocumentRepository(BaseRepository[Document]):
 
     async def get_pages(self, document_id: uuid.UUID) -> Sequence[DocumentPage]:
         result = await self.session.scalars(
-            select(DocumentPage)
-            .where(DocumentPage.document_id == document_id)
-            .order_by(DocumentPage.page_number)
+            select(DocumentPage).where(DocumentPage.document_id == document_id).order_by(DocumentPage.page_number)
         )
         return result.all()
 
     async def get_chunks(self, document_id: uuid.UUID) -> Sequence[DocumentChunk]:
         result = await self.session.scalars(
-            select(DocumentChunk)
-            .where(DocumentChunk.document_id == document_id)
-            .order_by(DocumentChunk.chunk_index)
+            select(DocumentChunk).where(DocumentChunk.document_id == document_id).order_by(DocumentChunk.chunk_index)
         )
         return result.all()

@@ -34,14 +34,22 @@ class NativeDocument(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     revision: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
-    versions: Mapped[list["NativeDocumentVersion"]] = relationship(cascade="all, delete-orphan", order_by="NativeDocumentVersion.version_number")
+    versions: Mapped[list["NativeDocumentVersion"]] = relationship(
+        cascade="all, delete-orphan", order_by="NativeDocumentVersion.version_number"
+    )
     sources: Mapped[list["NativeDocumentSource"]] = relationship(cascade="all, delete-orphan")
     comments: Mapped[list["DocumentComment"]] = relationship(cascade="all, delete-orphan")
     suggestions: Mapped[list["AISuggestion"]] = relationship(cascade="all, delete-orphan")
-    requirements: Mapped[list["DeliverableRequirement"]] = relationship(cascade="all, delete-orphan", order_by="DeliverableRequirement.position")
-    review_findings: Mapped[list["DeliverableReviewFinding"]] = relationship(cascade="all, delete-orphan", order_by="DeliverableReviewFinding.created_at")
+    requirements: Mapped[list["DeliverableRequirement"]] = relationship(
+        cascade="all, delete-orphan", order_by="DeliverableRequirement.position"
+    )
+    review_findings: Mapped[list["DeliverableReviewFinding"]] = relationship(
+        cascade="all, delete-orphan", order_by="DeliverableReviewFinding.created_at"
+    )
 
 
 class NativeDocumentVersion(Base):
@@ -49,7 +57,9 @@ class NativeDocumentVersion(Base):
     __table_args__ = (UniqueConstraint("native_document_id", "version_number"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    native_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("native_documents.id", ondelete="CASCADE"), index=True)
+    native_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("native_documents.id", ondelete="CASCADE"), index=True
+    )
     version_number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(180))
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -63,7 +73,9 @@ class NativeDocumentSource(Base):
     __table_args__ = (UniqueConstraint("native_document_id", "document_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    native_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("native_documents.id", ondelete="CASCADE"), index=True)
+    native_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("native_documents.id", ondelete="CASCADE"), index=True
+    )
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -72,7 +84,9 @@ class DocumentComment(Base):
     __tablename__ = "document_comments"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    native_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("native_documents.id", ondelete="CASCADE"), index=True)
+    native_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("native_documents.id", ondelete="CASCADE"), index=True
+    )
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     body: Mapped[str] = mapped_column(Text)
     anchor: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -85,7 +99,9 @@ class AISuggestion(Base):
     __tablename__ = "ai_suggestions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    native_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("native_documents.id", ondelete="CASCADE"), index=True)
+    native_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("native_documents.id", ondelete="CASCADE"), index=True
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     instruction: Mapped[str] = mapped_column(Text)
     before_text: Mapped[str] = mapped_column(Text, default="")
@@ -100,7 +116,9 @@ class DeliverableRequirement(Base):
     __tablename__ = "deliverable_requirements"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    native_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("native_documents.id", ondelete="CASCADE"), index=True)
+    native_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("native_documents.id", ondelete="CASCADE"), index=True
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(String(30), default="content", index=True)
@@ -111,15 +129,21 @@ class DeliverableRequirement(Base):
     evidence: Mapped[list[dict]] = mapped_column(JSONB, default=list)
     linked_sections: Mapped[list[str]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class DeliverableReviewFinding(Base):
     __tablename__ = "deliverable_review_findings"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    native_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("native_documents.id", ondelete="CASCADE"), index=True)
-    requirement_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("deliverable_requirements.id", ondelete="SET NULL"), nullable=True, index=True)
+    native_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("native_documents.id", ondelete="CASCADE"), index=True
+    )
+    requirement_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("deliverable_requirements.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(40), index=True)
     claim_type: Mapped[str] = mapped_column(String(30), default="other", index=True)
@@ -168,9 +192,7 @@ class ArtifactVersion(Base):
     __table_args__ = (UniqueConstraint("artifact_id", "version_number"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    artifact_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("generated_artifacts.id", ondelete="CASCADE"), index=True
-    )
+    artifact_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("generated_artifacts.id", ondelete="CASCADE"), index=True)
     version_number: Mapped[int] = mapped_column(Integer)
     object_key: Mapped[str] = mapped_column(String(500))
     content_type: Mapped[str] = mapped_column(String(100))

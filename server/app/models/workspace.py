@@ -31,7 +31,9 @@ class Workspace(Base):
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     owner: Mapped["User"] = relationship(back_populates="owned_workspaces")
     members: Mapped[list["WorkspaceMember"]] = relationship(cascade="all, delete-orphan")

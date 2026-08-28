@@ -7,9 +7,11 @@ and real-time execution progress events over Server-Sent Events (SSE).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
+import time
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -20,7 +22,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.ai_orchestration import ai_orchestrator
 from app.database import SessionLocal, get_session
@@ -56,6 +57,16 @@ from app.models import (
     Workspace,
     WorkspaceMemory,
 )
+from app.rag import (
+    build_retrieval_query,
+    clean_user_answer,
+    embed_texts_async,
+    relevant_snippet,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["Workspace agent"])
 
 
 async def _record_ai_usage(
@@ -91,21 +102,7 @@ async def _record_ai_usage(
         session.add(record)
     except Exception as exc:
         logger.warning("Failed to record AI usage telemetry: %s", exc)
-from app.rag import (
-    build_retrieval_query,
-    clean_user_answer,
-    embed_texts_async,
-    generate_answer,
-    relevant_snippet,
-)
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(tags=["Workspace agent"])
-
-
-import hashlib
-import time
 
 class WorkspaceAgentRequest(BaseModel):
     workspace_id: uuid.UUID
@@ -113,7 +110,9 @@ class WorkspaceAgentRequest(BaseModel):
     source_document_ids: list[uuid.UUID] = Field(default_factory=list)
     conversation_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
-    action_type: str | None = None  # "chat" | "report" | "proposal" | "presentation" | "summary" | "technical_doc" | "verify" | "edit" | "note"
+    action_type: str | None = (
+        None  # "chat" | "report" | "proposal" | "presentation" | "summary" | "technical_doc" | "verify" | "edit" | "note"
+    )
     idempotency_key: str | None = Field(default=None, max_length=128)
 
 
@@ -171,33 +170,46 @@ async def _build_workspace_context_snapshot(
         )
     if target_artifact is None:
         target_artifact = await session.scalar(
-            select(NativeDocument).where(NativeDocument.workspace_id == workspace.id).order_by(NativeDocument.updated_at.desc())
+            select(NativeDocument)
+            .where(NativeDocument.workspace_id == workspace.id)
+            .order_by(NativeDocument.updated_at.desc())
         )
 
     reqs: list[DeliverableRequirement] = []
     open_findings: list[DeliverableReviewFinding] = []
     if target_artifact:
-        reqs = list(await session.scalars(
-            select(DeliverableRequirement)
-            .where(DeliverableRequirement.native_document_id == target_artifact.id)
-            .order_by(DeliverableRequirement.position.asc())
-        ))
-        open_findings = list(await session.scalars(
-            select(DeliverableReviewFinding)
-            .where(DeliverableReviewFinding.native_document_id == target_artifact.id, DeliverableReviewFinding.status == "open")
-        ))
+        reqs = list(
+            await session.scalars(
+                select(DeliverableRequirement)
+                .where(DeliverableRequirement.native_document_id == target_artifact.id)
+                .order_by(DeliverableRequirement.position.asc())
+            )
+        )
+        open_findings = list(
+            await session.scalars(
+                select(DeliverableReviewFinding).where(
+                    DeliverableReviewFinding.native_document_id == target_artifact.id,
+                    DeliverableReviewFinding.status == "open",
+                )
+            )
+        )
 
-    memories = list(await session.scalars(
-        select(WorkspaceMemory)
-        .where(WorkspaceMemory.workspace_id == workspace.id)
-        .order_by(WorkspaceMemory.created_at.desc())
-        .limit(10)
-    ))
+    memories = list(
+        await session.scalars(
+            select(WorkspaceMemory)
+            .where(WorkspaceMemory.workspace_id == workspace.id)
+            .order_by(WorkspaceMemory.created_at.desc())
+            .limit(10)
+        )
+    )
 
-    sources_summary = "\n".join(
-        f"- {s.filename} ({s.page_count or 'N/A'} pages, status: {s.status.value if hasattr(s.status, 'value') else s.status})"
-        for s in sources
-    ) or "No sources attached yet."
+    sources_summary = (
+        "\n".join(
+            f"- {s.filename} ({s.page_count or 'N/A'} pages, status: {s.status.value if hasattr(s.status, 'value') else s.status})"
+            for s in sources
+        )
+        or "No sources attached yet."
+    )
 
     artifact_summary = "No deliverable drafted yet."
     if target_artifact:
@@ -208,19 +220,19 @@ async def _build_workspace_context_snapshot(
         )
 
     covered_count = len([r for r in reqs if r.status in ("covered", "waived")])
-    reqs_summary = "\n".join(
-        f"- [{r.status.upper()}] {r.text} ({'Required' if r.is_required else 'Optional'})"
-        for r in reqs[:15]
-    ) or "No requirements mapped."
+    reqs_summary = (
+        "\n".join(f"- [{r.status.upper()}] {r.text} ({'Required' if r.is_required else 'Optional'})" for r in reqs[:15])
+        or "No requirements mapped."
+    )
 
-    findings_summary = "\n".join(
-        f"- [{f.severity.upper()}] Claim: \"{f.claim_text}\" | Issue: {f.explanation}"
-        for f in open_findings[:10]
-    ) or "All claims verified (0 open review findings)."
+    findings_summary = (
+        "\n".join(
+            f'- [{f.severity.upper()}] Claim: "{f.claim_text}" | Issue: {f.explanation}' for f in open_findings[:10]
+        )
+        or "All claims verified (0 open review findings)."
+    )
 
-    notes_summary = "\n".join(
-        f"- {m.key}: {m.value}" for m in memories
-    ) or "No workspace notes recorded."
+    notes_summary = "\n".join(f"- {m.key}: {m.value}" for m in memories) or "No workspace notes recorded."
 
     user_lang = "en"
     if user and user.preferences:
@@ -259,20 +271,29 @@ def _classify_intent(prompt: str, action_type: str | None) -> str:
     if action_type == "note" or (prompt_lower.startswith("note:") or prompt_lower.startswith("save note")):
         return "create_note"
 
-    if any(re.search(pat, prompt_lower) for pat in [
-        r"\b(create|draft|generate|build|write)\b.*\b(proposal|report|presentation|pitch deck|deck|deliverable|brief)\b",
-    ]):
+    if any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(create|draft|generate|build|write)\b.*\b(proposal|report|presentation|pitch deck|deck|deliverable|brief)\b",
+        ]
+    ):
         return "generate_artifact"
 
-    if any(re.search(pat, prompt_lower) for pat in [
-        r"\b(verify|verification|audit|fact-?check|unsupported claims|compliance check)\b",
-        r"\bcheck\b.*\b(unsupported|claims|requirements|coverage)\b",
-    ]):
+    if any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(verify|verification|audit|fact-?check|unsupported claims|compliance check)\b",
+            r"\bcheck\b.*\b(unsupported|claims|requirements|coverage)\b",
+        ]
+    ):
         return "verify_artifact"
 
-    if any(re.search(pat, prompt_lower) for pat in [
-        r"\b(rewrite|shorten|expand|update|modify|edit|make)\b.*\b(section|paragraph|heading|draft|proposal|report)\b",
-    ]):
+    if any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(rewrite|shorten|expand|update|modify|edit|make)\b.*\b(section|paragraph|heading|draft|proposal|report)\b",
+        ]
+    ):
         return "modify_artifact"
 
     return "grounded_qa"
@@ -308,14 +329,12 @@ async def execute_workspace_agent(
         await session.flush()
 
     # Load recent conversation history before stream generator
-    message_rows = list(await session.scalars(
-        select(Message)
-        .where(Message.conversation_id == conversation.id)
-        .order_by(Message.created_at.asc())
-    ))
-    chat_history: list[dict[str, str]] = [
-        {"role": m.role.value, "content": m.content} for m in message_rows
-    ]
+    message_rows = list(
+        await session.scalars(
+            select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.asc())
+        )
+    )
+    chat_history: list[dict[str, str]] = [{"role": m.role.value, "content": m.content} for m in message_rows]
 
     # Add user message
     user_msg = Message(
@@ -343,7 +362,9 @@ async def execute_workspace_agent(
                     yield _sse_event("error", {"message": "Workspace not found."})
                     return
 
-                source_query = select(Document).where(Document.workspace_id == workspace_id, Document.status == DocumentStatus.READY)
+                source_query = select(Document).where(
+                    Document.workspace_id == workspace_id, Document.status == DocumentStatus.READY
+                )
                 if payload.source_document_ids:
                     source_query = source_query.where(Document.id.in_(payload.source_document_ids))
                 sources_list = list(await db_session.scalars(source_query))
@@ -409,22 +430,32 @@ async def _orchestrate_artifact_generation(
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
-    yield _sse_event("status", {"step": "analyzing_sources", "label": f"Analyzing {len(sources)} source(s) in workspace..."})
+    yield _sse_event(
+        "status", {"step": "analyzing_sources", "label": f"Analyzing {len(sources)} source(s) in workspace..."}
+    )
 
     # Build source text
-    source_pages = list(await session.scalars(
-        select(DocumentPage)
-        .where(DocumentPage.document_id.in_([s.id for s in sources]))
-        .order_by(DocumentPage.document_id, DocumentPage.page_number)
-        .limit(100)
-    )) if sources else []
+    source_pages = (
+        list(
+            await session.scalars(
+                select(DocumentPage)
+                .where(DocumentPage.document_id.in_([s.id for s in sources]))
+                .order_by(DocumentPage.document_id, DocumentPage.page_number)
+                .limit(100)
+            )
+        )
+        if sources
+        else []
+    )
 
     source_context_str = "\n\n".join(
         f"[document_id={p.document_id}; document_name={next((s.filename for s in sources if s.id == p.document_id), 'Document')}; page={p.page_number}]\n{p.text[:3000]}"
         for p in source_pages
     )[:80_000]
 
-    yield _sse_event("status", {"step": "extracting_requirements", "label": "Extracting verifiable acceptance requirements..."})
+    yield _sse_event(
+        "status", {"step": "extracting_requirements", "label": "Extracting verifiable acceptance requirements..."}
+    )
 
     extracted_reqs: list[dict[str, Any]] = []
     if source_context_str:
@@ -434,15 +465,34 @@ async def _orchestrate_artifact_generation(
         except Exception:
             extracted_reqs = []
 
-    yield _sse_event("status", {"step": "retrieving_evidence", "label": f"Gathered {len(extracted_reqs)} requirement(s) and grounding evidence..."})
+    yield _sse_event(
+        "status",
+        {
+            "step": "retrieving_evidence",
+            "label": f"Gathered {len(extracted_reqs)} requirement(s) and grounding evidence...",
+        },
+    )
 
     yield _sse_event("status", {"step": "drafting", "label": "Drafting verified deliverable..."})
 
     # Generate document content
-    doc_type = "technical proposal" if "proposal" in payload.prompt.lower() else "client report" if "report" in payload.prompt.lower() else "presentation" if "presentation" in payload.prompt.lower() else "deliverable"
+    doc_type = (
+        "technical proposal"
+        if "proposal" in payload.prompt.lower()
+        else "client report"
+        if "report" in payload.prompt.lower()
+        else "presentation"
+        if "presentation" in payload.prompt.lower()
+        else "deliverable"
+    )
     try:
         title_res = await ai_orchestrator.complete(
-            [{"role": "user", "content": f"Return ONLY a title (under 80 characters, no quotes) for: {payload.prompt}"}],
+            [
+                {
+                    "role": "user",
+                    "content": f"Return ONLY a title (under 80 characters, no quotes) for: {payload.prompt}",
+                }
+            ],
             operation="workspace_agent.title",
             temperature=0.2,
         )
@@ -450,9 +500,7 @@ async def _orchestrate_artifact_generation(
     except Exception:
         artifact_title = f"Verified {doc_type.title()}"
 
-    context_data = await _build_workspace_context_snapshot(
-        workspace, None, sources, session, user
-    )
+    context_data = await _build_workspace_context_snapshot(workspace, None, sources, session, user)
     user_prefs = user.preferences or {}
     doc_lang = user_prefs.get("document_language") or user_prefs.get("language") or "English"
     tone = user_prefs.get("default_tone") or "professional"
@@ -509,14 +557,16 @@ async def _orchestrate_artifact_generation(
     await session.flush()
 
     # Add version
-    session.add(NativeDocumentVersion(
-        native_document_id=native_doc.id,
-        version_number=1,
-        title=native_doc.title,
-        content=native_doc.content,
-        change_summary=f"Initial agent generation: {doc_type}",
-        created_by=user.id,
-    ))
+    session.add(
+        NativeDocumentVersion(
+            native_document_id=native_doc.id,
+            version_number=1,
+            title=native_doc.title,
+            content=native_doc.content,
+            change_summary=f"Initial agent generation: {doc_type}",
+            created_by=user.id,
+        )
+    )
 
     # Link sources
     for s in sources:
@@ -527,24 +577,28 @@ async def _orchestrate_artifact_generation(
         evidence_list = []
         if r.get("document_id") and r.get("page_number"):
             s_name = next((s.filename for s in sources if s.id == r["document_id"]), "Document")
-            evidence_list.append({
-                "document_id": str(r["document_id"]),
-                "document_name": s_name,
-                "page_number": r["page_number"],
-                "snippet": r.get("supporting_quote", ""),
-            })
-        session.add(DeliverableRequirement(
-            native_document_id=native_doc.id,
-            created_by=user.id,
-            text=r.get("text", ""),
-            kind=r.get("kind", "content"),
-            status="covered",
-            is_required=r.get("is_required", True),
-            position=idx + 1,
-            origin="ai",
-            evidence=evidence_list,
-            linked_sections=[],
-        ))
+            evidence_list.append(
+                {
+                    "document_id": str(r["document_id"]),
+                    "document_name": s_name,
+                    "page_number": r["page_number"],
+                    "snippet": r.get("supporting_quote", ""),
+                }
+            )
+        session.add(
+            DeliverableRequirement(
+                native_document_id=native_doc.id,
+                created_by=user.id,
+                text=r.get("text", ""),
+                kind=r.get("kind", "content"),
+                status="covered",
+                is_required=r.get("is_required", True),
+                position=idx + 1,
+                origin="ai",
+                evidence=evidence_list,
+                linked_sections=[],
+            )
+        )
 
     await session.flush()
 
@@ -558,19 +612,21 @@ async def _orchestrate_artifact_generation(
     )
 
     for finding in review_plan.findings:
-        session.add(DeliverableReviewFinding(
-            native_document_id=native_doc.id,
-            requirement_id=finding.requirement_id,
-            created_by=user.id,
-            kind=finding.kind,
-            claim_type=finding.claim_type,
-            severity=finding.severity,
-            claim_text=finding.claim_text,
-            explanation=finding.explanation,
-            proposed_text=finding.proposed_text,
-            citations=[c.model_dump() for c in finding.citations],
-            status="open",
-        ))
+        session.add(
+            DeliverableReviewFinding(
+                native_document_id=native_doc.id,
+                requirement_id=finding.requirement_id,
+                created_by=user.id,
+                kind=finding.kind,
+                claim_type=finding.claim_type,
+                severity=finding.severity,
+                claim_text=finding.claim_text,
+                explanation=finding.explanation,
+                proposed_text=finding.proposed_text,
+                citations=[c.model_dump() for c in finding.citations],
+                status="open",
+            )
+        )
 
     await activity(
         session,
@@ -611,11 +667,14 @@ async def _orchestrate_artifact_generation(
     yield _sse_event("artifact", {"artifact": native_resp.model_dump()})
     yield _sse_event("verification", {"readiness": readiness_res.model_dump()})
     yield _sse_event("token", {"text": summary_text})
-    yield _sse_event("complete", {
-        "message_id": str(asst_msg.id),
-        "artifact_id": str(native_doc.id),
-        "conversation_id": str(conversation_id),
-    })
+    yield _sse_event(
+        "complete",
+        {
+            "message_id": str(asst_msg.id),
+            "artifact_id": str(native_doc.id),
+            "conversation_id": str(conversation_id),
+        },
+    )
 
 
 async def _orchestrate_artifact_modification(
@@ -631,15 +690,21 @@ async def _orchestrate_artifact_modification(
     target_artifact: NativeDocument | None = None
     if payload.artifact_id:
         target_artifact = await session.scalar(
-            select(NativeDocument).where(NativeDocument.id == payload.artifact_id, NativeDocument.workspace_id == workspace.id)
+            select(NativeDocument).where(
+                NativeDocument.id == payload.artifact_id, NativeDocument.workspace_id == workspace.id
+            )
         )
     if target_artifact is None:
         target_artifact = await session.scalar(
-            select(NativeDocument).where(NativeDocument.workspace_id == workspace.id).order_by(NativeDocument.updated_at.desc())
+            select(NativeDocument)
+            .where(NativeDocument.workspace_id == workspace.id)
+            .order_by(NativeDocument.updated_at.desc())
         )
 
     if target_artifact is None:
-        yield _sse_event("token", {"text": "No artifact found in this workspace to modify. Please ask me to generate one first."})
+        yield _sse_event(
+            "token", {"text": "No artifact found in this workspace to modify. Please ask me to generate one first."}
+        )
         yield _sse_event("complete", {"conversation_id": str(conversation_id)})
         return
 
@@ -647,9 +712,7 @@ async def _orchestrate_artifact_modification(
 
     yield _sse_event("status", {"step": "drafting", "label": f"Applying updates to '{target_artifact.title}'..."})
 
-    context_data = await _build_workspace_context_snapshot(
-        workspace, target_artifact.id, sources, session, user
-    )
+    context_data = await _build_workspace_context_snapshot(workspace, target_artifact.id, sources, session, user)
 
     system_prompt = (
         f"You are Groundwork AI editing an existing deliverable '{target_artifact.title}' in workspace '{workspace.name}'.\n"
@@ -658,10 +721,7 @@ async def _orchestrate_artifact_modification(
         "Output the full updated document in Markdown format (# Heading, paragraphs, bullets).\n\n"
         f"{context_data['formatted_context']}"
     )
-    user_content = (
-        f"Current Document Text:\n{current_text}\n\n"
-        f"Requested Change: {payload.prompt}\n"
-    )
+    user_content = f"Current Document Text:\n{current_text}\n\nRequested Change: {payload.prompt}\n"
 
     t0 = time.time()
     updated_text = await ai_orchestrator.complete(
@@ -690,14 +750,16 @@ async def _orchestrate_artifact_modification(
     target_artifact.revision += 1
     target_artifact.updated_at = datetime.now(UTC)
 
-    session.add(NativeDocumentVersion(
-        native_document_id=target_artifact.id,
-        version_number=target_artifact.revision,
-        title=target_artifact.title,
-        content=target_artifact.content,
-        change_summary=payload.prompt[:200],
-        created_by=user.id,
-    ))
+    session.add(
+        NativeDocumentVersion(
+            native_document_id=target_artifact.id,
+            version_number=target_artifact.revision,
+            title=target_artifact.title,
+            content=target_artifact.content,
+            change_summary=payload.prompt[:200],
+            created_by=user.id,
+        )
+    )
 
     yield _sse_event("status", {"step": "verifying", "label": "Checking updated draft..."})
 
@@ -707,7 +769,7 @@ async def _orchestrate_artifact_modification(
     readiness_res = await readiness(target_artifact, session)
     native_resp = await native_response(target_artifact, session)
 
-    reply_text = f"I've updated **{target_artifact.title}** (Revision {target_artifact.revision}) based on your instruction: *\"{payload.prompt}\"*.\n\nYou can review the updated sections and version history in the Studio panel."
+    reply_text = f'I\'ve updated **{target_artifact.title}** (Revision {target_artifact.revision}) based on your instruction: *"{payload.prompt}"*.\n\nYou can review the updated sections and version history in the Studio panel.'
 
     asst_msg = Message(
         conversation_id=conversation_id,
@@ -720,11 +782,14 @@ async def _orchestrate_artifact_modification(
     yield _sse_event("artifact", {"artifact": native_resp.model_dump()})
     yield _sse_event("verification", {"readiness": readiness_res.model_dump()})
     yield _sse_event("token", {"text": reply_text})
-    yield _sse_event("complete", {
-        "message_id": str(asst_msg.id),
-        "artifact_id": str(target_artifact.id),
-        "conversation_id": str(conversation_id),
-    })
+    yield _sse_event(
+        "complete",
+        {
+            "message_id": str(asst_msg.id),
+            "artifact_id": str(target_artifact.id),
+            "conversation_id": str(conversation_id),
+        },
+    )
 
 
 async def _orchestrate_artifact_verification(
@@ -740,23 +805,42 @@ async def _orchestrate_artifact_verification(
     target_artifact: NativeDocument | None = None
     if payload.artifact_id:
         target_artifact = await session.scalar(
-            select(NativeDocument).where(NativeDocument.id == payload.artifact_id, NativeDocument.workspace_id == workspace.id)
+            select(NativeDocument).where(
+                NativeDocument.id == payload.artifact_id, NativeDocument.workspace_id == workspace.id
+            )
         )
     if target_artifact is None:
         target_artifact = await session.scalar(
-            select(NativeDocument).where(NativeDocument.workspace_id == workspace.id).order_by(NativeDocument.updated_at.desc())
+            select(NativeDocument)
+            .where(NativeDocument.workspace_id == workspace.id)
+            .order_by(NativeDocument.updated_at.desc())
         )
 
     if target_artifact is None:
-        yield _sse_event("token", {"text": "No deliverable found in this workspace to verify. Upload sources and ask me to generate a deliverable first."})
+        yield _sse_event(
+            "token",
+            {
+                "text": "No deliverable found in this workspace to verify. Upload sources and ask me to generate a deliverable first."
+            },
+        )
         yield _sse_event("complete", {"conversation_id": str(conversation_id)})
         return
 
     source_ctx = await source_context(target_artifact, user, session)
-    reqs = list(await session.scalars(select(DeliverableRequirement).where(DeliverableRequirement.native_document_id == target_artifact.id)))
+    reqs = list(
+        await session.scalars(
+            select(DeliverableRequirement).where(DeliverableRequirement.native_document_id == target_artifact.id)
+        )
+    )
     req_dicts = [{"id": str(r.id), "text": r.text, "is_required": r.is_required, "kind": r.kind} for r in reqs]
 
-    yield _sse_event("status", {"step": "verifying", "label": f"Verifying '{target_artifact.title}' against {len(reqs)} requirements and sources..."})
+    yield _sse_event(
+        "status",
+        {
+            "step": "verifying",
+            "label": f"Verifying '{target_artifact.title}' against {len(reqs)} requirements and sources...",
+        },
+    )
 
     review_plan = await review_deliverable(
         native_text(target_artifact),
@@ -765,19 +849,21 @@ async def _orchestrate_artifact_verification(
     )
 
     for finding in review_plan.findings:
-        session.add(DeliverableReviewFinding(
-            native_document_id=target_artifact.id,
-            requirement_id=finding.requirement_id,
-            created_by=user.id,
-            kind=finding.kind,
-            claim_type=finding.claim_type,
-            severity=finding.severity,
-            claim_text=finding.claim_text,
-            explanation=finding.explanation,
-            proposed_text=finding.proposed_text,
-            citations=[c.model_dump() for c in finding.citations],
-            status="open",
-        ))
+        session.add(
+            DeliverableReviewFinding(
+                native_document_id=target_artifact.id,
+                requirement_id=finding.requirement_id,
+                created_by=user.id,
+                kind=finding.kind,
+                claim_type=finding.claim_type,
+                severity=finding.severity,
+                claim_text=finding.claim_text,
+                explanation=finding.explanation,
+                proposed_text=finding.proposed_text,
+                citations=[c.model_dump() for c in finding.citations],
+                status="open",
+            )
+        )
     await session.commit()
 
     readiness_res = await readiness(target_artifact, session)
@@ -794,7 +880,9 @@ async def _orchestrate_artifact_verification(
     if readiness_res.blockers:
         verification_summary += "**Items needing attention:**\n" + "\n".join(f"- {b}" for b in readiness_res.blockers)
     else:
-        verification_summary += "All requirements are covered and claims are grounded in your sources! The deliverable is ready to export."
+        verification_summary += (
+            "All requirements are covered and claims are grounded in your sources! The deliverable is ready to export."
+        )
 
     asst_msg = Message(
         conversation_id=conversation_id,
@@ -807,11 +895,14 @@ async def _orchestrate_artifact_verification(
     yield _sse_event("artifact", {"artifact": native_resp.model_dump()})
     yield _sse_event("verification", {"readiness": readiness_res.model_dump()})
     yield _sse_event("token", {"text": verification_summary})
-    yield _sse_event("complete", {
-        "message_id": str(asst_msg.id),
-        "artifact_id": str(target_artifact.id),
-        "conversation_id": str(conversation_id),
-    })
+    yield _sse_event(
+        "complete",
+        {
+            "message_id": str(asst_msg.id),
+            "artifact_id": str(target_artifact.id),
+            "conversation_id": str(conversation_id),
+        },
+    )
 
 
 async def _orchestrate_create_note(
@@ -844,10 +935,13 @@ async def _orchestrate_create_note(
     await session.commit()
 
     yield _sse_event("token", {"text": reply_text})
-    yield _sse_event("complete", {
-        "message_id": str(asst_msg.id),
-        "conversation_id": str(conversation_id),
-    })
+    yield _sse_event(
+        "complete",
+        {
+            "message_id": str(asst_msg.id),
+            "conversation_id": str(conversation_id),
+        },
+    )
 
 
 async def _orchestrate_grounded_qa(
@@ -859,7 +953,9 @@ async def _orchestrate_grounded_qa(
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
-    yield _sse_event("status", {"step": "retrieving_evidence", "label": f"Searching evidence across {len(sources)} source(s)..."})
+    yield _sse_event(
+        "status", {"step": "retrieving_evidence", "label": f"Searching evidence across {len(sources)} source(s)..."}
+    )
 
     source_ids = [s.id for s in sources]
     chunks: list[DocumentChunk] = []
@@ -886,18 +982,26 @@ async def _orchestrate_grounded_qa(
     yield _sse_event("status", {"step": "drafting", "label": "Synthesizing context-aware response..."})
 
     retrieved_items = [
-        (c.document_id, c.page_number, c.text, next((s.filename for s in sources if s.id == c.document_id), "Document"), c.id)
+        (
+            c.document_id,
+            c.page_number,
+            c.text,
+            next((s.filename for s in sources if s.id == c.document_id), "Document"),
+            c.id,
+        )
         for c in chunks
     ]
 
-    context_data = await _build_workspace_context_snapshot(
-        workspace, payload.artifact_id, sources, session, user
-    )
+    context_data = await _build_workspace_context_snapshot(workspace, payload.artifact_id, sources, session, user)
 
-    retrieved_context_str = "\n\n".join(
-        f"[Source {idx + 1}: {next((s.filename for s in sources if s.id == c.document_id), 'Document')}, page {c.page_number}]\n{c.text}"
-        for idx, c in enumerate(chunks)
-    ) if chunks else "No additional semantic chunks retrieved."
+    retrieved_context_str = (
+        "\n\n".join(
+            f"[Source {idx + 1}: {next((s.filename for s in sources if s.id == c.document_id), 'Document')}, page {c.page_number}]\n{c.text}"
+            for idx, c in enumerate(chunks)
+        )
+        if chunks
+        else "No additional semantic chunks retrieved."
+    )
 
     system_prompt = (
         "You are Groundwork AI, the intelligent, context-aware co-pilot embedded inside this workspace.\n"
@@ -914,10 +1018,7 @@ async def _orchestrate_grounded_qa(
 
     ai_messages = [
         {"role": "system", "content": system_prompt},
-        *[
-            {"role": m.get("role", "user"), "content": m.get("content", "")}
-            for m in chat_history[-6:]
-        ],
+        *[{"role": m.get("role", "user"), "content": m.get("content", "")} for m in chat_history[-6:]],
         {
             "role": "user",
             "content": f"Retrieved Evidence Chunks:\n{retrieved_context_str}\n\nUser Question/Instruction: {payload.prompt}",
@@ -964,12 +1065,14 @@ async def _orchestrate_grounded_qa(
             snippet=snippet,
         )
         session.add(citation)
-        citations_data.append({
-            "document_id": str(doc_id),
-            "document_name": doc_name,
-            "page_number": page_num,
-            "snippet": snippet,
-        })
+        citations_data.append(
+            {
+                "document_id": str(doc_id),
+                "document_name": doc_name,
+                "page_number": page_num,
+                "snippet": snippet,
+            }
+        )
 
     await session.commit()
     await session.refresh(asst_msg)
@@ -978,7 +1081,10 @@ async def _orchestrate_grounded_qa(
         yield _sse_event("citation", {"citations": citations_data})
 
     yield _sse_event("token", {"text": clean_answer})
-    yield _sse_event("complete", {
-        "message_id": str(asst_msg.id),
-        "conversation_id": str(conversation_id),
-    })
+    yield _sse_event(
+        "complete",
+        {
+            "message_id": str(asst_msg.id),
+            "conversation_id": str(conversation_id),
+        },
+    )

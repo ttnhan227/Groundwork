@@ -32,9 +32,9 @@ async def owned_collection(identifier: uuid.UUID, user: User, session: AsyncSess
 async def list_collections(
     user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
 ) -> list[Collection]:
-    return list(await session.scalars(
-        select(Collection).where(Collection.owner_id == user.id).order_by(Collection.name)
-    ))
+    return list(
+        await session.scalars(select(Collection).where(Collection.owner_id == user.id).order_by(Collection.name))
+    )
 
 
 @router.post("/collections", response_model=CollectionResponse, status_code=status.HTTP_201_CREATED)
@@ -49,6 +49,7 @@ async def create_collection(
     if existing:
         raise HTTPException(status_code=409, detail="A collection with this name already exists")
     from app.deliverables import ensure_personal_workspace
+
     workspace = await ensure_personal_workspace(user, session)
     collection = Collection(owner_id=user.id, workspace_id=workspace.id, name=payload.name.strip(), color=payload.color)
     session.add(collection)

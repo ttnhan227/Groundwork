@@ -29,16 +29,18 @@ def test_version_two_five_models_expose_workspace_fields() -> None:
 
 
 def test_document_response_keeps_metadata_backward_compatible() -> None:
-    response = DocumentResponse.model_validate({
-        "id": uuid.uuid4(),
-        "filename": "source.pdf",
-        "content_type": "application/pdf",
-        "size_bytes": 10,
-        "status": "ready",
-        "page_count": 1,
-        "error_message": None,
-        "created_at": "2026-07-28T00:00:00Z",
-    })
+    response = DocumentResponse.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "filename": "source.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": 10,
+            "status": "ready",
+            "page_count": 1,
+            "error_message": None,
+            "created_at": "2026-07-28T00:00:00Z",
+        }
+    )
     assert response.display_title is None
     assert response.tags == []
     assert response.collection_id is None

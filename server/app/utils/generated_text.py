@@ -44,7 +44,9 @@ def _render(value: Any, level: int = 1) -> list[str]:
         lines = []
         for index, child in enumerate(value, 1):
             if isinstance(child, dict):
-                title_key = next((key for key in child if str(key).strip().casefold() in _TITLE_KEYS | {"name", "heading"}), None)
+                title_key = next(
+                    (key for key in child if str(key).strip().casefold() in _TITLE_KEYS | {"name", "heading"}), None
+                )
                 if title_key is not None and not isinstance(child[title_key], (dict, list)):
                     title = _scalar(child[title_key])
                     if title:

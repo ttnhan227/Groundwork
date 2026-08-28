@@ -63,7 +63,7 @@ class Settings(BaseSettings):
         elif not self.jwt_secret:
             # Safe local fallback for local development / unit testing when no .env exists
             self.jwt_secret = "dev-insecure-jwt-secret-for-local-development-only"
-        
+
         # Local development fallback for MinIO if not configured in .env
         if not is_prod:
             if not self.minio_access_key:

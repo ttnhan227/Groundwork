@@ -56,8 +56,16 @@ def answer_declines_context(answer: str) -> bool:
 def is_casual_message(message: str) -> bool:
     normalized = re.sub(r"[^a-z\s]", "", message.lower()).strip()
     return normalized in {
-        "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
-        "thanks", "thank you", "ok", "okay",
+        "hi",
+        "hello",
+        "hey",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "thanks",
+        "thank you",
+        "ok",
+        "okay",
     }
 
 
@@ -90,10 +98,7 @@ def clean_user_answer(answer: str) -> str:
 
 def build_retrieval_query(question: str, history: list[tuple[str, str]]) -> str:
     """Include recent context so ambiguous follow-ups retrieve the original subject."""
-    recent = [
-        clean_user_answer(content)
-        for _, content in history[-4:]
-    ]
+    recent = [clean_user_answer(content) for _, content in history[-4:]]
     return "\n".join([*recent, question])
 
 
@@ -103,8 +108,21 @@ def relevant_snippet(text: str, answer: str, question: str, limit: int = 350) ->
     if len(compact) <= limit:
         return compact
     ignored = {
-        "about", "answer", "document", "from", "mentioned", "page", "school",
-        "source", "that", "their", "there", "this", "what", "which", "with",
+        "about",
+        "answer",
+        "document",
+        "from",
+        "mentioned",
+        "page",
+        "school",
+        "source",
+        "that",
+        "their",
+        "there",
+        "this",
+        "what",
+        "which",
+        "with",
     }
     terms = [
         term
@@ -180,10 +198,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     if settings.embedding_provider != "local":
         raise RuntimeError(f"Unsupported embedding provider: {settings.embedding_provider}")
     vectors = embedding_model().encode(texts, normalize_embeddings=True)
-    return [
-        _normalize_embedding(vector.tolist(), settings.embedding_dimensions)
-        for vector in vectors
-    ]
+    return [_normalize_embedding(vector.tolist(), settings.embedding_dimensions) for vector in vectors]
 
 
 async def embed_texts_async(texts: list[str], *, operation: str = "document_retrieval") -> list[list[float]]:
@@ -201,9 +216,21 @@ def requires_visual_answer(question: str) -> bool:
     return any(
         phrase in normalized
         for phrase in (
-            "image", "picture", "photo", "photograph", "illustration", "drawing",
-            "character", "person shown", "who is shown", "what is shown",
-            "what do you see", "looks like", "visual", "chart", "diagram",
+            "image",
+            "picture",
+            "photo",
+            "photograph",
+            "illustration",
+            "drawing",
+            "character",
+            "person shown",
+            "who is shown",
+            "what is shown",
+            "what do you see",
+            "looks like",
+            "visual",
+            "chart",
+            "diagram",
         )
     )
 
@@ -214,19 +241,23 @@ async def generate_visual_answer(
     history: list[tuple[str, str]],
 ) -> str:
     settings = get_settings()
-    content: list[dict] = [{
-        "type": "text",
-        "text": (
-            f"Question: {question}\nAnalyze the supplied rendered PDF pages. Cite supporting pages with "
-            "[Source N]. If identity cannot be established from the image alone, describe the character "
-            "and say that the exact identity is uncertain."
-        ),
-    }]
+    content: list[dict] = [
+        {
+            "type": "text",
+            "text": (
+                f"Question: {question}\nAnalyze the supplied rendered PDF pages. Cite supporting pages with "
+                "[Source N]. If identity cannot be established from the image alone, describe the character "
+                "and say that the exact identity is uncertain."
+            ),
+        }
+    ]
     for index, (filename, page_number, data_url) in enumerate(sources, 1):
-        content.extend([
-            {"type": "text", "text": f"[Source {index}] {filename}, page {page_number}"},
-            {"type": "image_url", "image_url": data_url},
-        ])
+        content.extend(
+            [
+                {"type": "text", "text": f"[Source {index}] {filename}, page {page_number}"},
+                {"type": "image_url", "image_url": data_url},
+            ]
+        )
     messages = [
         {
             "role": "system",
@@ -242,9 +273,7 @@ async def generate_visual_answer(
         ],
         {"role": "user", "content": content},
     ]
-    return await ai_orchestrator.complete(
-        messages, operation="visual_document_answer", model=settings.vision_model
-    )
+    return await ai_orchestrator.complete(messages, operation="visual_document_answer", model=settings.vision_model)
 
 
 async def generate_answer(question: str, context: list[str], history: list[tuple[str, str]]) -> str:
@@ -273,14 +302,10 @@ async def generate_answer(question: str, context: list[str], history: list[tuple
         ],
         {"role": "user", "content": f"PDF sources:\n{sources}\n\nQuestion: {question}"},
     ]
-    return await ai_orchestrator.complete(
-        messages, operation="grounded_document_answer", model=settings.llm_model
-    )
+    return await ai_orchestrator.complete(messages, operation="grounded_document_answer", model=settings.llm_model)
 
 
-def _text_answer_messages(
-    question: str, context: list[str], history: list[tuple[str, str]]
-) -> list[dict]:
+def _text_answer_messages(question: str, context: list[str], history: list[tuple[str, str]]) -> list[dict]:
     sources = "\n\n".join(f"[Source {index + 1}]\n{text}" for index, text in enumerate(context))
     return [
         {
@@ -306,19 +331,23 @@ def _text_answer_messages(
 def _visual_answer_messages(
     question: str, sources: list[tuple[str, int, str]], history: list[tuple[str, str]]
 ) -> list[dict]:
-    content: list[dict] = [{
-        "type": "text",
-        "text": (
-            f"Question: {question}\nAnalyze the supplied rendered PDF pages. Cite supporting pages with "
-            "[Source N]. If identity cannot be established from the image alone, describe the character "
-            "and say that the exact identity is uncertain."
-        ),
-    }]
+    content: list[dict] = [
+        {
+            "type": "text",
+            "text": (
+                f"Question: {question}\nAnalyze the supplied rendered PDF pages. Cite supporting pages with "
+                "[Source N]. If identity cannot be established from the image alone, describe the character "
+                "and say that the exact identity is uncertain."
+            ),
+        }
+    ]
     for index, (filename, page_number, data_url) in enumerate(sources, 1):
-        content.extend([
-            {"type": "text", "text": f"[Source {index}] {filename}, page {page_number}"},
-            {"type": "image_url", "image_url": data_url},
-        ])
+        content.extend(
+            [
+                {"type": "text", "text": f"[Source {index}] {filename}, page {page_number}"},
+                {"type": "image_url", "image_url": data_url},
+            ]
+        )
     return [
         {
             "role": "system",
@@ -335,9 +364,7 @@ def _visual_answer_messages(
     ]
 
 
-def _general_answer_messages(
-    question: str, history: list[tuple[str, str]]
-) -> list[dict]:
+def _general_answer_messages(question: str, history: list[tuple[str, str]]) -> list[dict]:
     return [
         {
             "role": "system",
@@ -353,29 +380,19 @@ def _general_answer_messages(
 
 
 async def _stream_completion(messages: list[dict], model: str) -> AsyncIterator[str]:
-    async for token in ai_orchestrator.stream(
-        messages, operation="streaming_assistant_answer", model=model
-    ):
+    async for token in ai_orchestrator.stream(messages, operation="streaming_assistant_answer", model=model):
         yield token
 
 
-async def stream_answer(
-    question: str, context: list[str], history: list[tuple[str, str]]
-) -> AsyncIterator[str]:
+async def stream_answer(question: str, context: list[str], history: list[tuple[str, str]]) -> AsyncIterator[str]:
     settings = get_settings()
-    async for token in _stream_completion(
-        _text_answer_messages(question, context, history), settings.llm_model
-    ):
+    async for token in _stream_completion(_text_answer_messages(question, context, history), settings.llm_model):
         yield token
 
 
-async def stream_general_answer(
-    question: str, history: list[tuple[str, str]]
-) -> AsyncIterator[str]:
+async def stream_general_answer(question: str, history: list[tuple[str, str]]) -> AsyncIterator[str]:
     settings = get_settings()
-    async for token in _stream_completion(
-        _general_answer_messages(question, history), settings.llm_model
-    ):
+    async for token in _stream_completion(_general_answer_messages(question, history), settings.llm_model):
         yield token
 
 
@@ -383,7 +400,5 @@ async def stream_visual_answer(
     question: str, sources: list[tuple[str, int, str]], history: list[tuple[str, str]]
 ) -> AsyncIterator[str]:
     settings = get_settings()
-    async for token in _stream_completion(
-        _visual_answer_messages(question, sources, history), settings.vision_model
-    ):
+    async for token in _stream_completion(_visual_answer_messages(question, sources, history), settings.vision_model):
         yield token

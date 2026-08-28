@@ -34,7 +34,11 @@ from app.storage import ObjectStorage
 async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc()))
+        job = await session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.document_id == document_id)
+            .order_by(ProcessingJob.created_at.desc())
+        )
         if document is None or job is None:
             raise ValueError("Document or processing job no longer exists")
         document.status = DocumentStatus.EXTRACTING
@@ -42,21 +46,21 @@ async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
         job.status = JobStatus.RUNNING
         job.progress = 5
         job.started_at = datetime.now(UTC)
-        persisted_workflow = await session.scalar(
-            select(WorkflowRun).where(WorkflowRun.job_id == job.id)
-        )
+        persisted_workflow = await session.scalar(select(WorkflowRun).where(WorkflowRun.job_id == job.id))
         if persisted_workflow:
             persisted_workflow.status = "running"
-            session.add(WorkflowEvent(
-                workflow_id=persisted_workflow.id,
-                event_type="workflow.started",
-                payload={"job_id": str(job.id)},
-            ))
-            persisted_steps = list(await session.scalars(
-                select(WorkflowStepRun).where(
-                    WorkflowStepRun.workflow_id == persisted_workflow.id
+            session.add(
+                WorkflowEvent(
+                    workflow_id=persisted_workflow.id,
+                    event_type="workflow.started",
+                    payload={"job_id": str(job.id)},
                 )
-            ))
+            )
+            persisted_steps = list(
+                await session.scalars(
+                    select(WorkflowStepRun).where(WorkflowStepRun.workflow_id == persisted_workflow.id)
+                )
+            )
             for persisted_step in persisted_steps:
                 persisted_step.status = "running"
                 execution = await session.scalar(
@@ -72,14 +76,22 @@ async def _set_running(document_id: uuid.UUID, task_id: str) -> str:
 async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc()))
+        job = await session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.document_id == document_id)
+            .order_by(ProcessingJob.created_at.desc())
+        )
         if document is None or job is None:
             return
         await session.execute(delete(DocumentPage).where(DocumentPage.document_id == document_id))
-        session.add_all([
-            DocumentPage(document_id=document_id, page_number=p.page_number, text=p.text, extraction_method=p.method)
-            for p in pages
-        ])
+        session.add_all(
+            [
+                DocumentPage(
+                    document_id=document_id, page_number=p.page_number, text=p.text, extraction_method=p.method
+                )
+                for p in pages
+            ]
+        )
         document.page_count = len(pages)
         document.status = DocumentStatus.INDEXING
         job.progress = 70
@@ -91,20 +103,26 @@ async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
 
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id).order_by(ProcessingJob.created_at.desc()))
+        job = await session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.document_id == document_id)
+            .order_by(ProcessingJob.created_at.desc())
+        )
         if document is None or job is None:
             return
         await session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
-        session.add_all([
-            DocumentChunk(
-                document_id=document_id,
-                page_number=chunk.page_number,
-                chunk_index=chunk.chunk_index,
-                text=chunk.text,
-                embedding=vector,
-            )
-            for chunk, vector in zip(chunks, vectors, strict=True)
-        ])
+        session.add_all(
+            [
+                DocumentChunk(
+                    document_id=document_id,
+                    page_number=chunk.page_number,
+                    chunk_index=chunk.chunk_index,
+                    text=chunk.text,
+                    embedding=vector,
+                )
+                for chunk, vector in zip(chunks, vectors, strict=True)
+            ]
+        )
         document.status = DocumentStatus.READY
         document.error_message = None
         job.status = JobStatus.COMPLETED
@@ -113,8 +131,17 @@ async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
         user = await session.get(User, document.owner_id)
         if user is not None:
             from app.deliverables import activity, ensure_personal_workspace
+
             workspace = await ensure_personal_workspace(user, session)
-            await activity(session, workspace.id, user.id, "source.ready", "document", document.id, {"title": document.display_title or document.filename, "page_count": document.page_count})
+            await activity(
+                session,
+                workspace.id,
+                user.id,
+                "source.ready",
+                "document",
+                document.id,
+                {"title": document.display_title or document.filename, "page_count": document.page_count},
+            )
         await session.commit()
 
 
@@ -143,8 +170,17 @@ async def _fail(document_id: uuid.UUID, message: str, retries: int) -> None:
             user = await session.get(User, document.owner_id)
             if user is not None:
                 from app.deliverables import activity, ensure_personal_workspace
+
                 workspace = await ensure_personal_workspace(user, session)
-                await activity(session, workspace.id, user.id, "source.failed", "document", document.id, {"title": document.display_title or document.filename, "error": message[:300]})
+                await activity(
+                    session,
+                    workspace.id,
+                    user.id,
+                    "source.failed",
+                    "document",
+                    document.id,
+                    {"title": document.display_title or document.filename, "error": message[:300]},
+                )
         if job:
             job.status = JobStatus.FAILED
             job.error_message = message[:2000]
@@ -203,6 +239,7 @@ async def _store(
     key = f"{user.id}/generated/{identifier}/{filename}"
     ObjectStorage().upload(key, data, content_type)
     from app.deliverables import ensure_personal_workspace
+
     workspace = await ensure_personal_workspace(user, session)
     artifact = GeneratedArtifact(
         id=identifier,
@@ -269,6 +306,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         document_id = parameters.pop("document_id", None)
         if operation == "ai_create":
             from app.generation import CreateRequest, create_file
+
             result = await create_file(CreateRequest.model_validate(parameters["request"]), user, session)
             result_kind = "artifact"
         elif operation == "summary":
@@ -278,14 +316,10 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
             result = await quiz(uuid.UUID(document_id), QuizRequest(**parameters), user, session)
             result_kind = "ai_result"
         elif operation == "extraction":
-            result = await extract_information(
-                uuid.UUID(document_id), ExtractionRequest(**parameters), user, session
-            )
+            result = await extract_information(uuid.UUID(document_id), ExtractionRequest(**parameters), user, session)
             result_kind = "ai_result"
         elif operation == "translation":
-            result = await translate(
-                uuid.UUID(document_id), TranslationRequest(**parameters), user, session
-            )
+            result = await translate(uuid.UUID(document_id), TranslationRequest(**parameters), user, session)
             result_kind = "ai_result"
         elif operation == "comparison":
             result = await compare(ComparisonRequest(**parameters), user, session)
@@ -361,14 +395,16 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
         job.result_id = result.id
         if workflow:
             workflow.status = "completed"
-            session.add(WorkflowEvent(
-                workflow_id=workflow.id,
-                event_type="workflow.completed",
-                payload={"result_kind": result_kind, "result_id": str(result.id)},
-            ))
-            completed_steps = list(await session.scalars(
-                select(WorkflowStepRun).where(WorkflowStepRun.workflow_id == workflow.id)
-            ))
+            session.add(
+                WorkflowEvent(
+                    workflow_id=workflow.id,
+                    event_type="workflow.completed",
+                    payload={"result_kind": result_kind, "result_id": str(result.id)},
+                )
+            )
+            completed_steps = list(
+                await session.scalars(select(WorkflowStepRun).where(WorkflowStepRun.workflow_id == workflow.id))
+            )
             for completed_step in completed_steps:
                 completed_step.status = "completed"
                 execution = await session.scalar(
@@ -383,6 +419,7 @@ async def _run_operation(job_id: uuid.UUID, task_id: str) -> None:
                     execution.completed_at = datetime.now(UTC)
         from app.notifications import notify_user
         from app.schemas import UserPreferences
+
         preferences = UserPreferences.model_validate(user.preferences or {})
         if preferences.notify_processing_completed:
             await notify_user(
@@ -412,11 +449,13 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
         workflow = await session.scalar(select(WorkflowRun).where(WorkflowRun.job_id == job.id))
         if workflow:
             workflow.status = "failed"
-            session.add(WorkflowEvent(
-                workflow_id=workflow.id,
-                event_type="workflow.failed",
-                payload={"message": message[:500]},
-            ))
+            session.add(
+                WorkflowEvent(
+                    workflow_id=workflow.id,
+                    event_type="workflow.failed",
+                    payload={"message": message[:500]},
+                )
+            )
             failed_step = await session.scalar(
                 select(WorkflowStepRun)
                 .where(WorkflowStepRun.workflow_id == workflow.id, WorkflowStepRun.status == "running")
@@ -424,9 +463,7 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
             )
             if failed_step:
                 failed_step.status = "failed"
-                execution = await session.scalar(
-                    select(ToolExecution).where(ToolExecution.step_id == failed_step.id)
-                )
+                execution = await session.scalar(select(ToolExecution).where(ToolExecution.step_id == failed_step.id))
                 if execution:
                     execution.status = "failed"
                     execution.error_message = message[:2000]
@@ -436,6 +473,7 @@ async def _fail_operation(job_id: uuid.UUID, message: str, retries: int) -> None
             if owner is not None:
                 from app.notifications import notify_user
                 from app.schemas import UserPreferences
+
                 preferences = UserPreferences.model_validate(owner.preferences or {})
                 if preferences.notify_processing_failed:
                     await notify_user(

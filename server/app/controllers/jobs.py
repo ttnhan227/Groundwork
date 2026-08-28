@@ -79,6 +79,7 @@ async def cancel_job(
     await session.commit()
     if job.task_id:
         from app.celery_app import celery_app
+
         celery_app.control.revoke(job.task_id, terminate=True, signal="SIGTERM")
     await session.refresh(job)
     return job
@@ -145,10 +146,12 @@ async def create_images_to_pdf_job(
             key = f"{user.id}/staging/{uuid.uuid4()}/{position:03d}"
             storage.upload(key, content, file.content_type or "application/octet-stream")
             staged.append(key)
-            source_files.append({
-                "filename": safe_filename(file.filename or f"image-{position + 1}.png"),
-                "content_type": file.content_type or "application/octet-stream",
-            })
+            source_files.append(
+                {
+                    "filename": safe_filename(file.filename or f"image-{position + 1}.png"),
+                    "content_type": file.content_type or "application/octet-stream",
+                }
+            )
         return await create_job_without_documents(
             "images_to_pdf",
             {"staged_keys": staged, "save_sources": save_sources, "source_files": source_files},
@@ -265,6 +268,7 @@ async def create_job_without_documents(
     await session.commit()
     await session.refresh(job)
     from app.tasks import process_operation
+
     try:
         task = process_operation.delay(str(job.id))
         job.task_id = task.id

@@ -15,9 +15,7 @@ class JobRepository(BaseRepository[ProcessingJob]):
     """Data access operations for Background Processing Jobs."""
 
     async def get_by_id(self, job_id: uuid.UUID) -> ProcessingJob | None:
-        return await self.session.scalar(
-            select(ProcessingJob).where(ProcessingJob.id == job_id)
-        )
+        return await self.session.scalar(select(ProcessingJob).where(ProcessingJob.id == job_id))
 
     async def list_for_user(self, user: User, limit: int = 50) -> Sequence[ProcessingJob]:
         result = await self.session.scalars(

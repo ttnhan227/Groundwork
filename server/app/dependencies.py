@@ -49,6 +49,7 @@ async def admin_user(user: User = Depends(current_user)) -> User:
 
 # --- Dependency Injection Providers ---
 
+
 def get_user_repository(session: AsyncSession = Depends(get_session)) -> UserRepository:
     return UserRepository(session)
 
@@ -92,7 +93,9 @@ def get_notification_repository(session: AsyncSession = Depends(get_session)) ->
     return NotificationRepository(session)
 
 
-def get_notification_service(notif_repo: NotificationRepository = Depends(get_notification_repository)) -> NotificationService:
+def get_notification_service(
+    notif_repo: NotificationRepository = Depends(get_notification_repository),
+) -> NotificationService:
     return NotificationService(notif_repo)
 
 

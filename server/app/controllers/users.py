@@ -42,23 +42,38 @@ router = APIRouter(tags=["Users and dashboard"])
 
 
 async def stats(user_id: uuid.UUID, session: AsyncSession) -> UserStatsResponse:
-    document_count, pages, storage = (await session.execute(
-        select(func.count(Document.id), func.coalesce(func.sum(Document.page_count), 0), func.coalesce(func.sum(Document.size_bytes), 0))
-        .where(Document.owner_id == user_id)
-    )).one()
+    document_count, pages, storage = (
+        await session.execute(
+            select(
+                func.count(Document.id),
+                func.coalesce(func.sum(Document.page_count), 0),
+                func.coalesce(func.sum(Document.size_bytes), 0),
+            ).where(Document.owner_id == user_id)
+        )
+    ).one()
     ai_requests = await session.scalar(select(func.count(AIUsageRecord.id)).where(AIUsageRecord.owner_id == user_id))
-    generated = await session.scalar(select(func.count(GeneratedArtifact.id)).where(GeneratedArtifact.owner_id == user_id))
+    generated = await session.scalar(
+        select(func.count(GeneratedArtifact.id)).where(GeneratedArtifact.owner_id == user_id)
+    )
     failed = await session.scalar(
-        select(func.count(ProcessingJob.id)).join(Document).where(Document.owner_id == user_id, ProcessingJob.status == JobStatus.FAILED)
+        select(func.count(ProcessingJob.id))
+        .join(Document)
+        .where(Document.owner_id == user_id, ProcessingJob.status == JobStatus.FAILED)
     )
     return UserStatsResponse(
-        document_count=document_count, page_count=pages, storage_bytes=storage,
-        ai_requests=ai_requests or 0, generated_files=generated or 0, failed_jobs=failed or 0,
+        document_count=document_count,
+        page_count=pages,
+        storage_bytes=storage,
+        ai_requests=ai_requests or 0,
+        generated_files=generated or 0,
+        failed_jobs=failed or 0,
     )
 
 
 @router.patch("/profile", response_model=UserResponse)
-async def update_profile(payload: ProfileUpdateRequest, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+async def update_profile(
+    payload: ProfileUpdateRequest, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
+):
     user.display_name = payload.display_name.strip()
     await session.commit()
     await session.refresh(user)
@@ -82,12 +97,19 @@ async def update_preferences(
 
 
 @router.post("/profile/password", status_code=204)
-async def change_password(payload: PasswordChangeRequest, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+async def change_password(
+    payload: PasswordChangeRequest, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
+):
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=422, detail="Current password is incorrect")
     user.password_hash = hash_password(payload.new_password)
-    tokens = list(await session.scalars(select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))))
+    tokens = list(
+        await session.scalars(
+            select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        )
+    )
     from datetime import UTC, datetime
+
     for token in tokens:
         token.revoked_at = datetime.now(UTC)
     await session.commit()
@@ -99,11 +121,17 @@ async def active_sessions(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[RefreshToken]:
-    return list(await session.scalars(select(RefreshToken).where(
-        RefreshToken.user_id == user.id,
-        RefreshToken.revoked_at.is_(None),
-        RefreshToken.expires_at > datetime.now(UTC),
-    ).order_by(RefreshToken.created_at.desc())))
+    return list(
+        await session.scalars(
+            select(RefreshToken)
+            .where(
+                RefreshToken.user_id == user.id,
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > datetime.now(UTC),
+            )
+            .order_by(RefreshToken.created_at.desc())
+        )
+    )
 
 
 @router.delete("/profile/sessions/{session_id}", status_code=204)
@@ -112,11 +140,13 @@ async def revoke_session(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    token = await session.scalar(select(RefreshToken).where(
-        RefreshToken.id == session_id,
-        RefreshToken.user_id == user.id,
-        RefreshToken.revoked_at.is_(None),
-    ))
+    token = await session.scalar(
+        select(RefreshToken).where(
+            RefreshToken.id == session_id,
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    )
     if token is None:
         raise HTTPException(status_code=404, detail="Session not found")
     token.revoked_at = datetime.now(UTC)
@@ -129,10 +159,14 @@ async def revoke_all_sessions(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    tokens = list(await session.scalars(select(RefreshToken).where(
-        RefreshToken.user_id == user.id,
-        RefreshToken.revoked_at.is_(None),
-    )))
+    tokens = list(
+        await session.scalars(
+            select(RefreshToken).where(
+                RefreshToken.user_id == user.id,
+                RefreshToken.revoked_at.is_(None),
+            )
+        )
+    )
     now = datetime.now(UTC)
     for token in tokens:
         token.revoked_at = now
@@ -151,16 +185,26 @@ async def profile_usage(
     session: AsyncSession = Depends(get_session),
 ) -> UsageDetailResponse:
     values = await stats(user.id, session)
-    feature_rows = (await session.execute(select(
-        AIUsageRecord.feature, func.count(AIUsageRecord.id)
-    ).where(AIUsageRecord.owner_id == user.id).group_by(AIUsageRecord.feature))).all()
-    job_rows = (await session.execute(select(
-        ProcessingJob.status, func.count(ProcessingJob.id)
-    ).where(ProcessingJob.owner_id == user.id).group_by(ProcessingJob.status))).all()
-    recent = await session.scalar(select(func.count(AIUsageRecord.id)).where(
-        AIUsageRecord.owner_id == user.id,
-        AIUsageRecord.created_at >= datetime.now(UTC) - timedelta(days=30),
-    ))
+    feature_rows = (
+        await session.execute(
+            select(AIUsageRecord.feature, func.count(AIUsageRecord.id))
+            .where(AIUsageRecord.owner_id == user.id)
+            .group_by(AIUsageRecord.feature)
+        )
+    ).all()
+    job_rows = (
+        await session.execute(
+            select(ProcessingJob.status, func.count(ProcessingJob.id))
+            .where(ProcessingJob.owner_id == user.id)
+            .group_by(ProcessingJob.status)
+        )
+    ).all()
+    recent = await session.scalar(
+        select(func.count(AIUsageRecord.id)).where(
+            AIUsageRecord.owner_id == user.id,
+            AIUsageRecord.created_at >= datetime.now(UTC) - timedelta(days=30),
+        )
+    )
     return UsageDetailResponse(
         storage_limit_bytes=1024 * 1024 * 1024,
         storage_bytes=values.storage_bytes,
@@ -176,15 +220,18 @@ async def export_account_data(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    workspaces = list(await session.scalars(
-        select(Workspace).join(WorkspaceMember).where(WorkspaceMember.user_id == user.id)
-    ))
+    workspaces = list(
+        await session.scalars(select(Workspace).join(WorkspaceMember).where(WorkspaceMember.user_id == user.id))
+    )
     values = await stats(user.id, session)
     return {
         "exported_at": datetime.now(UTC).isoformat(),
         "account": {
-            "id": str(user.id), "email": user.email, "display_name": user.display_name,
-            "role": user.role.value, "created_at": user.created_at.isoformat(),
+            "id": str(user.id),
+            "email": user.email,
+            "display_name": user.display_name,
+            "role": user.role.value,
+            "created_at": user.created_at.isoformat(),
         },
         "preferences": user.preferences or {},
         "usage": values.model_dump(),
@@ -221,7 +268,9 @@ async def delete_account(
     if payload.confirmation.strip().lower() != user.email.lower():
         raise HTTPException(status_code=422, detail="Enter your account email to confirm deletion")
     document_keys = list(await session.scalars(select(Document.object_key).where(Document.owner_id == user.id)))
-    artifact_keys = list(await session.scalars(select(GeneratedArtifact.object_key).where(GeneratedArtifact.owner_id == user.id)))
+    artifact_keys = list(
+        await session.scalars(select(GeneratedArtifact.object_key).where(GeneratedArtifact.owner_id == user.id))
+    )
     storage = ObjectStorage()
     for key in [*document_keys, *artifact_keys]:
         try:
@@ -236,10 +285,20 @@ async def delete_account(
 @router.get("/dashboard", response_model=DashboardResponse)
 async def dashboard(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
     values = await stats(user.id, session)
-    documents = list(await session.scalars(select(Document).where(Document.owner_id == user.id).order_by(Document.created_at.desc()).limit(5)))
-    jobs = list(await session.scalars(
-        select(ProcessingJob).join(Document).where(Document.owner_id == user.id).order_by(ProcessingJob.created_at.desc()).limit(5)
-    ))
+    documents = list(
+        await session.scalars(
+            select(Document).where(Document.owner_id == user.id).order_by(Document.created_at.desc()).limit(5)
+        )
+    )
+    jobs = list(
+        await session.scalars(
+            select(ProcessingJob)
+            .join(Document)
+            .where(Document.owner_id == user.id)
+            .order_by(ProcessingJob.created_at.desc())
+            .limit(5)
+        )
+    )
     return DashboardResponse(**values.model_dump(), recent_documents=documents, recent_jobs=jobs)
 
 
@@ -249,12 +308,19 @@ async def admin_users(_: User = Depends(admin_user), session: AsyncSession = Dep
     output = []
     for item in users:
         values = await stats(item.id, session)
-        output.append(AdminUserResponse.model_validate({**UserResponse.model_validate(item).model_dump(), **values.model_dump()}))
+        output.append(
+            AdminUserResponse.model_validate({**UserResponse.model_validate(item).model_dump(), **values.model_dump()})
+        )
     return output
 
 
 @router.patch("/admin/users/{user_id}/status", response_model=UserResponse)
-async def change_user_status(user_id: uuid.UUID, payload: UserStatusRequest, admin: User = Depends(admin_user), session: AsyncSession = Depends(get_session)):
+async def change_user_status(
+    user_id: uuid.UUID,
+    payload: UserStatusRequest,
+    admin: User = Depends(admin_user),
+    session: AsyncSession = Depends(get_session),
+):
     if user_id == admin.id and not payload.is_active:
         raise HTTPException(status_code=422, detail="You cannot disable your own account")
     user = await session.get(User, user_id)
@@ -268,12 +334,23 @@ async def change_user_status(user_id: uuid.UUID, payload: UserStatusRequest, adm
 
 @router.get("/admin/stats", response_model=UserStatsResponse)
 async def admin_stats(_: User = Depends(admin_user), session: AsyncSession = Depends(get_session)):
-    document_count, pages, storage = (await session.execute(select(
-        func.count(Document.id), func.coalesce(func.sum(Document.page_count), 0), func.coalesce(func.sum(Document.size_bytes), 0)
-    ))).one()
+    document_count, pages, storage = (
+        await session.execute(
+            select(
+                func.count(Document.id),
+                func.coalesce(func.sum(Document.page_count), 0),
+                func.coalesce(func.sum(Document.size_bytes), 0),
+            )
+        )
+    ).one()
     return UserStatsResponse(
-        document_count=document_count, page_count=pages, storage_bytes=storage,
+        document_count=document_count,
+        page_count=pages,
+        storage_bytes=storage,
         ai_requests=await session.scalar(select(func.count(AIUsageRecord.id))) or 0,
         generated_files=await session.scalar(select(func.count(GeneratedArtifact.id))) or 0,
-        failed_jobs=await session.scalar(select(func.count(ProcessingJob.id)).where(ProcessingJob.status == JobStatus.FAILED)) or 0,
+        failed_jobs=await session.scalar(
+            select(func.count(ProcessingJob.id)).where(ProcessingJob.status == JobStatus.FAILED)
+        )
+        or 0,
     )

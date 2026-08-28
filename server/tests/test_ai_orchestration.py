@@ -30,7 +30,12 @@ def test_all_provider_http_calls_are_centralized() -> None:
 def test_jobs_and_users_expose_durable_redesign_state() -> None:
     assert JobStatus.CANCELLED.value == "cancelled"
     assert User.__table__.c.preferences.type.python_type is dict
-    migration = Path(__file__).parents[1].joinpath("alembic", "versions", "0017_cancellable_jobs.py").read_text(encoding="utf-8")
+    migration = (
+        Path(__file__)
+        .parents[1]
+        .joinpath("alembic", "versions", "0017_cancellable_jobs.py")
+        .read_text(encoding="utf-8")
+    )
     assert "CANCELLED" in migration
     assert '"preferences"' in migration
 
@@ -47,6 +52,7 @@ def test_generation_runs_through_a_cancellable_background_job() -> None:
 
 def test_extract_error_detail_formats_provider_errors() -> None:
     import httpx
+
     from app.ai_orchestration import _extract_error_detail
 
     request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
@@ -63,7 +69,9 @@ def test_extract_error_detail_formats_provider_errors() -> None:
 @pytest.mark.asyncio
 async def test_complete_raises_provider_error_without_fallback() -> None:
     from unittest.mock import patch
+
     import httpx
+
     from app.ai_orchestration import ai_orchestrator
 
     request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
@@ -72,7 +80,9 @@ async def test_complete_raises_provider_error_without_fallback() -> None:
         request=request,
         json={"detail": "Invalid API Key"},
     )
-    with patch("httpx.AsyncClient.post", side_effect=httpx.HTTPStatusError("Unauthorized", request=request, response=response)):
+    with patch(
+        "httpx.AsyncClient.post", side_effect=httpx.HTTPStatusError("Unauthorized", request=request, response=response)
+    ):
         with patch("app.services.ai_orchestration.get_settings") as mock_settings:
             mock_settings.return_value.llm_api_key = "test-key"
             mock_settings.return_value.llm_base_url = "https://api.openai.com/v1"

@@ -111,13 +111,7 @@ def docx_to_markdown(data: bytes) -> bytes:
                 text = f"1. {text}"
             lines.extend([text, ""])
         else:
-            rows = [
-                [
-                    cell.text.replace("|", "\\|").replace("\n", "<br>")
-                    for cell in row.cells
-                ]
-                for row in block.rows
-            ]
+            rows = [[cell.text.replace("|", "\\|").replace("\n", "<br>") for cell in row.cells] for row in block.rows]
             if not rows:
                 continue
             width = max(len(row) for row in rows)

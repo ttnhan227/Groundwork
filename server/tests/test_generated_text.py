@@ -18,7 +18,9 @@ def test_plain_prose_is_preserved() -> None:
 
 
 def test_document_content_normalizes_json_text_blocks() -> None:
-    content, changed = normalize_document_content({"type": "doc", "blocks": [{"type": "paragraph", "text": '{"summary":"Useful"}'}]})
+    content, changed = normalize_document_content(
+        {"type": "doc", "blocks": [{"type": "paragraph", "text": '{"summary":"Useful"}'}]}
+    )
 
     assert changed is True
     assert content["blocks"][0]["text"] == "# Summary\n\nUseful"

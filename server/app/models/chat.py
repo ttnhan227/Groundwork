@@ -32,7 +32,9 @@ class Conversation(Base):
     workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(160), default="New conversation")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     owner: Mapped["User"] = relationship(back_populates="conversations")
     documents: Mapped[list["Document"]] = relationship(secondary=conversation_documents)
@@ -78,9 +80,7 @@ class ConversationResource(Base):
     __table_args__ = (UniqueConstraint("conversation_id", "resource_type", "resource_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    conversation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
-    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     resource_type: Mapped[str] = mapped_column(String(20))
     resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     role: Mapped[str] = mapped_column(String(30), default="context")

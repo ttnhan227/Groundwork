@@ -101,10 +101,16 @@ class AIOrchestrator:
                 return response
             except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
                 last_error = exc
-                retryable = (
-                    isinstance(exc, httpx.HTTPStatusError)
-                    and exc.response.status_code in {408, 409, 425, 429, 500, 502, 503, 504}
-                )
+                retryable = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in {
+                    408,
+                    409,
+                    425,
+                    429,
+                    500,
+                    502,
+                    503,
+                    504,
+                }
                 if attempt >= self.max_attempts or not retryable:
                     break
                 await asyncio.sleep(0.25 * (2 ** (attempt - 1)))
@@ -129,7 +135,9 @@ class AIOrchestrator:
         settings = get_settings()
         target_model = model or settings.llm_model
         if not target_model:
-            raise AIProviderError("LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file.")
+            raise AIProviderError(
+                "LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file."
+            )
         response = await self._post(
             "chat/completions",
             {
@@ -158,7 +166,9 @@ class AIOrchestrator:
         settings = get_settings()
         target_model = model or settings.llm_model
         if not target_model:
-            raise AIProviderError("LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file.")
+            raise AIProviderError(
+                "LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file."
+            )
         response = await self._post(
             "chat/completions",
             {
@@ -180,12 +190,14 @@ class AIOrchestrator:
             return []
         settings = get_settings()
         if not settings.embedding_model:
-            raise AIProviderError("EMBEDDING_MODEL is not configured. Please set EMBEDDING_MODEL in your environment variables or .env file.")
+            raise AIProviderError(
+                "EMBEDDING_MODEL is not configured. Please set EMBEDDING_MODEL in your environment variables or .env file."
+            )
         vectors: list[list[float]] = []
         for start in range(0, len(texts), 64):
             response = await self._post(
                 "embeddings",
-                {"model": settings.embedding_model, "input": texts[start:start + 64]},
+                {"model": settings.embedding_model, "input": texts[start : start + 64]},
                 operation,
             )
             try:
@@ -193,7 +205,9 @@ class AIOrchestrator:
                 items = sorted(data, key=lambda item: item.get("index", 0)) if isinstance(data, list) else []
                 vectors.extend(item["embedding"] for item in items if isinstance(item, dict) and "embedding" in item)
             except Exception as exc:
-                raise AIProviderError(f"Could not parse embeddings data from AI provider: {response.text[:200]}") from exc
+                raise AIProviderError(
+                    f"Could not parse embeddings data from AI provider: {response.text[:200]}"
+                ) from exc
         return vectors
 
     def embeddings_sync(self, texts: list[str], *, operation: str = "embeddings") -> list[list[float]]:
@@ -202,9 +216,10 @@ class AIOrchestrator:
             return []
         settings = get_settings()
         if not settings.embedding_model:
-            raise AIProviderError("EMBEDDING_MODEL is not configured. Please set EMBEDDING_MODEL in your environment variables or .env file.")
+            raise AIProviderError(
+                "EMBEDDING_MODEL is not configured. Please set EMBEDDING_MODEL in your environment variables or .env file."
+            )
         vectors: list[list[float]] = []
-        started = time.monotonic()
         with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
             for start in range(0, len(texts), 64):
                 last_error: Exception | None = None
@@ -213,19 +228,27 @@ class AIOrchestrator:
                         response = client.post(
                             f"{settings.llm_base_url.rstrip('/')}/embeddings",
                             headers=self._headers(),
-                            json={"model": settings.embedding_model, "input": texts[start:start + 64]},
+                            json={"model": settings.embedding_model, "input": texts[start : start + 64]},
                         )
                         response.raise_for_status()
                         data = response.json().get("data", [])
                         items = sorted(data, key=lambda item: item.get("index", 0)) if isinstance(data, list) else []
-                        vectors.extend(item["embedding"] for item in items if isinstance(item, dict) and "embedding" in item)
+                        vectors.extend(
+                            item["embedding"] for item in items if isinstance(item, dict) and "embedding" in item
+                        )
                         break
                     except (httpx.HTTPError, KeyError, TypeError) as exc:
                         last_error = exc
-                        retryable = (
-                            isinstance(exc, httpx.HTTPStatusError)
-                            and exc.response.status_code in {408, 409, 425, 429, 500, 502, 503, 504}
-                        )
+                        retryable = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in {
+                            408,
+                            409,
+                            425,
+                            429,
+                            500,
+                            502,
+                            503,
+                            504,
+                        }
                         if attempt >= self.max_attempts or not retryable:
                             break
                         time.sleep(0.25 * (2 ** (attempt - 1)))
@@ -246,7 +269,9 @@ class AIOrchestrator:
         settings = get_settings()
         target_model = model or settings.llm_model
         if not target_model:
-            raise AIProviderError("LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file.")
+            raise AIProviderError(
+                "LLM_MODEL is not configured. Please set LLM_MODEL in your environment variables or .env file."
+            )
         payload = {
             "model": target_model,
             "messages": messages,
@@ -271,14 +296,18 @@ class AIOrchestrator:
                             if isinstance(parsed, dict):
                                 err = parsed.get("error", {})
                                 if isinstance(err, dict) and "message" in err:
-                                    raise AIProviderError(f"AI provider error ({response.status_code}): {err['message']}")
+                                    raise AIProviderError(
+                                        f"AI provider error ({response.status_code}): {err['message']}"
+                                    )
                                 if "detail" in parsed:
                                     detail = parsed["detail"]
                                     msg = detail if isinstance(detail, str) else detail.get("message", str(detail))
                                     raise AIProviderError(f"AI provider error ({response.status_code}): {msg}")
                         except json.JSONDecodeError:
                             pass
-                        raise AIProviderError(f"AI provider returned HTTP {response.status_code}: {error_body.decode('utf-8', errors='ignore')[:200]}")
+                        raise AIProviderError(
+                            f"AI provider returned HTTP {response.status_code}: {error_body.decode('utf-8', errors='ignore')[:200]}"
+                        )
 
                     async for line in response.aiter_lines():
                         if not line.startswith("data:"):
@@ -295,7 +324,9 @@ class AIOrchestrator:
                             continue
                     return
         except Exception as exc:
-            error_msg = _extract_error_detail(exc) if isinstance(exc, (httpx.HTTPError, httpx.RequestError)) else str(exc)
+            error_msg = (
+                _extract_error_detail(exc) if isinstance(exc, (httpx.HTTPError, httpx.RequestError)) else str(exc)
+            )
             logger.warning(
                 "ai_provider_stream_failed operation=%s model=%s duration_ms=%s error=%s",
                 operation,

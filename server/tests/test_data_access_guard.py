@@ -9,11 +9,8 @@ Enforces that:
 """
 
 import ast
-import os
 import uuid
 from pathlib import Path
-
-import pytest
 
 from app.controllers.workspace_agent import (
     WorkspaceAgentRequest,
@@ -43,7 +40,11 @@ def test_controllers_enforce_workspace_tenant_scoping():
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Only check route endpoints decorated with @router.<method>
                 decorator_names = [
-                    d.attr if isinstance(d, ast.Attribute) else d.func.attr if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) else ""
+                    d.attr
+                    if isinstance(d, ast.Attribute)
+                    else d.func.attr
+                    if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute)
+                    else ""
                     for d in node.decorator_list
                 ]
                 is_route = any(m in {"get", "post", "put", "delete", "patch"} for m in decorator_names)
@@ -54,13 +55,16 @@ def test_controllers_enforce_workspace_tenant_scoping():
                 func_text = ast.get_source_segment(content, node) or ""
 
                 if "workspace_id" in param_names or "payload" in param_names:
-                    has_guard = any(keyword in func_text for keyword in [
-                        "workspace_access",
-                        "workspace_id",
-                        "current_user",
-                        "owner_id",
-                        "get_session",
-                    ])
+                    has_guard = any(
+                        keyword in func_text
+                        for keyword in [
+                            "workspace_access",
+                            "workspace_id",
+                            "current_user",
+                            "owner_id",
+                            "get_session",
+                        ]
+                    )
                     assert has_guard, f"Route endpoint {filepath.name}::{node.name} lacks tenant access guard"
 
 

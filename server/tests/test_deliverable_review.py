@@ -9,13 +9,37 @@ from app.deliverable_review import extract_requirements, review_deliverable
 @pytest.mark.asyncio
 async def test_requirement_extraction_normalizes_unknown_kinds(monkeypatch) -> None:
     document_id = uuid.uuid4()
+
     async def complete_json(*args, **kwargs):
         assert kwargs["operation"] == "deliverable_requirements"
-        return {"requirements": [
-            {"text": "Include an executive summary", "kind": "section", "is_required": True, "supporting_quote": "Include an executive summary", "document_id": str(document_id), "page_number": 1},
-            {"text": "Use the client's logo", "kind": "invented_kind", "is_required": False, "supporting_quote": "Use the client's logo", "document_id": str(document_id), "page_number": 1},
-            {"text": "Invent a 30-page appendix", "kind": "format", "is_required": True, "supporting_quote": "not present in source", "document_id": str(document_id), "page_number": 1},
-        ]}
+        return {
+            "requirements": [
+                {
+                    "text": "Include an executive summary",
+                    "kind": "section",
+                    "is_required": True,
+                    "supporting_quote": "Include an executive summary",
+                    "document_id": str(document_id),
+                    "page_number": 1,
+                },
+                {
+                    "text": "Use the client's logo",
+                    "kind": "invented_kind",
+                    "is_required": False,
+                    "supporting_quote": "Use the client's logo",
+                    "document_id": str(document_id),
+                    "page_number": 1,
+                },
+                {
+                    "text": "Invent a 30-page appendix",
+                    "kind": "format",
+                    "is_required": True,
+                    "supporting_quote": "not present in source",
+                    "document_id": str(document_id),
+                    "page_number": 1,
+                },
+            ]
+        }
 
     monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
     result = await extract_requirements("Include an executive summary. Use the client's logo. Client brief text")
@@ -34,20 +58,31 @@ async def test_review_preserves_source_identity_and_normalizes_findings(monkeypa
         assert str(requirement_id) in messages[1]["content"]
         assert str(document_id) in messages[1]["content"]
         return {
-            "coverage": [{
-                "requirement_id": str(requirement_id),
-                "covered": True,
-                "citations": [{"document_id": str(document_id), "document_name": "brief.pdf", "page_number": 2, "snippet": "Target result"}],
-            }],
-            "findings": [{
-                "requirement_id": str(requirement_id),
-                "kind": "made_up",
-                "severity": "urgent",
-                "claim_text": "Revenue doubled",
-                "explanation": "The claim is unsupported.",
-                "proposed_text": "Revenue increased during the measured period.",
-                "citations": [],
-            }],
+            "coverage": [
+                {
+                    "requirement_id": str(requirement_id),
+                    "covered": True,
+                    "citations": [
+                        {
+                            "document_id": str(document_id),
+                            "document_name": "brief.pdf",
+                            "page_number": 2,
+                            "snippet": "Target result",
+                        }
+                    ],
+                }
+            ],
+            "findings": [
+                {
+                    "requirement_id": str(requirement_id),
+                    "kind": "made_up",
+                    "severity": "urgent",
+                    "claim_text": "Revenue doubled",
+                    "explanation": "The claim is unsupported.",
+                    "proposed_text": "Revenue increased during the measured period.",
+                    "citations": [],
+                }
+            ],
         }
 
     monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)
@@ -68,15 +103,17 @@ async def test_review_accepts_nullable_optional_ai_fields(monkeypatch) -> None:
     async def complete_json(*args, **kwargs):
         return {
             "coverage": [{"requirement_id": str(requirement_id), "covered": False, "citations": None}],
-            "findings": [{
-                "requirement_id": str(requirement_id),
-                "kind": None,
-                "severity": None,
-                "claim_text": None,
-                "explanation": None,
-                "proposed_text": None,
-                "citations": None,
-            }],
+            "findings": [
+                {
+                    "requirement_id": str(requirement_id),
+                    "kind": None,
+                    "severity": None,
+                    "claim_text": None,
+                    "explanation": None,
+                    "proposed_text": None,
+                    "citations": None,
+                }
+            ],
         }
 
     monkeypatch.setattr("app.services.deliverable_review.ai_orchestrator.complete_json", complete_json)

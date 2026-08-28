@@ -32,14 +32,20 @@ async def list_resources(
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationResource]:
     await owned_conversation(conversation_id, user, session)
-    return list(await session.scalars(
-        select(ConversationResource)
-        .where(ConversationResource.conversation_id == conversation_id)
-        .order_by(ConversationResource.created_at)
-    ))
+    return list(
+        await session.scalars(
+            select(ConversationResource)
+            .where(ConversationResource.conversation_id == conversation_id)
+            .order_by(ConversationResource.created_at)
+        )
+    )
 
 
-@router.post("/conversations/{conversation_id}/resources", response_model=ConversationResourceResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/conversations/{conversation_id}/resources",
+    response_model=ConversationResourceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def attach_resource(
     conversation_id: uuid.UUID,
     payload: ConversationResourceCreate,
@@ -48,9 +54,7 @@ async def attach_resource(
 ) -> ConversationResource:
     await owned_conversation(conversation_id, user, session)
     model = Document if payload.resource_type == "document" else GeneratedArtifact
-    resource = await session.scalar(
-        select(model).where(model.id == payload.resource_id, model.owner_id == user.id)
-    )
+    resource = await session.scalar(select(model).where(model.id == payload.resource_id, model.owner_id == user.id))
     if resource is None:
         raise HTTPException(status_code=404, detail="Workspace resource not found")
     existing = await session.scalar(
@@ -100,9 +104,11 @@ async def list_memory(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[WorkspaceMemory]:
-    return list(await session.scalars(
-        select(WorkspaceMemory).where(WorkspaceMemory.owner_id == user.id).order_by(WorkspaceMemory.key)
-    ))
+    return list(
+        await session.scalars(
+            select(WorkspaceMemory).where(WorkspaceMemory.owner_id == user.id).order_by(WorkspaceMemory.key)
+        )
+    )
 
 
 @router.put("/workspace/memory/{key}", response_model=WorkspaceMemoryResponse)
@@ -123,6 +129,7 @@ async def upsert_memory(
     )
     if memory is None:
         from app.deliverables import ensure_personal_workspace
+
         workspace = await ensure_personal_workspace(user, session)
         memory = WorkspaceMemory(owner_id=user.id, workspace_id=workspace.id, key=clean_key, value=payload.value)
         session.add(memory)
@@ -159,15 +166,20 @@ async def list_workspace_memories(
     session: AsyncSession = Depends(get_session),
 ) -> list[WorkspaceMemory]:
     from app.deliverables import workspace_access
+
     await workspace_access(workspace_id, user, session)
-    return list(await session.scalars(
-        select(WorkspaceMemory)
-        .where(WorkspaceMemory.workspace_id == workspace_id, WorkspaceMemory.owner_id == user.id)
-        .order_by(WorkspaceMemory.key)
-    ))
+    return list(
+        await session.scalars(
+            select(WorkspaceMemory)
+            .where(WorkspaceMemory.workspace_id == workspace_id, WorkspaceMemory.owner_id == user.id)
+            .order_by(WorkspaceMemory.key)
+        )
+    )
 
 
-@router.post("/workspaces/{workspace_id}/memories", response_model=WorkspaceMemoryResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/workspaces/{workspace_id}/memories", response_model=WorkspaceMemoryResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_workspace_memory(
     workspace_id: uuid.UUID,
     payload: WorkspaceMemoryCreate,
@@ -175,6 +187,7 @@ async def create_workspace_memory(
     session: AsyncSession = Depends(get_session),
 ) -> WorkspaceMemory:
     from app.deliverables import workspace_access
+
     await workspace_access(workspace_id, user, session, {"owner", "editor"})
     clean_key = payload.key.strip().lower().replace(" ", "_")
     if not clean_key or len(clean_key) > 80:
@@ -209,6 +222,7 @@ async def delete_workspace_memory(
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     from app.deliverables import workspace_access
+
     await workspace_access(workspace_id, user, session, {"owner", "editor"})
     memory = await session.scalar(
         select(WorkspaceMemory).where(

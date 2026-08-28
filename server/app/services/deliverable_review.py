@@ -106,7 +106,9 @@ class ReviewPlan(BaseModel):
         return [] if value is None else value
 
 
-def _numeric_claim_findings(draft: str, source_context: str, existing: list[ReviewFindingPlan]) -> list[ReviewFindingPlan]:
+def _numeric_claim_findings(
+    draft: str, source_context: str, existing: list[ReviewFindingPlan]
+) -> list[ReviewFindingPlan]:
     """Enforce an explicit source marker for every reader-facing numeric claim."""
     pages = [match.groupdict() for match in SOURCE_PAGE.finditer(source_context)]
     existing_claims = {" ".join(item.claim_text.split()).casefold() for item in existing if item.claim_text}
@@ -121,31 +123,44 @@ def _numeric_claim_findings(draft: str, source_context: str, existing: list[Revi
             if not tokens or normalized_claim in existing_claims:
                 continue
             matched_page = next(
-                (page for page in pages if all(token.casefold().replace(" ", "") in page["text"].casefold().replace(" ", "") for token in tokens)),
+                (
+                    page
+                    for page in pages
+                    if all(
+                        token.casefold().replace(" ", "") in page["text"].casefold().replace(" ", "")
+                        for token in tokens
+                    )
+                ),
                 None,
             )
             citations: list[ReviewCitation] = []
             if matched_page:
-                citations.append(ReviewCitation(
-                    document_id=matched_page["id"],
-                    document_name=matched_page["name"],
-                    page_number=int(matched_page["page"]),
-                    snippet=" ".join(matched_page["text"].split())[:800],
-                ))
+                citations.append(
+                    ReviewCitation(
+                        document_id=matched_page["id"],
+                        document_name=matched_page["name"],
+                        page_number=int(matched_page["page"]),
+                        snippet=" ".join(matched_page["text"].split())[:800],
+                    )
+                )
                 proposed = f"{claim} [Source: {matched_page['name']}, p. {matched_page['page']}]"
-                explanation = "This numeric claim appears in linked evidence but needs an explicit page citation in the draft."
+                explanation = (
+                    "This numeric claim appears in linked evidence but needs an explicit page citation in the draft."
+                )
             else:
                 proposed = NUMERIC_TOKEN.sub("[confirm metric]", claim)
                 explanation = "This numeric claim has no matching value in the linked evidence and cannot be exported as verified."
-            findings.append(ReviewFindingPlan(
-                kind="unsupported_claim",
-                claim_type="number_stat",
-                severity="high",
-                claim_text=claim,
-                explanation=explanation,
-                proposed_text=proposed,
-                citations=citations,
-            ))
+            findings.append(
+                ReviewFindingPlan(
+                    kind="unsupported_claim",
+                    claim_type="number_stat",
+                    severity="high",
+                    claim_text=claim,
+                    explanation=explanation,
+                    proposed_text=proposed,
+                    citations=citations,
+                )
+            )
             existing_claims.add(normalized_claim)
     return findings
 
@@ -180,7 +195,12 @@ async def extract_requirements(source_context: str) -> ExtractedRequirementSet:
         if item.kind not in REQUIREMENT_KINDS.split(", "):
             item.kind = "content"
         quote = " ".join(item.supporting_quote.split()).casefold()
-        if len(quote) >= 6 and quote in normalized_context and item.document_id is not None and item.page_number is not None:
+        if (
+            len(quote) >= 6
+            and quote in normalized_context
+            and item.document_id is not None
+            and item.page_number is not None
+        ):
             grounded.append(item)
     return ExtractedRequirementSet(requirements=grounded)
 
@@ -192,7 +212,6 @@ def _validate_physical_citations(
 ) -> ReviewPlan:
     """Hardened code-level validator preventing phantom citations or hallucinated page references."""
     pages = [match.groupdict() for match in SOURCE_PAGE.finditer(source_context)]
-    valid_doc_ids = {p["id"] for p in pages}
     valid_doc_pages = {(p["id"], int(p["page"])) for p in pages}
     valid_doc_names = {p["name"].strip().casefold() for p in pages}
 
@@ -219,24 +238,32 @@ def _validate_physical_citations(
 
     # 3. Detect phantom inline citations in the draft text when sources are linked
     if pages:
-        inline_matches = re.finditer(r"\[(?:source|evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]", draft, re.IGNORECASE)
+        inline_matches = re.finditer(
+            r"\[(?:source|evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]", draft, re.IGNORECASE
+        )
         for match in inline_matches:
             cited_name = match.group(1).strip()
             cited_page = int(match.group(2)) if match.group(2) else None
 
-            name_match = cited_name.casefold() in valid_doc_names or any(cited_name.casefold() in n for n in valid_doc_names)
-            page_match = cited_page is None or any(p["page"] == str(cited_page) for p in pages if cited_name.casefold() in p["name"].casefold())
+            name_match = cited_name.casefold() in valid_doc_names or any(
+                cited_name.casefold() in n for n in valid_doc_names
+            )
+            page_match = cited_page is None or any(
+                p["page"] == str(cited_page) for p in pages if cited_name.casefold() in p["name"].casefold()
+            )
 
             if not name_match or not page_match:
-                plan.findings.append(ReviewFindingPlan(
-                    kind="source_conflict",
-                    claim_type="other",
-                    severity="high",
-                    claim_text=match.group(0),
-                    explanation=f"Inline citation '{match.group(0)}' references a document or page not physically present in the workspace evidence.",
-                    proposed_text="[Missing source citation / unverified]",
-                    citations=[],
-                ))
+                plan.findings.append(
+                    ReviewFindingPlan(
+                        kind="source_conflict",
+                        claim_type="other",
+                        severity="high",
+                        claim_text=match.group(0),
+                        explanation=f"Inline citation '{match.group(0)}' references a document or page not physically present in the workspace evidence.",
+                        proposed_text="[Missing source citation / unverified]",
+                        citations=[],
+                    )
+                )
 
     return plan
 
@@ -292,7 +319,11 @@ async def review_deliverable(
             finding.severity = "medium"
         if finding.claim_type not in allowed_claim_types:
             finding.claim_type = "other"
-        if finding.claim_type == "other" and finding.kind == "unsupported_claim" and NUMERIC_TOKEN.search(finding.claim_text):
+        if (
+            finding.claim_type == "other"
+            and finding.kind == "unsupported_claim"
+            and NUMERIC_TOKEN.search(finding.claim_text)
+        ):
             finding.claim_type = "number_stat"
     result.findings.extend(_numeric_claim_findings(draft, source_context, result.findings))
     result = _validate_physical_citations(result, draft, source_context)

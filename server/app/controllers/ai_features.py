@@ -166,11 +166,11 @@ def _comparison_evidence(
             details.append(f"original pages {', '.join(map(str, left_visual_pages))}")
         if right_visual_pages:
             details.append(f"compared pages {', '.join(map(str, right_visual_pages))}")
-        warnings.append(
-            f"Visual content was detected on {'; '.join(details)}. Images were not semantically compared."
-        )
+        warnings.append(f"Visual content was detected on {'; '.join(details)}. Images were not semantically compared.")
         if not prefix:
-            prefix = "This result compares extracted text only; it does not establish that visual content is identical. "
+            prefix = (
+                "This result compares extracted text only; it does not establish that visual content is identical. "
+            )
     return similarity, warnings, prefix, insufficient
 
 
@@ -261,7 +261,9 @@ async def _cached_or_generate(
         try:
             result = schema.model_validate(raw).model_dump(mode="json")
         except ValidationError as exc:
-            raise HTTPException(status_code=502, detail="The language model result did not match the required format") from exc
+            raise HTTPException(
+                status_code=502, detail="The language model result did not match the required format"
+            ) from exc
         if summary_prefix and "summary" in result:
             result["summary"] = summary_prefix + str(result["summary"])
         if result_overrides:
@@ -311,12 +313,18 @@ async def summarize(
         "action_items": "Extract concrete action items as a Markdown checklist. State clearly if none exist.",
     }
     instruction = (
-        f"{instructions[payload.style]} Return {{\"title\": string, \"content\": string, "
-        "\"page_references\": [{\"document_id\": UUID, \"document_name\": string, \"page_number\": integer}]}."
+        f'{instructions[payload.style]} Return {{"title": string, "content": string, '
+        '"page_references": [{"document_id": UUID, "document_name": string, "page_number": integer}]}.'
     )
     return await _cached_or_generate(
-        AIFeature.SUMMARY, [document], payload.model_dump(), SummaryPayload,
-        instruction, _context([(document, pages)]), user, session,
+        AIFeature.SUMMARY,
+        [document],
+        payload.model_dump(),
+        SummaryPayload,
+        instruction,
+        _context([(document, pages)]),
+        user,
+        session,
     )
 
 
@@ -337,13 +345,13 @@ async def analyze_report(
         "the exact value found in the source. Rank findings and risks by importance. Return "
         '{"title": string, "document_type": string, "purpose": string, "executive_summary": string, '
         '"metrics": [{"label": string, "value": string, "change": string, "trend": "up|down|neutral", '
-        '"context": string, "page_references": [' + reference + ']}], '
+        '"context": string, "page_references": [' + reference + "]}], "
         '"findings": [{"title": string, "detail": string, "importance": "high|medium|low", '
-        '"page_references": [' + reference + ']}], '
+        '"page_references": [' + reference + "]}], "
         '"risks": [{"title": string, "detail": string, "severity": "high|medium|low", '
-        '"page_references": [' + reference + ']}], '
+        '"page_references": [' + reference + "]}], "
         '"entities": [{"name": string, "role": string}], '
-        '"timeline": [{"date": string, "event": string, "page_references": [' + reference + ']}], '
+        '"timeline": [{"date": string, "event": string, "page_references": [' + reference + "]}], "
         '"missing_information": [string], "next_actions": [string]}.'
     )
     return await _cached_or_generate(
@@ -369,13 +377,19 @@ async def quiz(
     pages = await _pages(document, session)
     instruction = (
         f"Create exactly {payload.question_count} useful multiple-choice questions. Return "
-        "{\"title\": string, \"questions\": [{\"question\": string, \"options\": [string], "
-        "\"correct_answer\": string, \"explanation\": string, \"page_references\": "
-        "[{\"document_id\": UUID, \"document_name\": string, \"page_number\": integer}]}]}."
+        '{"title": string, "questions": [{"question": string, "options": [string], '
+        '"correct_answer": string, "explanation": string, "page_references": '
+        '[{"document_id": UUID, "document_name": string, "page_number": integer}]}]}.'
     )
     return await _cached_or_generate(
-        AIFeature.QUIZ, [document], payload.model_dump(), QuizPayload,
-        instruction, _context([(document, pages)]), user, session,
+        AIFeature.QUIZ,
+        [document],
+        payload.model_dump(),
+        QuizPayload,
+        instruction,
+        _context([(document, pages)]),
+        user,
+        session,
     )
 
 
@@ -390,13 +404,19 @@ async def extract_information(
     pages = await _pages(document, session)
     fields = [*payload.categories, *payload.custom_fields]
     instruction = (
-        f"Extract these fields: {', '.join(fields)}. Return {{\"items\": [{{\"field\": string, "
-        "\"value\": string, \"context\": string, \"page_references\": [{\"document_id\": UUID, "
-        "\"document_name\": string, \"page_number\": integer}]}}]}. Omit absent values."
+        f'Extract these fields: {", ".join(fields)}. Return {{"items": [{{"field": string, '
+        '"value": string, "context": string, "page_references": [{"document_id": UUID, '
+        '"document_name": string, "page_number": integer}]}}]}. Omit absent values.'
     )
     return await _cached_or_generate(
-        AIFeature.EXTRACTION, [document], payload.model_dump(), ExtractionPayload,
-        instruction, _context([(document, pages)]), user, session,
+        AIFeature.EXTRACTION,
+        [document],
+        payload.model_dump(),
+        ExtractionPayload,
+        instruction,
+        _context([(document, pages)]),
+        user,
+        session,
     )
 
 
@@ -412,13 +432,19 @@ async def translate(
     pages = await _pages(document, session, selected)
     instruction = (
         f"Translate all supplied text into {payload.target_language}. Preserve headings and meaning in "
-        f"{payload.format}. Return {{\"title\": string, \"target_language\": \"{payload.target_language}\", "
-        "\"content\": string, \"translated_pages\": [integer]}}."
+        f'{payload.format}. Return {{"title": string, "target_language": "{payload.target_language}", '
+        '"content": string, "translated_pages": [integer]}}.'
     )
     parameters = {**payload.model_dump(), "page_numbers": selected}
     return await _cached_or_generate(
-        AIFeature.TRANSLATION, [document], parameters, TranslationPayload,
-        instruction, _context([(document, pages)]), user, session,
+        AIFeature.TRANSLATION,
+        [document],
+        parameters,
+        TranslationPayload,
+        instruction,
+        _context([(document, pages)]),
+        user,
+        session,
     )
 
 
@@ -442,9 +468,7 @@ async def get_result(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AIResultResponse:
-    stored = await session.scalar(
-        select(AIResult).where(AIResult.id == result_id, AIResult.owner_id == user.id)
-    )
+    stored = await session.scalar(select(AIResult).where(AIResult.id == result_id, AIResult.owner_id == user.id))
     if stored is None:
         raise HTTPException(status_code=404, detail="AI result not found")
     return AIResultResponse(
@@ -476,10 +500,10 @@ async def compare(
         left_text, right_text, left_visual_pages, right_visual_pages
     )
     instruction = (
-        "Compare the two documents. Return {\"summary\": string, \"added_sections\": "
-        "[{\"description\": string, \"left_pages\": [integer], \"right_pages\": [integer]}], "
-        "\"removed_sections\": [...], \"changed_sections\": [...], \"numerical_changes\": [...], "
-        f"\"similarity_percent\": {similarity}}}. Added means only in the right document; removed means only "
+        'Compare the two documents. Return {"summary": string, "added_sections": '
+        '[{"description": string, "left_pages": [integer], "right_pages": [integer]}], '
+        '"removed_sections": [...], "changed_sections": [...], "numerical_changes": [...], '
+        f'"similarity_percent": {similarity}}}. Added means only in the right document; removed means only '
         "in the left. Focus on meaningful differences and exact numerical changes. Never claim the documents "
         "are visually identical: only extracted text is supplied."
     )
@@ -491,16 +515,25 @@ async def compare(
         "warnings": warnings,
     }
     if insufficient:
-        overrides.update({
-            "summary": summary_prefix.rstrip(),
-            "added_sections": [],
-            "removed_sections": [],
-            "changed_sections": [],
-            "numerical_changes": [],
-        })
+        overrides.update(
+            {
+                "summary": summary_prefix.rstrip(),
+                "added_sections": [],
+                "removed_sections": [],
+                "changed_sections": [],
+                "numerical_changes": [],
+            }
+        )
         summary_prefix = ""
     return await _cached_or_generate(
-        AIFeature.COMPARISON, [left, right], parameters, ComparisonPayload,
-        instruction, _context([(left, left_pages), (right, right_pages)]), user, session,
-        result_overrides=overrides, summary_prefix=summary_prefix,
+        AIFeature.COMPARISON,
+        [left, right],
+        parameters,
+        ComparisonPayload,
+        instruction,
+        _context([(left, left_pages), (right, right_pages)]),
+        user,
+        session,
+        result_overrides=overrides,
+        summary_prefix=summary_prefix,
     )

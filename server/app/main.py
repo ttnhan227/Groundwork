@@ -46,9 +46,7 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 cors_kwargs = (
-    {"allow_origin_regex": ".*"}
-    if "*" in settings.cors_origins
-    else {"allow_origins": settings.cors_origin_list}
+    {"allow_origin_regex": ".*"} if "*" in settings.cors_origins else {"allow_origins": settings.cors_origin_list}
 )
 app.add_middleware(
     CORSMiddleware,

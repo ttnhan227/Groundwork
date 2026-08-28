@@ -28,7 +28,13 @@ def test_notification_model_is_durable_and_user_scoped() -> None:
 
 def test_notification_api_supports_inbox_lifecycle() -> None:
     source = ROOT.joinpath("app", "controllers", "notifications.py").read_text(encoding="utf-8")
-    for route in ('@router.get("",', '"/unread-count"', '"/{notification_id}/read"', '"/read-all"', '@router.delete("/{notification_id}"'):
+    for route in (
+        '@router.get("",',
+        '"/unread-count"',
+        '"/{notification_id}/read"',
+        '"/read-all"',
+        '@router.delete("/{notification_id}"',
+    ):
         assert route in source
 
 
@@ -51,7 +57,12 @@ def test_notification_migration_follows_guided_verification_head() -> None:
 def test_account_api_exposes_security_usage_and_privacy_controls() -> None:
     source = ROOT.joinpath("app", "controllers", "users.py").read_text(encoding="utf-8")
     for route in (
-        '"/profile/sessions"', '"/profile/sessions/{session_id}"', '"/profile/sessions/revoke-all"',
-        '"/profile/usage"', '"/profile/data-export"', '"/profile/history"', '"/profile/account"',
+        '"/profile/sessions"',
+        '"/profile/sessions/{session_id}"',
+        '"/profile/sessions/revoke-all"',
+        '"/profile/usage"',
+        '"/profile/data-export"',
+        '"/profile/history"',
+        '"/profile/account"',
     ):
         assert route in source

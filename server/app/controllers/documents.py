@@ -76,23 +76,28 @@ def text_to_pdf(text: str, title: str) -> bytes:
             if not raw_line.strip():
                 lines.append("")
                 continue
-            lines.extend(textwrap.wrap(
-                raw_line,
-                width=88,
-                replace_whitespace=False,
-                drop_whitespace=True,
-                break_long_words=True,
-                break_on_hyphens=False,
-            ) or [""])
+            lines.extend(
+                textwrap.wrap(
+                    raw_line,
+                    width=88,
+                    replace_whitespace=False,
+                    drop_whitespace=True,
+                    break_long_words=True,
+                    break_on_hyphens=False,
+                )
+                or [""]
+            )
         lines_per_page = 42
         for offset in range(0, len(lines), lines_per_page):
             page = pdf.new_page(width=595, height=842)
             if offset == 0:
-                page.insert_textbox(fitz.Rect(52, 42, 543, 78), title, fontsize=16, fontname="helv", color=(0.08, 0.12, 0.24))
+                page.insert_textbox(
+                    fitz.Rect(52, 42, 543, 78), title, fontsize=16, fontname="helv", color=(0.08, 0.12, 0.24)
+                )
             top = 92 if offset == 0 else 52
             page.insert_textbox(
                 fitz.Rect(52, top, 543, 790),
-                "\n".join(lines[offset:offset + lines_per_page]),
+                "\n".join(lines[offset : offset + lines_per_page]),
                 fontsize=10,
                 fontname="helv",
                 lineheight=1.35,
@@ -213,12 +218,22 @@ async def download_documents_archive(
         raise HTTPException(status_code=422, detail="Select at least two different files")
     document_ids = [identifier for kind, identifier in references if kind == "document"]
     artifact_ids = [identifier for kind, identifier in references if kind == "artifact"]
-    documents = list(await session.scalars(
-        select(Document).where(Document.id.in_(document_ids), Document.owner_id == user.id)
-    )) if document_ids else []
-    artifacts = list(await session.scalars(
-        select(GeneratedArtifact).where(GeneratedArtifact.id.in_(artifact_ids), GeneratedArtifact.owner_id == user.id)
-    )) if artifact_ids else []
+    documents = (
+        list(await session.scalars(select(Document).where(Document.id.in_(document_ids), Document.owner_id == user.id)))
+        if document_ids
+        else []
+    )
+    artifacts = (
+        list(
+            await session.scalars(
+                select(GeneratedArtifact).where(
+                    GeneratedArtifact.id.in_(artifact_ids), GeneratedArtifact.owner_id == user.id
+                )
+            )
+        )
+        if artifact_ids
+        else []
+    )
     document_map = {item.id: item for item in documents}
     artifact_map = {item.id: item for item in artifacts}
     if len(document_map) != len(document_ids) or len(artifact_map) != len(artifact_ids):
@@ -229,7 +244,9 @@ async def download_documents_archive(
         else (artifact_map[identifier].filename, artifact_map[identifier].object_key)
         for kind, identifier in references
     ]
-    total_size = sum(document_map[item].size_bytes for item in document_ids) + sum(artifact_map[item].size_bytes for item in artifact_ids)
+    total_size = sum(document_map[item].size_bytes for item in document_ids) + sum(
+        artifact_map[item].size_bytes for item in artifact_ids
+    )
     if total_size > 500 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Selected documents exceed the 500 MB archive limit")
 
@@ -263,14 +280,18 @@ async def owned_document(document_id: uuid.UUID, user: User, session: AsyncSessi
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> Document:
+async def get_document(
+    document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
+) -> Document:
     return await owned_document(document_id, user, session)
 
 
 @router.patch("/{document_id}", response_model=DocumentResponse)
 async def rename_document(
-    document_id: uuid.UUID, payload: DocumentRenameRequest,
-    user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
+    document_id: uuid.UUID,
+    payload: DocumentRenameRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> Document:
     document = await owned_document(document_id, user, session)
     filename = safe_filename(payload.filename)
@@ -284,7 +305,9 @@ async def rename_document(
 
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(
-    document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> Response:
     document = await owned_document(document_id, user, session)
     try:
@@ -370,7 +393,7 @@ async def document_thumbnail(
     try:
         if not pdf.page_count:
             raise HTTPException(status_code=422, detail="The PDF has no pages")
-        image = pdf[0].get_pixmap(matrix=fitz.Matrix(.55, .55), alpha=False).tobytes("png")
+        image = pdf[0].get_pixmap(matrix=fitz.Matrix(0.55, 0.55), alpha=False).tobytes("png")
     finally:
         pdf.close()
     return Response(
@@ -408,13 +431,25 @@ async def upload_document(
     original_filename = safe_filename(file.filename or "document.pdf")
     suffix = original_filename.lower().rsplit(".", 1)[-1] if "." in original_filename else ""
     generic_upload_types = {None, "", "application/octet-stream", "application/zip"}
-    is_pdf = suffix == "pdf" and (file.content_type in {"application/pdf", "application/x-pdf", *generic_upload_types} or not file.content_type)
-    is_image = suffix in {"png", "jpg", "jpeg", "webp"} and (file.content_type in {*IMAGE_CONTENT_TYPES, *generic_upload_types} or not file.content_type)
-    is_docx = suffix == "docx" and (file.content_type in {DOCX_CONTENT_TYPE, *generic_upload_types} or not file.content_type)
-    is_pptx = suffix == "pptx" and (file.content_type in {PPTX_CONTENT_TYPE, *generic_upload_types} or not file.content_type)
-    is_text = suffix in {"txt", "md", "markdown", "rtf"} and (file.content_type in {*TEXT_CONTENT_TYPES, *generic_upload_types} or not file.content_type)
+    is_pdf = suffix == "pdf" and (
+        file.content_type in {"application/pdf", "application/x-pdf", *generic_upload_types} or not file.content_type
+    )
+    is_image = suffix in {"png", "jpg", "jpeg", "webp"} and (
+        file.content_type in {*IMAGE_CONTENT_TYPES, *generic_upload_types} or not file.content_type
+    )
+    is_docx = suffix == "docx" and (
+        file.content_type in {DOCX_CONTENT_TYPE, *generic_upload_types} or not file.content_type
+    )
+    is_pptx = suffix == "pptx" and (
+        file.content_type in {PPTX_CONTENT_TYPE, *generic_upload_types} or not file.content_type
+    )
+    is_text = suffix in {"txt", "md", "markdown", "rtf"} and (
+        file.content_type in {*TEXT_CONTENT_TYPES, *generic_upload_types} or not file.content_type
+    )
     if not is_pdf and not is_image and not is_docx and not is_pptx and not is_text:
-        raise HTTPException(status_code=415, detail="Supported sources are PDF, DOCX, PPTX, Markdown, text, RTF, PNG, JPEG, and WebP")
+        raise HTTPException(
+            status_code=415, detail="Supported sources are PDF, DOCX, PPTX, Markdown, text, RTF, PNG, JPEG, and WebP"
+        )
     data = await file.read(settings.max_file_size_mb * 1024 * 1024 + 1)
     if len(data) > settings.max_file_size_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_file_size_mb} MB")
@@ -435,11 +470,16 @@ async def upload_document(
         workspace = await ensure_personal_workspace(user, session)
 
     source_sha256 = hashlib.sha256(data).hexdigest()
-    duplicate = await session.scalar(select(Document).where(
-        Document.owner_id == user.id, Document.workspace_id == workspace.id, Document.source_sha256 == source_sha256
-    ))
+    duplicate = await session.scalar(
+        select(Document).where(
+            Document.owner_id == user.id, Document.workspace_id == workspace.id, Document.source_sha256 == source_sha256
+        )
+    )
     if duplicate is not None:
-        raise HTTPException(status_code=409, detail={"message": "This source is already in your workspace", "document_id": str(duplicate.id)})
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "This source is already in your workspace", "document_id": str(duplicate.id)},
+        )
     display_title = None
     filename = original_filename
     original_data = data
@@ -491,7 +531,9 @@ async def upload_document(
         source_sha256=source_sha256,
     )
     session.add(document)
-    await activity(session, workspace.id, user.id, "source.uploaded", "document", document.id, {"title": display_title or filename})
+    await activity(
+        session, workspace.id, user.id, "source.uploaded", "document", document.id, {"title": display_title or filename}
+    )
     job = ProcessingJob(
         document_id=document_id,
         owner_id=user.id,
@@ -519,7 +561,9 @@ async def upload_document(
 
 @router.post("/{document_id}/retry", response_model=ProcessingJobResponse)
 async def retry_document(
-    document_id: uuid.UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ProcessingJob:
     document = await owned_document(document_id, user, session)
     if document.status != DocumentStatus.FAILED:
@@ -535,11 +579,21 @@ async def retry_document(
     document.error_message = None
     session.add(job)
     from app.deliverables import activity, ensure_personal_workspace
+
     workspace = await ensure_personal_workspace(user, session)
-    await activity(session, workspace.id, user.id, "source.processing_retried", "document", document.id, {"title": document.display_title or document.filename})
+    await activity(
+        session,
+        workspace.id,
+        user.id,
+        "source.processing_retried",
+        "document",
+        document.id,
+        {"title": document.display_title or document.filename},
+    )
     await session.commit()
     await session.refresh(job)
     from app.tasks import process_document
+
     try:
         task = process_document.delay(str(document.id))
         job.task_id = task.id

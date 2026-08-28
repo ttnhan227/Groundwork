@@ -29,4 +29,3 @@ class TranslationRequest(BaseModel):
 class ComparisonRequest(BaseModel):
     left_document_id: uuid.UUID
     right_document_id: uuid.UUID
-

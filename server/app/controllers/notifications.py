@@ -61,10 +61,12 @@ async def unread_count(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> NotificationCountResponse:
-    count = await session.scalar(select(func.count(Notification.id)).where(
-        Notification.user_id == user.id,
-        Notification.read_at.is_(None),
-    ))
+    count = await session.scalar(
+        select(func.count(Notification.id)).where(
+            Notification.user_id == user.id,
+            Notification.read_at.is_(None),
+        )
+    )
     return NotificationCountResponse(unread=count or 0)
 
 
@@ -74,10 +76,12 @@ async def mark_notification_read(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Notification:
-    item = await session.scalar(select(Notification).where(
-        Notification.id == notification_id,
-        Notification.user_id == user.id,
-    ))
+    item = await session.scalar(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == user.id,
+        )
+    )
     if item is None:
         raise HTTPException(status_code=404, detail="Notification not found")
     if item.read_at is None:
@@ -92,10 +96,14 @@ async def mark_all_read(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    await session.execute(update(Notification).where(
-        Notification.user_id == user.id,
-        Notification.read_at.is_(None),
-    ).values(read_at=datetime.now(UTC)))
+    await session.execute(
+        update(Notification)
+        .where(
+            Notification.user_id == user.id,
+            Notification.read_at.is_(None),
+        )
+        .values(read_at=datetime.now(UTC))
+    )
     await session.commit()
     return Response(status_code=204)
 
@@ -106,10 +114,12 @@ async def remove_notification(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    result = await session.execute(delete(Notification).where(
-        Notification.id == notification_id,
-        Notification.user_id == user.id,
-    ))
+    result = await session.execute(
+        delete(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == user.id,
+        )
+    )
     if not result.rowcount:
         raise HTTPException(status_code=404, detail="Notification not found")
     await session.commit()

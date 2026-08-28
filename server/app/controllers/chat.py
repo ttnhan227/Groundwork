@@ -81,7 +81,9 @@ def serialize(conversation: Conversation) -> ConversationResponse:
             MessageResponse(
                 id=message.id,
                 role=message.role,
-                content=clean_user_answer(message.content) if message.role == MessageRole.ASSISTANT else message.content,
+                content=clean_user_answer(message.content)
+                if message.role == MessageRole.ASSISTANT
+                else message.content,
                 created_at=message.created_at,
                 citations=[
                     CitationResponse(
@@ -155,29 +157,36 @@ async def create_conversation(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
-    documents = list(await session.scalars(
-        select(Document).where(
-            Document.id.in_(payload.document_ids),
-            Document.owner_id == user.id,
-            Document.status == DocumentStatus.READY,
+    documents = list(
+        await session.scalars(
+            select(Document).where(
+                Document.id.in_(payload.document_ids),
+                Document.owner_id == user.id,
+                Document.status == DocumentStatus.READY,
+            )
         )
-    ))
+    )
     if len(documents) != len(set(payload.document_ids)):
         raise HTTPException(status_code=422, detail="Every selected document must be owned by you and ready")
     from app.deliverables import ensure_personal_workspace
+
     workspace = await ensure_personal_workspace(user, session)
-    conversation = Conversation(owner_id=user.id, workspace_id=workspace.id, title=payload.title.strip(), documents=documents)
+    conversation = Conversation(
+        owner_id=user.id, workspace_id=workspace.id, title=payload.title.strip(), documents=documents
+    )
     session.add(conversation)
     await session.flush()
-    session.add_all([
-        ConversationResource(
-            conversation_id=conversation.id,
-            resource_type="document",
-            resource_id=document.id,
-            role="context",
-        )
-        for document in documents
-    ])
+    session.add_all(
+        [
+            ConversationResource(
+                conversation_id=conversation.id,
+                resource_type="document",
+                resource_id=document.id,
+                role="context",
+            )
+            for document in documents
+        ]
+    )
     await session.commit()
     return serialize(await owned_conversation(conversation.id, user, session))
 
@@ -193,13 +202,15 @@ async def update_conversation(
     if payload.title is not None:
         conversation.title = payload.title.strip()
     if payload.document_ids is not None:
-        documents = list(await session.scalars(
-            select(Document).where(
-                Document.id.in_(payload.document_ids),
-                Document.owner_id == user.id,
-                Document.status == DocumentStatus.READY,
+        documents = list(
+            await session.scalars(
+                select(Document).where(
+                    Document.id.in_(payload.document_ids),
+                    Document.owner_id == user.id,
+                    Document.status == DocumentStatus.READY,
+                )
             )
-        ))
+        )
         if len(documents) != len(set(payload.document_ids)):
             raise HTTPException(status_code=422, detail="Every selected document must be owned by you and ready")
         conversation.documents = documents
@@ -209,15 +220,17 @@ async def update_conversation(
                 ConversationResource.resource_type == "document",
             )
         )
-        session.add_all([
-            ConversationResource(
-                conversation_id=conversation.id,
-                resource_type="document",
-                resource_id=document.id,
-                role="context",
-            )
-            for document in documents
-        ])
+        session.add_all(
+            [
+                ConversationResource(
+                    conversation_id=conversation.id,
+                    resource_type="document",
+                    resource_id=document.id,
+                    role="context",
+                )
+                for document in documents
+            ]
+        )
     await session.commit()
     return serialize(await owned_conversation(conversation_id, user, session))
 
@@ -246,10 +259,12 @@ async def ask_question(
     history = [(message.role.value, message.content) for message in conversation.messages]
     if is_casual_message(payload.question):
         answer = "Hello! Ask me anything about this PDF, and I’ll answer using its indexed content."
-        session.add_all([
-            Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question),
-            Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer),
-        ])
+        session.add_all(
+            [
+                Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question),
+                Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer),
+            ]
+        )
         await session.commit()
         return ChatResponse(answer=answer, citations=[])
 
@@ -259,16 +274,18 @@ async def ask_question(
     if not visual_mode:
         retrieval_query = build_retrieval_query(payload.question, history)
         query_vector = (await embed_texts_async([retrieval_query]))[0]
-        chunks = list(await session.scalars(
-            select(DocumentChunk)
-            .join(Document, Document.id == DocumentChunk.document_id)
-            .where(
-                DocumentChunk.document_id.in_(document_ids),
-                Document.owner_id == user.id,
+        chunks = list(
+            await session.scalars(
+                select(DocumentChunk)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    DocumentChunk.document_id.in_(document_ids),
+                    Document.owner_id == user.id,
+                )
+                .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
+                .limit(settings.rag_top_k)
             )
-            .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
-            .limit(settings.rag_top_k)
-        ))
+        )
         visual_mode = not chunks
     await record_ai_usage(user, "chat", session)
     try:
@@ -324,7 +341,8 @@ async def ask_question(
     ]
     return ChatResponse(
         answer=answer,
-        citations=visual_citations or [
+        citations=visual_citations
+        or [
             CitationResponse(
                 document_id=chunk.document_id,
                 document_name=names[chunk.document_id],
@@ -366,21 +384,20 @@ async def stream_question(
         if not visual_mode:
             retrieval_query = build_retrieval_query(payload.question, history)
             query_vector = (await embed_texts_async([retrieval_query]))[0]
-            chunks = list(await session.scalars(
-                select(DocumentChunk)
-                .join(Document, Document.id == DocumentChunk.document_id)
-                .where(
-                    DocumentChunk.document_id.in_(document_ids),
-                    Document.owner_id == user.id,
+            chunks = list(
+                await session.scalars(
+                    select(DocumentChunk)
+                    .join(Document, Document.id == DocumentChunk.document_id)
+                    .where(
+                        DocumentChunk.document_id.in_(document_ids),
+                        Document.owner_id == user.id,
+                    )
+                    .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
+                    .limit(settings.rag_top_k)
                 )
-                .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
-                .limit(settings.rag_top_k)
-            ))
+            )
             visual_mode = not chunks
-        visual_sources = (
-            _visual_sources(conversation.documents, settings.vision_max_pages)
-            if visual_mode else []
-        )
+        visual_sources = _visual_sources(conversation.documents, settings.vision_max_pages) if visual_mode else []
         if visual_mode and not visual_sources:
             raise HTTPException(status_code=409, detail="The selected documents contain no readable pages")
         await record_ai_usage(user, "chat", session)
@@ -399,10 +416,7 @@ async def stream_question(
                     if general_mode
                     else stream_visual_answer(
                         payload.question,
-                        [
-                            (document.filename, page, data_url)
-                            for document, page, data_url in visual_sources
-                        ],
+                        [(document.filename, page, data_url) for document, page, data_url in visual_sources],
                         history,
                     )
                     if visual_mode
@@ -413,24 +427,16 @@ async def stream_question(
                     yield _sse("token", {"text": token_part})
 
             raw_answer = "".join(raw_parts).strip()
-            cited_chunks = cited_sources(
-                raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number)
-            )
-            cited_visuals = cited_sources(
-                raw_answer, visual_sources, lambda item: (item[0].id, item[1])
-            )
+            cited_chunks = cited_sources(raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number))
+            cited_visuals = cited_sources(raw_answer, visual_sources, lambda item: (item[0].id, item[1]))
             if not general_mode and not cited_chunks and not cited_visuals and not answer_declines_context(raw_answer):
                 if visual_mode:
                     cited_visuals = visual_sources[:1]
                 else:
                     cited_chunks = chunks[:1]
             answer = clean_user_answer(raw_answer)
-            user_message = Message(
-                conversation_id=conversation.id, role=MessageRole.USER, content=payload.question
-            )
-            assistant_message = Message(
-                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer
-            )
+            user_message = Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question)
+            assistant_message = Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer)
             session.add_all([user_message, assistant_message])
             await session.flush()
             names = {document.id: document.filename for document in conversation.documents}
@@ -463,12 +469,13 @@ async def stream_question(
                 )
                 for chunk in cited_chunks
             ]
-            yield _sse("complete", {
-                "answer": answer,
-                "citations": [
-                    citation.model_dump(mode="json") for citation in response_citations
-                ],
-            })
+            yield _sse(
+                "complete",
+                {
+                    "answer": answer,
+                    "citations": [citation.model_dump(mode="json") for citation in response_citations],
+                },
+            )
         except Exception as exc:
             await session.rollback()
             yield _sse("error", {"message": str(exc) or f"Error: {type(exc).__name__}"})

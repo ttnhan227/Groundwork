@@ -66,7 +66,9 @@ async def issue_tokens(user: User, session: AsyncSession) -> TokenResponse:
         )
     )
     await session.commit()
-    return TokenResponse(access_token=create_access_token(user.id), refresh_token=raw_refresh, user=UserResponse.model_validate(user))
+    return TokenResponse(
+        access_token=create_access_token(user.id), refresh_token=raw_refresh, user=UserResponse.model_validate(user)
+    )
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -76,7 +78,11 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
     existing = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
-    user = User(email=payload.email.lower(), display_name=payload.display_name.strip(), password_hash=hash_password(payload.password))
+    user = User(
+        email=payload.email.lower(),
+        display_name=payload.display_name.strip(),
+        password_hash=hash_password(payload.password),
+    )
     session.add(user)
     await session.flush()
     return await issue_tokens(user, session)
@@ -133,7 +139,9 @@ async def google_login(payload: GoogleLoginRequest, session: AsyncSession = Depe
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
-    token = await session.scalar(select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token)))
+    token = await session.scalar(
+        select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token))
+    )
     if token is None or token.revoked_at is not None or token.expires_at < datetime.now(UTC):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     token.revoked_at = datetime.now(UTC)
@@ -147,7 +155,9 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_s
 
 @router.post("/logout", status_code=204)
 async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_session)) -> None:
-    token = await session.scalar(select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token)))
+    token = await session.scalar(
+        select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token))
+    )
     if token:
         token.revoked_at = datetime.now(UTC)
         await session.commit()

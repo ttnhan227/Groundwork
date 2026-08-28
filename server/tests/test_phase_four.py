@@ -27,39 +27,71 @@ def test_cache_key_is_stable_for_document_order_and_parameters() -> None:
 def test_phase_four_structured_payloads_validate_page_references() -> None:
     reference = {"document_id": str(uuid.uuid4()), "document_name": "Guide.pdf", "page_number": 2}
     assert SummaryPayload.model_validate({"title": "Guide", "content": "Summary", "page_references": [reference]})
-    assert QuizPayload.model_validate({
-        "title": "Quiz",
-        "questions": [{
-            "question": "What is required?", "options": ["A", "B"], "correct_answer": "A",
-            "explanation": "The guide says so.", "page_references": [reference],
-        }],
-    })
-    assert ExtractionPayload.model_validate({
-        "items": [{"field": "deadline", "value": "Friday", "context": "Due Friday", "page_references": [reference]}],
-    })
-    assert TranslationPayload.model_validate({
-        "title": "Translation", "target_language": "Vietnamese", "content": "Nội dung", "translated_pages": [2],
-    })
-    assert ComparisonPayload.model_validate({
-        "summary": "One change",
-        "changed_sections": [{"description": "Deadline changed", "left_pages": [1], "right_pages": [2]}],
-        "similarity_percent": 82.5,
-    })
-    report = ReportPayload.model_validate({
-        "title": "Annual report analysis", "document_type": "Financial report",
-        "purpose": "Report annual performance", "executive_summary": "Revenue increased.",
-        "metrics": [{"label": "Revenue", "value": "$48.2M", "change": "18.4%", "trend": "up",
-                     "context": "FY25 revenue", "page_references": [reference]}],
-        "findings": [], "risks": [], "entities": [], "timeline": [],
-        "missing_information": [], "next_actions": [],
-    })
+    assert QuizPayload.model_validate(
+        {
+            "title": "Quiz",
+            "questions": [
+                {
+                    "question": "What is required?",
+                    "options": ["A", "B"],
+                    "correct_answer": "A",
+                    "explanation": "The guide says so.",
+                    "page_references": [reference],
+                }
+            ],
+        }
+    )
+    assert ExtractionPayload.model_validate(
+        {
+            "items": [
+                {"field": "deadline", "value": "Friday", "context": "Due Friday", "page_references": [reference]}
+            ],
+        }
+    )
+    assert TranslationPayload.model_validate(
+        {
+            "title": "Translation",
+            "target_language": "Vietnamese",
+            "content": "Nội dung",
+            "translated_pages": [2],
+        }
+    )
+    assert ComparisonPayload.model_validate(
+        {
+            "summary": "One change",
+            "changed_sections": [{"description": "Deadline changed", "left_pages": [1], "right_pages": [2]}],
+            "similarity_percent": 82.5,
+        }
+    )
+    report = ReportPayload.model_validate(
+        {
+            "title": "Annual report analysis",
+            "document_type": "Financial report",
+            "purpose": "Report annual performance",
+            "executive_summary": "Revenue increased.",
+            "metrics": [
+                {
+                    "label": "Revenue",
+                    "value": "$48.2M",
+                    "change": "18.4%",
+                    "trend": "up",
+                    "context": "FY25 revenue",
+                    "page_references": [reference],
+                }
+            ],
+            "findings": [],
+            "risks": [],
+            "entities": [],
+            "timeline": [],
+            "missing_information": [],
+            "next_actions": [],
+        }
+    )
     assert report.metrics[0].value == "$48.2M"
 
 
 def test_comparison_never_calls_unreadable_image_document_identical() -> None:
-    similarity, warnings, prefix, insufficient = _comparison_evidence(
-        "A readable contract", "", [], [1]
-    )
+    similarity, warnings, prefix, insufficient = _comparison_evidence("A readable contract", "", [], [1])
     assert similarity == 0
     assert insufficient
     assert "complete comparison is not possible" in prefix.lower()

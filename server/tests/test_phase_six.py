@@ -12,8 +12,12 @@ from app.usage import record_ai_usage
 
 def test_dashboard_schema_exposes_portfolio_metrics() -> None:
     stats = UserStatsResponse(
-        document_count=3, page_count=17, storage_bytes=4096,
-        ai_requests=8, generated_files=4, failed_jobs=0,
+        document_count=3,
+        page_count=17,
+        storage_bytes=4096,
+        ai_requests=8,
+        generated_files=4,
+        failed_jobs=0,
     )
     dashboard = DashboardResponse(**stats.model_dump(), recent_documents=[], recent_jobs=[])
     assert dashboard.page_count == 17
@@ -23,8 +27,12 @@ def test_dashboard_schema_exposes_portfolio_metrics() -> None:
 @pytest.mark.asyncio
 async def test_non_admin_is_rejected() -> None:
     user = User(
-        id=uuid.uuid4(), email="user@example.com", display_name="User",
-        password_hash="hash", role=UserRole.USER, is_active=True,
+        id=uuid.uuid4(),
+        email="user@example.com",
+        display_name="User",
+        password_hash="hash",
+        role=UserRole.USER,
+        is_active=True,
     )
     with pytest.raises(HTTPException) as error:
         await admin_user(user)

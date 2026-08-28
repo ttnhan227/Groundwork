@@ -79,7 +79,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if count > limit:
                 return JSONResponse(
                     status_code=429,
-                    content={"error": {"code": "RATE_LIMITED", "message": "Too many requests. Try again shortly.", "details": {}}},
+                    content={
+                        "error": {
+                            "code": "RATE_LIMITED",
+                            "message": "Too many requests. Try again shortly.",
+                            "details": {},
+                        }
+                    },
                     headers={"Retry-After": retry_after},
                 )
         except Exception:

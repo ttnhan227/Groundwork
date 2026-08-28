@@ -15,9 +15,7 @@ class ArtifactRepository(BaseRepository[GeneratedArtifact]):
     """Data access operations for Generated Artifacts and Versions."""
 
     async def get_by_id(self, artifact_id: uuid.UUID) -> GeneratedArtifact | None:
-        return await self.session.scalar(
-            select(GeneratedArtifact).where(GeneratedArtifact.id == artifact_id)
-        )
+        return await self.session.scalar(select(GeneratedArtifact).where(GeneratedArtifact.id == artifact_id))
 
     async def list_for_user(self, user: User) -> Sequence[GeneratedArtifact]:
         result = await self.session.scalars(
