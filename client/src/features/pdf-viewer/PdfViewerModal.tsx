@@ -60,7 +60,11 @@ function PdfThumbnail({
       if (!context) return;
       canvas.current.width = viewport.width;
       canvas.current.height = viewport.height;
-      task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
+      task = pdfPage.render({
+        canvas: canvas.current,
+        canvasContext: context,
+        viewport,
+      });
       await task.promise;
     })().catch(() => undefined);
     return () => {
@@ -80,8 +84,13 @@ function PdfThumbnail({
           : "border-[var(--hairline)] bg-[var(--paper-subtle)] hover:bg-[var(--surface-hover)]"
       }`}
     >
-      <canvas ref={canvas} className="w-full bg-white shadow-xs rounded-[2px]" />
-      <span className="text-[11px] font-mono text-[var(--ink-muted)]">Page {pageNumber}</span>
+      <canvas
+        ref={canvas}
+        className="w-full bg-white shadow-xs rounded-[2px]"
+      />
+      <span className="text-[11px] font-mono text-[var(--ink-muted)]">
+        Page {pageNumber}
+      </span>
     </button>
   );
 }
@@ -110,16 +119,30 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
   const [highlightBoxes, setHighlightBoxes] = useState<
     { left: number; top: number; width: number; height: number }[]
   >([]);
-  const [citationStatus, setCitationStatus] = useState<"idle" | "matched" | "not-found">("idle");
+  const [citationStatus, setCitationStatus] = useState<
+    "idle" | "matched" | "not-found"
+  >("idle");
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [error, setError] = useState("");
-  const [searchResults, setSearchResults] = useState<{ page: number; snippet: string }[]>([]);
+  const [searchResults, setSearchResults] = useState<
+    { page: number; snippet: string }[]
+  >([]);
   const [searching, setSearching] = useState(false);
   const [sideMode, setSideMode] = useState<"pages" | "search">("pages");
-  const [loadStage, setLoadStage] = useState<"downloading" | "opening" | "rendering" | "ready">(
-    "downloading",
-  );
+  const [loadStage, setLoadStage] = useState<
+    "downloading" | "opening" | "rendering" | "ready"
+  >("downloading");
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,7 +168,8 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
             if (done) break;
             chunks.push(value);
             received += value.length;
-            if (!cancelled) setDownloadPercent(Math.round((received / total) * 100));
+            if (!cancelled)
+              setDownloadPercent(Math.round((received / total) * 100));
           }
           data = new Uint8Array(received);
           let offset = 0;
@@ -156,7 +180,9 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         } else {
           data = new Uint8Array(await response.arrayBuffer());
         }
-        objectUrl = URL.createObjectURL(new Blob([data.slice().buffer], { type: "application/pdf" }));
+        objectUrl = URL.createObjectURL(
+          new Blob([data.slice().buffer], { type: "application/pdf" }),
+        );
         if (!cancelled) setPdfSource(objectUrl);
         if (!cancelled) setLoadStage("opening");
         const loaded = await pdfjs.getDocument({ data }).promise;
@@ -164,7 +190,9 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         if (!cancelled) setLoadStage("rendering");
         setPage(initialPage);
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "Could not load this PDF");
+        setError(
+          reason instanceof Error ? reason.message : "Could not load this PDF",
+        );
       }
     })();
     return () => {
@@ -183,12 +211,22 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
       if (!context) return;
       canvas.current.width = viewport.width;
       canvas.current.height = viewport.height;
-      task = pdfPage.render({ canvas: canvas.current, canvasContext: context, viewport });
+      task = pdfPage.render({
+        canvas: canvas.current,
+        canvasContext: context,
+        viewport,
+      });
       await task.promise;
       const content = await pdfPage.getTextContent();
       const items = content.items.filter(
-        (item): item is typeof item & { str: string; transform: number[]; width: number; height: number } =>
-          "str" in item && Boolean(item.str),
+        (
+          item,
+        ): item is typeof item & {
+          str: string;
+          transform: number[];
+          width: number;
+          height: number;
+        } => "str" in item && Boolean(item.str),
       );
       const joined = items.map((item) => item.str).join(" ");
       const normalized = joined.replace(/\s+/g, " ").toLowerCase();
@@ -200,7 +238,11 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
       let matchLength = requested.length;
       if (matchStart < 0 && requested) {
         const words = requested.split(" ").filter((word) => word.length > 2);
-        for (let width = Math.min(10, words.length); width >= 3 && matchStart < 0; width -= 1) {
+        for (
+          let width = Math.min(10, words.length);
+          width >= 3 && matchStart < 0;
+          width -= 1
+        ) {
           for (let start = 0; start + width <= words.length; start += 1) {
             const candidate = words.slice(start, start + width).join(" ");
             const found = normalized.indexOf(candidate);
@@ -212,14 +254,20 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
           }
         }
       }
-      const boxes: { left: number; top: number; width: number; height: number }[] = [];
+      const boxes: {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+      }[] = [];
       if (matchStart >= 0) {
         let cursor = 0;
         for (const item of items) {
           const itemStart = cursor;
           const itemEnd = cursor + item.str.length;
           cursor = itemEnd + 1;
-          if (itemEnd < matchStart || itemStart > matchStart + matchLength) continue;
+          if (itemEnd < matchStart || itemStart > matchStart + matchLength)
+            continue;
           const transform = viewport.transform;
           const source = item.transform;
           const tx = [
@@ -241,15 +289,20 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
       }
       setPageSize({ width: viewport.width, height: viewport.height });
       setHighlightBoxes(boxes);
-      setCitationStatus(activeSearch ? (boxes.length ? "matched" : "not-found") : "idle");
+      setCitationStatus(
+        activeSearch ? (boxes.length ? "matched" : "not-found") : "idle",
+      );
       setLoadStage("ready");
     })();
     return () => task?.cancel();
   }, [activeSearch, page, scale, pdf]);
 
-  useEffect(() => () => {
-    pdf?.destroy();
-  }, [pdf]);
+  useEffect(
+    () => () => {
+      pdf?.destroy();
+    },
+    [pdf],
+  );
 
   async function searchPdf(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -293,17 +346,23 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(22,21,20,0.6)] backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-label={`Preview ${document.filename}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="relative w-full max-w-5xl h-[88vh] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col overflow-hidden">
         {/* Toolbar */}
         <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-4 flex items-center justify-between text-xs">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex items-center gap-2 truncate">
-              <FileText size={15} className="text-[var(--ink-blue)] flex-shrink-0" />
+              <FileText
+                size={15}
+                className="text-[var(--ink-blue)] flex-shrink-0"
+              />
               <strong className="font-semibold text-[var(--ink)] truncate max-w-xs font-sans">
                 {document.filename}
               </strong>
@@ -356,7 +415,10 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
                 placeholder="Search text…"
                 className="h-7 px-2 pl-6 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-faint)] outline-none focus:border-[var(--ink-blue)]"
               />
-              <Search size={12} className="absolute left-2 text-[var(--ink-muted)] pointer-events-none" />
+              <Search
+                size={12}
+                className="absolute left-2 text-[var(--ink-muted)] pointer-events-none"
+              />
             </form>
 
             {citationStatus === "matched" && (
@@ -369,7 +431,9 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => window.open(pdfSource, "_blank", "noopener,noreferrer")}
+                onClick={() =>
+                  window.open(pdfSource, "_blank", "noopener,noreferrer")
+                }
                 title="Open in new tab"
               >
                 <ExternalLink size={14} />
@@ -410,10 +474,16 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
             ) : (
               <div
                 className="relative bg-white shadow-[var(--shadow-modal)] rounded-[2px]"
-                style={{ width: pageSize.width || undefined, height: pageSize.height || undefined }}
+                style={{
+                  width: pageSize.width || undefined,
+                  height: pageSize.height || undefined,
+                }}
               >
                 <canvas ref={canvas} className="block" />
-                <div className="pdf-highlight-layer absolute inset-0 pointer-events-none" aria-hidden="true">
+                <div
+                  className="pdf-highlight-layer absolute inset-0 pointer-events-none"
+                  aria-hidden="true"
+                >
                   {highlightBoxes.map((box, idx) => (
                     <mark
                       key={idx}

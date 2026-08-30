@@ -19,7 +19,12 @@ import {
   PanelLeft,
   PanelLeftClose,
 } from "lucide-react";
-import type { Workspace, DocumentItem, NativeDocument, AuthResult } from "../../types";
+import type {
+  Workspace,
+  DocumentItem,
+  NativeDocument,
+  AuthResult,
+} from "../../types";
 import { BrandMark } from "../../components/common/BrandMark";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -36,7 +41,10 @@ export interface WorkspaceLibraryProps {
   isLoading?: boolean;
   onToggleSidebar?: () => void;
   onSelectWorkspace: (workspaceId: string) => void;
-  onCreateWorkspace: (name: string, template?: string) => Promise<string | null>;
+  onCreateWorkspace: (
+    name: string,
+    template?: string,
+  ) => Promise<string | null>;
   onDeleteWorkspace: (workspaceId: string) => Promise<void>;
   onRenameWorkspace: (workspaceId: string, newName: string) => Promise<void>;
   onUploadToNewWorkspace: (file: File) => Promise<void>;
@@ -71,7 +79,9 @@ export function WorkspaceLibrary({
   const [selectedTemplate, setSelectedTemplate] = useState("proposal");
   const [isCreating, setIsCreating] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
-  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(
+    null,
+  );
   const [renameValue, setRenameValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
@@ -80,7 +90,8 @@ export function WorkspaceLibrary({
       id: "proposal",
       title: "Technical Proposal",
       icon: ShieldCheck,
-      description: "Grounded technical proposal with continuous SLA and claim verification.",
+      description:
+        "Grounded technical proposal with continuous SLA and claim verification.",
       color: "var(--ink-blue)",
       bg: "var(--ink-blue-subtle)",
     },
@@ -88,7 +99,8 @@ export function WorkspaceLibrary({
       id: "report",
       title: "Client Research Report",
       icon: FileText,
-      description: "Multi-document synthesis report with cited evidence appendix.",
+      description:
+        "Multi-document synthesis report with cited evidence appendix.",
       color: "var(--ink-sepia)",
       bg: "var(--ink-sepia-subtle)",
     },
@@ -96,7 +108,8 @@ export function WorkspaceLibrary({
       id: "presentation",
       title: "Executive Presentation",
       icon: Layers,
-      description: "Concise summary structured for stakeholders and review boards.",
+      description:
+        "Concise summary structured for stakeholders and review boards.",
       color: "var(--ink-blue)",
       bg: "var(--ink-blue-subtle)",
     },
@@ -104,7 +117,8 @@ export function WorkspaceLibrary({
       id: "blank",
       title: "Blank Workspace",
       icon: BookOpen,
-      description: "Empty workspace to draft and ground any custom deliverable.",
+      description:
+        "Empty workspace to draft and ground any custom deliverable.",
       color: "var(--ink)",
       bg: "var(--paper-subtle)",
     },
@@ -112,7 +126,10 @@ export function WorkspaceLibrary({
 
   // Group stats per workspace
   const workspaceStats = useMemo(() => {
-    const map: Record<string, { sourcesCount: number; deliverablesCount: number; hasVerified: boolean }> = {};
+    const map: Record<
+      string,
+      { sourcesCount: number; deliverablesCount: number; hasVerified: boolean }
+    > = {};
     for (const ws of workspaces) {
       const wsDocs = documents.filter((d) => d.workspace_id === ws.id);
       const wsArtifacts = nativeDocs.filter((n) => n.workspace_id === ws.id);
@@ -138,7 +155,10 @@ export function WorkspaceLibrary({
     if (!newWorkspaceName.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      const id = await onCreateWorkspace(newWorkspaceName.trim(), selectedTemplate);
+      const id = await onCreateWorkspace(
+        newWorkspaceName.trim(),
+        selectedTemplate,
+      );
       setIsCreateModalOpen(false);
       setNewWorkspaceName("");
       if (id) selectWs(id);
@@ -174,7 +194,10 @@ export function WorkspaceLibrary({
         setIsDragging(true);
       }}
       onDragLeave={(e) => {
-        if (!e.relatedTarget || (e.relatedTarget as HTMLElement).nodeName === "HTML") {
+        if (
+          !e.relatedTarget ||
+          (e.relatedTarget as HTMLElement).nodeName === "HTML"
+        ) {
           setIsDragging(false);
         }
       }}
@@ -187,24 +210,30 @@ export function WorkspaceLibrary({
       {isDragging && !isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-[rgba(43,58,85,0.08)] backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none text-[var(--ink-blue)]">
           <Upload size={36} />
-          <strong className="text-sm font-serif font-bold mt-2">Drop file here to start new workspace</strong>
-          <span className="text-xs text-[var(--ink-muted)]">We'll automatically initialize and index your document</span>
+          <strong className="text-sm font-serif font-bold mt-2">
+            Drop file here to start new workspace
+          </strong>
+          <span className="text-xs text-[var(--ink-muted)]">
+            We'll automatically initialize and index your document
+          </span>
         </div>
       )}
 
       {/* Top Navbar */}
       <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-3 sm:px-6 flex items-center justify-between min-w-0 w-full z-20">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onToggleSidebar}
-            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
-            title={isSidebarOpen ? "Collapse sidebar" : "Open sidebar"}
-            aria-label={isSidebarOpen ? "Collapse sidebar" : "Open sidebar"}
-          >
-            {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
-          </Button>
+          {!isSidebarOpen && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={onToggleSidebar}
+              className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
+              title="Open sidebar"
+              aria-label="Open sidebar"
+            >
+              <PanelLeft size={16} />
+            </Button>
+          )}
 
           <BrandMark size={20} className="flex-shrink-0" />
           <strong className="font-serif text-sm font-bold text-[var(--ink)] truncate">
@@ -339,7 +368,10 @@ export function WorkspaceLibrary({
                   <div className="min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <FileCheck2 size={16} className="text-[var(--ink-blue)] flex-shrink-0" />
+                        <FileCheck2
+                          size={16}
+                          className="text-[var(--ink-blue)] flex-shrink-0"
+                        />
                         {isEditing ? (
                           <div className="flex items-center gap-1 min-w-0 flex-1">
                             <input
@@ -348,7 +380,8 @@ export function WorkspaceLibrary({
                               onChange={(e) => setRenameValue(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") handleSaveRename(ws.id);
-                                if (e.key === "Escape") setEditingWorkspaceId(null);
+                                if (e.key === "Escape")
+                                  setEditingWorkspaceId(null);
                               }}
                               className="w-full px-1.5 py-0.5 text-xs bg-[var(--paper)] border border-[var(--ink-blue)] rounded outline-none text-[var(--ink)] min-w-0"
                             />
@@ -380,7 +413,9 @@ export function WorkspaceLibrary({
                           className="opacity-0 group-hover:opacity-100 text-[var(--ink-muted)] hover:text-[var(--ink)]"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveDropdownId(activeDropdownId === ws.id ? null : ws.id);
+                            setActiveDropdownId(
+                              activeDropdownId === ws.id ? null : ws.id,
+                            );
                           }}
                         >
                           <MoreVertical size={13} />
@@ -423,24 +458,28 @@ export function WorkspaceLibrary({
                     </div>
 
                     {/* Document Preview Thumbnail & Details */}
-                    <div 
+                    <div
                       onClick={() => selectWs(ws.id)}
                       className="cursor-pointer my-2.5 flex items-center gap-3 p-2 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] hover:border-[var(--ink-blue-border)] transition-colors"
                     >
                       <img
                         src={
-                          ws.name.toLowerCase().includes("rfp") || ws.name.toLowerCase().includes("defense")
+                          ws.name.toLowerCase().includes("rfp") ||
+                          ws.name.toLowerCase().includes("defense")
                             ? "/doc-dod-rfp.jpg"
-                            : ws.name.toLowerCase().includes("soc") || ws.name.toLowerCase().includes("security")
-                            ? "/doc-audit-soc2.jpg"
-                            : "/doc-sec-10k.jpg"
+                            : ws.name.toLowerCase().includes("soc") ||
+                                ws.name.toLowerCase().includes("security")
+                              ? "/doc-audit-soc2.jpg"
+                              : "/doc-sec-10k.jpg"
                         }
                         alt="Document Cover"
                         className="w-10 h-13 object-cover rounded shadow-sm border border-[var(--hairline)] shrink-0 bg-white"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--ink-muted)]">
-                          <span>{stats.sourcesCount || 3} evidence sources</span>
+                          <span>
+                            {stats.sourcesCount || 3} evidence sources
+                          </span>
                           <span>·</span>
                           <span>{stats.deliverablesCount || 1} draft</span>
                         </div>
@@ -448,8 +487,8 @@ export function WorkspaceLibrary({
                           {ws.name.toLowerCase().includes("rfp")
                             ? "DoD Logistics Spec & High-Availability SLA"
                             : ws.name.toLowerCase().includes("soc")
-                            ? "Continuous NIST AI RMF & ISO Assessment"
-                            : "SEC Form 10-K Ingestion & Audit Trail"}
+                              ? "Continuous NIST AI RMF & ISO Assessment"
+                              : "SEC Form 10-K Ingestion & Audit Trail"}
                         </p>
                       </div>
                     </div>
@@ -483,7 +522,10 @@ export function WorkspaceLibrary({
 
           {filteredWorkspaces.length === 0 && (
             <div className="py-16 text-center text-xs text-[var(--ink-muted)] space-y-2">
-              <FolderPlus size={32} className="mx-auto text-[var(--ink-faint)]" />
+              <FolderPlus
+                size={32}
+                className="mx-auto text-[var(--ink-faint)]"
+              />
               <p className="font-serif text-sm font-semibold text-[var(--ink)]">
                 No Workspaces Found
               </p>
@@ -521,7 +563,8 @@ export function WorkspaceLibrary({
               Drop RFP, Spec, or Documentation here
             </p>
             <p className="text-[11px] text-[var(--ink-muted)]">
-              We'll automatically initialize and index the workspace from your document.
+              We'll automatically initialize and index the workspace from your
+              document.
             </p>
             <label className="inline-block mt-2">
               <Button variant="secondary" size="xs" type="button">
@@ -543,7 +586,9 @@ export function WorkspaceLibrary({
 
           <div className="flex items-center gap-3">
             <span className="flex-1 h-px bg-[var(--hairline)]" />
-            <span className="text-[10px] font-mono text-[var(--ink-faint)] uppercase">or start empty</span>
+            <span className="text-[10px] font-mono text-[var(--ink-faint)] uppercase">
+              or start empty
+            </span>
             <span className="flex-1 h-px bg-[var(--hairline)]" />
           </div>
 

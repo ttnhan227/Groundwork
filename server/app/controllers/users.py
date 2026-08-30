@@ -74,6 +74,10 @@ async def stats(user_id: uuid.UUID, session: AsyncSession) -> UserStatsResponse:
 async def update_profile(
     payload: ProfileUpdateRequest, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
 ):
+    if not payload:
+        raise HTTPException(status_code=422, detail="At least one field must be provided")
+    if not payload.display_name or not payload.display_name.strip():
+        raise HTTPException(status_code=422, detail="display_name cannot be empty")
     user.display_name = payload.display_name.strip()
     await session.commit()
     await session.refresh(user)
@@ -299,7 +303,16 @@ async def dashboard(user: User = Depends(current_user), session: AsyncSession = 
             .limit(5)
         )
     )
-    return DashboardResponse(**values.model_dump(), recent_documents=documents, recent_jobs=jobs)
+    return DashboardResponse(
+        document_count=values.document_count,
+        page_count=values.page_count,
+        storage_bytes=values.storage_bytes,
+        ai_requests=values.ai_requests,
+        generated_files=values.generated_files,
+        failed_jobs=values.failed_jobs,
+        recent_documents=documents,
+        recent_jobs=jobs
+    )
 
 
 @router.get("/admin/users", response_model=list[AdminUserResponse])

@@ -21,7 +21,10 @@ export const Card: React.FC<CardProps> = ({
   const paddingClass = padded ? "p-4" : "";
 
   return (
-    <div className={`${baseClasses} ${interactiveClasses} ${paddingClass} ${className}`} {...rest}>
+    <div
+      className={`${baseClasses} ${interactiveClasses} ${paddingClass} ${className}`}
+      {...rest}
+    >
       {children}
     </div>
   );

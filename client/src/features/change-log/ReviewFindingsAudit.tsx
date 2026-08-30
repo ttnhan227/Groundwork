@@ -11,7 +11,10 @@ import {
   Lock,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import type { DeliverableReviewFinding, DeliverableRequirement } from "../../types";
+import type {
+  DeliverableReviewFinding,
+  DeliverableRequirement,
+} from "../../types";
 
 export interface ReviewFindingsAuditProps {
   findings: DeliverableReviewFinding[];
@@ -21,7 +24,10 @@ export interface ReviewFindingsAuditProps {
   isRunningAudit: boolean;
   isResolvingFindingId: string | null;
   onRunAudit: () => void;
-  onResolveFinding: (finding: DeliverableReviewFinding, action: "accept" | "reject") => void;
+  onResolveFinding: (
+    finding: DeliverableReviewFinding,
+    action: "accept" | "reject",
+  ) => void;
   onOpenViewer: (docId: string, pageNumber?: number) => void;
   onPromptAgent: (prompt: string) => void;
   onExport: () => void;
@@ -64,13 +70,21 @@ export const ReviewFindingsAudit: React.FC<ReviewFindingsAuditProps> = ({
               <div className="font-serif text-sm font-bold text-[var(--ink)] flex items-center gap-1.5 min-w-0">
                 {isExportBlocked ? (
                   <>
-                    <Lock size={14} className="text-[var(--warning)] flex-shrink-0" />
+                    <Lock
+                      size={14}
+                      className="text-[var(--warning)] flex-shrink-0"
+                    />
                     <span className="truncate">Readiness Gate: Blocked</span>
                   </>
                 ) : (
                   <>
-                    <ShieldCheck size={14} className="text-[var(--success)] flex-shrink-0" />
-                    <span className="truncate">Readiness Gate: Passed (100%)</span>
+                    <ShieldCheck
+                      size={14}
+                      className="text-[var(--success)] flex-shrink-0"
+                    />
+                    <span className="truncate">
+                      Readiness Gate: Passed (100%)
+                    </span>
                   </>
                 )}
               </div>
@@ -91,7 +105,9 @@ export const ReviewFindingsAudit: React.FC<ReviewFindingsAuditProps> = ({
             title="Re-run verification audit"
           >
             <RefreshCw size={12} className={isRunningAudit ? "spin" : ""} />
-            <span className="hidden xs:inline">{isRunningAudit ? "Auditing…" : "Re-scan"}</span>
+            <span className="hidden xs:inline">
+              {isRunningAudit ? "Auditing…" : "Re-scan"}
+            </span>
           </Button>
         </div>
 
@@ -106,7 +122,9 @@ export const ReviewFindingsAudit: React.FC<ReviewFindingsAuditProps> = ({
         </div>
 
         <div className="flex items-center justify-between text-[11px] font-mono text-[var(--ink-muted)] mt-2">
-          <span>Requirements: {coveredRequirements}/{requirements.length}</span>
+          <span>
+            Requirements: {coveredRequirements}/{requirements.length}
+          </span>
           <span>Open findings: {openFindings.length}</span>
         </div>
       </div>
@@ -160,11 +178,19 @@ export const ReviewFindingsAudit: React.FC<ReviewFindingsAuditProps> = ({
                   )}
                   <button
                     type="button"
-                    onClick={() => onOpenViewer(firstCitation.document_id, firstCitation.page_number)}
+                    onClick={() =>
+                      onOpenViewer(
+                        firstCitation.document_id,
+                        firstCitation.page_number,
+                      )
+                    }
                     className="inline-flex items-center gap-1 font-mono text-[10px] text-[var(--ink-blue)] hover:underline cursor-pointer max-w-full truncate"
                   >
                     <ExternalLink size={9} className="flex-shrink-0" />
-                    <span className="truncate">{firstCitation.document_name} (Page {firstCitation.page_number})</span>
+                    <span className="truncate">
+                      {firstCitation.document_name} (Page{" "}
+                      {firstCitation.page_number})
+                    </span>
                   </button>
                 </div>
               )}
@@ -179,7 +205,9 @@ export const ReviewFindingsAudit: React.FC<ReviewFindingsAuditProps> = ({
                   className="flex-1 truncate"
                 >
                   <CheckCheck size={12} className="flex-shrink-0" />
-                  <span className="truncate">{isResolving ? "Applying…" : "Apply Verified SLA Fix"}</span>
+                  <span className="truncate">
+                    {isResolving ? "Applying…" : "Apply Verified SLA Fix"}
+                  </span>
                 </Button>
 
                 <Button
@@ -218,9 +246,15 @@ export const ReviewFindingsAudit: React.FC<ReviewFindingsAuditProps> = ({
               All Claims Verified & Grounded
             </h5>
             <p className="text-xs text-[var(--ink-muted)] break-words">
-              Zero unverified claims remaining. The deliverable is ready for production export.
+              Zero unverified claims remaining. The deliverable is ready for
+              production export.
             </p>
-            <Button variant="human" size="sm" onClick={onExport} className="mt-2">
+            <Button
+              variant="human"
+              size="sm"
+              onClick={onExport}
+              className="mt-2"
+            >
               <Download size={13} />
               <span>Export Deliverable Now</span>
             </Button>

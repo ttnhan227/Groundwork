@@ -4,17 +4,27 @@ import test from "node:test";
 
 async function readSourceTree(directory = new URL("../src/", import.meta.url)) {
   const entries = await readdir(directory, { withFileTypes: true });
-  const contents = await Promise.all(entries.map((entry) => {
-    const target = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directory);
-    return entry.isDirectory()
-      ? readSourceTree(target)
-      : /\.(?:ts|tsx)$/.test(entry.name) ? readFile(target, "utf8") : "";
-  }));
+  const contents = await Promise.all(
+    entries.map((entry) => {
+      const target = new URL(
+        entry.name + (entry.isDirectory() ? "/" : ""),
+        directory,
+      );
+      return entry.isDirectory()
+        ? readSourceTree(target)
+        : /\.(?:ts|tsx)$/.test(entry.name)
+          ? readFile(target, "utf8")
+          : "";
+    }),
+  );
   return contents.join("\n");
 }
 
 test("builds the Groundwork static application shell", async () => {
-  const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+  const html = await readFile(
+    new URL("../dist/index.html", import.meta.url),
+    "utf8",
+  );
   assert.match(html, /<title>Groundwork/);
   assert.match(html, /<div id="root"><\/div>/);
   assert.match(html, /\/assets\/index-/);
@@ -52,7 +62,12 @@ test("includes research workspace workflows and export options", async () => {
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  for (const label of ["Technical Proposal", "Client Research Report", "Executive Presentation", "Blank Workspace"]) {
+  for (const label of [
+    "Technical Proposal",
+    "Client Research Report",
+    "Executive Presentation",
+    "Blank Workspace",
+  ]) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /Export Deliverable/);
@@ -89,11 +104,26 @@ test("includes complete account settings and durable notifications", async () =>
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   for (const value of [
-    "Profile", "Security", "Document Defaults", "Notifications",
-    "Privacy & Data", "Usage", "Team", "Admin", "/profile/sessions",
-    "/profile/data-export", "/profile/usage", "/notifications/read-all",
-    "Activity center", "Live now", "Needs attention",
-  ]) assert.match(page, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    "Profile",
+    "Security",
+    "Document Defaults",
+    "Notifications",
+    "Privacy & Data",
+    "Usage",
+    "Team",
+    "Admin",
+    "/profile/sessions",
+    "/profile/data-export",
+    "/profile/usage",
+    "/notifications/read-all",
+    "Activity center",
+    "Live now",
+    "Needs attention",
+  ])
+    assert.match(
+      page,
+      new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
   assert.match(css, /\.account-settings-nav/);
   assert.match(css, /\.notification-panel/);
   assert.match(css, /\.settings-toggle/);

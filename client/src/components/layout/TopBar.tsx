@@ -18,7 +18,11 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
-import type { Workspace, NativeDocument, DeliverableReadiness } from "../../types";
+import type {
+  Workspace,
+  NativeDocument,
+  DeliverableReadiness,
+} from "../../types";
 
 export interface TopBarProps {
   workspace: Workspace;
@@ -61,26 +65,43 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
+  React.useEffect(() => {
+    if (!isExportMenuOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsExportMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExportMenuOpen]);
+
   return (
     <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-3 sm:px-4 flex items-center justify-between select-none z-20 min-w-0 w-full">
-      {/* Left: Sidebar Toggle + Breadcrumb */}
+      {/* Left: Sidebar Toggle (when collapsed) + Breadcrumb */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={onToggleSidebar}
-          className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
-          title={isSidebarOpen ? "Collapse sidebar" : "Open sidebar"}
-          aria-label={isSidebarOpen ? "Collapse sidebar" : "Open sidebar"}
-        >
-          {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
-        </Button>
+        {!isSidebarOpen && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleSidebar}
+            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
+            title="Open sidebar"
+            aria-label="Open sidebar"
+          >
+            <PanelLeft size={16} />
+          </Button>
+        )}
 
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-[var(--ink-muted)] min-w-0 flex-1">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center gap-1.5 text-xs text-[var(--ink-muted)] min-w-0 flex-1"
+        >
           <span className="truncate max-w-[100px] sm:max-w-[140px] text-[var(--ink-secondary)] font-medium">
             {workspace.name}
           </span>
-          <ChevronRight size={12} className="text-[var(--ink-faint)] flex-shrink-0" />
+          <ChevronRight
+            size={12}
+            className="text-[var(--ink-faint)] flex-shrink-0"
+          />
           <span className="font-serif font-semibold text-[13px] text-[var(--ink)] truncate max-w-[120px] sm:max-w-[200px]">
             {activeDoc?.title || "Untitled Document"}
           </span>
@@ -108,7 +129,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             role="status"
           >
             <RefreshCw size={11} className="spin text-[var(--ink-sepia)]" />
-            <span className="truncate max-w-[150px]">{activeAgentStepLabel || "Agent drafting…"}</span>
+            <span className="truncate max-w-[150px]">
+              {activeAgentStepLabel || "Agent drafting…"}
+            </span>
           </div>
         )}
       </div>
@@ -168,8 +191,12 @@ export const TopBar: React.FC<TopBarProps> = ({
               />
               <div className="absolute right-0 mt-1.5 w-52 bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-popover)] p-1 z-40 animate-in fade-in zoom-in-95">
                 <div className="px-2.5 py-1.5 border-b border-[var(--hairline-subtle)] mb-1">
-                  <p className="text-[11px] font-semibold text-[var(--ink)]">Export Verified Deliverable</p>
-                  <p className="text-[10px] text-[var(--ink-muted)]">Includes Cryptographic Provenance</p>
+                  <p className="text-[11px] font-semibold text-[var(--ink)]">
+                    Export Verified Deliverable
+                  </p>
+                  <p className="text-[10px] text-[var(--ink-muted)]">
+                    Includes Cryptographic Provenance
+                  </p>
                 </div>
 
                 <button
@@ -183,7 +210,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                     <FileText size={14} className="text-[var(--ink-blue)]" />
                     <span>PDF Document</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[var(--success)] font-medium">Ready</span>
+                  <span className="text-[10px] font-mono text-[var(--success)] font-medium">
+                    Ready
+                  </span>
                 </button>
 
                 <button
@@ -197,7 +226,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                     <FileCheck2 size={14} className="text-[var(--ink-blue)]" />
                     <span>Word (.docx)</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[var(--success)] font-medium">Ready</span>
+                  <span className="text-[10px] font-mono text-[var(--success)] font-medium">
+                    Ready
+                  </span>
                 </button>
 
                 <button
@@ -211,7 +242,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                     <FileCode size={14} className="text-[var(--ink-blue)]" />
                     <span>Markdown</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[var(--success)] font-medium">Ready</span>
+                  <span className="text-[10px] font-mono text-[var(--success)] font-medium">
+                    Ready
+                  </span>
                 </button>
               </div>
             </>
@@ -223,10 +256,18 @@ export const TopBar: React.FC<TopBarProps> = ({
               size="xs"
               onClick={onToggleRightPanel}
               className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0 ml-1"
-              title={isRightPanelOpen ? "Collapse audit panel" : "Open audit panel"}
-              aria-label={isRightPanelOpen ? "Collapse audit panel" : "Open audit panel"}
+              title={
+                isRightPanelOpen ? "Collapse audit panel" : "Open audit panel"
+              }
+              aria-label={
+                isRightPanelOpen ? "Collapse audit panel" : "Open audit panel"
+              }
             >
-              {isRightPanelOpen ? <PanelRightClose size={15} /> : <PanelRight size={15} />}
+              {isRightPanelOpen ? (
+                <PanelRightClose size={15} />
+              ) : (
+                <PanelRight size={15} />
+              )}
             </Button>
           )}
         </div>

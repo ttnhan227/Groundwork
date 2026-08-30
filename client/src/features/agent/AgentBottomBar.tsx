@@ -1,5 +1,11 @@
 import React from "react";
-import { Sparkles, Send, RefreshCw, PanelBottomClose, PanelBottomOpen } from "lucide-react";
+import {
+  Sparkles,
+  Send,
+  RefreshCw,
+  PanelBottomClose,
+  PanelBottomOpen,
+} from "lucide-react";
 import { Button } from "../../components/ui/Button";
 
 export interface ContextualSuggestion {
@@ -43,7 +49,10 @@ export const AgentBottomBar: React.FC<AgentBottomBarProps> = ({
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-full)] bg-[var(--paper)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)] font-medium transition-colors cursor-pointer flex-shrink-0"
               title={suggestion.prompt}
             >
-              <Sparkles size={11} className="text-[var(--ink-sepia)] flex-shrink-0" />
+              <Sparkles
+                size={11}
+                className="text-[var(--ink-sepia)] flex-shrink-0"
+              />
               <span>{suggestion.label}</span>
             </button>
           ))}
@@ -76,9 +85,17 @@ export const AgentBottomBar: React.FC<AgentBottomBarProps> = ({
             type="button"
             onClick={onToggleDrawer}
             className="px-2 text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors text-xs flex items-center gap-1 font-mono cursor-pointer flex-shrink-0"
-            title={isDrawerOpen ? "Minimize reasoning drawer" : "Open agent reasoning history"}
+            title={
+              isDrawerOpen
+                ? "Minimize reasoning drawer"
+                : "Open agent reasoning history"
+            }
           >
-            {isDrawerOpen ? <PanelBottomClose size={14} /> : <PanelBottomOpen size={14} />}
+            {isDrawerOpen ? (
+              <PanelBottomClose size={14} />
+            ) : (
+              <PanelBottomOpen size={14} />
+            )}
           </button>
         </div>
 
@@ -90,8 +107,14 @@ export const AgentBottomBar: React.FC<AgentBottomBarProps> = ({
           title="Execute agent task"
           className="flex-shrink-0"
         >
-          {isAgentRunning ? <RefreshCw size={13} className="spin flex-shrink-0" /> : <Send size={13} className="flex-shrink-0" />}
-          <span className="hidden xs:inline">{isAgentRunning ? "Drafting…" : "Draft"}</span>
+          {isAgentRunning ? (
+            <RefreshCw size={13} className="spin flex-shrink-0" />
+          ) : (
+            <Send size={13} className="flex-shrink-0" />
+          )}
+          <span className="hidden xs:inline">
+            {isAgentRunning ? "Drafting…" : "Draft"}
+          </span>
         </Button>
       </div>
     </div>

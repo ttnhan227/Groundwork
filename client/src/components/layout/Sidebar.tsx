@@ -62,7 +62,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleTheme,
 }) => {
   const { t } = useTranslation();
-  const [expandedWorkspaces, setExpandedWorkspaces] = React.useState<Record<string, boolean>>(() => {
+  const [expandedWorkspaces, setExpandedWorkspaces] = React.useState<
+    Record<string, boolean>
+  >(() => {
     return activeWorkspaceId ? { [activeWorkspaceId]: true } : {};
   });
 
@@ -74,7 +76,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={`h-screen flex-shrink-0 flex flex-col bg-[var(--paper)] border-r border-[var(--hairline)] transition-[width,opacity] duration-300 ease-in-out select-none z-30 overflow-hidden ${
-        isOpen ? "w-[260px] opacity-100" : "w-0 opacity-0 border-r-0 pointer-events-none"
+        isOpen
+          ? "w-[260px] opacity-100"
+          : "w-0 opacity-0 border-r-0 pointer-events-none"
       }`}
       aria-hidden={!isOpen}
     >
@@ -117,7 +121,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)] rounded-[var(--radius-sm)] transition-colors group cursor-pointer min-w-0"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <Search size={14} className="text-[var(--ink-muted)] group-hover:text-[var(--ink)] flex-shrink-0" />
+              <Search
+                size={14}
+                className="text-[var(--ink-muted)] group-hover:text-[var(--ink)] flex-shrink-0"
+              />
               <span className="truncate">Quick search</span>
             </div>
             <kbd className="text-[10px] font-mono px-1 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] text-[var(--ink-muted)] flex-shrink-0">
@@ -129,7 +136,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={onCreateWorkspace}
             className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)] rounded-[var(--radius-sm)] transition-colors cursor-pointer min-w-0"
           >
-            <FolderPlus size={14} className="text-[var(--ink-muted)] flex-shrink-0" />
+            <FolderPlus
+              size={14}
+              className="text-[var(--ink-muted)] flex-shrink-0"
+            />
             <span className="truncate">New workspace</span>
           </button>
         </div>
@@ -153,8 +163,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-0.5 mt-0.5">
               {workspaces.map((ws) => {
                 const isActiveWs = ws.id === activeWorkspaceId;
-                const isExpanded = Boolean(expandedWorkspaces[ws.id] ?? isActiveWs);
-                const wsDocs = nativeDocs.filter((d) => d.workspace_id === ws.id);
+                const isExpanded = Boolean(
+                  expandedWorkspaces[ws.id] ?? isActiveWs,
+                );
+                const wsDocs = nativeDocs.filter(
+                  (d) => d.workspace_id === ws.id,
+                );
 
                 return (
                   <div key={ws.id} className="group/ws">
@@ -172,9 +186,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onClick={(e) => toggleExpand(ws.id, e)}
                           className="text-[var(--ink-muted)] hover:text-[var(--ink)] p-0.5 -ml-1 rounded flex-shrink-0"
                         >
-                          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          {isExpanded ? (
+                            <ChevronDown size={12} />
+                          ) : (
+                            <ChevronRight size={12} />
+                          )}
                         </button>
-                        <Layers size={13} className={isActiveWs ? "text-[var(--ink-blue)] flex-shrink-0" : "text-[var(--ink-muted)] flex-shrink-0"} />
+                        <Layers
+                          size={13}
+                          className={
+                            isActiveWs
+                              ? "text-[var(--ink-blue)] flex-shrink-0"
+                              : "text-[var(--ink-muted)] flex-shrink-0"
+                          }
+                        />
                         <span className="truncate">{ws.name}</span>
                       </div>
 
@@ -215,10 +240,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   : "text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
                               }`}
                             >
-                              <FileText size={12} className={isActiveDoc ? "text-[var(--ink-blue)] flex-shrink-0" : "text-[var(--ink-faint)] flex-shrink-0"} />
-                              <span className="truncate flex-1">{doc.title || "Untitled Document"}</span>
+                              <FileText
+                                size={12}
+                                className={
+                                  isActiveDoc
+                                    ? "text-[var(--ink-blue)] flex-shrink-0"
+                                    : "text-[var(--ink-faint)] flex-shrink-0"
+                                }
+                              />
+                              <span className="truncate flex-1">
+                                {doc.title || "Untitled Document"}
+                              </span>
                               {doc.status === "complete" && (
-                                <CheckCircle2 size={10} className="text-[var(--success)] ml-auto flex-shrink-0" />
+                                <CheckCircle2
+                                  size={10}
+                                  className="text-[var(--success)] ml-auto flex-shrink-0"
+                                />
                               )}
                             </div>
                           );

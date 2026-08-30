@@ -45,8 +45,13 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
       {/* Header */}
       <div className="p-3 border-b border-[var(--hairline)] flex items-center justify-between min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <FileText size={14} className="text-[var(--ink-blue)] flex-shrink-0" />
-          <strong className="font-serif text-xs font-semibold text-[var(--ink)] truncate">Evidence Sources</strong>
+          <FileText
+            size={14}
+            className="text-[var(--ink-blue)] flex-shrink-0"
+          />
+          <strong className="font-serif text-xs font-semibold text-[var(--ink)] truncate">
+            Evidence Sources
+          </strong>
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
             {sources.length}
           </span>
@@ -77,7 +82,9 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
 
       {/* Grounding Toggle Bar */}
       <div className="px-3 py-2 border-b border-[var(--hairline-subtle)] flex items-center justify-between text-[11px] text-[var(--ink-muted)] min-w-0">
-        <span className="truncate">{selectedSourceIds.length} active in grounding</span>
+        <span className="truncate">
+          {selectedSourceIds.length} active in grounding
+        </span>
         <div className="flex items-center gap-1 font-mono flex-shrink-0 ml-1">
           <button
             onClick={onSelectAll}
@@ -124,11 +131,13 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
               {/* Document Cover Thumbnail */}
               <img
                 src={
-                  doc.filename.toLowerCase().includes("rfp") || doc.filename.toLowerCase().includes("horizon")
+                  doc.filename.toLowerCase().includes("rfp") ||
+                  doc.filename.toLowerCase().includes("horizon")
                     ? "/doc-dod-rfp.jpg"
-                    : doc.filename.toLowerCase().includes("security") || doc.filename.toLowerCase().includes("soc")
-                    ? "/doc-audit-soc2.jpg"
-                    : "/doc-sec-10k.jpg"
+                    : doc.filename.toLowerCase().includes("security") ||
+                        doc.filename.toLowerCase().includes("soc")
+                      ? "/doc-audit-soc2.jpg"
+                      : "/doc-sec-10k.jpg"
                 }
                 alt="Doc Cover"
                 className="w-7 h-9 object-cover rounded shadow-xs border border-[var(--hairline)] shrink-0 bg-white"
@@ -138,11 +147,16 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 className="flex-1 min-w-0 cursor-pointer"
                 onClick={() => onToggleSource(doc.id)}
               >
-                <p className="font-medium text-[var(--ink)] truncate text-xs" title={doc.filename}>
+                <p
+                  className="font-medium text-[var(--ink)] truncate text-xs"
+                  title={doc.filename}
+                >
                   {doc.filename}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[var(--ink-muted)] font-mono">
-                  <span>{doc.page_count ? `${doc.page_count} pgs` : "1 pg"}</span>
+                  <span>
+                    {doc.page_count ? `${doc.page_count} pgs` : "1 pg"}
+                  </span>
                   {doc.status === "failed" ? (
                     <span className="text-[var(--danger)] flex items-center gap-0.5 truncate">
                       <AlertTriangle size={9} /> Failed
@@ -175,7 +189,9 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                   variant="ghost"
                   size="xs"
                   className="h-5 w-5 p-0 text-[var(--ink-muted)] hover:text-[var(--ink)]"
-                  onClick={() => window.open(`${API}/documents/${doc.id}/download`, "_blank")}
+                  onClick={() =>
+                    window.open(`${API}/documents/${doc.id}/download`, "_blank")
+                  }
                   title="Download original"
                   aria-label="Download original"
                 >

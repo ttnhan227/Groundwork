@@ -3,10 +3,25 @@ import { describe, expect, test } from "vitest";
 
 async function readWorkspaceImplementation() {
   const files = await Promise.all([
-    readFile(new URL("../src/features/workspace/WorkspaceLibrary.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/workspace/ResearchWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../src/features/workspace/WorkspaceLibrary.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/features/workspace/ResearchWorkspace.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
     readFile(new URL("../src/api/client.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/workspace/WorkspaceApp.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../src/features/workspace/WorkspaceApp.tsx", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../src/i18n/index.ts", import.meta.url), "utf8"),
   ]);
   return files.join("\n");

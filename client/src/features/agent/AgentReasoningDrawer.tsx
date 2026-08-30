@@ -50,7 +50,12 @@ export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
         </div>
 
         {isAgentRunning && (
-          <Button variant="danger" size="xs" onClick={onStopAgent} className="flex-shrink-0 ml-2">
+          <Button
+            variant="danger"
+            size="xs"
+            onClick={onStopAgent}
+            className="flex-shrink-0 ml-2"
+          >
             <Square size={11} />
             <span>Stop</span>
           </Button>
@@ -71,18 +76,28 @@ export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
             <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-[var(--ink-muted)] mb-1 min-w-0">
               {msg.role === "user" ? (
                 <>
-                  <User size={12} className="text-[var(--ink-blue)] flex-shrink-0" />
+                  <User
+                    size={12}
+                    className="text-[var(--ink-blue)] flex-shrink-0"
+                  />
                   <span className="text-[var(--ink-blue)] truncate">You</span>
                 </>
               ) : (
                 <>
-                  <Bot size={12} className="text-[var(--ink-sepia)] flex-shrink-0" />
-                  <span className="text-[var(--ink-sepia)] truncate">Agent</span>
+                  <Bot
+                    size={12}
+                    className="text-[var(--ink-sepia)] flex-shrink-0"
+                  />
+                  <span className="text-[var(--ink-sepia)] truncate">
+                    Agent
+                  </span>
                 </>
               )}
             </div>
 
-            <div className={`font-sans whitespace-pre-wrap break-words ${msg.role === "assistant" ? "font-mono text-[12px]" : ""}`}>
+            <div
+              className={`font-sans whitespace-pre-wrap break-words ${msg.role === "assistant" ? "font-mono text-[12px]" : ""}`}
+            >
               {msg.content}
             </div>
 
@@ -97,8 +112,12 @@ export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
                     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--surface)] hover:bg-[var(--paper)] border border-[var(--hairline)] text-[10px] font-mono text-[var(--ink-blue)] transition-colors cursor-pointer max-w-full truncate"
                   >
                     <ExternalLink size={9} className="flex-shrink-0" />
-                    <span className="truncate max-w-[120px]">{c.document_name}</span>
-                    <strong className="flex-shrink-0">p. {c.page_number}</strong>
+                    <span className="truncate max-w-[120px]">
+                      {c.document_name}
+                    </span>
+                    <strong className="flex-shrink-0">
+                      p. {c.page_number}
+                    </strong>
                   </button>
                 ))}
               </div>
@@ -110,19 +129,33 @@ export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
         {isAgentRunning && (
           <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--surface)] border border-[var(--ink-sepia-border)] shadow-[var(--shadow-subtle)] space-y-2 min-w-0">
             <div className="flex items-center gap-2 text-xs font-mono font-semibold text-[var(--ink-sepia)] min-w-0">
-              <RefreshCw size={12} className="spin text-[var(--ink-sepia)] flex-shrink-0" />
+              <RefreshCw
+                size={12}
+                className="spin text-[var(--ink-sepia)] flex-shrink-0"
+              />
               <span className="truncate">Executing reasoning steps:</span>
             </div>
 
             <div className="space-y-1 pl-4 border-l-2 border-[var(--ink-sepia-border)] min-w-0">
               {activeSteps.map((step, sIdx) => (
-                <div key={sIdx} className="flex items-center gap-2 text-xs font-mono min-w-0">
+                <div
+                  key={sIdx}
+                  className="flex items-center gap-2 text-xs font-mono min-w-0"
+                >
                   {step.status === "completed" ? (
-                    <Check size={12} className="text-[var(--success)] flex-shrink-0" />
+                    <Check
+                      size={12}
+                      className="text-[var(--success)] flex-shrink-0"
+                    />
                   ) : (
-                    <RefreshCw size={11} className="spin text-[var(--ink-sepia)] flex-shrink-0" />
+                    <RefreshCw
+                      size={11}
+                      className="spin text-[var(--ink-sepia)] flex-shrink-0"
+                    />
                   )}
-                  <span className={`truncate ${step.status === "completed" ? "text-[var(--ink-muted)] line-through" : "text-[var(--ink)] font-medium"}`}>
+                  <span
+                    className={`truncate ${step.status === "completed" ? "text-[var(--ink-muted)] line-through" : "text-[var(--ink)] font-medium"}`}
+                  >
                     {step.label}
                   </span>
                 </div>

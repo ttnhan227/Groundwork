@@ -1,6 +1,7 @@
 import React, { forwardRef } from "react";
 
-export type ButtonVariant = "primary" | "human" | "agent" | "secondary" | "ghost" | "danger" | "outline";
+export type ButtonVariant =
+  "primary" | "human" | "agent" | "secondary" | "ghost" | "danger" | "outline";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -60,7 +61,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const combined = `${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`;
 
     return (
-      <button ref={ref} disabled={disabled || isLoading} className={combined} {...rest}>
+      <button
+        ref={ref}
+        disabled={disabled || isLoading}
+        className={combined}
+        {...rest}
+      >
         {isLoading && (
           <span className="spin inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full mr-1" />
         )}

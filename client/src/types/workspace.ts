@@ -53,7 +53,14 @@ export type WorkspaceNote = {
 };
 
 export type WorkspaceAgentEvent = {
-  event: "status" | "token" | "citation" | "artifact" | "verification" | "complete" | "error";
+  event:
+    | "status"
+    | "token"
+    | "citation"
+    | "artifact"
+    | "verification"
+    | "complete"
+    | "error";
   data: unknown;
 };
 

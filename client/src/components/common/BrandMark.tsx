@@ -1,6 +1,20 @@
-export function BrandMark({ className = "", size = 20 }: { className?: string; size?: number }) {
+export function BrandMark({
+  className = "",
+  size = 20,
+}: {
+  className?: string;
+  size?: number;
+}) {
   return (
-    <span className={`brand-symbol ${className}`.trim()} aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+    <span
+      className={`brand-symbol ${className}`.trim()}
+      aria-hidden="true"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <svg
         width={size}
         height={size}

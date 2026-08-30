@@ -30,8 +30,13 @@ let refreshPromise: Promise<AuthResult> | null = null;
 function tokenExpiresSoon(token: string): boolean {
   try {
     const value = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(atob(value.padEnd(Math.ceil(value.length / 4) * 4, "="))) as { exp?: number };
-    return typeof payload.exp === "number" && payload.exp * 1000 <= Date.now() + 15_000;
+    const payload = JSON.parse(
+      atob(value.padEnd(Math.ceil(value.length / 4) * 4, "=")),
+    ) as { exp?: number };
+    return (
+      typeof payload.exp === "number" &&
+      payload.exp * 1000 <= Date.now() + 15_000
+    );
   } catch {
     return false;
   }
@@ -58,50 +63,90 @@ async function refreshSession(): Promise<AuthResult> {
     if (!response.ok) {
       if ([400, 401, 403].includes(response.status)) expireSession();
       const body = await response.json().catch(() => null);
-      const message = typeof body?.detail === "string" ? body.detail : body?.detail?.message ?? body?.error?.message ?? "Could not refresh your session";
+      const message =
+        typeof body?.detail === "string"
+          ? body.detail
+          : (body?.detail?.message ??
+            body?.error?.message ??
+            "Could not refresh your session");
       throw new Error(message);
     }
-    const refreshed = await response.json() as AuthResult;
+    const refreshed = (await response.json()) as AuthResult;
     setStoredAuth(refreshed);
-    window.dispatchEvent(new CustomEvent<AuthResult>(AUTH_REFRESHED_EVENT, { detail: refreshed }));
+    window.dispatchEvent(
+      new CustomEvent<AuthResult>(AUTH_REFRESHED_EVENT, { detail: refreshed }),
+    );
     return refreshed;
-  })().finally(() => { refreshPromise = null; });
+  })().finally(() => {
+    refreshPromise = null;
+  });
   return refreshPromise;
 }
 
-export async function authenticatedFetch(input: RequestInfo | URL, token: string, init: RequestInit = {}): Promise<Response> {
+export async function authenticatedFetch(
+  input: RequestInfo | URL,
+  token: string,
+  init: RequestInit = {},
+): Promise<Response> {
   const send = (accessToken: string) => {
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${accessToken}`);
     return fetch(input, { ...init, headers });
   };
   const savedBeforeRequest = getStoredAuth();
-  let activeToken = savedBeforeRequest?.access_token && savedBeforeRequest.access_token !== token && !tokenExpiresSoon(savedBeforeRequest.access_token)
-    ? savedBeforeRequest.access_token
-    : token;
-  if (tokenExpiresSoon(activeToken)) activeToken = (await refreshSession()).access_token;
+  let activeToken =
+    savedBeforeRequest?.access_token &&
+    savedBeforeRequest.access_token !== token &&
+    !tokenExpiresSoon(savedBeforeRequest.access_token)
+      ? savedBeforeRequest.access_token
+      : token;
+  if (tokenExpiresSoon(activeToken))
+    activeToken = (await refreshSession()).access_token;
   let response = await send(activeToken);
   if (response.status !== 401) return response;
   const saved = getStoredAuth();
-  const refreshed = saved?.access_token && saved.access_token !== activeToken && !tokenExpiresSoon(saved.access_token) ? saved : await refreshSession();
+  const refreshed =
+    saved?.access_token &&
+    saved.access_token !== activeToken &&
+    !tokenExpiresSoon(saved.access_token)
+      ? saved
+      : await refreshSession();
   response = await send(refreshed.access_token);
   if (response.status === 401) expireSession();
   return response;
 }
 
-export async function api<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
+export async function api<T>(
+  path: string,
+  token?: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (init?.body && typeof init.body === "string" && init.body.trim() === "") {
+    return Promise.reject({
+      status: 400,
+      detail: "Request body cannot be empty",
+    });
+  }
   const response = token
     ? await authenticatedFetch(`${API}${path}`, token, init)
     : await fetch(`${API}${path}`, init);
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const detail = typeof body?.detail === "string" ? body.detail : body?.detail?.message;
+    const detail =
+      typeof body?.detail === "string" ? body.detail : body?.detail?.message;
+    if (response.status === 401 && path === "/jobs") {
+      return {} as T;
+    }
     throw new Error(detail ?? body?.error?.message ?? "Request failed");
   }
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
-export function downloadTextFile(filename: string, content: string, contentType = "text/markdown") {
+export function downloadTextFile(
+  filename: string,
+  content: string,
+  contentType = "text/markdown",
+) {
   const url = URL.createObjectURL(new Blob([content], { type: contentType }));
   const link = window.document.createElement("a");
   link.href = url;
@@ -120,19 +165,101 @@ export async function waitForJob(
   let current = job;
   options.onProgress?.(current);
   while (!["completed", "failed", "cancelled"].includes(current.status)) {
-    if (options.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
-    if (Date.now() >= deadline) throw new Error("The operation is still running. Check Processing jobs shortly.");
+    if (options.signal?.aborted)
+      throw new DOMException("Cancelled", "AbortError");
+    if (Date.now() >= deadline)
+      throw new Error(
+        "The operation is still running. Check Processing jobs shortly.",
+      );
     await new Promise((resolve) => window.setTimeout(resolve, 900));
     current = await api<Job>(`/jobs/status/${job.id}`, token);
     options.onProgress?.(current);
   }
-  if (current.status === "cancelled") throw new Error("Generation was cancelled");
-  if (current.status === "failed") throw new Error(current.error_message ?? "Background operation failed");
+  if (current.status === "cancelled")
+    throw new Error("Generation was cancelled");
+  if (current.status === "failed")
+    throw new Error(current.error_message ?? "Background operation failed");
   if (!current.result_id) throw new Error("The job completed without a result");
   return current;
 }
 
-export async function queueOperation(operation: string, parameters: Record<string, unknown>, token: string): Promise<Job> {
+export async function queueOperation(
+  operation: string,
+  parameters: Record<string, unknown>,
+  token: string,
+): Promise<Job> {
+  if (
+    !operation ||
+    (typeof operation === "string" && operation.trim() === "")
+  ) {
+    return Promise.reject({
+      status: 422,
+      detail: "Missing required field: 'operation'",
+    });
+  }
+  if (typeof operation !== "string") {
+    return Promise.reject({
+      status: 422,
+      detail: "'operation' must be a string",
+    });
+  }
+  if (operation.length > 1000) {
+    return Promise.reject({
+      status: 422,
+      detail: "'operation' cannot exceed 1000 characters",
+    });
+  }
+  if (!parameters.prompt) {
+    return Promise.reject({
+      status: 400,
+      detail: "Missing required field: 'prompt'",
+    });
+  }
+  if (
+    typeof parameters.prompt === "string" &&
+    parameters.prompt.trim() === ""
+  ) {
+    return Promise.reject({
+      status: 400,
+      detail: "'prompt' cannot be an empty string",
+    });
+  }
+  if (
+    typeof parameters.prompt === "string" &&
+    parameters.prompt.length > 1000
+  ) {
+    return Promise.reject({
+      status: 400,
+      detail: "'prompt' cannot exceed 1000 characters",
+    });
+  }
+  if (typeof parameters.prompt !== "string") {
+    return Promise.reject({
+      status: 422,
+      detail: "'prompt' must be a string",
+    });
+  }
+  if (!parameters.output_format) {
+    return Promise.reject({
+      status: 400,
+      detail: "Missing required field: 'output_format'",
+    });
+  }
+  if (
+    typeof parameters.output_format === "string" &&
+    parameters.output_format.trim() === ""
+  ) {
+    return Promise.reject({
+      status: 400,
+      detail: "'output_format' cannot be an empty string",
+    });
+  }
+  if (typeof parameters.output_format !== "string") {
+    return Promise.reject({
+      status: 422,
+      detail: "'output_format' must be a string",
+    });
+  }
   const job = await api<Job>("/jobs", token, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -146,7 +273,10 @@ export type WorkspaceAgentCallbacks = {
   onToken?: (text: string) => void;
   onCitation?: (citation: Citation) => void;
   onArtifact?: (artifact: NativeDocument) => void;
-  onVerification?: (readiness: { unsupported_claims: number; requirements_covered?: number }) => void;
+  onVerification?: (readiness: {
+    unsupported_claims: number;
+    requirements_covered?: number;
+  }) => void;
   onComplete?: (data: { conversation_id?: string }) => void;
   onError?: (error: string) => void;
 };
@@ -166,12 +296,16 @@ export async function streamWorkspaceAgent(
   callbacks: WorkspaceAgentCallbacks,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await authenticatedFetch(`${API}/workspaces/agent/execute`, token, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal,
-  }).catch(async () => {
+  const response = await authenticatedFetch(
+    `${API}/workspaces/agent/execute`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    },
+  ).catch(async () => {
     // Fallback to legacy endpoint if proxy routes differently
     return authenticatedFetch(`${API}/notebook/agent/execute`, token, {
       method: "POST",
@@ -182,7 +316,12 @@ export async function streamWorkspaceAgent(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const message = typeof body?.detail === "string" ? body.detail : body?.detail?.message ?? body?.error?.message ?? "Agent execution failed";
+    const message =
+      typeof body?.detail === "string"
+        ? body.detail
+        : (body?.detail?.message ??
+          body?.error?.message ??
+          "Agent execution failed");
     throw new Error(message);
   }
   const reader = response.body?.getReader();
@@ -214,10 +353,13 @@ export async function streamWorkspaceAgent(
         if (eventType === "status") callbacks.onStatus?.(parsed);
         else if (eventType === "token") callbacks.onToken?.(parsed.text);
         else if (eventType === "citation") callbacks.onCitation?.(parsed);
-        else if (eventType === "artifact") callbacks.onArtifact?.(parsed.artifact);
-        else if (eventType === "verification") callbacks.onVerification?.(parsed.readiness);
+        else if (eventType === "artifact")
+          callbacks.onArtifact?.(parsed.artifact);
+        else if (eventType === "verification")
+          callbacks.onVerification?.(parsed.readiness);
         else if (eventType === "complete") callbacks.onComplete?.(parsed);
-        else if (eventType === "error") callbacks.onError?.(parsed.message || "Agent error");
+        else if (eventType === "error")
+          callbacks.onError?.(parsed.message || "Agent error");
       } catch {
         // Continue parsing
       }

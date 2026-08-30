@@ -10,7 +10,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div
         className={`relative inline-flex items-center w-full rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] transition-all focus-within:border-[var(--ink-blue-border)] focus-within:ring-2 focus-within:ring-[var(--ink-blue-faint)] ${
-          disabled ? "opacity-50 cursor-not-allowed bg-[var(--paper-subtle)]" : "hover:border-[var(--hairline-strong)]"
+          disabled
+            ? "opacity-50 cursor-not-allowed bg-[var(--paper-subtle)]"
+            : "hover:border-[var(--hairline-strong)]"
         }`}
       >
         {icon && (

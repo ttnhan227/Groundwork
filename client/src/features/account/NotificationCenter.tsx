@@ -17,10 +17,17 @@ import { Button } from "../../components/ui/Button";
 
 type Filter = "all" | "unread" | "attention";
 
-function NotificationIcon({ severity }: { severity: NotificationItem["severity"] }) {
-  if (severity === "error") return <AlertTriangle size={15} className="text-[var(--danger)]" />;
-  if (severity === "warning") return <AlertTriangle size={15} className="text-[var(--warning)]" />;
-  if (severity === "success") return <CheckCircle2 size={15} className="text-[var(--success)]" />;
+function NotificationIcon({
+  severity,
+}: {
+  severity: NotificationItem["severity"];
+}) {
+  if (severity === "error")
+    return <AlertTriangle size={15} className="text-[var(--danger)]" />;
+  if (severity === "warning")
+    return <AlertTriangle size={15} className="text-[var(--warning)]" />;
+  if (severity === "success")
+    return <CheckCircle2 size={15} className="text-[var(--success)]" />;
   return <Info size={15} className="text-[var(--ink-blue)]" />;
 }
 
@@ -47,13 +54,29 @@ export function NotificationCenter({
         api<Job[]>("/jobs", token),
       ]);
       setItems(notifications);
-      setJobs(allJobs.filter((job) => ["queued", "running"].includes(job.status)));
+      setJobs(
+        allJobs.filter((job) => ["queued", "running"].includes(job.status)),
+      );
       onUnread(notifications.filter((item) => !item.read_at).length);
       setError("");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not load notifications");
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Could not load notifications",
+      );
     }
   }, [onUnread, token]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     const initial = window.setTimeout(load, 0);
@@ -68,7 +91,8 @@ export function NotificationCenter({
     () =>
       items.filter((item) => {
         if (filter === "unread") return !item.read_at;
-        if (filter === "attention") return ["error", "warning"].includes(item.severity);
+        if (filter === "attention")
+          return ["error", "warning"].includes(item.severity);
         return true;
       }),
     [filter, items],
@@ -76,10 +100,16 @@ export function NotificationCenter({
 
   async function markRead(item: NotificationItem) {
     if (!item.read_at) {
-      const updated = await api<NotificationItem>(`/notifications/${item.id}/read`, token, {
-        method: "PATCH",
-      });
-      setItems((current) => current.map((value) => (value.id === item.id ? updated : value)));
+      const updated = await api<NotificationItem>(
+        `/notifications/${item.id}/read`,
+        token,
+        {
+          method: "PATCH",
+        },
+      );
+      setItems((current) =>
+        current.map((value) => (value.id === item.id ? updated : value)),
+      );
       onUnread(Math.max(0, items.filter((value) => !value.read_at).length - 1));
     }
     onNavigate(item.action);
@@ -88,7 +118,9 @@ export function NotificationCenter({
   async function markAllRead() {
     await api("/notifications/read-all", token, { method: "POST" });
     const timestamp = new Date().toISOString();
-    setItems((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? timestamp })));
+    setItems((current) =>
+      current.map((item) => ({ ...item, read_at: item.read_at ?? timestamp })),
+    );
     onUnread(0);
   }
 
@@ -102,7 +134,12 @@ export function NotificationCenter({
   const unread = items.filter((item) => !item.read_at).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[rgba(33,31,28,0.45)] backdrop-blur-sm animate-in fade-in duration-150 min-w-0">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150 min-w-0"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="w-full max-w-lg max-h-[85vh] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col overflow-hidden notification-panel min-w-0">
         {/* Header */}
         <header className="h-14 px-4 sm:px-5 border-b border-[var(--hairline)] bg-[var(--paper)] flex items-center justify-between flex-shrink-0 min-w-0">
@@ -139,7 +176,9 @@ export function NotificationCenter({
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-sepia)] animate-pulse flex-shrink-0" />
                 <span className="truncate">Live now</span>
               </div>
-              <span className="text-[10px] text-[var(--ink-muted)]">{jobs.length} active</span>
+              <span className="text-[10px] text-[var(--ink-muted)]">
+                {jobs.length} active
+              </span>
             </div>
 
             {jobs.map((job) => (
@@ -148,10 +187,16 @@ export function NotificationCenter({
                 className="p-2 rounded-[var(--radius-sm)] bg-[var(--surface)] border border-[var(--hairline)] text-xs flex items-center justify-between gap-3 min-w-0"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <RefreshCw size={13} className="spin text-[var(--ink-sepia)] flex-shrink-0" />
+                  <RefreshCw
+                    size={13}
+                    className="spin text-[var(--ink-sepia)] flex-shrink-0"
+                  />
                   <div className="min-w-0 flex-1">
                     <strong className="block font-medium text-[var(--ink)] truncate">
-                      {(job.operation ?? "Document processing").replaceAll("_", " ")}
+                      {(job.operation ?? "Document processing").replaceAll(
+                        "_",
+                        " ",
+                      )}
                     </strong>
                     <div className="w-full h-1 rounded-full bg-[rgba(0,0,0,0.08)] overflow-hidden mt-1">
                       <div
@@ -216,7 +261,9 @@ export function NotificationCenter({
             <Button
               variant="ghost"
               size="xs"
-              onClick={() => markAllRead().catch((reason) => setError(reason.message))}
+              onClick={() =>
+                markAllRead().catch((reason) => setError(reason.message))
+              }
               className="text-[var(--ink-blue)] hover:text-[var(--ink-blue-hover)] flex-shrink-0"
             >
               <Check size={12} />
@@ -248,7 +295,9 @@ export function NotificationCenter({
 
               <div
                 className="flex-1 min-w-0 cursor-pointer"
-                onClick={() => markRead(item).catch((reason) => setError(reason.message))}
+                onClick={() =>
+                  markRead(item).catch((reason) => setError(reason.message))
+                }
               >
                 <div className="flex items-center justify-between gap-1 min-w-0">
                   <strong className="font-serif font-bold text-[var(--ink)] truncate">
@@ -272,7 +321,9 @@ export function NotificationCenter({
                 size="xs"
                 className="opacity-0 group-hover:opacity-100 text-[var(--ink-muted)] hover:text-[var(--danger)] h-6 w-6 p-0 flex-shrink-0 transition-opacity"
                 aria-label={`Delete ${item.title}`}
-                onClick={() => remove(item).catch((reason) => setError(reason.message))}
+                onClick={() =>
+                  remove(item).catch((reason) => setError(reason.message))
+                }
               >
                 <Trash2 size={12} />
               </Button>
@@ -281,16 +332,20 @@ export function NotificationCenter({
 
           {visible.length === 0 && (
             <div className="p-8 text-center text-xs text-[var(--ink-muted)] space-y-1.5">
-              <Bell size={24} className="mx-auto text-[var(--ink-faint)] opacity-60" />
+              <Bell
+                size={24}
+                className="mx-auto text-[var(--ink-faint)] opacity-60"
+              />
               <p className="font-serif text-sm font-semibold text-[var(--ink)]">
                 {filter === "unread"
                   ? "No unread notifications"
                   : filter === "attention"
-                  ? "Nothing needs attention"
-                  : "No notifications yet"}
+                    ? "Nothing needs attention"
+                    : "No notifications yet"}
               </p>
               <p className="text-[11px] max-w-xs mx-auto">
-                Processing updates, completed exports, reviews, and team activity will appear here.
+                Processing updates, completed exports, reviews, and team
+                activity will appear here.
               </p>
             </div>
           )}

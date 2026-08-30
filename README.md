@@ -145,6 +145,8 @@ docker compose up -d --build
 | `MINIO_BUCKET_ORIGINALS` | S3 bucket name for uploaded source documents | `original-documents` |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID for backend auth verification | Optional (empty = disabled) |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client ID for frontend button initialization | Optional |
+| `ADMIN_EMAIL` | Administrator account email (seeded on startup if provided — you can set any email you like) | `admin@groundwork.dev` (or any custom email) |
+| `ADMIN_PASSWORD` | Administrator account password (seeded on startup — you can set any password you like) | `Admin123456!` (or custom secure password) |
 | `CORS_ORIGINS` | Comma-separated allowed origins | `http://localhost:5173,http://localhost:3000,http://localhost:8080` |
 
 ---

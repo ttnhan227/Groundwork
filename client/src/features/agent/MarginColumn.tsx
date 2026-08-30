@@ -15,7 +15,10 @@ export interface MarginColumnProps {
   findings: DeliverableReviewFinding[];
   sources: DocumentItem[];
   isResolvingFindingId: string | null;
-  onResolveFinding: (finding: DeliverableReviewFinding, action: "accept" | "reject") => void;
+  onResolveFinding: (
+    finding: DeliverableReviewFinding,
+    action: "accept" | "reject",
+  ) => void;
   onOpenViewer: (docId: string, pageNumber?: number) => void;
   onPromptAgent: (prompt: string) => void;
 }
@@ -41,7 +44,10 @@ export const MarginColumn: React.FC<MarginColumnProps> = ({
     <aside className="w-[280px] flex-shrink-0 flex flex-col py-4 px-3 space-y-3 select-none min-w-0">
       <div className="flex items-center justify-between pb-2 border-b border-[var(--hairline)] min-w-0">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-secondary)] min-w-0">
-          <Sparkles size={13} className="text-[var(--ink-sepia)] flex-shrink-0" />
+          <Sparkles
+            size={13}
+            className="text-[var(--ink-sepia)] flex-shrink-0"
+          />
           <span className="font-serif truncate">Margin Marginalia</span>
         </div>
         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
@@ -65,7 +71,9 @@ export const MarginColumn: React.FC<MarginColumnProps> = ({
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-sepia)] flex-shrink-0" />
                   <span className="truncate">Agent Verification</span>
                 </div>
-                <span className="text-[10px] uppercase opacity-75 flex-shrink-0">{finding.severity}</span>
+                <span className="text-[10px] uppercase opacity-75 flex-shrink-0">
+                  {finding.severity}
+                </span>
               </div>
 
               {/* Finding Claim Quote */}
@@ -81,15 +89,24 @@ export const MarginColumn: React.FC<MarginColumnProps> = ({
               {firstCitation && (
                 <button
                   type="button"
-                  onClick={() => onOpenViewer(firstCitation.document_id, firstCitation.page_number)}
+                  onClick={() =>
+                    onOpenViewer(
+                      firstCitation.document_id,
+                      firstCitation.page_number,
+                    )
+                  }
                   className="w-full flex items-center justify-between px-2 py-1 mb-2.5 rounded bg-[var(--paper-subtle)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] text-[10px] font-mono text-[var(--ink-blue)] transition-colors cursor-pointer text-left min-w-0"
                   title="Inspect source evidence"
                 >
                   <div className="flex items-center gap-1 min-w-0 flex-1">
                     <ExternalLink size={10} className="flex-shrink-0" />
-                    <span className="truncate">{firstCitation.document_name}</span>
+                    <span className="truncate">
+                      {firstCitation.document_name}
+                    </span>
                   </div>
-                  <strong className="flex-shrink-0 ml-1.5">p. {firstCitation.page_number}</strong>
+                  <strong className="flex-shrink-0 ml-1.5">
+                    p. {firstCitation.page_number}
+                  </strong>
                 </button>
               )}
 
@@ -123,8 +140,13 @@ export const MarginColumn: React.FC<MarginColumnProps> = ({
 
         {openFindings.length === 0 && (
           <div className="p-4 rounded-[var(--radius-sm)] border border-dashed border-[var(--hairline-strong)] text-center min-w-0">
-            <ShieldCheck size={20} className="mx-auto text-[var(--success)] mb-1.5" />
-            <p className="text-xs font-serif font-semibold text-[var(--ink)]">All Claims Verified</p>
+            <ShieldCheck
+              size={20}
+              className="mx-auto text-[var(--success)] mb-1.5"
+            />
+            <p className="text-xs font-serif font-semibold text-[var(--ink)]">
+              All Claims Verified
+            </p>
             <p className="text-[11px] text-[var(--ink-muted)] mt-0.5 break-words">
               Margin is clear. Zero unsupported claims detected.
             </p>

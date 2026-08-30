@@ -28,7 +28,9 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
 
       <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--surface)] border border-[var(--hairline)] shadow-[var(--shadow-subtle)] space-y-3 min-w-0">
         <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-[var(--hairline-subtle)] min-w-0">
-          <span className="text-[var(--ink-muted)] flex-shrink-0">Deliverable:</span>
+          <span className="text-[var(--ink-muted)] flex-shrink-0">
+            Deliverable:
+          </span>
           <strong className="text-[var(--ink)] truncate max-w-[160px] ml-2">
             {activeArtifact?.title || "Technical Deliverable"}
           </strong>
@@ -46,7 +48,10 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
             <tbody className="divide-y divide-[var(--hairline-subtle)] text-[11px]">
               {requirements.map((req, idx) => (
                 <tr key={idx}>
-                  <td className="py-2 pr-2 font-medium text-[var(--ink)] truncate max-w-[120px] sm:max-w-[140px]" title={req.text}>
+                  <td
+                    className="py-2 pr-2 font-medium text-[var(--ink)] truncate max-w-[120px] sm:max-w-[140px]"
+                    title={req.text}
+                  >
                     {req.text}
                   </td>
                   <td className="py-2 px-2 font-mono text-[var(--ink-blue)] truncate max-w-[100px] sm:max-w-[120px]">
@@ -73,10 +78,17 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
 
         {/* Cryptographic Stamp */}
         <div className="p-2.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] flex items-center gap-2 text-xs text-[var(--ink-secondary)] min-w-0">
-          <ShieldCheck size={16} className="text-[var(--success)] flex-shrink-0" />
+          <ShieldCheck
+            size={16}
+            className="text-[var(--success)] flex-shrink-0"
+          />
           <div className="flex-1 min-w-0 font-mono text-[10px]">
-            <p className="font-semibold text-[var(--ink)] truncate">Deterministic Verification Seal</p>
-            <p className="text-[var(--ink-muted)] truncate">SHA-256: 8f4c2e1a9b7d3f0e5a8c2d1b...</p>
+            <p className="font-semibold text-[var(--ink)] truncate">
+              Deterministic Verification Seal
+            </p>
+            <p className="text-[var(--ink-muted)] truncate">
+              SHA-256: 8f4c2e1a9b7d3f0e5a8c2d1b...
+            </p>
           </div>
         </div>
       </div>

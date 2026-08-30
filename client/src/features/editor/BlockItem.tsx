@@ -10,7 +10,11 @@ import {
   Check,
   Sparkles,
 } from "lucide-react";
-import type { NativeBlock, DeliverableReviewFinding, DocumentItem } from "../../types";
+import type {
+  NativeBlock,
+  DeliverableReviewFinding,
+  DocumentItem,
+} from "../../types";
 import { Button } from "../../components/ui/Button";
 
 export interface BlockItemProps {
@@ -22,7 +26,10 @@ export interface BlockItemProps {
   isResolvingFinding?: boolean;
   onUpdateText: (newText: string) => void;
   onOpenViewer: (docId: string, pageNumber?: number) => void;
-  onResolveFinding?: (finding: DeliverableReviewFinding, action: "accept" | "reject") => void;
+  onResolveFinding?: (
+    finding: DeliverableReviewFinding,
+    action: "accept" | "reject",
+  ) => void;
   onPromptSection?: (prompt: string) => void;
 }
 
@@ -42,7 +49,8 @@ export const BlockItem: React.FC<BlockItemProps> = ({
 
   // Helper to parse citations from text [Source: Document.pdf, p. 4]
   const renderTextWithCitations = (text: string) => {
-    const citationRegex = /\[(?:Source|Evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]/gi;
+    const citationRegex =
+      /\[(?:Source|Evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]/gi;
     const parts: (string | React.ReactNode)[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -149,7 +157,9 @@ export const BlockItem: React.FC<BlockItemProps> = ({
 
       <div className="flex items-start gap-2">
         {block.type === "bullet" && (
-          <span className="text-[var(--ink-muted)] text-base select-none leading-relaxed">•</span>
+          <span className="text-[var(--ink-muted)] text-base select-none leading-relaxed">
+            •
+          </span>
         )}
 
         <div className="flex-1 min-w-0">

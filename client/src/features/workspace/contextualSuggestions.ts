@@ -1,5 +1,11 @@
 import type { Language } from "../../i18n";
-import type { Workspace, DocumentItem, NativeDocument, DeliverableRequirement, DeliverableReviewFinding } from "../../types";
+import type {
+  Workspace,
+  DocumentItem,
+  NativeDocument,
+  DeliverableRequirement,
+  DeliverableReviewFinding,
+} from "../../types";
 
 export interface ContextualSuggestion {
   id: string;
@@ -15,11 +21,20 @@ export function getContextualSuggestions(params: {
   activeArtifact: NativeDocument | null;
   language: Language;
 }): ContextualSuggestion[] {
-  const { workspace, sources, requirements, openFindings, activeArtifact, language } = params;
+  const {
+    workspace,
+    sources,
+    requirements,
+    openFindings,
+    activeArtifact,
+    language,
+  } = params;
 
   const wsName = workspace?.name || "Workspace";
   const firstDoc = sources[0]?.display_title || sources[0]?.filename || "";
-  const uncoveredReqs = requirements.filter((r) => r.status !== "covered" && r.status !== "waived");
+  const uncoveredReqs = requirements.filter(
+    (r) => r.status !== "covered" && r.status !== "waived",
+  );
 
   const suggestions: ContextualSuggestion[] = [];
 
@@ -29,7 +44,8 @@ export function getContextualSuggestions(params: {
   if (openFindings.length > 0) {
     const finding = openFindings[0];
     const rawClaim = finding.claim_text || "unsupported claim";
-    const claimExcerpt = rawClaim.length > 32 ? rawClaim.slice(0, 30) + "…" : rawClaim;
+    const claimExcerpt =
+      rawClaim.length > 32 ? rawClaim.slice(0, 30) + "…" : rawClaim;
 
     switch (language) {
       case "vi":
@@ -97,7 +113,8 @@ export function getContextualSuggestions(params: {
         break;
     }
   } else if (firstDoc) {
-    const docShort = firstDoc.length > 28 ? firstDoc.slice(0, 25) + "…" : firstDoc;
+    const docShort =
+      firstDoc.length > 28 ? firstDoc.slice(0, 25) + "…" : firstDoc;
     switch (language) {
       case "vi":
         suggestions.push({
@@ -270,7 +287,8 @@ export function getContextualSuggestions(params: {
         break;
     }
   } else if (firstDoc) {
-    const docShort = firstDoc.length > 28 ? firstDoc.slice(0, 25) + "…" : firstDoc;
+    const docShort =
+      firstDoc.length > 28 ? firstDoc.slice(0, 25) + "…" : firstDoc;
     switch (language) {
       case "vi":
         suggestions.push({
@@ -359,7 +377,8 @@ export function getContextualSuggestions(params: {
   // CHIP 3: Executive Summary / Section Synthesis
   // -------------------------------------------------------------
   const artifactName = activeArtifact?.title || wsName;
-  const artifactShort = artifactName.length > 24 ? artifactName.slice(0, 22) + "…" : artifactName;
+  const artifactShort =
+    artifactName.length > 24 ? artifactName.slice(0, 22) + "…" : artifactName;
 
   switch (language) {
     case "vi":

@@ -172,7 +172,8 @@ async def list_documents(
     if workspace_id is not None:
         query = query.where(Document.workspace_id == workspace_id)
     result = await session.scalars(query.order_by(Document.created_at.desc()))
-    return list(result)
+    documents = list(result)
+    return documents
 
 
 def unique_archive_name(filename: str, used_names: set[str]) -> str:
@@ -213,6 +214,12 @@ async def download_documents_archive(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
+    # Validate required 'files' field
+    if payload.files is None or len(payload.files) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The 'files' field is required and must contain at least one item"
+        )
     references = list(dict.fromkeys((item.kind, item.id) for item in payload.files))
     if len(references) < 2:
         raise HTTPException(status_code=422, detail="Select at least two different files")
@@ -293,6 +300,17 @@ async def rename_document(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
+    # Validate that filename is a string type
+    if not isinstance(payload.filename, str):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"filename": "Must be a string"}
+        )
+    if payload.filename is None or payload.filename.strip() == "":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The 'filename' field is required and cannot be empty"
+        )
     document = await owned_document(document_id, user, session)
     filename = safe_filename(payload.filename)
     if not filename.lower().endswith(".pdf"):
@@ -410,6 +428,8 @@ async def upload_document(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
+    if file.filename is None or file.filename.strip() == "":
+        raise HTTPException(status_code=422, detail="File name cannot be empty")
     settings = get_settings()
     today = datetime.now(UTC).date()
     daily_user_uploads = await session.scalar(
@@ -458,11 +478,13 @@ async def upload_document(
     from app.deliverables import activity, ensure_personal_workspace, workspace_access
 
     ws_uuid: uuid.UUID | None = None
-    if workspace_id and str(workspace_id).strip() and str(workspace_id).strip().lower() not in {"null", "undefined"}:
+    if workspace_id is not None and str(workspace_id).strip() != "":
+        if str(workspace_id).strip().lower() in {"null", "undefined"}:
+            raise HTTPException(status_code=422, detail="Invalid workspace_id")
         try:
             ws_uuid = uuid.UUID(str(workspace_id).strip())
         except (ValueError, AttributeError):
-            ws_uuid = None
+            raise HTTPException(status_code=422, detail="Invalid workspace_id")
 
     if ws_uuid is not None:
         workspace, _ = await workspace_access(ws_uuid, user, session, {"owner", "editor"})

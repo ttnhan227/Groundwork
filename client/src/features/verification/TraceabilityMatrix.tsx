@@ -1,5 +1,10 @@
 import React from "react";
-import { CheckCircle2, AlertCircle, Sparkles, ExternalLink } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  ExternalLink,
+} from "lucide-react";
 import type { DeliverableRequirement } from "../../types";
 import { Button } from "../../components/ui/Button";
 
@@ -14,7 +19,9 @@ export const TraceabilityMatrix: React.FC<TraceabilityMatrixProps> = ({
   onPromptAgent,
   onOpenViewer,
 }) => {
-  const coveredCount = requirements.filter((r) => r.status === "covered" || r.status === "waived").length;
+  const coveredCount = requirements.filter(
+    (r) => r.status === "covered" || r.status === "waived",
+  ).length;
 
   return (
     <div className="p-4 space-y-4 min-w-0">
@@ -48,13 +55,21 @@ export const TraceabilityMatrix: React.FC<TraceabilityMatrixProps> = ({
             >
               <div className="flex items-start gap-2 mb-1.5 min-w-0">
                 {isCovered ? (
-                  <CheckCircle2 size={14} className="text-[var(--success)] flex-shrink-0 mt-0.5" />
+                  <CheckCircle2
+                    size={14}
+                    className="text-[var(--success)] flex-shrink-0 mt-0.5"
+                  />
                 ) : (
-                  <AlertCircle size={14} className="text-[var(--warning)] flex-shrink-0 mt-0.5" />
+                  <AlertCircle
+                    size={14}
+                    className="text-[var(--warning)] flex-shrink-0 mt-0.5"
+                  />
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[var(--ink)] font-sans leading-snug break-words">{req.text}</p>
+                  <p className="font-medium text-[var(--ink)] font-sans leading-snug break-words">
+                    {req.text}
+                  </p>
                   {req.linked_sections?.[0] && (
                     <span className="inline-block mt-1 text-[10px] font-mono text-[var(--ink-muted)] truncate max-w-full">
                       Mapped to section: {req.linked_sections[0]}
@@ -68,12 +83,21 @@ export const TraceabilityMatrix: React.FC<TraceabilityMatrixProps> = ({
                 {firstEvidence ? (
                   <button
                     type="button"
-                    onClick={() => onOpenViewer(firstEvidence.document_id, firstEvidence.page_number)}
+                    onClick={() =>
+                      onOpenViewer(
+                        firstEvidence.document_id,
+                        firstEvidence.page_number,
+                      )
+                    }
                     className="inline-flex items-center gap-1 font-mono text-[var(--ink-blue)] hover:underline truncate max-w-[140px] sm:max-w-xs cursor-pointer min-w-0"
                   >
                     <ExternalLink size={10} className="flex-shrink-0" />
-                    <span className="truncate">{firstEvidence.document_name}</span>
-                    <strong className="flex-shrink-0">p. {firstEvidence.page_number}</strong>
+                    <span className="truncate">
+                      {firstEvidence.document_name}
+                    </span>
+                    <strong className="flex-shrink-0">
+                      p. {firstEvidence.page_number}
+                    </strong>
                   </button>
                 ) : (
                   <span className="text-[10px] font-mono text-[var(--warning)] flex-shrink-0">
@@ -103,7 +127,8 @@ export const TraceabilityMatrix: React.FC<TraceabilityMatrixProps> = ({
 
         {requirements.length === 0 && (
           <div className="p-4 text-center text-xs text-[var(--ink-muted)] min-w-0">
-            No requirements extracted yet. Ask the agent to analyze the uploaded RFP.
+            No requirements extracted yet. Ask the agent to analyze the uploaded
+            RFP.
           </div>
         )}
       </div>

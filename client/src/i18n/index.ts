@@ -1,16 +1,32 @@
 import { useState, useEffect, useCallback } from "react";
-import { PREFERENCES_CHANGED_EVENT, storedPreferences, applyPreferences, type UserPreferences, type AppLanguage } from "../features/account/preferences";
+import {
+  PREFERENCES_CHANGED_EVENT,
+  storedPreferences,
+  applyPreferences,
+  type UserPreferences,
+  type AppLanguage,
+} from "../features/account/preferences";
 
 export type Language = AppLanguage;
 
-export const LANGUAGE_OPTIONS: Array<{ code: Language; label: string; flag: string; nativeName: string }> = [
+export const LANGUAGE_OPTIONS: Array<{
+  code: Language;
+  label: string;
+  flag: string;
+  nativeName: string;
+}> = [
   { code: "en", label: "English", flag: "🇺🇸", nativeName: "English" },
   { code: "vi", label: "Vietnamese", flag: "🇻🇳", nativeName: "Tiếng Việt" },
   { code: "es", label: "Spanish", flag: "🇪🇸", nativeName: "Español" },
   { code: "ja", label: "Japanese", flag: "🇯🇵", nativeName: "日本語" },
   { code: "de", label: "German", flag: "🇩🇪", nativeName: "Deutsch" },
   { code: "fr", label: "French", flag: "🇫🇷", nativeName: "Français" },
-  { code: "zh", label: "Chinese (Simplified)", flag: "🇨🇳", nativeName: "简体中文" },
+  {
+    code: "zh",
+    label: "Chinese (Simplified)",
+    flag: "🇨🇳",
+    nativeName: "简体中文",
+  },
   { code: "ko", label: "Korean", flag: "🇰🇷", nativeName: "한국어" },
   { code: "pt", label: "Portuguese", flag: "🇧🇷", nativeName: "Português" },
 ];
@@ -35,21 +51,28 @@ export const TRANSLATIONS = {
     // Workspace Library (Hero & Templates)
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Grounded Deliverable Workspaces",
-    "library.hero_subtitle": "Transform client RFPs, specifications, and messy files into 100% verified, source-grounded technical proposals and deliverables.",
+    "library.hero_subtitle":
+      "Transform client RFPs, specifications, and messy files into 100% verified, source-grounded technical proposals and deliverables.",
     "library.templates_heading": "Recommended Workflows",
-    "library.templates_subheading": "Choose a deliverable workflow tailored for your engagement",
+    "library.templates_subheading":
+      "Choose a deliverable workflow tailored for your engagement",
     "library.category_all": "All Workspaces",
     "library.category_proposals": "Proposals",
     "library.category_reports": "Reports",
     "library.template_proposal_title": "Technical Proposal",
-    "library.template_proposal_desc": "Draft compliant technical bids mapped directly to client requirements and SLAs.",
+    "library.template_proposal_desc":
+      "Draft compliant technical bids mapped directly to client requirements and SLAs.",
     "library.template_report_title": "Client Research Report",
-    "library.template_report_desc": "Analyze market data, financial statements, or research papers into an executive brief.",
+    "library.template_report_desc":
+      "Analyze market data, financial statements, or research papers into an executive brief.",
     "library.template_presentation_title": "Executive Presentation",
-    "library.template_presentation_desc": "Structure source content into an audience-tailored executive deck and narrative.",
+    "library.template_presentation_desc":
+      "Structure source content into an audience-tailored executive deck and narrative.",
     "library.template_blank_title": "Blank Workspace",
-    "library.template_blank_desc": "Start fresh with an empty workspace and ground queries on your custom files.",
-    "library.loading_banner": "Connecting to Groundwork cloud · Loading workspaces & evidence indices (may take ~5s on cold wake)...",
+    "library.template_blank_desc":
+      "Start fresh with an empty workspace and ground queries on your custom files.",
+    "library.loading_banner":
+      "Connecting to Groundwork cloud · Loading workspaces & evidence indices (may take ~5s on cold wake)...",
     "library.sources_count": "{count} source",
     "library.sources_count_plural": "{count} sources",
     "library.deliverables_count": "{count} deliverable",
@@ -59,17 +82,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "Open deliverable workspace",
     "library.empty_title": "No workspaces created yet",
     "library.empty_search_title": "No matching workspaces found",
-    "library.empty_desc": "Create your first workspace to organize source documents, draft deliverables, and enforce verification audits.",
-    "library.empty_search_desc": "Try adjusting your search terms or view all workspaces.",
+    "library.empty_desc":
+      "Create your first workspace to organize source documents, draft deliverables, and enforce verification audits.",
+    "library.empty_search_desc":
+      "Try adjusting your search terms or view all workspaces.",
     "library.create_modal_title": "Create New Workspace",
     "library.workspace_name_label": "Workspace Name",
-    "library.workspace_name_placeholder": "e.g., Apex Financial RFP Response, Q3 Cloud Security Report",
+    "library.workspace_name_placeholder":
+      "e.g., Apex Financial RFP Response, Q3 Cloud Security Report",
     "library.template_select_label": "Select Deliverable Workflow Template",
     "library.btn_cancel": "Cancel",
     "library.btn_create": "Create Workspace",
     "library.btn_creating": "Creating...",
     "library.drag_drop_title": "Drop file here to start new workspace",
-    "library.drag_drop_desc": "We'll automatically initialize and index your document",
+    "library.drag_drop_desc":
+      "We'll automatically initialize and index your document",
     "library.action_rename": "Rename",
     "library.action_delete": "Delete",
     "library.btn_save": "Save",
@@ -102,22 +129,26 @@ export const TRANSLATIONS = {
     "sources.status_indexing": "Indexing...",
     "sources.status_failed": "Failed",
     "sources.empty_title": "No sources attached",
-    "sources.empty_desc": "Upload an RFP, technical specification, or brief to ground this workspace.",
+    "sources.empty_desc":
+      "Upload an RFP, technical specification, or brief to ground this workspace.",
     "sources.attach_pdf": "Attach PDF or specification",
     "sources.attach_pdf_uploading": "Uploading & indexing file...",
 
     // Center Canvas: Deliverable Editor
     "editor.heading": "Deliverable Structure & Content",
-    "editor.loading": "Loading deliverable draft, structure & verification status...",
+    "editor.loading":
+      "Loading deliverable draft, structure & verification status...",
     "editor.btn_save_draft": "Save Draft",
     "editor.btn_saving": "Saving...",
     "editor.btn_reverify": "Re-Verify Draft",
     "editor.btn_verifying": "Verifying...",
     "editor.empty_title": "No deliverable drafted yet",
-    "editor.empty_desc": "Upload client RFPs, specifications, or notes on the left, then instruct the agent to draft and verify your deliverable.",
+    "editor.empty_desc":
+      "Upload client RFPs, specifications, or notes on the left, then instruct the agent to draft and verify your deliverable.",
     "editor.chip_draft_proposal": "Draft Technical Proposal",
     "editor.chip_extract_requirements": "Extract Requirements",
-    "editor.warning_unsupported": "Verification Warning: Unsupported claim detected",
+    "editor.warning_unsupported":
+      "Verification Warning: Unsupported claim detected",
     "editor.btn_fix_claim": "Fix Claim with Source Evidence",
     "editor.placeholder_text": "Enter block content here...",
 
@@ -134,7 +165,8 @@ export const TRANSLATIONS = {
     "audit.review_findings": "Review Findings ({count})",
     "audit.btn_scan": "Scan",
     "audit.btn_scanning": "Scanning...",
-    "audit.loading_findings": "Auditing deliverable claims against active evidence...",
+    "audit.loading_findings":
+      "Auditing deliverable claims against active evidence...",
     "audit.high_severity": "HIGH SEVERITY",
     "audit.unsupported_claim": "Unsupported Claim",
     "audit.evidence_available": "Supporting Evidence Available:",
@@ -142,24 +174,28 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "Applying Revision…",
     "audit.btn_waive": "Dismiss",
     "audit.all_cleared_title": "All Verification Findings Resolved",
-    "audit.all_cleared_desc": "Every claim in this proposal is grounded in your source documentation. Export is fully unlocked.",
+    "audit.all_cleared_desc":
+      "Every claim in this proposal is grounded in your source documentation. Export is fully unlocked.",
     "audit.btn_export_now": "Export Verified Deliverable",
 
     // Requirements Matrix Tab
     "matrix.header_title": "Verifiable Requirements Traceability Matrix",
-    "matrix.header_desc": "Track client RFP requirements against draft coverage and source grounding.",
+    "matrix.header_desc":
+      "Track client RFP requirements against draft coverage and source grounding.",
     "matrix.loading": "Extracting and mapping acceptance requirements...",
     "matrix.btn_ask_agent": "Ask Agent to Satisfy Requirement",
 
     // Appendix Tab
     "appendix.header_title": "Verification & Audit Appendix Preview",
-    "appendix.header_desc": "This evidence provenance ledger is compiled and attached when exporting the deliverable.",
+    "appendix.header_desc":
+      "This evidence provenance ledger is compiled and attached when exporting the deliverable.",
     "appendix.col_requirement": "Requirement / Claim",
     "appendix.col_source": "Evidence Source",
     "appendix.col_status": "Status",
     "appendix.status_verified": "Verified ✓",
     "appendix.status_unverified": "Unverified ⚠",
-    "appendix.cryptographic_stamp": "Groundwork Cryptographic Provenance Audit Stamped",
+    "appendix.cryptographic_stamp":
+      "Groundwork Cryptographic Provenance Audit Stamped",
 
     // Agent Dock
     "agent.dock_title": "Groundwork Grounded Agent",
@@ -172,22 +208,29 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "History",
     "agent.toggle_minimize": "Minimize",
     "agent.loading_history": "Loading conversation history...",
-    "agent.empty_history": "Groundwork agent acts directly on your deliverable draft, requirements matrix, and evidence sources.",
+    "agent.empty_history":
+      "Groundwork agent acts directly on your deliverable draft, requirements matrix, and evidence sources.",
     "agent.task_execution": "Multi-Step Task Execution",
     "agent.btn_stop": "Stop",
-    "agent.placeholder_ready": "Ask agent to draft, verify, or resolve claims across {count} sources…",
-    "agent.placeholder_with_artifact": "Ask agent about \"{artifact}\" or query across {count} sources…",
-    "agent.placeholder_with_findings": "Ask agent to resolve {count} unverified claim(s) or draft updates…",
-    "agent.placeholder_working": "Agent is executing instructions across sources…",
+    "agent.placeholder_ready":
+      "Ask agent to draft, verify, or resolve claims across {count} sources…",
+    "agent.placeholder_with_artifact":
+      'Ask agent about "{artifact}" or query across {count} sources…',
+    "agent.placeholder_with_findings":
+      "Ask agent to resolve {count} unverified claim(s) or draft updates…",
+    "agent.placeholder_working":
+      "Agent is executing instructions across sources…",
     "agent.btn_execute": "Execute",
     "agent.btn_working": "Working…",
 
     // Settings / Account Panel
     "settings.eyebrow_profile": "Profile",
     "settings.profile_title": "Your account",
-    "settings.profile_desc": "Keep your identity clear wherever you collaborate or export work.",
+    "settings.profile_desc":
+      "Keep your identity clear wherever you collaborate or export work.",
     "settings.language_heading": "Language & Appearance",
-    "settings.language_desc": "Choose your preferred interface language and display theme.",
+    "settings.language_desc":
+      "Choose your preferred interface language and display theme.",
     "settings.language_label": "Interface Language",
     "settings.theme_label": "Theme",
     "settings.btn_save_preferences": "Save Settings",
@@ -229,21 +272,28 @@ export const TRANSLATIONS = {
     // Workspace Library (Hero & Templates)
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Không Gian Soạn Thảo Có Căn Cứ",
-    "library.hero_subtitle": "Chuyển đổi hồ sơ mời thầu (RFP), đặc tả kỹ thuật và tệp tài liệu thành đề xuất kỹ thuật được xác thực 100% từ nguồn dẫn.",
+    "library.hero_subtitle":
+      "Chuyển đổi hồ sơ mời thầu (RFP), đặc tả kỹ thuật và tệp tài liệu thành đề xuất kỹ thuật được xác thực 100% từ nguồn dẫn.",
     "library.templates_heading": "Mẫu Quy Trình Khởi Đầu Nhanh",
-    "library.templates_subheading": "Chọn quy trình soạn thảo phù hợp với dự án của bạn",
+    "library.templates_subheading":
+      "Chọn quy trình soạn thảo phù hợp với dự án của bạn",
     "library.category_all": "Tất cả không gian",
     "library.category_proposals": "Hồ sơ đề xuất",
     "library.category_reports": "Báo cáo",
     "library.template_proposal_title": "Đề xuất Kỹ thuật & RFP",
-    "library.template_proposal_desc": "Soạn thảo hồ sơ dự thầu kỹ thuật đối chiếu trực tiếp với yêu cầu và cam kết SLA của khách hàng.",
+    "library.template_proposal_desc":
+      "Soạn thảo hồ sơ dự thầu kỹ thuật đối chiếu trực tiếp với yêu cầu và cam kết SLA của khách hàng.",
     "library.template_report_title": "Báo cáo Nghiên cứu Khách hàng",
-    "library.template_report_desc": "Phân tích dữ liệu thị trường, báo cáo tài chính hoặc tài liệu nghiên cứu thành bản tóm tắt điều hành.",
+    "library.template_report_desc":
+      "Phân tích dữ liệu thị trường, báo cáo tài chính hoặc tài liệu nghiên cứu thành bản tóm tắt điều hành.",
     "library.template_presentation_title": "Bài thuyết trình Điều hành",
-    "library.template_presentation_desc": "Cấu trúc nội dung nguồn thành bài trình bày và mạch dẫn phù hợp cho ban điều hành.",
+    "library.template_presentation_desc":
+      "Cấu trúc nội dung nguồn thành bài trình bày và mạch dẫn phù hợp cho ban điều hành.",
     "library.template_blank_title": "Không gian trống",
-    "library.template_blank_desc": "Bắt đầu mới với không gian trống và truy vấn dựa trên tệp của riêng bạn.",
-    "library.loading_banner": "Đang kết nối tới đám mây Groundwork · Tải không gian làm việc & chỉ mục bằng chứng (có thể mất ~5s khi khởi động)...",
+    "library.template_blank_desc":
+      "Bắt đầu mới với không gian trống và truy vấn dựa trên tệp của riêng bạn.",
+    "library.loading_banner":
+      "Đang kết nối tới đám mây Groundwork · Tải không gian làm việc & chỉ mục bằng chứng (có thể mất ~5s khi khởi động)...",
     "library.sources_count": "{count} nguồn",
     "library.sources_count_plural": "{count} nguồn",
     "library.deliverables_count": "{count} tài liệu",
@@ -253,17 +303,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "Mở không gian tài liệu",
     "library.empty_title": "Chưa có không gian làm việc nào",
     "library.empty_search_title": "Không tìm thấy không gian phù hợp",
-    "library.empty_desc": "Tạo không gian làm việc đầu tiên để sắp xếp tài liệu nguồn, soạn thảo đề xuất và thực hiện kiểm toán xác thực.",
-    "library.empty_search_desc": "Thử điều chỉnh từ khóa tìm kiếm hoặc xem tất cả không gian làm việc.",
+    "library.empty_desc":
+      "Tạo không gian làm việc đầu tiên để sắp xếp tài liệu nguồn, soạn thảo đề xuất và thực hiện kiểm toán xác thực.",
+    "library.empty_search_desc":
+      "Thử điều chỉnh từ khóa tìm kiếm hoặc xem tất cả không gian làm việc.",
     "library.create_modal_title": "Tạo Không Gian Làm Việc Mới",
     "library.workspace_name_label": "Tên Không Gian Làm Việc",
-    "library.workspace_name_placeholder": "Ví dụ: Đề xuất dự thầu Apex Financial, Báo cáo bảo mật đám mây Q3",
+    "library.workspace_name_placeholder":
+      "Ví dụ: Đề xuất dự thầu Apex Financial, Báo cáo bảo mật đám mây Q3",
     "library.template_select_label": "Chọn Mẫu Quy Trình Làm Việc",
     "library.btn_cancel": "Hủy",
     "library.btn_create": "Tạo Không Gian",
     "library.btn_creating": "Đang tạo...",
     "library.drag_drop_title": "Thả tệp vào đây để tạo không gian mới",
-    "library.drag_drop_desc": "Hệ thống sẽ tự động khởi tạo và lập chỉ mục tài liệu của bạn",
+    "library.drag_drop_desc":
+      "Hệ thống sẽ tự động khởi tạo và lập chỉ mục tài liệu của bạn",
     "library.action_rename": "Đổi tên",
     "library.action_delete": "Xóa",
     "library.btn_save": "Lưu",
@@ -277,7 +331,8 @@ export const TRANSLATIONS = {
     "workspace.verified_100": "✓ 100% Đã xác thực",
     "workspace.export_deliverable": "Xuất Tài Liệu",
     "workspace.export_pdf": "Tài liệu PDF",
-    "workspace.export_pdf_desc": "Định dạng chuẩn kèm phụ lục kiểm toán bằng chứng",
+    "workspace.export_pdf_desc":
+      "Định dạng chuẩn kèm phụ lục kiểm toán bằng chứng",
     "workspace.export_docx": "Tài liệu Word (DOCX)",
     "workspace.export_docx_desc": "Bản đề xuất có thể chỉnh sửa kèm nguồn dẫn",
     "workspace.export_md": "Tệp Markdown",
@@ -291,27 +346,32 @@ export const TRANSLATIONS = {
     "sources.btn_uploading": "Đang tải lên...",
     "sources.btn_all": "Tất cả",
     "sources.btn_none": "Bỏ chọn",
-    "sources.active_in_grounding": "{selected} trên {total} đang dùng đối chiếu",
+    "sources.active_in_grounding":
+      "{selected} trên {total} đang dùng đối chiếu",
     "sources.status_indexed": "Đã lập chỉ mục",
     "sources.status_indexing": "Đang xử lý...",
     "sources.status_failed": "Thất bại",
     "sources.empty_title": "Chưa đính kèm tài liệu",
-    "sources.empty_desc": "Tải lên RFP, đặc tả kỹ thuật hoặc tài liệu tóm tắt để tạo căn cứ cho không gian này.",
+    "sources.empty_desc":
+      "Tải lên RFP, đặc tả kỹ thuật hoặc tài liệu tóm tắt để tạo căn cứ cho không gian này.",
     "sources.attach_pdf": "Đính kèm tệp PDF hoặc đặc tả",
     "sources.attach_pdf_uploading": "Đang tải lên & lập chỉ mục tệp...",
 
     // Center Canvas: Deliverable Editor
     "editor.heading": "Cấu Trúc & Nội Dung Bản Thảo",
-    "editor.loading": "Đang tải bản thảo tài liệu, cấu trúc & trạng thái xác thực...",
+    "editor.loading":
+      "Đang tải bản thảo tài liệu, cấu trúc & trạng thái xác thực...",
     "editor.btn_save_draft": "Lưu bản thảo",
     "editor.btn_saving": "Đang lưu...",
     "editor.btn_reverify": "Kiểm toán lại",
     "editor.btn_verifying": "Đang kiểm toán...",
     "editor.empty_title": "Chưa có bản thảo tài liệu nào",
-    "editor.empty_desc": "Tải lên RFP, đặc tả hoặc ghi chú của khách hàng ở cột bên trái, sau đó yêu cầu trợ lý soạn thảo và kiểm toán tài liệu.",
+    "editor.empty_desc":
+      "Tải lên RFP, đặc tả hoặc ghi chú của khách hàng ở cột bên trái, sau đó yêu cầu trợ lý soạn thảo và kiểm toán tài liệu.",
     "editor.chip_draft_proposal": "Soạn Đề Xuất Kỹ Thuật",
     "editor.chip_extract_requirements": "Trích Xuất Yêu Cầu",
-    "editor.warning_unsupported": "Cảnh báo xác thực: Phát hiện tuyên bố thiếu căn cứ",
+    "editor.warning_unsupported":
+      "Cảnh báo xác thực: Phát hiện tuyên bố thiếu căn cứ",
     "editor.btn_fix_claim": "Sửa tuyên bố bằng bằng chứng nguồn",
     "editor.placeholder_text": "Nhập nội dung khối văn bản tại đây...",
 
@@ -328,7 +388,8 @@ export const TRANSLATIONS = {
     "audit.review_findings": "Vấn Đề Cần Xử Lý ({count})",
     "audit.btn_scan": "Quét lại",
     "audit.btn_scanning": "Đang quét...",
-    "audit.loading_findings": "Đang kiểm toán các tuyên bố dựa trên bằng chứng nguồn...",
+    "audit.loading_findings":
+      "Đang kiểm toán các tuyên bố dựa trên bằng chứng nguồn...",
     "audit.high_severity": "MỨC ĐỘ CAO",
     "audit.unsupported_claim": "Tuyên Bố Chưa Có Căn Cứ",
     "audit.evidence_available": "Đã Tìm Thấy Bằng Chứng Hỗ Trợ:",
@@ -336,24 +397,28 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "Đang áp dụng sửa đổi…",
     "audit.btn_waive": "Bỏ qua",
     "audit.all_cleared_title": "Đã Giải Quyết Mọi Vấn Đề Xác Thực",
-    "audit.all_cleared_desc": "Mọi tuyên bố trong tài liệu này đều có căn cứ từ tài liệu nguồn của bạn. Cổng xuất tài liệu đã được mở khóa hoàn toàn.",
+    "audit.all_cleared_desc":
+      "Mọi tuyên bố trong tài liệu này đều có căn cứ từ tài liệu nguồn của bạn. Cổng xuất tài liệu đã được mở khóa hoàn toàn.",
     "audit.btn_export_now": "Xuất Tài Liệu Đã Xác Thực",
 
     // Requirements Matrix Tab
     "matrix.header_title": "Ma Trận Truy Xuất Yêu Cầu Có Thể Xác Thực",
-    "matrix.header_desc": "Theo dõi yêu cầu RFP của khách hàng so với độ bao phủ của bản thảo và căn cứ nguồn.",
+    "matrix.header_desc":
+      "Theo dõi yêu cầu RFP của khách hàng so với độ bao phủ của bản thảo và căn cứ nguồn.",
     "matrix.loading": "Đang trích xuất và ánh xạ ma trận yêu cầu...",
     "matrix.btn_ask_agent": "Yêu Cầu Trợ Lý Đáp Ứng Yêu Cầu Này",
 
     // Appendix Tab
     "appendix.header_title": "Xem Trước Phụ Lục Kiểm Toán & Xác Thực",
-    "appendix.header_desc": "Sổ cái nguồn gốc bằng chứng này sẽ được biên soạn và đính kèm khi xuất tài liệu.",
+    "appendix.header_desc":
+      "Sổ cái nguồn gốc bằng chứng này sẽ được biên soạn và đính kèm khi xuất tài liệu.",
     "appendix.col_requirement": "Yêu Cầu / Tuyên Bố",
     "appendix.col_source": "Nguồn Bằng Chứng",
     "appendix.col_status": "Trạng Thái",
     "appendix.status_verified": "Đã xác thực ✓",
     "appendix.status_unverified": "Chưa xác thực ⚠",
-    "appendix.cryptographic_stamp": "Đã đóng dấu kiểm toán nguồn gốc mã hóa Groundwork",
+    "appendix.cryptographic_stamp":
+      "Đã đóng dấu kiểm toán nguồn gốc mã hóa Groundwork",
 
     // Agent Dock
     "agent.dock_title": "Trợ Lý AI Căn Cứ Groundwork",
@@ -366,22 +431,29 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "Lịch sử",
     "agent.toggle_minimize": "Thu nhỏ",
     "agent.loading_history": "Đang tải lịch sử trò chuyện...",
-    "agent.empty_history": "Trợ lý Groundwork thao tác trực tiếp trên bản thảo, ma trận yêu cầu và các nguồn tài liệu của bạn.",
+    "agent.empty_history":
+      "Trợ lý Groundwork thao tác trực tiếp trên bản thảo, ma trận yêu cầu và các nguồn tài liệu của bạn.",
     "agent.task_execution": "Tiến Trình Thực Thi Đa Bước",
     "agent.btn_stop": "Dừng lại",
-    "agent.placeholder_ready": "Yêu cầu trợ lý soạn thảo, xác thực hoặc giải quyết tuyên bố trên {count} tài liệu nguồn…",
-    "agent.placeholder_with_artifact": "Hỏi trợ lý về \"{artifact}\" hoặc đối chiếu {count} tài liệu nguồn…",
-    "agent.placeholder_with_findings": "Yêu cầu trợ lý giải quyết {count} tuyên bố chưa có căn cứ hoặc sửa đổi…",
-    "agent.placeholder_working": "Trợ lý đang thực thi chỉ thị trên tài liệu nguồn…",
+    "agent.placeholder_ready":
+      "Yêu cầu trợ lý soạn thảo, xác thực hoặc giải quyết tuyên bố trên {count} tài liệu nguồn…",
+    "agent.placeholder_with_artifact":
+      'Hỏi trợ lý về "{artifact}" hoặc đối chiếu {count} tài liệu nguồn…',
+    "agent.placeholder_with_findings":
+      "Yêu cầu trợ lý giải quyết {count} tuyên bố chưa có căn cứ hoặc sửa đổi…",
+    "agent.placeholder_working":
+      "Trợ lý đang thực thi chỉ thị trên tài liệu nguồn…",
     "agent.btn_execute": "Thực thi",
     "agent.btn_working": "Đang xử lý…",
 
     // Settings / Account Panel
     "settings.eyebrow_profile": "Hồ sơ",
     "settings.profile_title": "Tài khoản của bạn",
-    "settings.profile_desc": "Đảm bảo danh tính rõ ràng khi cộng tác hoặc xuất tài liệu.",
+    "settings.profile_desc":
+      "Đảm bảo danh tính rõ ràng khi cộng tác hoặc xuất tài liệu.",
     "settings.language_heading": "Ngôn Ngữ & Giao Diện",
-    "settings.language_desc": "Chọn ngôn ngữ giao diện hiển thị và chế độ sáng/tối.",
+    "settings.language_desc":
+      "Chọn ngôn ngữ giao diện hiển thị và chế độ sáng/tối.",
     "settings.language_label": "Ngôn Ngữ Giao Diện",
     "settings.theme_label": "Chế Độ Giao Diện",
     "settings.btn_save_preferences": "Lưu Cài Đặt",
@@ -421,21 +493,28 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Espacios de Trabajo con Evidencia Verificada",
-    "library.hero_subtitle": "Transforme RFP de clientes, especificaciones y documentos en propuestas técnicas 100% verificadas y fundamentadas en fuentes.",
+    "library.hero_subtitle":
+      "Transforme RFP de clientes, especificaciones y documentos en propuestas técnicas 100% verificadas y fundamentadas en fuentes.",
     "library.templates_heading": "Plantillas de Inicio Rápido",
-    "library.templates_subheading": "Elija un flujo de trabajo adaptado a su proyecto",
+    "library.templates_subheading":
+      "Elija un flujo de trabajo adaptado a su proyecto",
     "library.category_all": "Todos los espacios",
     "library.category_proposals": "Propuestas",
     "library.category_reports": "Informes",
     "library.template_proposal_title": "Propuesta Técnica y RFP",
-    "library.template_proposal_desc": "Redacte ofertas técnicas asignadas directamente a los requisitos y SLA del cliente.",
+    "library.template_proposal_desc":
+      "Redacte ofertas técnicas asignadas directamente a los requisitos y SLA del cliente.",
     "library.template_report_title": "Informe de Investigación",
-    "library.template_report_desc": "Analice datos de mercado, balances o estudios en un resumen ejecutivo.",
+    "library.template_report_desc":
+      "Analice datos de mercado, balances o estudios en un resumen ejecutivo.",
     "library.template_presentation_title": "Presentación Ejecutiva",
-    "library.template_presentation_desc": "Estructure el contenido en una presentación ejecutiva adaptada a la audiencia.",
+    "library.template_presentation_desc":
+      "Estructure el contenido en una presentación ejecutiva adaptada a la audiencia.",
     "library.template_blank_title": "Espacio en Blanco",
-    "library.template_blank_desc": "Comience desde cero y fundamente consultas en sus archivos personalizados.",
-    "library.loading_banner": "Conectando a la nube de Groundwork · Cargando espacios e índices...",
+    "library.template_blank_desc":
+      "Comience desde cero y fundamente consultas en sus archivos personalizados.",
+    "library.loading_banner":
+      "Conectando a la nube de Groundwork · Cargando espacios e índices...",
     "library.sources_count": "{count} fuente",
     "library.sources_count_plural": "{count} fuentes",
     "library.deliverables_count": "{count} entregable",
@@ -445,17 +524,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "Abrir espacio de trabajo",
     "library.empty_title": "No hay espacios de trabajo creados",
     "library.empty_search_title": "No se encontraron espacios coincidentes",
-    "library.empty_desc": "Cree su primer espacio para organizar documentos, redactar propuestas y auditar la verificación.",
-    "library.empty_search_desc": "Intente ajustar sus términos de búsqueda o vea todos los espacios.",
+    "library.empty_desc":
+      "Cree su primer espacio para organizar documentos, redactar propuestas y auditar la verificación.",
+    "library.empty_search_desc":
+      "Intente ajustar sus términos de búsqueda o vea todos los espacios.",
     "library.create_modal_title": "Crear Nuevo Espacio de Trabajo",
     "library.workspace_name_label": "Nombre del Espacio",
-    "library.workspace_name_placeholder": "p. ej., Propuesta RFP Apex, Informe de Seguridad Q3",
+    "library.workspace_name_placeholder":
+      "p. ej., Propuesta RFP Apex, Informe de Seguridad Q3",
     "library.template_select_label": "Seleccionar Plantilla de Flujo",
     "library.btn_cancel": "Cancelar",
     "library.btn_create": "Crear Espacio",
     "library.btn_creating": "Creando...",
     "library.drag_drop_title": "Suelte el archivo aquí para comenzar",
-    "library.drag_drop_desc": "Inicializaremos e indexaremos su documento automáticamente",
+    "library.drag_drop_desc":
+      "Inicializaremos e indexaremos su documento automáticamente",
     "library.action_rename": "Renombrar",
     "library.action_delete": "Eliminar",
     "library.btn_save": "Guardar",
@@ -480,12 +563,14 @@ export const TRANSLATIONS = {
     "sources.btn_uploading": "Subiendo...",
     "sources.btn_all": "Todos",
     "sources.btn_none": "Ninguno",
-    "sources.active_in_grounding": "{selected} de {total} activos en validación",
+    "sources.active_in_grounding":
+      "{selected} de {total} activos en validación",
     "sources.status_indexed": "Indexado",
     "sources.status_indexing": "Procesando...",
     "sources.status_failed": "Fallido",
     "sources.empty_title": "Sin fuentes adjuntas",
-    "sources.empty_desc": "Suba un RFP o especificación técnica para fundamentar este espacio.",
+    "sources.empty_desc":
+      "Suba un RFP o especificación técnica para fundamentar este espacio.",
     "sources.attach_pdf": "Adjuntar PDF o especificación",
     "sources.attach_pdf_uploading": "Subiendo e indexando archivo...",
 
@@ -496,10 +581,12 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "Reverificar Borrador",
     "editor.btn_verifying": "Verificando...",
     "editor.empty_title": "No hay borrador redactado",
-    "editor.empty_desc": "Suba especificaciones a la izquierda e indique al asistente que redacte y verifique su propuesta.",
+    "editor.empty_desc":
+      "Suba especificaciones a la izquierda e indique al asistente que redacte y verifique su propuesta.",
     "editor.chip_draft_proposal": "Redactar Propuesta Técnica",
     "editor.chip_extract_requirements": "Extraer Requisitos",
-    "editor.warning_unsupported": "Aviso de Verificación: Afirmación sin fundamento detectada",
+    "editor.warning_unsupported":
+      "Aviso de Verificación: Afirmación sin fundamento detectada",
     "editor.btn_fix_claim": "Corregir con Evidencia de Fuente",
     "editor.placeholder_text": "Introduzca el contenido aquí...",
 
@@ -515,7 +602,8 @@ export const TRANSLATIONS = {
     "audit.review_findings": "Hallazgos de Revisión ({count})",
     "audit.btn_scan": "Escanear",
     "audit.btn_scanning": "Escaneando...",
-    "audit.loading_findings": "Auditando afirmaciones contra la evidencia activa...",
+    "audit.loading_findings":
+      "Auditando afirmaciones contra la evidencia activa...",
     "audit.high_severity": "SEVERIDAD ALTA",
     "audit.unsupported_claim": "Afirmación Sin Evidencia",
     "audit.evidence_available": "Evidencia de Respaldo Disponible:",
@@ -523,22 +611,26 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "Aplicando revisión…",
     "audit.btn_waive": "Descartar",
     "audit.all_cleared_title": "Todos los Hallazgos Resueltos",
-    "audit.all_cleared_desc": "Cada afirmación está respaldada en su documentación fuente. Exportación desbloqueada.",
+    "audit.all_cleared_desc":
+      "Cada afirmación está respaldada en su documentación fuente. Exportación desbloqueada.",
     "audit.btn_export_now": "Exportar Entregable Verificado",
 
     "matrix.header_title": "Matriz de Trazabilidad de Requisitos Verificables",
-    "matrix.header_desc": "Rastree los requisitos del cliente frente a la cobertura del borrador.",
+    "matrix.header_desc":
+      "Rastree los requisitos del cliente frente a la cobertura del borrador.",
     "matrix.loading": "Extrayendo y mapeando requisitos...",
     "matrix.btn_ask_agent": "Pedir al Asistente Cumplir Requisito",
 
     "appendix.header_title": "Vista Previa del Apéndice de Auditoría",
-    "appendix.header_desc": "Este registro de procedencia de evidencia se adjunta al exportar el documento.",
+    "appendix.header_desc":
+      "Este registro de procedencia de evidencia se adjunta al exportar el documento.",
     "appendix.col_requirement": "Requisito / Afirmación",
     "appendix.col_source": "Fuente de Evidencia",
     "appendix.col_status": "Estado",
     "appendix.status_verified": "Verificado ✓",
     "appendix.status_unverified": "Sin verificar ⚠",
-    "appendix.cryptographic_stamp": "Sello Criptográfico de Auditoría Groundwork",
+    "appendix.cryptographic_stamp":
+      "Sello Criptográfico de Auditoría Groundwork",
 
     "agent.dock_title": "Asistente Verificado Groundwork",
     "agent.status_ready": "Listo para instrucciones",
@@ -550,19 +642,23 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "Historial",
     "agent.toggle_minimize": "Minimizar",
     "agent.loading_history": "Cargando historial...",
-    "agent.empty_history": "El asistente opera directamente sobre su borrador, matriz de requisitos y fuentes.",
+    "agent.empty_history":
+      "El asistente opera directamente sobre su borrador, matriz de requisitos y fuentes.",
     "agent.task_execution": "Ejecución de Tareas Multietapa",
     "agent.btn_stop": "Detener",
-    "agent.placeholder_ready": "Pida al asistente redactar o verificar afirmaciones en {count} fuentes…",
+    "agent.placeholder_ready":
+      "Pida al asistente redactar o verificar afirmaciones en {count} fuentes…",
     "agent.placeholder_working": "El asistente está ejecutando instrucciones…",
     "agent.btn_execute": "Ejecutar",
     "agent.btn_working": "Procesando…",
 
     "settings.eyebrow_profile": "Perfil",
     "settings.profile_title": "Su cuenta",
-    "settings.profile_desc": "Mantenga clara su identidad para colaborar y exportar.",
+    "settings.profile_desc":
+      "Mantenga clara su identidad para colaborar y exportar.",
     "settings.language_heading": "Idioma y Apariencia",
-    "settings.language_desc": "Elija su idioma preferido y tema de visualización.",
+    "settings.language_desc":
+      "Elija su idioma preferido y tema de visualización.",
     "settings.language_label": "Idioma de Interfaz",
     "settings.theme_label": "Tema",
     "settings.btn_save_preferences": "Guardar Configuración",
@@ -602,21 +698,28 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "根拠に基づく成果物ワークスペース",
-    "library.hero_subtitle": "クライアントのRFP、仕様書、資料を、100%根拠のある検証済み技術提案書や成果物に変換します。",
+    "library.hero_subtitle":
+      "クライアントのRFP、仕様書、資料を、100%根拠のある検証済み技術提案書や成果物に変換します。",
     "library.templates_heading": "クイックスタートテンプレート",
-    "library.templates_subheading": "案件に適したワークフローを選択してください",
+    "library.templates_subheading":
+      "案件に適したワークフローを選択してください",
     "library.category_all": "すべてのワークスペース",
     "library.category_proposals": "提案書",
     "library.category_reports": "レポート",
     "library.template_proposal_title": "技術提案書＆RFP",
-    "library.template_proposal_desc": "要件やSLAに直接対応した技術提案書を作成します。",
+    "library.template_proposal_desc":
+      "要件やSLAに直接対応した技術提案書を作成します。",
     "library.template_report_title": "リサーチレポート",
-    "library.template_report_desc": "市場データや論文をエグゼクティブ向け要約にまとめます。",
+    "library.template_report_desc":
+      "市場データや論文をエグゼクティブ向け要約にまとめます。",
     "library.template_presentation_title": "プレゼンテーション資料",
-    "library.template_presentation_desc": "資料を構成し、相手に合わせたプレゼン構成を作成します。",
+    "library.template_presentation_desc":
+      "資料を構成し、相手に合わせたプレゼン構成を作成します。",
     "library.template_blank_title": "空のワークスペース",
-    "library.template_blank_desc": "独自のファイルをもとにゼロから分析を始めます。",
-    "library.loading_banner": "クラウドに接続中 · ワークスペースとインデックスを読み込んでいます...",
+    "library.template_blank_desc":
+      "独自のファイルをもとにゼロから分析を始めます。",
+    "library.loading_banner":
+      "クラウドに接続中 · ワークスペースとインデックスを読み込んでいます...",
     "library.sources_count": "{count}件のソース",
     "library.sources_count_plural": "{count}件のソース",
     "library.deliverables_count": "{count}件の成果物",
@@ -626,17 +729,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "ワークスペースを開く",
     "library.empty_title": "ワークスペースがまだありません",
     "library.empty_search_title": "該当するワークスペースが見つかりません",
-    "library.empty_desc": "最初のワークスペースを作成して資料を整理し、提案書を作成・検証しましょう。",
-    "library.empty_search_desc": "検索ワードを変更するか、すべての一覧をご覧ください。",
+    "library.empty_desc":
+      "最初のワークスペースを作成して資料を整理し、提案書を作成・検証しましょう。",
+    "library.empty_search_desc":
+      "検索ワードを変更するか、すべての一覧をご覧ください。",
     "library.create_modal_title": "新規ワークスペース作成",
     "library.workspace_name_label": "ワークスペース名",
-    "library.workspace_name_placeholder": "例: クラウドセキュリティ提案書、Q3市場分析",
+    "library.workspace_name_placeholder":
+      "例: クラウドセキュリティ提案書、Q3市場分析",
     "library.template_select_label": "ワークフローテンプレートを選択",
     "library.btn_cancel": "キャンセル",
     "library.btn_create": "作成する",
     "library.btn_creating": "作成中...",
     "library.drag_drop_title": "ここにファイルをドロップして開始",
-    "library.drag_drop_desc": "ドキュメントを自動的に初期化およびインデックス付けします",
+    "library.drag_drop_desc":
+      "ドキュメントを自動的に初期化およびインデックス付けします",
     "library.action_rename": "名前変更",
     "library.action_delete": "削除",
     "library.btn_save": "保存",
@@ -666,7 +773,8 @@ export const TRANSLATIONS = {
     "sources.status_indexing": "処理中...",
     "sources.status_failed": "失敗",
     "sources.empty_title": "ソース資料がありません",
-    "sources.empty_desc": "RFPや仕様書をアップロードして分析の根拠に設定してください。",
+    "sources.empty_desc":
+      "RFPや仕様書をアップロードして分析の根拠に設定してください。",
     "sources.attach_pdf": "PDFまたは仕様書を添付",
     "sources.attach_pdf_uploading": "アップロードおよびインデックス中...",
 
@@ -677,7 +785,8 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "再検証を実行",
     "editor.btn_verifying": "検証中...",
     "editor.empty_title": "下書きがまだありません",
-    "editor.empty_desc": "左側に仕様書をアップロードし、AIエージェントに下書き作成と検証を指示してください。",
+    "editor.empty_desc":
+      "左側に仕様書をアップロードし、AIエージェントに下書き作成と検証を指示してください。",
     "editor.chip_draft_proposal": "技術提案書を作成",
     "editor.chip_extract_requirements": "要件を抽出",
     "editor.warning_unsupported": "検証警告: 根拠が不足している記述を検出",
@@ -704,16 +813,19 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "修正適用中…",
     "audit.btn_waive": "無視",
     "audit.all_cleared_title": "すべての検証指摘事項が解決されました",
-    "audit.all_cleared_desc": "提案書内のすべての記述がソース資料で裏付けられています。エクスポート可能です。",
+    "audit.all_cleared_desc":
+      "提案書内のすべての記述がソース資料で裏付けられています。エクスポート可能です。",
     "audit.btn_export_now": "検証済み成果物をエクスポート",
 
     "matrix.header_title": "検証可能要件トレーサビリティマトリクス",
-    "matrix.header_desc": "顧客要件に対するドラフトの網羅度と根拠を追跡します。",
+    "matrix.header_desc":
+      "顧客要件に対するドラフトの網羅度と根拠を追跡します。",
     "matrix.loading": "要件を抽出およびマッピング中...",
     "matrix.btn_ask_agent": "エージェントに要件充足を指示",
 
     "appendix.header_title": "監査付録プレビュー",
-    "appendix.header_desc": "この根拠追跡台帳は、エクスポート時に成果物に添付されます。",
+    "appendix.header_desc":
+      "この根拠追跡台帳は、エクスポート時に成果物に添付されます。",
     "appendix.col_requirement": "要件 / 主張",
     "appendix.col_source": "根拠ソース",
     "appendix.col_status": "ステータス",
@@ -731,17 +843,20 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "履歴",
     "agent.toggle_minimize": "最小化",
     "agent.loading_history": "会話履歴を読み込み中...",
-    "agent.empty_history": "Groundworkエージェントは下書き、要件マトリクス、ソース資料に直接働きかけます。",
+    "agent.empty_history":
+      "Groundworkエージェントは下書き、要件マトリクス、ソース資料に直接働きかけます。",
     "agent.task_execution": "タスク実行ステップ",
     "agent.btn_stop": "停止",
-    "agent.placeholder_ready": "{count}件のソースをもとに下書き・検証・修正を指示…",
+    "agent.placeholder_ready":
+      "{count}件のソースをもとに下書き・検証・修正を指示…",
     "agent.placeholder_working": "エージェントが指示を実行中…",
     "agent.btn_execute": "実行",
     "agent.btn_working": "処理中…",
 
     "settings.eyebrow_profile": "プロフィール",
     "settings.profile_title": "アカウント情報",
-    "settings.profile_desc": "コラボレーションやエクスポート時に表示される情報です。",
+    "settings.profile_desc":
+      "コラボレーションやエクスポート時に表示される情報です。",
     "settings.language_heading": "言語と表示設定",
     "settings.language_desc": "インターフェース言語とテーマを選択します。",
     "settings.language_label": "表示言語",
@@ -783,21 +898,28 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Evidenzbasierte Arbeitsbereiche",
-    "library.hero_subtitle": "Verwandeln Sie Ausschreibungen, Spezifikationen und Unterlagen in 100 % verifizierte, quellengestützte technische Angebote.",
+    "library.hero_subtitle":
+      "Verwandeln Sie Ausschreibungen, Spezifikationen und Unterlagen in 100 % verifizierte, quellengestützte technische Angebote.",
     "library.templates_heading": "Schnellstart-Vorlagen",
-    "library.templates_subheading": "Wählen Sie den passenden Workflow für Ihr Projekt",
+    "library.templates_subheading":
+      "Wählen Sie den passenden Workflow für Ihr Projekt",
     "library.category_all": "Alle Arbeitsbereiche",
     "library.category_proposals": "Angebote",
     "library.category_reports": "Berichte",
     "library.template_proposal_title": "Technisches Angebot & RFP",
-    "library.template_proposal_desc": "Erstellen Sie anforderungsgerechte Angebote mit Zuordnung zu Kunden-SLAs.",
+    "library.template_proposal_desc":
+      "Erstellen Sie anforderungsgerechte Angebote mit Zuordnung zu Kunden-SLAs.",
     "library.template_report_title": "Recherchebericht",
-    "library.template_report_desc": "Analysieren Sie Marktdaten oder Finanzberichte in einer Management-Zusammenfassung.",
+    "library.template_report_desc":
+      "Analysieren Sie Marktdaten oder Finanzberichte in einer Management-Zusammenfassung.",
     "library.template_presentation_title": "Management-Präsentation",
-    "library.template_presentation_desc": "Strukturieren Sie Inhalte zielgruppengerecht für Entscheidungsträger.",
+    "library.template_presentation_desc":
+      "Strukturieren Sie Inhalte zielgruppengerecht für Entscheidungsträger.",
     "library.template_blank_title": "Leerer Arbeitsbereich",
-    "library.template_blank_desc": "Starten Sie auf einer leeren Fläche mit Ihren eigenen Dokumenten.",
-    "library.loading_banner": "Verbindung zur Groundwork-Cloud · Lade Arbeitsbereiche...",
+    "library.template_blank_desc":
+      "Starten Sie auf einer leeren Fläche mit Ihren eigenen Dokumenten.",
+    "library.loading_banner":
+      "Verbindung zur Groundwork-Cloud · Lade Arbeitsbereiche...",
     "library.sources_count": "{count} Quelle",
     "library.sources_count_plural": "{count} Quellen",
     "library.deliverables_count": "{count} Dokument",
@@ -807,17 +929,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "Arbeitsbereich öffnen",
     "library.empty_title": "Noch keine Arbeitsbereiche vorhanden",
     "library.empty_search_title": "Keine passenden Arbeitsbereiche gefunden",
-    "library.empty_desc": "Erstellen Sie Ihren ersten Bereich, um Quelldokumente zu strukturieren und Angebote zu verifizieren.",
-    "library.empty_search_desc": "Passen Sie Ihre Suchbegriffe an oder zeigen Sie alle Bereiche an.",
+    "library.empty_desc":
+      "Erstellen Sie Ihren ersten Bereich, um Quelldokumente zu strukturieren und Angebote zu verifizieren.",
+    "library.empty_search_desc":
+      "Passen Sie Ihre Suchbegriffe an oder zeigen Sie alle Bereiche an.",
     "library.create_modal_title": "Neuen Arbeitsbereich erstellen",
     "library.workspace_name_label": "Name des Arbeitsbereichs",
-    "library.workspace_name_placeholder": "z. B. Apex RFP-Angebot, Cloud-Sicherheitsbericht Q3",
+    "library.workspace_name_placeholder":
+      "z. B. Apex RFP-Angebot, Cloud-Sicherheitsbericht Q3",
     "library.template_select_label": "Workflow-Vorlage wählen",
     "library.btn_cancel": "Abbrechen",
     "library.btn_create": "Erstellen",
     "library.btn_creating": "Wird erstellt...",
     "library.drag_drop_title": "Datei hier ablegen, um zu starten",
-    "library.drag_drop_desc": "Wir initialisieren und indexieren Ihr Dokument automatisch",
+    "library.drag_drop_desc":
+      "Wir initialisieren und indexieren Ihr Dokument automatisch",
     "library.action_rename": "Umbenennen",
     "library.action_delete": "Löschen",
     "library.btn_save": "Speichern",
@@ -842,12 +968,14 @@ export const TRANSLATIONS = {
     "sources.btn_uploading": "Wird hochgeladen...",
     "sources.btn_all": "Alle",
     "sources.btn_none": "Keine",
-    "sources.active_in_grounding": "{selected} von {total} aktiv zur Begründung",
+    "sources.active_in_grounding":
+      "{selected} von {total} aktiv zur Begründung",
     "sources.status_indexed": "Indexiert",
     "sources.status_indexing": "Wird verarbeitet...",
     "sources.status_failed": "Fehlgeschlagen",
     "sources.empty_title": "Keine Quellen angehängt",
-    "sources.empty_desc": "Laden Sie Spezifikationen hoch, um diesen Bereich zu begründen.",
+    "sources.empty_desc":
+      "Laden Sie Spezifikationen hoch, um diesen Bereich zu begründen.",
     "sources.attach_pdf": "PDF oder Spezifikation anhängen",
     "sources.attach_pdf_uploading": "Wird hochgeladen & indexiert...",
 
@@ -858,7 +986,8 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "Erneut verifizieren",
     "editor.btn_verifying": "Wird geprüft...",
     "editor.empty_title": "Noch kein Entwurf vorhanden",
-    "editor.empty_desc": "Laden Sie links Unterlagen hoch und weisen Sie den Assistenten an, Ihren Entwurf zu verfassen.",
+    "editor.empty_desc":
+      "Laden Sie links Unterlagen hoch und weisen Sie den Assistenten an, Ihren Entwurf zu verfassen.",
     "editor.chip_draft_proposal": "Technisches Angebot verfassen",
     "editor.chip_extract_requirements": "Anforderungen extrahieren",
     "editor.warning_unsupported": "Prüfhinweis: Unbelegte Behauptung erkannt",
@@ -885,7 +1014,8 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "Wird angewendet…",
     "audit.btn_waive": "Ignorieren",
     "audit.all_cleared_title": "Alle Prüfbefunde gelöst",
-    "audit.all_cleared_desc": "Jede Behauptung ist durch Ihre Quelldokumente belegt. Export freigegeben.",
+    "audit.all_cleared_desc":
+      "Jede Behauptung ist durch Ihre Quelldokumente belegt. Export freigegeben.",
     "audit.btn_export_now": "Verifiziertes Dokument exportieren",
 
     "matrix.header_title": "Anforderungs-Rückverfolgbarkeitsmatrix",
@@ -894,13 +1024,15 @@ export const TRANSLATIONS = {
     "matrix.btn_ask_agent": "Assistent mit Anforderung beauftragen",
 
     "appendix.header_title": "Vorschau des Audit-Anhangs",
-    "appendix.header_desc": "Dieses Evidenzregister wird beim Export an das Dokument angehängt.",
+    "appendix.header_desc":
+      "Dieses Evidenzregister wird beim Export an das Dokument angehängt.",
     "appendix.col_requirement": "Anforderung / Behauptung",
     "appendix.col_source": "Evidenzquelle",
     "appendix.col_status": "Status",
     "appendix.status_verified": "Verifiziert ✓",
     "appendix.status_unverified": "Unverifiziert ⚠",
-    "appendix.cryptographic_stamp": "Kryptografisch auditierter Groundwork-Stempel",
+    "appendix.cryptographic_stamp":
+      "Kryptografisch auditierter Groundwork-Stempel",
 
     "agent.dock_title": "Groundwork KI-Assistent",
     "agent.status_ready": "Bereit für Anweisungen",
@@ -912,10 +1044,12 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "Verlauf",
     "agent.toggle_minimize": "Minimieren",
     "agent.loading_history": "Lade Gesprächsverlauf...",
-    "agent.empty_history": "Der Assistent arbeitet direkt mit Ihrem Entwurf, der Matrix und den Quellen.",
+    "agent.empty_history":
+      "Der Assistent arbeitet direkt mit Ihrem Entwurf, der Matrix und den Quellen.",
     "agent.task_execution": "Aufgabenausführung",
     "agent.btn_stop": "Stopp",
-    "agent.placeholder_ready": "Beauftragen Sie den Assistenten über {count} Quellen…",
+    "agent.placeholder_ready":
+      "Beauftragen Sie den Assistenten über {count} Quellen…",
     "agent.placeholder_working": "Assistent führt Befehle aus…",
     "agent.btn_execute": "Ausführen",
     "agent.btn_working": "In Arbeit…",
@@ -964,21 +1098,29 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Espaces de Rédaction Fondés sur des Preuves",
-    "library.hero_subtitle": "Transformez vos appels d'offres et spécifications en propositions techniques 100 % vérifiées et étayées par des sources.",
+    "library.hero_subtitle":
+      "Transformez vos appels d'offres et spécifications en propositions techniques 100 % vérifiées et étayées par des sources.",
     "library.templates_heading": "Modèles de Démarrage Rapide",
-    "library.templates_subheading": "Choisissez un flux de travail adapté à votre projet",
+    "library.templates_subheading":
+      "Choisissez un flux de travail adapté à votre projet",
     "library.category_all": "Tous les espaces",
     "library.category_proposals": "Propositions",
     "library.category_reports": "Rapports",
-    "library.template_proposal_title": "Proposition Technique et Appel d'Offres",
-    "library.template_proposal_desc": "Rédigez des offres conformes mappées directement aux exigences et SLA du client.",
+    "library.template_proposal_title":
+      "Proposition Technique et Appel d'Offres",
+    "library.template_proposal_desc":
+      "Rédigez des offres conformes mappées directement aux exigences et SLA du client.",
     "library.template_report_title": "Rapport de Recherche",
-    "library.template_report_desc": "Analysez des données de marché ou bilans en synthèse exécutive.",
+    "library.template_report_desc":
+      "Analysez des données de marché ou bilans en synthèse exécutive.",
     "library.template_presentation_title": "Présentation Exécutive",
-    "library.template_presentation_desc": "Structurez vos contenus en une présentation adaptée aux décideurs.",
+    "library.template_presentation_desc":
+      "Structurez vos contenus en une présentation adaptée aux décideurs.",
     "library.template_blank_title": "Espace Vierge",
-    "library.template_blank_desc": "Partez de zéro et fondez vos requêtes sur vos propres fichiers.",
-    "library.loading_banner": "Connexion au cloud Groundwork · Chargement des espaces...",
+    "library.template_blank_desc":
+      "Partez de zéro et fondez vos requêtes sur vos propres fichiers.",
+    "library.loading_banner":
+      "Connexion au cloud Groundwork · Chargement des espaces...",
     "library.sources_count": "{count} source",
     "library.sources_count_plural": "{count} sources",
     "library.deliverables_count": "{count} livrable",
@@ -988,17 +1130,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "Ouvrir l'espace",
     "library.empty_title": "Aucun espace créé pour le moment",
     "library.empty_search_title": "Aucun espace correspondant trouvé",
-    "library.empty_desc": "Créez votre premier espace pour organiser vos documents et auditer vos propositions.",
-    "library.empty_search_desc": "Ajustez vos termes de recherche ou affichez tous les espaces.",
+    "library.empty_desc":
+      "Créez votre premier espace pour organiser vos documents et auditer vos propositions.",
+    "library.empty_search_desc":
+      "Ajustez vos termes de recherche ou affichez tous les espaces.",
     "library.create_modal_title": "Créer un Nouvel Espace de Travail",
     "library.workspace_name_label": "Nom de l'Espace",
-    "library.workspace_name_placeholder": "ex. Réponse RFP Apex, Rapport Sécurité Q3",
+    "library.workspace_name_placeholder":
+      "ex. Réponse RFP Apex, Rapport Sécurité Q3",
     "library.template_select_label": "Sélectionner un Modèle",
     "library.btn_cancel": "Annuler",
     "library.btn_create": "Créer l'Espace",
     "library.btn_creating": "Création...",
     "library.drag_drop_title": "Glissez un fichier ici pour commencer",
-    "library.drag_drop_desc": "Nous initialiserons et indexerons automatiquement votre document",
+    "library.drag_drop_desc":
+      "Nous initialiserons et indexerons automatiquement votre document",
     "library.action_rename": "Renommer",
     "library.action_delete": "Supprimer",
     "library.btn_save": "Enregistrer",
@@ -1023,12 +1169,14 @@ export const TRANSLATIONS = {
     "sources.btn_uploading": "Téléversement...",
     "sources.btn_all": "Tous",
     "sources.btn_none": "Aucun",
-    "sources.active_in_grounding": "{selected} sur {total} actifs en justification",
+    "sources.active_in_grounding":
+      "{selected} sur {total} actifs en justification",
     "sources.status_indexed": "Indexé",
     "sources.status_indexing": "En cours...",
     "sources.status_failed": "Échoué",
     "sources.empty_title": "Aucune source attachée",
-    "sources.empty_desc": "Téléversez une spécification pour fonder cet espace.",
+    "sources.empty_desc":
+      "Téléversez une spécification pour fonder cet espace.",
     "sources.attach_pdf": "Joindre un PDF ou spécification",
     "sources.attach_pdf_uploading": "Téléversement et indexation...",
 
@@ -1039,10 +1187,12 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "Revérifier le Projet",
     "editor.btn_verifying": "Vérification...",
     "editor.empty_title": "Aucun projet rédigé pour le moment",
-    "editor.empty_desc": "Téléversez des spécifications à gauche puis demandez à l'assistant de rédiger et vérifier.",
+    "editor.empty_desc":
+      "Téléversez des spécifications à gauche puis demandez à l'assistant de rédiger et vérifier.",
     "editor.chip_draft_proposal": "Rédiger une Proposition Technique",
     "editor.chip_extract_requirements": "Extraire les Exigences",
-    "editor.warning_unsupported": "Alerte de Vérification : Affirmation non justifiée détectée",
+    "editor.warning_unsupported":
+      "Alerte de Vérification : Affirmation non justifiée détectée",
     "editor.btn_fix_claim": "Corriger avec Preuve Source",
     "editor.placeholder_text": "Saisissez le contenu ici...",
 
@@ -1058,7 +1208,8 @@ export const TRANSLATIONS = {
     "audit.review_findings": "Constats d'Audit ({count})",
     "audit.btn_scan": "Analyser",
     "audit.btn_scanning": "Analyse en cours...",
-    "audit.loading_findings": "Audit des affirmations par rapport aux preuves actives...",
+    "audit.loading_findings":
+      "Audit des affirmations par rapport aux preuves actives...",
     "audit.high_severity": "SÉVÉRITÉ ÉLEVÉE",
     "audit.unsupported_claim": "Affirmation Non Justifiée",
     "audit.evidence_available": "Preuve Disponible :",
@@ -1066,16 +1217,19 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "Application en cours…",
     "audit.btn_waive": "Ignorer",
     "audit.all_cleared_title": "Tous les Constats d'Audit sont Résolus",
-    "audit.all_cleared_desc": "Chaque affirmation est étayée par vos documents sources. Exportation déverrouillée.",
+    "audit.all_cleared_desc":
+      "Chaque affirmation est étayée par vos documents sources. Exportation déverrouillée.",
     "audit.btn_export_now": "Exporter le Livrable Vérifié",
 
     "matrix.header_title": "Matrice de Traçabilité des Exigences",
-    "matrix.header_desc": "Suivez les exigences client face à la couverture du brouillon.",
+    "matrix.header_desc":
+      "Suivez les exigences client face à la couverture du brouillon.",
     "matrix.loading": "Extraction et mappage des exigences...",
     "matrix.btn_ask_agent": "Demander à l'Assistant de Répondre",
 
     "appendix.header_title": "Aperçu de l'Annexe d'Audit",
-    "appendix.header_desc": "Ce registre de provenance est compilé et joint lors de l'exportation.",
+    "appendix.header_desc":
+      "Ce registre de provenance est compilé et joint lors de l'exportation.",
     "appendix.col_requirement": "Exigence / Affirmation",
     "appendix.col_source": "Source de Preuve",
     "appendix.col_status": "Statut",
@@ -1093,19 +1247,23 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "Historique",
     "agent.toggle_minimize": "Réduire",
     "agent.loading_history": "Chargement de l'historique...",
-    "agent.empty_history": "L'assistant opère directement sur votre projet, matrice et sources.",
+    "agent.empty_history":
+      "L'assistant opère directement sur votre projet, matrice et sources.",
     "agent.task_execution": "Exécution Multi-Étapes",
     "agent.btn_stop": "Arrêter",
-    "agent.placeholder_ready": "Demandez à l'assistant de rédiger ou vérifier sur {count} sources…",
+    "agent.placeholder_ready":
+      "Demandez à l'assistant de rédiger ou vérifier sur {count} sources…",
     "agent.placeholder_working": "L'assistant exécute les instructions…",
     "agent.btn_execute": "Exécuter",
     "agent.btn_working": "Traitement…",
 
     "settings.eyebrow_profile": "Profil",
     "settings.profile_title": "Votre compte",
-    "settings.profile_desc": "Assurez la clarté de votre identité pour collaborer.",
+    "settings.profile_desc":
+      "Assurez la clarté de votre identité pour collaborer.",
     "settings.language_heading": "Langue et Affichage",
-    "settings.language_desc": "Choisissez la langue de l'interface et le thème.",
+    "settings.language_desc":
+      "Choisissez la langue de l'interface et le thème.",
     "settings.language_label": "Langue d'Interface",
     "settings.theme_label": "Thème",
     "settings.btn_save_preferences": "Enregistrer les Paramètres",
@@ -1145,21 +1303,27 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "基于证据的成果工作区",
-    "library.hero_subtitle": "将客户招标书（RFP）、技术规范与资料转化为100%有据可查、经严格验证的技术提案与成果。",
+    "library.hero_subtitle":
+      "将客户招标书（RFP）、技术规范与资料转化为100%有据可查、经严格验证的技术提案与成果。",
     "library.templates_heading": "快速入门模板",
     "library.templates_subheading": "选择适合您项目的交付流程",
     "library.category_all": "所有工作区",
     "library.category_proposals": "方案提案",
     "library.category_reports": "研究报告",
     "library.template_proposal_title": "技术提案与招标书",
-    "library.template_proposal_desc": "起草直接对照客户需求与SLA的合规技术投标书。",
+    "library.template_proposal_desc":
+      "起草直接对照客户需求与SLA的合规技术投标书。",
     "library.template_report_title": "客户研究报告",
-    "library.template_report_desc": "将市场数据、财务报告或研究论文分析提炼为高管简报。",
+    "library.template_report_desc":
+      "将市场数据、财务报告或研究论文分析提炼为高管简报。",
     "library.template_presentation_title": "高管汇报演示",
-    "library.template_presentation_desc": "构建适合受众与决策层的高管汇报框架与叙事。",
+    "library.template_presentation_desc":
+      "构建适合受众与决策层的高管汇报框架与叙事。",
     "library.template_blank_title": "空白工作区",
-    "library.template_blank_desc": "从零开始，基于您的专属文件建立有依据的查询与分析。",
-    "library.loading_banner": "正在连接 Groundwork 云端 · 加载工作区与证据索引...",
+    "library.template_blank_desc":
+      "从零开始，基于您的专属文件建立有依据的查询与分析。",
+    "library.loading_banner":
+      "正在连接 Groundwork 云端 · 加载工作区与证据索引...",
     "library.sources_count": "{count} 个来源",
     "library.sources_count_plural": "{count} 个来源",
     "library.deliverables_count": "{count} 个成果",
@@ -1169,11 +1333,13 @@ export const TRANSLATIONS = {
     "library.open_workspace": "打开工作区",
     "library.empty_title": "尚未创建工作区",
     "library.empty_search_title": "未找到匹配的工作区",
-    "library.empty_desc": "创建第一个工作区以组织来源文档、撰写提案并执行合规审计。",
+    "library.empty_desc":
+      "创建第一个工作区以组织来源文档、撰写提案并执行合规审计。",
     "library.empty_search_desc": "请尝试调整搜索词或查看全部工作区。",
     "library.create_modal_title": "创建新工作区",
     "library.workspace_name_label": "工作区名称",
-    "library.workspace_name_placeholder": "例如: Apex 招标书应答, Q3 云安全评估报告",
+    "library.workspace_name_placeholder":
+      "例如: Apex 招标书应答, Q3 云安全评估报告",
     "library.template_select_label": "选择交付工作流模板",
     "library.btn_cancel": "取消",
     "library.btn_create": "创建工作区",
@@ -1220,7 +1386,8 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "重新验证草稿",
     "editor.btn_verifying": "验证中...",
     "editor.empty_title": "暂无草稿内容",
-    "editor.empty_desc": "请在左侧上传规范文档，然后指示智能助手撰写并验证交付成果。",
+    "editor.empty_desc":
+      "请在左侧上传规范文档，然后指示智能助手撰写并验证交付成果。",
     "editor.chip_draft_proposal": "起草技术提案",
     "editor.chip_extract_requirements": "提取验收要求",
     "editor.warning_unsupported": "验证警报：检测到缺乏依据的主张",
@@ -1247,7 +1414,8 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "应用修订中…",
     "audit.btn_waive": "忽略",
     "audit.all_cleared_title": "所有验证发现已全部解决",
-    "audit.all_cleared_desc": "本提案中的每一项陈述均有来源依据支持。导出功能已完全解锁。",
+    "audit.all_cleared_desc":
+      "本提案中的每一项陈述均有来源依据支持。导出功能已完全解锁。",
     "audit.btn_export_now": "导出已验证成果",
 
     "matrix.header_title": "可验证需求可追溯性矩阵",
@@ -1256,7 +1424,8 @@ export const TRANSLATIONS = {
     "matrix.btn_ask_agent": "要求助手满足此项要求",
 
     "appendix.header_title": "验证与审计附录预览",
-    "appendix.header_desc": "此证据来源台账将在导出时自动编制并附加在文档末尾。",
+    "appendix.header_desc":
+      "此证据来源台账将在导出时自动编制并附加在文档末尾。",
     "appendix.col_requirement": "需求项 / 陈述",
     "appendix.col_source": "证据来源",
     "appendix.col_status": "状态",
@@ -1274,10 +1443,12 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "历史",
     "agent.toggle_minimize": "最小化",
     "agent.loading_history": "正在加载对话历史...",
-    "agent.empty_history": "Groundwork 助手直接操作您的文档草稿、需求矩阵与来源资料。",
+    "agent.empty_history":
+      "Groundwork 助手直接操作您的文档草稿、需求矩阵与来源资料。",
     "agent.task_execution": "多步骤任务执行进度",
     "agent.btn_stop": "停止",
-    "agent.placeholder_ready": "指示助手基于 {count} 个来源起草、验证或解决陈述…",
+    "agent.placeholder_ready":
+      "指示助手基于 {count} 个来源起草、验证或解决陈述…",
     "agent.placeholder_working": "助手正在执行跨来源指令…",
     "agent.btn_execute": "执行",
     "agent.btn_working": "处理中…",
@@ -1326,21 +1497,27 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "근거 기반 산출물 워크스페이스",
-    "library.hero_subtitle": "고객 RFP, 기술 사양 및 문서를 100% 검증된 출처 기반 기술 제안서 및 산출물로 변환합니다.",
+    "library.hero_subtitle":
+      "고객 RFP, 기술 사양 및 문서를 100% 검증된 출처 기반 기술 제안서 및 산출물로 변환합니다.",
     "library.templates_heading": "빠른 시작 템플릿",
     "library.templates_subheading": "프로젝트에 적합한 워크플로우를 선택하세요",
     "library.category_all": "전체 워크스페이스",
     "library.category_proposals": "제안서",
     "library.category_reports": "보고서",
     "library.template_proposal_title": "기술 제안서 및 RFP",
-    "library.template_proposal_desc": "고객 요구사항 및 SLA에 직접 대응하는 기술 입찰서를 작성합니다.",
+    "library.template_proposal_desc":
+      "고객 요구사항 및 SLA에 직접 대응하는 기술 입찰서를 작성합니다.",
     "library.template_report_title": "연구 분석 보고서",
-    "library.template_report_desc": "시장 데이터, 재무제표 및 논문을 경영진 요약본으로 분석합니다.",
+    "library.template_report_desc":
+      "시장 데이터, 재무제표 및 논문을 경영진 요약본으로 분석합니다.",
     "library.template_presentation_title": "경영진 프레젠테이션",
-    "library.template_presentation_desc": "청중에 맞춘 발표 자료와 논리 구조를 설계합니다.",
+    "library.template_presentation_desc":
+      "청중에 맞춘 발표 자료와 논리 구조를 설계합니다.",
     "library.template_blank_title": "빈 워크스페이스",
-    "library.template_blank_desc": "새로운 공간에서 자체 파일을 기반으로 조회를 시작합니다.",
-    "library.loading_banner": "Groundwork 클라우드 연결 중 · 워크스페이스 및 색인 로드 중...",
+    "library.template_blank_desc":
+      "새로운 공간에서 자체 파일을 기반으로 조회를 시작합니다.",
+    "library.loading_banner":
+      "Groundwork 클라우드 연결 중 · 워크스페이스 및 색인 로드 중...",
     "library.sources_count": "{count}개 소스",
     "library.sources_count_plural": "{count}개 소스",
     "library.deliverables_count": "{count}개 산출물",
@@ -1350,11 +1527,13 @@ export const TRANSLATIONS = {
     "library.open_workspace": "워크스페이스 열기",
     "library.empty_title": "생성된 워크스페이스가 없습니다",
     "library.empty_search_title": "일치하는 워크스페이스가 없습니다",
-    "library.empty_desc": "첫 번째 워크스페이스를 생성하여 문서를 정리하고 제안서를 검증하세요.",
+    "library.empty_desc":
+      "첫 번째 워크스페이스를 생성하여 문서를 정리하고 제안서를 검증하세요.",
     "library.empty_search_desc": "검색어를 변경하거나 전체 목록을 확인하세요.",
     "library.create_modal_title": "새 워크스페이스 생성",
     "library.workspace_name_label": "워크스페이스 이름",
-    "library.workspace_name_placeholder": "예: Apex 클라우드 보안 제안서, Q3 보고서",
+    "library.workspace_name_placeholder":
+      "예: Apex 클라우드 보안 제안서, Q3 보고서",
     "library.template_select_label": "워크플로우 템플릿 선택",
     "library.btn_cancel": "취소",
     "library.btn_create": "생성하기",
@@ -1390,7 +1569,8 @@ export const TRANSLATIONS = {
     "sources.status_indexing": "처리 중...",
     "sources.status_failed": "실패",
     "sources.empty_title": "첨부된 소스가 없습니다",
-    "sources.empty_desc": "RFP나 기술 사양서를 업로드하여 분석 근거로 활용하세요.",
+    "sources.empty_desc":
+      "RFP나 기술 사양서를 업로드하여 분석 근거로 활용하세요.",
     "sources.attach_pdf": "PDF 또는 사양서 첨부",
     "sources.attach_pdf_uploading": "업로드 및 색인 생성 중...",
 
@@ -1401,7 +1581,8 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "초안 재검증",
     "editor.btn_verifying": "검증 중...",
     "editor.empty_title": "작성된 초안이 없습니다",
-    "editor.empty_desc": "왼쪽에 사양서를 업로드하고 에이전트에게 제안서 작성 및 검증을 지시하세요.",
+    "editor.empty_desc":
+      "왼쪽에 사양서를 업로드하고 에이전트에게 제안서 작성 및 검증을 지시하세요.",
     "editor.chip_draft_proposal": "기술 제안서 작성",
     "editor.chip_extract_requirements": "요구사항 추출",
     "editor.warning_unsupported": "검증 경고: 근거가 부족한 주장 감지됨",
@@ -1428,16 +1609,19 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "수정사항 적용 중…",
     "audit.btn_waive": "무시",
     "audit.all_cleared_title": "모든 검증 항목이 해결되었습니다",
-    "audit.all_cleared_desc": "문서의 모든 주장이 소스 증거로 뒷받침됩니다. 내보내기가 가능합니다.",
+    "audit.all_cleared_desc":
+      "문서의 모든 주장이 소스 증거로 뒷받침됩니다. 내보내기가 가능합니다.",
     "audit.btn_export_now": "검증된 산출물 내보내기",
 
     "matrix.header_title": "검증 가능 요구사항 추적 매트릭스",
-    "matrix.header_desc": "고객 요구사항 대비 초안 충족도 및 소스 근거를 추적합니다.",
+    "matrix.header_desc":
+      "고객 요구사항 대비 초안 충족도 및 소스 근거를 추적합니다.",
     "matrix.loading": "요구사항 추출 및 매핑 중...",
     "matrix.btn_ask_agent": "에이전트에게 요구사항 충족 지시",
 
     "appendix.header_title": "감사 부록 미리보기",
-    "appendix.header_desc": "이 증거 출처 대장은 내보낼 때 산출물에 첨부됩니다.",
+    "appendix.header_desc":
+      "이 증거 출처 대장은 내보낼 때 산출물에 첨부됩니다.",
     "appendix.col_requirement": "요구사항 / 주장",
     "appendix.col_source": "증거 소스",
     "appendix.col_status": "상태",
@@ -1455,10 +1639,12 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "기록",
     "agent.toggle_minimize": "최소화",
     "agent.loading_history": "대화 기록 불러오는 중...",
-    "agent.empty_history": "Groundwork 에이전트는 초안, 요구사항 매트릭스, 소스 자료에 직접 접근합니다.",
+    "agent.empty_history":
+      "Groundwork 에이전트는 초안, 요구사항 매트릭스, 소스 자료에 직접 접근합니다.",
     "agent.task_execution": "작업 실행 단계",
     "agent.btn_stop": "중지",
-    "agent.placeholder_ready": "{count}개 소스를 기반으로 작성, 검증, 수정을 지시하세요…",
+    "agent.placeholder_ready":
+      "{count}개 소스를 기반으로 작성, 검증, 수정을 지시하세요…",
     "agent.placeholder_working": "에이전트가 지시를 실행 중입니다…",
     "agent.btn_execute": "실행",
     "agent.btn_working": "처리 중…",
@@ -1507,21 +1693,28 @@ export const TRANSLATIONS = {
 
     "library.hero_badge": "Groundwork 2.5",
     "library.hero_title": "Espaços de Trabalho Baseados em Evidências",
-    "library.hero_subtitle": "Transforme RFPs, especificações e arquivos em propostas técnicas 100% verificadas e fundamentadas em fontes.",
+    "library.hero_subtitle":
+      "Transforme RFPs, especificações e arquivos em propostas técnicas 100% verificadas e fundamentadas em fontes.",
     "library.templates_heading": "Modelos de Início Rápido",
-    "library.templates_subheading": "Escolha um fluxo de trabalho adaptado ao seu projeto",
+    "library.templates_subheading":
+      "Escolha um fluxo de trabalho adaptado ao seu projeto",
     "library.category_all": "Todos os espaços",
     "library.category_proposals": "Propostas",
     "library.category_reports": "Relatórios",
     "library.template_proposal_title": "Proposta Técnica e RFP",
-    "library.template_proposal_desc": "Elabore propostas técnicas mapeadas diretamente aos requisitos e SLAs do cliente.",
+    "library.template_proposal_desc":
+      "Elabore propostas técnicas mapeadas diretamente aos requisitos e SLAs do cliente.",
     "library.template_report_title": "Relatório de Pesquisa",
-    "library.template_report_desc": "Analise dados de mercado ou balanços em um resumo executivo.",
+    "library.template_report_desc":
+      "Analise dados de mercado ou balanços em um resumo executivo.",
     "library.template_presentation_title": "Apresentação Executiva",
-    "library.template_presentation_desc": "Estruture o conteúdo em uma apresentação adaptada para executivos.",
+    "library.template_presentation_desc":
+      "Estruture o conteúdo em uma apresentação adaptada para executivos.",
     "library.template_blank_title": "Espaço em Branco",
-    "library.template_blank_desc": "Comece do zero com seus próprios arquivos como base.",
-    "library.loading_banner": "Conectando à nuvem Groundwork · Carregando espaços e índices...",
+    "library.template_blank_desc":
+      "Comece do zero com seus próprios arquivos como base.",
+    "library.loading_banner":
+      "Conectando à nuvem Groundwork · Carregando espaços e índices...",
     "library.sources_count": "{count} fonte",
     "library.sources_count_plural": "{count} fontes",
     "library.deliverables_count": "{count} documento",
@@ -1531,17 +1724,21 @@ export const TRANSLATIONS = {
     "library.open_workspace": "Abrir espaço de trabalho",
     "library.empty_title": "Nenhum espaço criado ainda",
     "library.empty_search_title": "Nenhum espaço correspondente encontrado",
-    "library.empty_desc": "Crie seu primeiro espaço para organizar documentos, elaborar propostas e auditar verificações.",
-    "library.empty_search_desc": "Ajuste os termos da pesquisa ou veja todos os espaços.",
+    "library.empty_desc":
+      "Crie seu primeiro espaço para organizar documentos, elaborar propostas e auditar verificações.",
+    "library.empty_search_desc":
+      "Ajuste os termos da pesquisa ou veja todos os espaços.",
     "library.create_modal_title": "Criar Novo Espaço de Trabalho",
     "library.workspace_name_label": "Nome do Espaço",
-    "library.workspace_name_placeholder": "ex.: Resposta RFP Apex, Relatório de Segurança Q3",
+    "library.workspace_name_placeholder":
+      "ex.: Resposta RFP Apex, Relatório de Segurança Q3",
     "library.template_select_label": "Selecionar Modelo de Fluxo",
     "library.btn_cancel": "Cancelar",
     "library.btn_create": "Criar Espaço",
     "library.btn_creating": "Criando...",
     "library.drag_drop_title": "Solte o arquivo aqui para começar",
-    "library.drag_drop_desc": "Inicializaremos e indexaremos seu documento automaticamente",
+    "library.drag_drop_desc":
+      "Inicializaremos e indexaremos seu documento automaticamente",
     "library.action_rename": "Renomear",
     "library.action_delete": "Excluir",
     "library.btn_save": "Salvar",
@@ -1566,12 +1763,14 @@ export const TRANSLATIONS = {
     "sources.btn_uploading": "Enviando...",
     "sources.btn_all": "Todos",
     "sources.btn_none": "Nenhum",
-    "sources.active_in_grounding": "{selected} de {total} ativos em comprovação",
+    "sources.active_in_grounding":
+      "{selected} de {total} ativos em comprovação",
     "sources.status_indexed": "Indexado",
     "sources.status_indexing": "Processando...",
     "sources.status_failed": "Falhou",
     "sources.empty_title": "Nenhuma fonte anexada",
-    "sources.empty_desc": "Envie uma especificação ou RFP para fundamentar este espaço.",
+    "sources.empty_desc":
+      "Envie uma especificação ou RFP para fundamentar este espaço.",
     "sources.attach_pdf": "Anexar PDF ou especificação",
     "sources.attach_pdf_uploading": "Enviando e indexando arquivo...",
 
@@ -1582,10 +1781,12 @@ export const TRANSLATIONS = {
     "editor.btn_reverify": "Reverificar Rascunho",
     "editor.btn_verifying": "Verificando...",
     "editor.empty_title": "Nenhum rascunho elaborado ainda",
-    "editor.empty_desc": "Envie especificações à esquerda e instrua o assistente a redigir e auditar seu documento.",
+    "editor.empty_desc":
+      "Envie especificações à esquerda e instrua o assistente a redigir e auditar seu documento.",
     "editor.chip_draft_proposal": "Redigir Proposta Técnica",
     "editor.chip_extract_requirements": "Extrair Requisitos",
-    "editor.warning_unsupported": "Aviso de Verificação: Declaração sem evidência detectada",
+    "editor.warning_unsupported":
+      "Aviso de Verificação: Declaração sem evidência detectada",
     "editor.btn_fix_claim": "Corrigir com Evidência da Fonte",
     "editor.placeholder_text": "Insira o conteúdo aqui...",
 
@@ -1601,7 +1802,8 @@ export const TRANSLATIONS = {
     "audit.review_findings": "Apontamentos da Revisão ({count})",
     "audit.btn_scan": "Escanear",
     "audit.btn_scanning": "Escaneando...",
-    "audit.loading_findings": "Auditando afirmações contra evidências ativas...",
+    "audit.loading_findings":
+      "Auditando afirmações contra evidências ativas...",
     "audit.high_severity": "ALTA SEVERIDADE",
     "audit.unsupported_claim": "Declaração Sem Evidência",
     "audit.evidence_available": "Evidência de Suporte Disponível:",
@@ -1609,22 +1811,27 @@ export const TRANSLATIONS = {
     "audit.btn_applying_fix": "Aplicando revisão…",
     "audit.btn_waive": "Ignorar",
     "audit.all_cleared_title": "Todas as Pendências Foram Resolvidas",
-    "audit.all_cleared_desc": "Todas as afirmações nesta proposta estão fundamentadas em suas fontes. Exportação liberada.",
+    "audit.all_cleared_desc":
+      "Todas as afirmações nesta proposta estão fundamentadas em suas fontes. Exportação liberada.",
     "audit.btn_export_now": "Exportar Documento Verificado",
 
-    "matrix.header_title": "Matriz de Rastreabilidade de Requisitos Verificáveis",
-    "matrix.header_desc": "Acompanhe os requisitos do cliente em relação ao rascunho.",
+    "matrix.header_title":
+      "Matriz de Rastreabilidade de Requisitos Verificáveis",
+    "matrix.header_desc":
+      "Acompanhe os requisitos do cliente em relação ao rascunho.",
     "matrix.loading": "Extraindo e mapeando requisitos...",
     "matrix.btn_ask_agent": "Pedir ao Assistente para Atender Requisito",
 
     "appendix.header_title": "Prévia do Apêndice de Auditoria",
-    "appendix.header_desc": "Este registro de procedência de evidências é anexado ao exportar o documento.",
+    "appendix.header_desc":
+      "Este registro de procedência de evidências é anexado ao exportar o documento.",
     "appendix.col_requirement": "Requisito / Declaração",
     "appendix.col_source": "Fonte de Evidência",
     "appendix.col_status": "Status",
     "appendix.status_verified": "Verificado ✓",
     "appendix.status_unverified": "Não verificado ⚠",
-    "appendix.cryptographic_stamp": "Carimbo Criptográfico de Auditoria Groundwork",
+    "appendix.cryptographic_stamp":
+      "Carimbo Criptográfico de Auditoria Groundwork",
 
     "agent.dock_title": "Assistente IA Groundwork",
     "agent.status_ready": "Pronto para instruções",
@@ -1636,19 +1843,23 @@ export const TRANSLATIONS = {
     "agent.toggle_history": "Histórico",
     "agent.toggle_minimize": "Minimizar",
     "agent.loading_history": "Carregando histórico de conversa...",
-    "agent.empty_history": "O assistente opera diretamente sobre seu rascunho, matriz de requisitos e fontes.",
+    "agent.empty_history":
+      "O assistente opera diretamente sobre seu rascunho, matriz de requisitos e fontes.",
     "agent.task_execution": "Execução de Tarefas em Etapas",
     "agent.btn_stop": "Parar",
-    "agent.placeholder_ready": "Peça ao assistente para redigir, verificar ou resolver declarações em {count} fontes…",
+    "agent.placeholder_ready":
+      "Peça ao assistente para redigir, verificar ou resolver declarações em {count} fontes…",
     "agent.placeholder_working": "O assistente está executando as instruções…",
     "agent.btn_execute": "Executar",
     "agent.btn_working": "Processando…",
 
     "settings.eyebrow_profile": "Perfil",
     "settings.profile_title": "Sua conta",
-    "settings.profile_desc": "Mantenha sua identidade clara para colaborar e exportar.",
+    "settings.profile_desc":
+      "Mantenha sua identidade clara para colaborar e exportar.",
     "settings.language_heading": "Idioma e Aparência",
-    "settings.language_desc": "Escolha seu idioma preferido e tema de exibição.",
+    "settings.language_desc":
+      "Escolha seu idioma preferido e tema de exibição.",
     "settings.language_label": "Idioma da Interface",
     "settings.theme_label": "Tema",
     "settings.btn_save_preferences": "Salvar Configurações",
@@ -1679,14 +1890,24 @@ export function getActiveLanguage(): Language {
   return (prefs.language as Language) || "en";
 }
 
-export function translate(key: TranslationKey, params?: Record<string, string | number>, lang?: Language): string {
+export function translate(
+  key: TranslationKey,
+  params?: Record<string, string | number>,
+  lang?: Language,
+): string {
   const currentLang = lang || getActiveLanguage();
-  const dict = (TRANSLATIONS as Record<string, Record<string, string>>)[currentLang] || TRANSLATIONS.en;
-  let text: string = dict[key] || (TRANSLATIONS.en as Record<string, string>)[key] || key;
+  const dict =
+    (TRANSLATIONS as Record<string, Record<string, string>>)[currentLang] ||
+    TRANSLATIONS.en;
+  let text: string =
+    dict[key] || (TRANSLATIONS.en as Record<string, string>)[key] || key;
 
   if (params) {
     for (const [paramKey, paramVal] of Object.entries(params)) {
-      text = text.replace(new RegExp(`\\{${paramKey}\\}`, "g"), String(paramVal));
+      text = text.replace(
+        new RegExp(`\\{${paramKey}\\}`, "g"),
+        String(paramVal),
+      );
     }
   }
 
@@ -1726,5 +1947,10 @@ export function useTranslation() {
     [language],
   );
 
-  return { t, language, setLanguage: changeLanguage, languageOptions: LANGUAGE_OPTIONS };
+  return {
+    t,
+    language,
+    setLanguage: changeLanguage,
+    languageOptions: LANGUAGE_OPTIONS,
+  };
 }

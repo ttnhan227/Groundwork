@@ -9,11 +9,15 @@
    ========================================================================== */
 
 /* Global Box-Sizing & Word-Wrap Reset */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -33,14 +37,29 @@ body {
 }
 
 /* Universal Text & Heading Overflow Protection */
-h1, h2, h3, h4, h5, h6, p, blockquote, span, a, div, li, td, th {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+span,
+a,
+div,
+li,
+td,
+th {
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
 /* Reduced motion accessibility */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -57,15 +76,18 @@ h1, h2, h3, h4, h5, h6, p, blockquote, span, a, div, li, td, th {
 }
 
 /* Typography Role Helpers */
-.font-display, .font-serif {
+.font-display,
+.font-serif {
   font-family: var(--font-serif);
 }
 
-.font-body, .font-sans {
+.font-body,
+.font-sans {
   font-family: var(--font-sans);
 }
 
-.font-agent, .font-mono {
+.font-agent,
+.font-mono {
   font-family: var(--font-mono);
 }
 
@@ -166,7 +188,11 @@ h1, h2, h3, h4, h5, h6, p, blockquote, span, a, div, li, td, th {
 }
 
 /* Focus Rings */
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--ink-blue);
   outline-offset: 1px;
 }
@@ -176,6 +202,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   animation: spin 1s linear infinite;
 }
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

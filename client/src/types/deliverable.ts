@@ -46,7 +46,11 @@ export type AISuggestion = {
   before_text: string;
   proposed_text: string;
   status: "pending" | "accepted" | "rejected";
-  citations: Array<{ document_id: string; document_name?: string; page_number: number }>;
+  citations: Array<{
+    document_id: string;
+    document_name?: string;
+    page_number: number;
+  }>;
   created_at: string;
   decided_at: string | null;
 };
@@ -87,7 +91,13 @@ export type DeliverableReviewFinding = {
     | "repetition"
     | "tone_inconsistency"
     | "source_conflict";
-  claim_type: "number_stat" | "timeline_date" | "user_quote" | "recommendation" | "assumption" | "other";
+  claim_type:
+    | "number_stat"
+    | "timeline_date"
+    | "user_quote"
+    | "recommendation"
+    | "assumption"
+    | "other";
   severity: "low" | "medium" | "high";
   claim_text: string;
   explanation: string;

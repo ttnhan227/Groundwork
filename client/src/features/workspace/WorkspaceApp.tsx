@@ -8,6 +8,11 @@ import {
   RefreshCw,
   X,
   Plus,
+  FolderPlus,
+  Folder,
+  Bell,
+  Settings,
+  BookOpen,
 } from "lucide-react";
 import type {
   AuthResult,
@@ -35,13 +40,19 @@ import {
 } from "../../api/client";
 import { AccountPanel as AccountSettingsPanel } from "../account/AccountPanel";
 import { NotificationCenter } from "../account/NotificationCenter";
-import { applyPreferences, storedPreferences, type UserPreferences } from "../account/preferences";
+import {
+  applyPreferences,
+  storedPreferences,
+  PREFERENCES_CHANGED_EVENT,
+  type UserPreferences,
+} from "../account/preferences";
 import { WorkspaceLibrary } from "./WorkspaceLibrary";
 import { ResearchWorkspace } from "./ResearchWorkspace";
 import { PdfViewerModal } from "../pdf-viewer/PdfViewerModal";
 
 const REGISTRATION_ENABLED =
-  (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !== "false";
+  (import.meta.env.VITE_REGISTRATION_ENABLED ?? "true").toLowerCase() !==
+  "false";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
 
 type GoogleCredentialResponse = { credential: string };
@@ -54,7 +65,10 @@ declare global {
             client_id: string;
             callback: (response: GoogleCredentialResponse) => void;
           }) => void;
-          renderButton: (element: HTMLElement, options: Record<string, string | number>) => void;
+          renderButton: (
+            element: HTMLElement,
+            options: Record<string, string | number>,
+          ) => void;
         };
       };
     };
@@ -121,7 +135,9 @@ function GoogleSignInButton({
     script.defer = true;
     script.onload = render;
     script.onerror = () =>
-      onErrorRef.current("Google sign-in could not be loaded. Check connection.");
+      onErrorRef.current(
+        "Google sign-in could not be loaded. Check connection.",
+      );
     document.head.appendChild(script);
     return () => {
       cancelled = true;
@@ -146,7 +162,13 @@ const authSchema = z.object({
 });
 type AuthFields = z.infer<typeof authSchema>;
 
-function ProcessingJobsModal({ token, onClose }: { token: string; onClose: () => void }) {
+function ProcessingJobsModal({
+  token,
+  onClose,
+}: {
+  token: string;
+  onClose: () => void;
+}) {
   const [items, setItems] = useState<Job[]>([]);
   const [error, setError] = useState("");
   const load = useCallback(
@@ -164,9 +186,18 @@ function ProcessingJobsModal({ token, onClose }: { token: string; onClose: () =>
   }, [load]);
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="Background Processing Jobs" eyebrow="Activity Monitor">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Background Processing Jobs"
+      eyebrow="Activity Monitor"
+    >
       <div className="space-y-3 jobs-panel min-w-0">
-        {error && <div className="p-2 rounded bg-[var(--danger-bg)] text-xs text-[var(--danger)]">{error}</div>}
+        {error && (
+          <div className="p-2 rounded bg-[var(--danger-bg)] text-xs text-[var(--danger)]">
+            {error}
+          </div>
+        )}
         {items.map((job) => (
           <div
             key={job.id}
@@ -177,7 +208,10 @@ function ProcessingJobsModal({ token, onClose }: { token: string; onClose: () =>
                 {(job.operation ?? "document processing").replaceAll("_", " ")}
               </strong>
               <span className="text-[11px] text-[var(--ink-muted)] font-mono">
-                {job.created_at ? new Date(job.created_at).toLocaleTimeString() : ""} · {job.progress}%
+                {job.created_at
+                  ? new Date(job.created_at).toLocaleTimeString()
+                  : ""}{" "}
+                · {job.progress}%
               </span>
             </div>
             <span className="job-state font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] font-medium flex-shrink-0">
@@ -186,7 +220,9 @@ function ProcessingJobsModal({ token, onClose }: { token: string; onClose: () =>
           </div>
         ))}
         {items.length === 0 && !error && (
-          <p className="text-xs text-[var(--ink-muted)] text-center py-4">No processing jobs active.</p>
+          <p className="text-xs text-[var(--ink-muted)] text-center py-4">
+            No processing jobs active.
+          </p>
         )}
       </div>
     </Modal>
@@ -204,7 +240,9 @@ export function WorkspaceApp({
 }) {
   const [initialAuth] = useState<AuthResult | null>(() => getStoredAuth());
   const [token, setToken] = useState(initialAuth?.access_token ?? "");
-  const [user, setUser] = useState<AuthResult["user"] | null>(initialAuth?.user ?? null);
+  const [user, setUser] = useState<AuthResult["user"] | null>(
+    initialAuth?.user ?? null,
+  );
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState("");
@@ -224,13 +262,20 @@ export function WorkspaceApp({
   );
   const [nativeDocs, setNativeDocs] = useState<NativeDocument[]>([]);
   const [workspaceView, setWorkspaceView] = useState<"library" | "workspace">(
-    () => (new URLSearchParams(window.location.search).has("ws") ? "workspace" : "library"),
+    () =>
+      new URLSearchParams(window.location.search).has("ws")
+        ? "workspace"
+        : "library",
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">(() =>
-    document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light",
+    document.documentElement.getAttribute("data-theme") === "dark"
+      ? "dark"
+      : "light",
   );
-  const [isInitialLoading, setIsInitialLoading] = useState(Boolean(initialAuth));
+  const [isInitialLoading, setIsInitialLoading] = useState(
+    Boolean(initialAuth),
+  );
 
   const authForm = useForm<AuthFields>({
     resolver: zodResolver(authSchema),
@@ -239,6 +284,25 @@ export function WorkspaceApp({
 
   useEffect(() => {
     applyPreferences(storedPreferences());
+  }, []);
+
+  useEffect(() => {
+    function handlePrefsChange(e: Event) {
+      const detail = (e as CustomEvent<UserPreferences>).detail;
+      if (detail?.theme) {
+        if (detail.theme === "system") {
+          const isDark =
+            typeof window !== "undefined" &&
+            window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+          setActiveTheme(isDark ? "dark" : "light");
+        } else {
+          setActiveTheme(detail.theme);
+        }
+      }
+    }
+    window.addEventListener(PREFERENCES_CHANGED_EVENT, handlePrefsChange);
+    return () =>
+      window.removeEventListener(PREFERENCES_CHANGED_EVENT, handlePrefsChange);
   }, []);
 
   useEffect(() => {
@@ -281,9 +345,45 @@ export function WorkspaceApp({
       const items = await api<DocumentItem[]>("/documents", accessToken);
       if (items.length === 0) {
         const fallbacks: DocumentItem[] = [
-          { id: "doc_01", workspace_id: "ws_01", filename: "Cloudflare-2026-10K-Annual-Filing.pdf", page_count: 284, status: "completed", size_bytes: 4200000, error_message: null, display_title: "Cloudflare 2026 10-K Annual Filing", tags: ["10-K", "SEC"], collection_id: null, created_at: "2026-08-20T10:00:00Z" },
-          { id: "doc_02", workspace_id: "ws_01", filename: "DoD-Defense-Logistics-Spec.pdf", page_count: 48, status: "completed", size_bytes: 1800000, error_message: null, display_title: "DoD Defense Logistics Spec", tags: ["DoD", "RFP"], collection_id: null, created_at: "2026-08-22T14:30:00Z" },
-          { id: "doc_03", workspace_id: "ws_01", filename: "SOC2-TypeII-Audit-Assessment.pdf", page_count: 92, status: "completed", size_bytes: 3100000, error_message: null, display_title: "SOC 2 Type II Audit Assessment", tags: ["SOC2", "Audit"], collection_id: null, created_at: "2026-08-25T09:15:00Z" },
+          {
+            id: "doc_01",
+            workspace_id: "ws_01",
+            filename: "Cloudflare-2026-10K-Annual-Filing.pdf",
+            page_count: 284,
+            status: "completed",
+            size_bytes: 4200000,
+            error_message: null,
+            display_title: "Cloudflare 2026 10-K Annual Filing",
+            tags: ["10-K", "SEC"],
+            collection_id: null,
+            created_at: "2026-08-20T10:00:00Z",
+          },
+          {
+            id: "doc_02",
+            workspace_id: "ws_01",
+            filename: "DoD-Defense-Logistics-Spec.pdf",
+            page_count: 48,
+            status: "completed",
+            size_bytes: 1800000,
+            error_message: null,
+            display_title: "DoD Defense Logistics Spec",
+            tags: ["DoD", "RFP"],
+            collection_id: null,
+            created_at: "2026-08-22T14:30:00Z",
+          },
+          {
+            id: "doc_03",
+            workspace_id: "ws_01",
+            filename: "SOC2-TypeII-Audit-Assessment.pdf",
+            page_count: 92,
+            status: "completed",
+            size_bytes: 3100000,
+            error_message: null,
+            display_title: "SOC 2 Type II Audit Assessment",
+            tags: ["SOC2", "Audit"],
+            collection_id: null,
+            created_at: "2026-08-25T09:15:00Z",
+          },
         ];
         setDocuments(fallbacks);
       } else {
@@ -291,9 +391,45 @@ export function WorkspaceApp({
       }
     } catch {
       setDocuments([
-        { id: "doc_01", workspace_id: "ws_01", filename: "Cloudflare-2026-10K-Annual-Filing.pdf", page_count: 284, status: "completed", size_bytes: 4200000, error_message: null, display_title: "Cloudflare 2026 10-K Annual Filing", tags: ["10-K", "SEC"], collection_id: null, created_at: "2026-08-20T10:00:00Z" },
-        { id: "doc_02", workspace_id: "ws_01", filename: "DoD-Defense-Logistics-Spec.pdf", page_count: 48, status: "completed", size_bytes: 1800000, error_message: null, display_title: "DoD Defense Logistics Spec", tags: ["DoD", "RFP"], collection_id: null, created_at: "2026-08-22T14:30:00Z" },
-        { id: "doc_03", workspace_id: "ws_01", filename: "SOC2-TypeII-Audit-Assessment.pdf", page_count: 92, status: "completed", size_bytes: 3100000, error_message: null, display_title: "SOC 2 Type II Audit Assessment", tags: ["SOC2", "Audit"], collection_id: null, created_at: "2026-08-25T09:15:00Z" },
+        {
+          id: "doc_01",
+          workspace_id: "ws_01",
+          filename: "Cloudflare-2026-10K-Annual-Filing.pdf",
+          page_count: 284,
+          status: "completed",
+          size_bytes: 4200000,
+          error_message: null,
+          display_title: "Cloudflare 2026 10-K Annual Filing",
+          tags: ["10-K", "SEC"],
+          collection_id: null,
+          created_at: "2026-08-20T10:00:00Z",
+        },
+        {
+          id: "doc_02",
+          workspace_id: "ws_01",
+          filename: "DoD-Defense-Logistics-Spec.pdf",
+          page_count: 48,
+          status: "completed",
+          size_bytes: 1800000,
+          error_message: null,
+          display_title: "DoD Defense Logistics Spec",
+          tags: ["DoD", "RFP"],
+          collection_id: null,
+          created_at: "2026-08-22T14:30:00Z",
+        },
+        {
+          id: "doc_03",
+          workspace_id: "ws_01",
+          filename: "SOC2-TypeII-Audit-Assessment.pdf",
+          page_count: 92,
+          status: "completed",
+          size_bytes: 3100000,
+          error_message: null,
+          display_title: "SOC 2 Type II Audit Assessment",
+          tags: ["SOC2", "Audit"],
+          collection_id: null,
+          created_at: "2026-08-25T09:15:00Z",
+        },
       ]);
     }
   }, []);
@@ -316,15 +452,39 @@ export function WorkspaceApp({
           }),
         }).catch(() => null);
         if (starter) {
-          await api(`/workspaces/${starter.id}/demo`, accessToken, { method: "POST" }).catch(
-            () => undefined,
-          );
+          await api(`/workspaces/${starter.id}/demo`, accessToken, {
+            method: "POST",
+          }).catch(() => undefined);
           items = [starter];
         } else {
           items = [
-            { id: "ws_01", owner_id: "usr-gw-101", name: "Cloudflare 2026 Form 10-K Regulatory Review", kind: "personal", role: "owner", created_at: "2026-08-20T10:00:00Z", updated_at: "2026-08-20T10:00:00Z" },
-            { id: "ws_02", owner_id: "usr-gw-101", name: "DoD Logistics Procurement Proposal RFP v3.1", kind: "personal", role: "owner", created_at: "2026-08-22T14:30:00Z", updated_at: "2026-08-22T14:30:00Z" },
-            { id: "ws_03", owner_id: "usr-gw-101", name: "SOC 2 Type II Continuous Compliance & Security", kind: "personal", role: "owner", created_at: "2026-08-25T09:15:00Z", updated_at: "2026-08-25T09:15:00Z" },
+            {
+              id: "ws_01",
+              owner_id: "usr-gw-101",
+              name: "Cloudflare 2026 Form 10-K Regulatory Review",
+              kind: "personal",
+              role: "owner",
+              created_at: "2026-08-20T10:00:00Z",
+              updated_at: "2026-08-20T10:00:00Z",
+            },
+            {
+              id: "ws_02",
+              owner_id: "usr-gw-101",
+              name: "DoD Logistics Procurement Proposal RFP v3.1",
+              kind: "personal",
+              role: "owner",
+              created_at: "2026-08-22T14:30:00Z",
+              updated_at: "2026-08-22T14:30:00Z",
+            },
+            {
+              id: "ws_03",
+              owner_id: "usr-gw-101",
+              name: "SOC 2 Type II Continuous Compliance & Security",
+              kind: "personal",
+              role: "owner",
+              created_at: "2026-08-25T09:15:00Z",
+              updated_at: "2026-08-25T09:15:00Z",
+            },
           ];
         }
       }
@@ -332,9 +492,33 @@ export function WorkspaceApp({
       return items;
     } catch {
       const fallback: Workspace[] = [
-        { id: "ws_01", owner_id: "usr-gw-101", name: "Cloudflare 2026 Form 10-K Regulatory Review", kind: "personal", role: "owner", created_at: "2026-08-20T10:00:00Z", updated_at: "2026-08-20T10:00:00Z" },
-        { id: "ws_02", owner_id: "usr-gw-101", name: "DoD Logistics Procurement Proposal RFP v3.1", kind: "personal", role: "owner", created_at: "2026-08-22T14:30:00Z", updated_at: "2026-08-22T14:30:00Z" },
-        { id: "ws_03", owner_id: "usr-gw-101", name: "SOC 2 Type II Continuous Compliance & Security", kind: "personal", role: "owner", created_at: "2026-08-25T09:15:00Z", updated_at: "2026-08-25T09:15:00Z" },
+        {
+          id: "ws_01",
+          owner_id: "usr-gw-101",
+          name: "Cloudflare 2026 Form 10-K Regulatory Review",
+          kind: "personal",
+          role: "owner",
+          created_at: "2026-08-20T10:00:00Z",
+          updated_at: "2026-08-20T10:00:00Z",
+        },
+        {
+          id: "ws_02",
+          owner_id: "usr-gw-101",
+          name: "DoD Logistics Procurement Proposal RFP v3.1",
+          kind: "personal",
+          role: "owner",
+          created_at: "2026-08-22T14:30:00Z",
+          updated_at: "2026-08-22T14:30:00Z",
+        },
+        {
+          id: "ws_03",
+          owner_id: "usr-gw-101",
+          name: "SOC 2 Type II Continuous Compliance & Security",
+          kind: "personal",
+          role: "owner",
+          created_at: "2026-08-25T09:15:00Z",
+          updated_at: "2026-08-25T09:15:00Z",
+        },
       ];
       setWorkspaces(fallback);
       return fallback;
@@ -357,12 +541,19 @@ export function WorkspaceApp({
           id: "nd_01",
           workspace_id: "ws_01",
           owner_id: "usr-gw-101",
-          title: "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Proposal",
+          title:
+            "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Proposal",
           content: {
             type: "doc",
             blocks: [
-              { type: "paragraph", text: "Cloudflare operates a global Anycast network spanning over 330 cities worldwide. Under SEC Form 10-K Item 1A risk disclosure standards, infrastructure multi-region high availability is benchmarked against strict deterministic SLA criteria." },
-              { type: "paragraph", text: "Section 3.2: High Availability & Zero-Trust Failover Architecture guarantees 99.99% continuous availability across active edge nodes." },
+              {
+                type: "paragraph",
+                text: "Cloudflare operates a global Anycast network spanning over 330 cities worldwide. Under SEC Form 10-K Item 1A risk disclosure standards, infrastructure multi-region high availability is benchmarked against strict deterministic SLA criteria.",
+              },
+              {
+                type: "paragraph",
+                text: "Section 3.2: High Availability & Zero-Trust Failover Architecture guarantees 99.99% continuous availability across active edge nodes.",
+              },
             ],
           },
           status: "complete",
@@ -380,12 +571,19 @@ export function WorkspaceApp({
           id: "nd_01",
           workspace_id: "ws_01",
           owner_id: "usr-gw-101",
-          title: "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Proposal",
+          title:
+            "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Proposal",
           content: {
             type: "doc",
             blocks: [
-              { type: "paragraph", text: "Cloudflare operates a global Anycast network spanning over 330 cities worldwide. Under SEC Form 10-K Item 1A risk disclosure standards, infrastructure multi-region high availability is benchmarked against strict deterministic SLA criteria." },
-              { type: "paragraph", text: "Section 3.2: High Availability & Zero-Trust Failover Architecture guarantees 99.99% continuous availability across active edge nodes." },
+              {
+                type: "paragraph",
+                text: "Cloudflare operates a global Anycast network spanning over 330 cities worldwide. Under SEC Form 10-K Item 1A risk disclosure standards, infrastructure multi-region high availability is benchmarked against strict deterministic SLA criteria.",
+              },
+              {
+                type: "paragraph",
+                text: "Section 3.2: High Availability & Zero-Trust Failover Architecture guarantees 99.99% continuous availability across active edge nodes.",
+              },
             ],
           },
           status: "complete",
@@ -401,16 +599,24 @@ export function WorkspaceApp({
   }, []);
 
   function toggleTheme() {
-    const next = activeTheme === "dark" ? "light" : "dark";
+    const next: "light" | "dark" = activeTheme === "dark" ? "light" : "dark";
     setActiveTheme(next);
-    if (next === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
+    const current = storedPreferences();
+    const updated: UserPreferences = { ...current, theme: next };
+    applyPreferences(updated);
+    if (token) {
+      api("/profile/preferences", token, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      }).catch(() => undefined);
     }
   }
 
-  async function handleCreateWorkspace(name: string, template?: string): Promise<string | null> {
+  async function handleCreateWorkspace(
+    name: string,
+    template?: string,
+  ): Promise<string | null> {
     try {
       const newWs = await api<Workspace>("/workspaces", token, {
         method: "POST",
@@ -422,7 +628,9 @@ export function WorkspaceApp({
       setWorkspaceView("workspace");
       return newWs.id;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Could not create workspace");
+      setError(
+        err instanceof Error ? err.message : "Could not create workspace",
+      );
       return null;
     }
   }
@@ -437,11 +645,16 @@ export function WorkspaceApp({
         setWorkspaceView("library");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete workspace");
+      setError(
+        err instanceof Error ? err.message : "Failed to delete workspace",
+      );
     }
   }
 
-  async function handleRenameWorkspace(wsId: string, newName: string): Promise<void> {
+  async function handleRenameWorkspace(
+    wsId: string,
+    newName: string,
+  ): Promise<void> {
     try {
       const updated = await api<Workspace>(`/workspaces/${wsId}`, token, {
         method: "PATCH",
@@ -450,7 +663,9 @@ export function WorkspaceApp({
       });
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to rename workspace");
+      setError(
+        err instanceof Error ? err.message : "Failed to rename workspace",
+      );
     }
   }
 
@@ -487,9 +702,15 @@ export function WorkspaceApp({
       loadWorkspaces(initialAuth.access_token),
       loadAllNativeDocs(initialAuth.access_token),
     ]).finally(() => setIsInitialLoading(false));
-  }, [initialAuth, loadDocuments, loadStats, loadWorkspaces, loadAllNativeDocs]);
+  }, [
+    initialAuth,
+    loadDocuments,
+    loadStats,
+    loadWorkspaces,
+    loadAllNativeDocs,
+  ]);
 
-  // Keyboard shortcut ⌘K
+  // Keyboard shortcut ⌘K and Escape
   useEffect(() => {
     function keyboardShortcuts(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -499,6 +720,9 @@ export function WorkspaceApp({
       if (event.key === "Escape") {
         setViewer(null);
         setCommandPaletteOpen(false);
+        setAccountOpen(false);
+        setNotificationsOpen(false);
+        setJobsOpen(false);
       }
     }
     window.addEventListener("keydown", keyboardShortcuts);
@@ -511,16 +735,50 @@ export function WorkspaceApp({
           id: "library",
           label: "Open Workspace Library",
           detail: "Browse all research workspaces",
-          icon: <FileText size={16} />,
+          icon: <BookOpen size={16} />,
+          shortcut: "⌘L",
           run: () => setWorkspaceView("library"),
+        },
+        {
+          id: "new-workspace",
+          label: "New Workspace",
+          detail: "Create a new research workspace",
+          icon: <FolderPlus size={16} />,
+          run: () => handleCreateWorkspace("New Research Workspace"),
         },
         {
           id: "jobs",
           label: "View processing jobs",
           detail: "Inspect background task progress",
           icon: <Activity size={16} />,
+          shortcut: "⌘J",
           run: () => setJobsOpen(true),
         },
+        {
+          id: "notifications",
+          label: "Activity & Notifications",
+          detail: "View updates, alerts, and task progress",
+          icon: <Bell size={16} />,
+          run: () => setNotificationsOpen(true),
+        },
+        {
+          id: "account",
+          label: "Account & Preferences",
+          detail: "Manage profile, appearance, and settings",
+          icon: <Settings size={16} />,
+          shortcut: "⌘,",
+          run: () => setAccountOpen(true),
+        },
+        ...workspaces.map((ws) => ({
+          id: `workspace-${ws.id}`,
+          label: `Open: ${ws.name}`,
+          detail: ws.kind === "team" ? "Team workspace" : "Personal workspace",
+          icon: <Folder size={16} />,
+          run: () => {
+            setActiveWorkspaceId(ws.id);
+            setWorkspaceView("workspace");
+          },
+        })),
       ]
     : [];
 
@@ -547,7 +805,9 @@ export function WorkspaceApp({
         loadAllNativeDocs(result.access_token),
       ]);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Authentication failed");
+      setError(
+        reason instanceof Error ? reason.message : "Authentication failed",
+      );
     } finally {
       setBusy(false);
     }
@@ -592,28 +852,54 @@ export function WorkspaceApp({
             onError={setError}
           />
 
-          <form onSubmit={authForm.handleSubmit(authenticate)} className="space-y-3 min-w-0">
+          <form
+            onSubmit={authForm.handleSubmit(authenticate)}
+            className="space-y-3 min-w-0"
+          >
             {mode === "register" && (
               <div>
-                <label htmlFor="auth-display-name" className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+                <label
+                  htmlFor="auth-display-name"
+                  className="block text-xs font-medium text-[var(--ink-secondary)] mb-1"
+                >
                   Display Name
                 </label>
-                <Input id="auth-display-name" {...authForm.register("display_name")} required />
+                <Input
+                  id="auth-display-name"
+                  {...authForm.register("display_name")}
+                  required
+                />
               </div>
             )}
 
             <div>
-              <label htmlFor="auth-email" className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+              <label
+                htmlFor="auth-email"
+                className="block text-xs font-medium text-[var(--ink-secondary)] mb-1"
+              >
                 Email
               </label>
-              <Input id="auth-email" type="email" {...authForm.register("email")} required />
+              <Input
+                id="auth-email"
+                type="email"
+                {...authForm.register("email")}
+                required
+              />
             </div>
 
             <div>
-              <label htmlFor="auth-password" className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+              <label
+                htmlFor="auth-password"
+                className="block text-xs font-medium text-[var(--ink-secondary)] mb-1"
+              >
                 Password
               </label>
-              <Input id="auth-password" type="password" {...authForm.register("password")} required />
+              <Input
+                id="auth-password"
+                type="password"
+                {...authForm.register("password")}
+                required
+              />
             </div>
 
             {error && (
@@ -629,7 +915,11 @@ export function WorkspaceApp({
               disabled={busy}
               className="w-full mt-2"
             >
-              {busy ? "Connecting…" : mode === "login" ? "Sign In" : "Create Account"}
+              {busy
+                ? "Connecting…"
+                : mode === "login"
+                  ? "Sign In"
+                  : "Create Account"}
             </Button>
           </form>
 
@@ -641,7 +931,9 @@ export function WorkspaceApp({
               }}
               className="text-xs text-[var(--ink-blue)] hover:underline cursor-pointer"
             >
-              {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
+              {mode === "login"
+                ? "Need an account? Register"
+                : "Already registered? Sign in"}
             </button>
 
             <div>
@@ -680,7 +972,9 @@ export function WorkspaceApp({
         onSelectDoc={(docId) => {
           setWorkspaceView("workspace");
         }}
-        onCreateWorkspace={() => handleCreateWorkspace("New Proposal Workspace")}
+        onCreateWorkspace={() =>
+          handleCreateWorkspace("New Proposal Workspace")
+        }
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onOpenAccount={() => setAccountOpen(true)}
         onToggleTheme={toggleTheme}
@@ -732,7 +1026,9 @@ export function WorkspaceApp({
             onDeleteWorkspace={handleDeleteWorkspace}
             onRenameWorkspace={handleRenameWorkspace}
             onUploadToNewWorkspace={async (file) => {
-              const wsId = await handleCreateWorkspace(file.name.replace(/\.[^/.]+$/, ""));
+              const wsId = await handleCreateWorkspace(
+                file.name.replace(/\.[^/.]+$/, ""),
+              );
               if (wsId) await handleUploadWorkspaceDocument(file, wsId);
             }}
             onOpenAccount={() => setAccountOpen(true)}
@@ -776,10 +1072,15 @@ export function WorkspaceApp({
         />
       )}
 
-      {jobsOpen && <ProcessingJobsModal token={token} onClose={() => setJobsOpen(false)} />}
+      {jobsOpen && (
+        <ProcessingJobsModal token={token} onClose={() => setJobsOpen(false)} />
+      )}
 
       {commandPaletteOpen && (
-        <CommandPalette commands={workspaceCommands} onClose={() => setCommandPaletteOpen(false)} />
+        <CommandPalette
+          commands={workspaceCommands}
+          onClose={() => setCommandPaletteOpen(false)}
+        />
       )}
     </div>
   );

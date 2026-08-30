@@ -7,13 +7,16 @@
 
 /* Reduced Motion & Dark Theme */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
-[data-theme="dark"], html[data-theme="dark"] {
+[data-theme="dark"],
+html[data-theme="dark"] {
   color-scheme: dark;
 }
 
@@ -55,7 +58,8 @@
   margin: 0 auto;
 }
 
-.notebook-workspace-3col, .research-workspace-3col {
+.notebook-workspace-3col,
+.research-workspace-3col {
   display: flex;
   height: 100%;
   width: 100%;
@@ -111,7 +115,8 @@
 }
 
 /* Panels, Modals, Overlays */
-.account-panel, .account-panel-dialog {
+.account-panel,
+.account-panel-dialog {
   background-color: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
@@ -138,7 +143,8 @@
 .job-state.completed {
   color: var(--success);
 }
-.job-state.running, .job-state.queued {
+.job-state.running,
+.job-state.queued {
   color: var(--ink-sepia);
 }
 .job-state.failed {

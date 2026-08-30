@@ -1,4 +1,5 @@
-export type AppLanguage = "en" | "vi" | "es" | "ja" | "de" | "fr" | "zh" | "ko" | "pt";
+export type AppLanguage =
+  "en" | "vi" | "es" | "ja" | "de" | "fr" | "zh" | "ko" | "pt";
 
 export type UserPreferences = {
   language: AppLanguage;
@@ -6,7 +7,8 @@ export type UserPreferences = {
   reduced_motion: boolean;
   default_export_format: "pdf" | "docx" | "markdown";
   document_language: string;
-  default_tone: "professional" | "concise" | "technical" | "academic" | "friendly";
+  default_tone:
+    "professional" | "concise" | "technical" | "academic" | "friendly";
   citation_style: "inline" | "footnote" | "apa" | "mla" | "chicago";
   page_size: "a4" | "letter";
   theme: "light" | "dark" | "system";
@@ -58,7 +60,26 @@ export function applyPreferences(preferences: UserPreferences) {
   root.lang = preferences.language || "en";
   root.toggleAttribute("data-reduced-motion", preferences.reduced_motion);
   root.toggleAttribute("data-high-contrast", preferences.high_contrast);
-  root.dataset.theme = preferences.theme;
+
+  if (preferences.theme === "dark") {
+    root.setAttribute("data-theme", "dark");
+  } else if (preferences.theme === "light") {
+    root.removeAttribute("data-theme");
+  } else if (preferences.theme === "system") {
+    const prefersDark =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    if (prefersDark) {
+      root.setAttribute("data-theme", "dark");
+    } else {
+      root.removeAttribute("data-theme");
+    }
+  }
+
   root.dataset.interfaceSize = preferences.interface_size;
-  window.dispatchEvent(new CustomEvent<UserPreferences>(PREFERENCES_CHANGED_EVENT, { detail: preferences }));
+  window.dispatchEvent(
+    new CustomEvent<UserPreferences>(PREFERENCES_CHANGED_EVENT, {
+      detail: preferences,
+    }),
+  );
 }

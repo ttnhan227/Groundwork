@@ -90,8 +90,44 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
 
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
+    # Input validation for empty fields
+    if not payload.email or not payload.password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "value_error.missing",
+                    "loc": ["body", "email"],
+                    "msg": "Email is required",
+                    "input": payload.email
+                },
+                {
+                    "type": "value_error.missing",
+                    "loc": ["body", "password"],
+                    "msg": "Password is required",
+                    "input": payload.password
+                }
+            ]
+        )
+    
+    # Explicit validation for empty string password
+    if payload.password == "":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "value_error.empty",
+                    "loc": ["body", "password"],
+                    "msg": "Password cannot be empty",
+                    "input": ""
+                }
+            ]
+        )
+    
     user = await session.scalar(select(User).where(User.email == payload.email.lower()))
-    if user is None or not verify_password(payload.password, user.password_hash):
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if user.password_hash is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This account is disabled")
@@ -100,8 +136,16 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
 
 @router.post("/google", response_model=TokenResponse)
 async def google_login(payload: GoogleLoginRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
+    if not payload.credential or not payload.credential.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Google credential is required"
+        )
     settings = get_settings()
-    claims = await asyncio.to_thread(verify_google_credential, payload.credential, settings.google_client_id)
+    try:
+        claims = await asyncio.to_thread(verify_google_credential, payload.credential, settings.google_client_id)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google credential") from e
     google_sub = str(claims["sub"])
     email = str(claims["email"]).lower()
 
@@ -139,6 +183,47 @@ async def google_login(payload: GoogleLoginRequest, session: AsyncSession = Depe
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
+    if not payload.refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "value_error.missing",
+                    "loc": ["body", "refresh_token"],
+                    "msg": "Refresh token is required",
+                    "input": payload.refresh_token
+                }
+            ]
+        )
+    
+    if payload.refresh_token == "":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "value_error.empty",
+                    "loc": ["body", "refresh_token"],
+                    "msg": "Refresh token cannot be empty",
+                    "input": ""
+                }
+            ]
+        )
+    
+    # Validate refresh_token length to prevent potential DoS
+    if len(payload.refresh_token) > 1024:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "string_too_long",
+                    "loc": ["body", "refresh_token"],
+                    "msg": "String should have at most 1024 characters",
+                    "input": payload.refresh_token,
+                    "ctx": {"max_length": 1024}
+                }
+            ]
+        )
+    
     token = await session.scalar(
         select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token))
     )
@@ -155,6 +240,47 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_s
 
 @router.post("/logout", status_code=204)
 async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_session)) -> None:
+    if not payload.refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "value_error.missing",
+                    "loc": ["body", "refresh_token"],
+                    "msg": "Refresh token is required",
+                    "input": payload.refresh_token
+                }
+            ]
+        )
+    
+    if payload.refresh_token == "":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "value_error.empty",
+                    "loc": ["body", "refresh_token"],
+                    "msg": "Refresh token cannot be empty",
+                    "input": ""
+                }
+            ]
+        )
+    
+    # Validate refresh_token length to prevent potential DoS
+    if len(payload.refresh_token) > 1024:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "type": "string_too_long",
+                    "loc": ["body", "refresh_token"],
+                    "msg": "String should have at most 1024 characters",
+                    "input": payload.refresh_token,
+                    "ctx": {"max_length": 1024}
+                }
+            ]
+        )
+    
     token = await session.scalar(
         select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token))
     )
@@ -164,5 +290,5 @@ async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_se
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(current_user)) -> User:
-    return user
+async def me(user: User = Depends(current_user)) -> UserResponse:
+    return UserResponse.model_validate(user)

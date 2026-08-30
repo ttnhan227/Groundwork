@@ -1,7 +1,10 @@
 // src/components/ui/PanelHeader.tsx
 import React from "react";
 
-export interface PanelHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+export interface PanelHeaderProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "title"
+> {
   /** Title text or element */
   title: React.ReactNode;
   /** Optional actions (e.g., buttons) placed on the right */

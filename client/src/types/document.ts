@@ -53,7 +53,11 @@ export type DocumentReport = {
     page_references: ReportReference[];
   }>;
   entities: Array<{ name: string; role: string }>;
-  timeline: Array<{ date: string; event: string; page_references: ReportReference[] }>;
+  timeline: Array<{
+    date: string;
+    event: string;
+    page_references: ReportReference[];
+  }>;
   missing_information: string[];
   next_actions: string[];
 };

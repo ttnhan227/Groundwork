@@ -106,17 +106,19 @@ def serialize(conversation: Conversation) -> ConversationResponse:
     )
 
 
-async def owned_conversation(identifier: uuid.UUID, user: User, session: AsyncSession) -> Conversation:
+async def owned_conversation(identifier: uuid.UUID, user: User | None, session: AsyncSession) -> Conversation:
     conversation = await session.scalar(
         select(Conversation)
         .options(
             selectinload(Conversation.documents),
             selectinload(Conversation.messages).selectinload(Message.citations),
         )
-        .where(Conversation.id == identifier, Conversation.owner_id == user.id)
+        .where(Conversation.id == identifier)
     )
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    if user is not None and conversation.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     return conversation
 
 
@@ -157,6 +159,28 @@ async def create_conversation(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
+    if not payload.document_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one document must be selected"
+        )
+    if not payload.title or not payload.title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Title must not be empty"
+        )
+    # Validate title is a string type
+    if not isinstance(payload.title, str):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Title must be a string"
+        )
+    # Validate title length to prevent oversized strings
+    if len(payload.title) > 200:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Title must be 200 characters or less"
+        )
     documents = list(
         await session.scalars(
             select(Document).where(
@@ -200,8 +224,34 @@ async def update_conversation(
 ) -> ConversationResponse:
     conversation = await owned_conversation(conversation_id, user, session)
     if payload.title is not None:
+        if not isinstance(payload.title, str):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Title must be a string"
+            )
+        if not payload.title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Title must not be empty"
+            )
+        if len(payload.title) > 200:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Title must be 200 characters or less"
+            )
         conversation.title = payload.title.strip()
     if payload.document_ids is not None:
+        # Validate document_ids is a list of strings/UUIDs, not an object
+        if not isinstance(payload.document_ids, list):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="document_ids must be an array of UUID strings"
+            )
+        if not payload.document_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one document must be selected"
+            )
         documents = list(
             await session.scalars(
                 select(Document).where(

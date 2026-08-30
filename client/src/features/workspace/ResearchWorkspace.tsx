@@ -11,6 +11,7 @@ import {
   PanelRight,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
 import { Tabs } from "../../components/ui/Tabs";
 import { TopBar } from "../../components/layout/TopBar";
 import { SourcesSidebar } from "../sources/SourcesSidebar";
@@ -22,7 +23,12 @@ import { ReviewFindingsAudit } from "../change-log/ReviewFindingsAudit";
 import { TraceabilityMatrix } from "../verification/TraceabilityMatrix";
 import { ProvenanceAppendix } from "../verification/ProvenanceAppendix";
 import { getContextualSuggestions } from "./contextualSuggestions";
-import { API, api, streamWorkspaceAgent, downloadTextFile } from "../../api/client";
+import {
+  API,
+  api,
+  streamWorkspaceAgent,
+  downloadTextFile,
+} from "../../api/client";
 import type {
   Workspace,
   DocumentItem,
@@ -52,7 +58,10 @@ export interface ResearchWorkspaceProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onBackToLibrary: () => void;
-  onUploadDocument: (file: File, workspaceId: string) => Promise<DocumentItem | null>;
+  onUploadDocument: (
+    file: File,
+    workspaceId: string,
+  ) => Promise<DocumentItem | null>;
   onDeleteDocument: (docId: string) => Promise<void>;
   onOpenAccount?: () => void;
   onToggleTheme?: () => void;
@@ -86,7 +95,9 @@ export function ResearchWorkspace({
 
   function toggleSource(sourceId: string) {
     setSelectedSourceIds((prev) =>
-      prev.includes(sourceId) ? prev.filter((id) => id !== sourceId) : [...prev, sourceId],
+      prev.includes(sourceId)
+        ? prev.filter((id) => id !== sourceId)
+        : [...prev, sourceId],
     );
   }
 
@@ -111,13 +122,19 @@ export function ResearchWorkspace({
   }, [workspaceArtifacts, activeArtifactId]);
 
   const activeArtifact = useMemo(() => {
-    return workspaceArtifacts.find((a) => a.id === activeArtifactId) || workspaceArtifacts[0] || null;
+    return (
+      workspaceArtifacts.find((a) => a.id === activeArtifactId) ||
+      workspaceArtifacts[0] ||
+      null
+    );
   }, [workspaceArtifacts, activeArtifactId]);
 
   // Layout panels
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<"audit" | "matrix" | "appendix">("audit");
+  const [rightPanelTab, setRightPanelTab] = useState<
+    "audit" | "matrix" | "appendix"
+  >("audit");
 
   // Agent & Execution state
   const [promptInput, setPromptInput] = useState("");
@@ -130,13 +147,17 @@ export function ResearchWorkspace({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Deliverable details state
-  const [requirements, setRequirements] = useState<DeliverableRequirement[]>([]);
+  const [requirements, setRequirements] = useState<DeliverableRequirement[]>(
+    [],
+  );
   const [findings, setFindings] = useState<DeliverableReviewFinding[]>([]);
   const [readiness, setReadiness] = useState<DeliverableReadiness | null>(null);
   const [isEditingContent, setIsEditingContent] = useState(false);
   const [editableBlocks, setEditableBlocks] = useState<NativeBlock[]>([]);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [isResolvingFindingId, setIsResolvingFindingId] = useState<string | null>(null);
+  const [isResolvingFindingId, setIsResolvingFindingId] = useState<
+    string | null
+  >(null);
   const [isRunningAudit, setIsRunningAudit] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
 
@@ -258,7 +279,10 @@ export function ResearchWorkspace({
                 next[existingIdx] = agentStep;
                 return next;
               }
-              const next = prev.map((s) => ({ ...s, status: "completed" as const }));
+              const next = prev.map((s) => ({
+                ...s,
+                status: "completed" as const,
+              }));
               return [...next, agentStep];
             });
           },
@@ -278,7 +302,9 @@ export function ResearchWorkspace({
           },
           onComplete: (data) => {
             if (data.conversation_id) setConversationId(data.conversation_id);
-            setActiveSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
+            setActiveSteps((prev) =>
+              prev.map((s) => ({ ...s, status: "completed" as const })),
+            );
             const aiMessage: ChatMessage = {
               role: "assistant",
               content: fullAiResponse || "Task completed successfully.",
@@ -291,12 +317,18 @@ export function ResearchWorkspace({
             reloadArtifactDetails();
           },
           onError: (errStr) => {
-            setActiveSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
-            const rawMessage = (errStr || "").replace(/^⚠️\s*/, "").replace(/^Error during execution:\s*/i, "");
+            setActiveSteps((prev) =>
+              prev.map((s) => ({ ...s, status: "completed" as const })),
+            );
+            const rawMessage = (errStr || "")
+              .replace(/^⚠️\s*/, "")
+              .replace(/^Error during execution:\s*/i, "");
             const friendly =
-              rawMessage.includes("sqlalche.me") || rawMessage.includes("Session")
+              rawMessage.includes("sqlalche.me") ||
+              rawMessage.includes("Session")
                 ? "A momentary synchronization error occurred. Please try resending your prompt."
-                : rawMessage || "An unexpected error occurred during execution.";
+                : rawMessage ||
+                  "An unexpected error occurred during execution.";
             setMessages((prev) => [
               ...prev,
               {
@@ -380,7 +412,10 @@ export function ResearchWorkspace({
         setEditableBlocks((prev) =>
           prev.map((b) => {
             if (b.text.includes(finding.claim_text)) {
-              return { ...b, text: b.text.replace(finding.claim_text, finding.proposed_text) };
+              return {
+                ...b,
+                text: b.text.replace(finding.claim_text, finding.proposed_text),
+              };
             }
             return b;
           }),
@@ -400,11 +435,15 @@ export function ResearchWorkspace({
     if (!activeArtifact || isRunningAudit) return;
     setIsRunningAudit(true);
     try {
-      await api(`/workspaces/${workspace.id}/native-documents/${activeArtifact.id}/review`, auth.access_token, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "full" }),
-      });
+      await api(
+        `/workspaces/${workspace.id}/native-documents/${activeArtifact.id}/review`,
+        auth.access_token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "full" }),
+        },
+      );
       await reloadArtifactDetails();
     } catch (err) {
       console.error("Audit run failed", err);
@@ -424,27 +463,43 @@ export function ResearchWorkspace({
       if (exportData?.download_url) {
         window.open(exportData.download_url, "_blank");
       } else if (exportData?.content) {
-        downloadTextFile(`${activeArtifact.title || "deliverable"}.${format}`, exportData.content);
+        downloadTextFile(
+          `${activeArtifact.title || "deliverable"}.${format}`,
+          exportData.content,
+        );
       }
     } catch (err: unknown) {
-      alert((err as Error)?.message || "Export failed. Please verify all claims.");
+      alert(
+        (err as Error)?.message || "Export failed. Please verify all claims.",
+      );
     }
   }
 
   // Calculate open findings & readiness
-  const openFindings = useMemo(() => findings.filter((f) => f.status === "open"), [findings]);
+  const openFindings = useMemo(
+    () => findings.filter((f) => f.status === "open"),
+    [findings],
+  );
   const coveredRequirementsCount = useMemo(
-    () => requirements.filter((r) => r.status === "covered" || r.status === "waived").length,
+    () =>
+      requirements.filter(
+        (r) => r.status === "covered" || r.status === "waived",
+      ).length,
     [requirements],
   );
   const readinessScore = useMemo(() => {
     if (requirements.length === 0) return 0;
     const reqRatio = coveredRequirementsCount / requirements.length;
     const findingsPenalty = openFindings.length > 0 ? 0.2 : 0;
-    return Math.max(0, Math.min(100, Math.round((reqRatio - findingsPenalty) * 100)));
+    return Math.max(
+      0,
+      Math.min(100, Math.round((reqRatio - findingsPenalty) * 100)),
+    );
   }, [requirements.length, coveredRequirementsCount, openFindings.length]);
 
-  const isExportBlocked = readiness?.status !== "ready" && (openFindings.length > 0 || readinessScore < 100);
+  const isExportBlocked =
+    readiness?.status !== "ready" &&
+    (openFindings.length > 0 || readinessScore < 100);
 
   const contextualSuggestions = useMemo(() => {
     return getContextualSuggestions({
@@ -466,7 +521,9 @@ export function ResearchWorkspace({
         sourcesCount={workspaceSources.length}
         selectedSourcesCount={selectedSourceIds.length}
         isAgentRunning={isAgentRunning}
-        activeAgentStepLabel={activeSteps.find((s) => s.status === "in_progress")?.label}
+        activeAgentStepLabel={
+          activeSteps.find((s) => s.status === "in_progress")?.label
+        }
         readinessScore={readinessScore}
         isExportBlocked={isExportBlocked}
         openFindingsCount={openFindings.length}
@@ -505,7 +562,9 @@ export function ResearchWorkspace({
             onDeleteSource={(id) => onDeleteDocument(id)}
             onRetrySource={async (id) => {
               try {
-                await api(`/documents/${id}/retry`, auth.access_token, { method: "POST" });
+                await api(`/documents/${id}/retry`, auth.access_token, {
+                  method: "POST",
+                });
               } catch (err: unknown) {
                 alert((err as Error)?.message || "Retry failed");
               }
@@ -537,22 +596,33 @@ export function ResearchWorkspace({
               {/* Document Title Header */}
               <div className="border-b border-[var(--hairline-subtle)] pb-6 mb-8 min-w-0 space-y-4">
                 {/* 1. Action Row */}
-                <div className="flex items-center justify-between gap-4 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[var(--success)] px-2 py-0.5 rounded bg-[var(--success-bg)] border border-[var(--success-border)]">
-                      <ShieldCheck size={12} />
+                <div className="flex items-center justify-between gap-4 min-w-0 flex-wrap sm:flex-nowrap">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge
+                      variant="success"
+                      icon={<ShieldCheck size={12} />}
+                      className="font-mono font-bold whitespace-nowrap"
+                    >
                       v2.4 Final Draft · Legal Review Active
-                    </span>
+                    </Badge>
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
                       variant="ghost"
                       size="xs"
-                      onClick={() => (isEditingContent ? handleSaveBlocks() : setIsEditingContent(true))}
+                      onClick={() =>
+                        isEditingContent
+                          ? handleSaveBlocks()
+                          : setIsEditingContent(true)
+                      }
                       className="text-[var(--ink-secondary)] hover:text-[var(--ink)]"
                     >
-                      {isEditingContent ? (isSavingDraft ? "Saving…" : "Save Changes") : "Edit Text"}
+                      {isEditingContent
+                        ? isSavingDraft
+                          ? "Saving…"
+                          : "Save Changes"
+                        : "Edit Text"}
                     </Button>
 
                     <Button
@@ -561,7 +631,10 @@ export function ResearchWorkspace({
                       onClick={handleRunAudit}
                       disabled={isRunningAudit}
                     >
-                      <RefreshCw size={11} className={isRunningAudit ? "spin" : ""} />
+                      <RefreshCw
+                        size={11}
+                        className={isRunningAudit ? "spin" : ""}
+                      />
                       <span>{isRunningAudit ? "Verifying…" : "Re-Verify"}</span>
                     </Button>
                   </div>
@@ -569,13 +642,16 @@ export function ResearchWorkspace({
 
                 {/* 2. Document Title Heading */}
                 <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)] tracking-tight leading-[1.25] break-normal">
-                  {activeArtifact?.title || "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Strategy"}
+                  {activeArtifact?.title ||
+                    "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Strategy"}
                 </h1>
 
                 {/* 3. Reviewers & Enterprise Compliance Strip */}
                 <div className="flex items-center justify-between gap-3 text-xs text-[var(--ink-muted)] flex-wrap pt-2 border-t border-[var(--hairline)]">
                   <div className="flex items-center gap-2 font-sans">
-                    <span className="text-[11px] text-[var(--ink-secondary)]">Reviewers:</span>
+                    <span className="text-[11px] text-[var(--ink-secondary)]">
+                      Reviewers:
+                    </span>
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink)] px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)]">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Sarah Chen (Legal Counsel)
@@ -587,7 +663,9 @@ export function ResearchWorkspace({
                   </div>
 
                   <div className="flex items-center gap-2 font-mono text-[11px]">
-                    <span className="text-[var(--success)] font-semibold">✔ 0 Phantom Citations</span>
+                    <span className="text-[var(--success)] font-semibold">
+                      ✔ 0 Phantom Citations
+                    </span>
                     <span>·</span>
                     <span>SOX 404 Ready</span>
                   </div>
@@ -598,7 +676,11 @@ export function ResearchWorkspace({
               <div className="space-y-4 flex-1 min-w-0">
                 {editableBlocks.map((block, idx) => {
                   const matchedFinding = openFindings.find(
-                    (f) => f.claim_text && block.text.toLowerCase().includes(f.claim_text.toLowerCase()),
+                    (f) =>
+                      f.claim_text &&
+                      block.text
+                        .toLowerCase()
+                        .includes(f.claim_text.toLowerCase()),
                   );
 
                   return (
@@ -609,13 +691,17 @@ export function ResearchWorkspace({
                       isEditing={isEditingContent}
                       matchedFinding={matchedFinding}
                       sources={workspaceSources}
-                      isResolvingFinding={isResolvingFindingId === matchedFinding?.id}
+                      isResolvingFinding={
+                        isResolvingFindingId === matchedFinding?.id
+                      }
                       onUpdateText={(newText) => {
                         const next = [...editableBlocks];
                         next[idx] = { ...block, text: newText };
                         setEditableBlocks(next);
                       }}
-                      onOpenViewer={(docId, page) => onOpenViewer?.(docId, page)}
+                      onOpenViewer={(docId, page) =>
+                        onOpenViewer?.(docId, page)
+                      }
                       onResolveFinding={handleResolveFinding}
                       onPromptSection={(prompt) => handleSendPrompt(prompt)}
                     />
@@ -624,12 +710,16 @@ export function ResearchWorkspace({
 
                 {editableBlocks.length === 0 && (
                   <div className="py-16 text-center text-xs text-[var(--ink-muted)] space-y-2 min-w-0">
-                    <FileText size={28} className="mx-auto text-[var(--ink-faint)]" />
+                    <FileText
+                      size={28}
+                      className="mx-auto text-[var(--ink-faint)]"
+                    />
                     <p className="font-serif text-sm font-semibold text-[var(--ink)]">
                       Empty Document Canvas
                     </p>
                     <p className="text-[11px] max-w-sm mx-auto">
-                      Use the agent prompt composer below to draft your first sections based on uploaded RFP sources.
+                      Use the agent prompt composer below to draft your first
+                      sections based on uploaded RFP sources.
                     </p>
                   </div>
                 )}
