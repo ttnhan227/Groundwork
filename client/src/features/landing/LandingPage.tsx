@@ -151,7 +151,7 @@ export function LandingPage({
                 width="1440"
                 height="810"
                 className="block h-auto w-full"
-                alt="Groundwork AI research workspace showing grounded sources, research canvas, and source-backed AI assistant"
+                alt="Groundwork response workspace showing grounded research sources, workspace studio, and cited AI assistant"
               />
             </div>
           </div>
