@@ -26,6 +26,24 @@ def test_classify_intent_identifies_notes() -> None:
     assert _classify_intent("save note: Pricing structure confirmed", None) == "create_note"
 
 
+def test_classify_intent_identifies_studio_actions() -> None:
+    assert _classify_intent("Generate an Audio Overview for these sources", None) == "studio_audio_overview"
+    assert _classify_intent("Create a deep dive podcast episode", None) == "studio_audio_overview"
+    assert _classify_intent("Any prompt", "studio_audio_overview") == "studio_audio_overview"
+
+    assert _classify_intent("Build a study guide from the document", None) == "studio_study_guide"
+    assert _classify_intent("Give me practice quiz questions", None) == "studio_study_guide"
+    assert _classify_intent("Any prompt", "studio_study_guide") == "studio_study_guide"
+
+    assert _classify_intent("Generate an FAQ document", None) == "studio_faq"
+    assert _classify_intent("Give me frequently asked questions", None) == "studio_faq"
+    assert _classify_intent("Any prompt", "studio_faq") == "studio_faq"
+
+    assert _classify_intent("Create a briefing doc for leadership", None) == "studio_briefing_doc"
+    assert _classify_intent("Draft an executive briefing", None) == "studio_briefing_doc"
+    assert _classify_intent("Any prompt", "studio_briefing_doc") == "studio_briefing_doc"
+
+
 def test_classify_intent_defaults_to_grounded_qa() -> None:
     assert _classify_intent("What does the contract say about termination?", None) == "grounded_qa"
     assert _classify_intent("Summarize section 1", None) == "grounded_qa"

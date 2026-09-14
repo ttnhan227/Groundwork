@@ -70,3 +70,20 @@ class DocumentPageResponse(BaseModel):
     page_number: int
     text: str
     extraction_method: str
+
+
+class TextSourceCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1)
+    workspace_id: uuid.UUID | None = None
+
+
+class UrlSourceCreateRequest(BaseModel):
+    url: str = Field(min_length=5, max_length=2000)
+    workspace_id: uuid.UUID | None = None
+
+
+class YouTubeSourceCreateRequest(BaseModel):
+    url: str = Field(min_length=5, max_length=2000)
+    workspace_id: uuid.UUID | None = None
+

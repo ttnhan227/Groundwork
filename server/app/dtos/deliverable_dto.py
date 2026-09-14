@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class NativeDocumentCreateRequest(BaseModel):
-    title: str = Field(default="Untitled client report", min_length=1, max_length=180)
+    title: str = Field(default="Untitled RFP response", min_length=1, max_length=180)
     source_document_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
 
 

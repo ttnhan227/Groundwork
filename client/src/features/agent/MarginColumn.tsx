@@ -1,11 +1,8 @@
 import React from "react";
 import {
   ShieldCheck,
-  AlertTriangle,
   CheckCircle2,
-  FileText,
   ExternalLink,
-  MessageSquare,
   Sparkles,
 } from "lucide-react";
 import type { DeliverableReviewFinding, DocumentItem } from "../../types";
@@ -32,16 +29,16 @@ export interface MarginColumnProps {
  */
 export const MarginColumn: React.FC<MarginColumnProps> = ({
   findings,
-  sources,
+  sources: _sources,
   isResolvingFindingId,
   onResolveFinding,
   onOpenViewer,
-  onPromptAgent,
+  onPromptAgent: _onPromptAgent,
 }) => {
   const openFindings = findings.filter((f) => f.status === "open");
 
   return (
-    <aside className="w-[280px] flex-shrink-0 flex flex-col py-4 px-3 space-y-3 select-none min-w-0">
+    <aside className="w-[280px] flex-shrink-0 flex flex-col py-4 px-3 space-y-3 min-w-0">
       <div className="flex items-center justify-between pb-2 border-b border-[var(--hairline)] min-w-0">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-secondary)] min-w-0">
           <Sparkles
@@ -145,10 +142,10 @@ export const MarginColumn: React.FC<MarginColumnProps> = ({
               className="mx-auto text-[var(--success)] mb-1.5"
             />
             <p className="text-xs font-serif font-semibold text-[var(--ink)]">
-              All Claims Verified
+              No open findings
             </p>
             <p className="text-[11px] text-[var(--ink-muted)] mt-0.5 break-words">
-              Margin is clear. Zero unsupported claims detected.
+              Automated review has no open findings. Complete a final human review.
             </p>
           </div>
         )}

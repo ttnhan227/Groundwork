@@ -1,4 +1,4 @@
-import type { AuthResult, Citation, Job, NativeDocument } from "../types";
+import type { AuthResult, Citation, DocumentItem, Job, NativeDocument } from "../types";
 
 export const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 export const AUTH_STORAGE_KEY = "groundwork-auth";
@@ -155,6 +155,34 @@ export function downloadTextFile(
   URL.revokeObjectURL(url);
 }
 
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (window.navigator?.clipboard?.writeText) {
+    try {
+      await window.navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fallback below
+    }
+  }
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    textArea.remove();
+    return successful;
+  } catch (err) {
+    console.error("Failed to copy text to clipboard:", err);
+    return false;
+  }
+}
+
 export async function waitForJob(
   job: Job,
   token: string,
@@ -277,7 +305,13 @@ export type WorkspaceAgentCallbacks = {
     unsupported_claims: number;
     requirements_covered?: number;
   }) => void;
-  onComplete?: (data: { conversation_id?: string }) => void;
+  onStudioArtifact?: (artifact: {
+    type: string;
+    title: string;
+    content: string;
+    citations?: Citation[];
+  }) => void;
+  onComplete?: (data: { conversation_id?: string; studio_type?: string }) => void;
   onError?: (error: string) => void;
 };
 
@@ -355,6 +389,8 @@ export async function streamWorkspaceAgent(
         else if (eventType === "citation") callbacks.onCitation?.(parsed);
         else if (eventType === "artifact")
           callbacks.onArtifact?.(parsed.artifact);
+        else if (eventType === "studio_artifact")
+          callbacks.onStudioArtifact?.(parsed);
         else if (eventType === "verification")
           callbacks.onVerification?.(parsed.readiness);
         else if (eventType === "complete") callbacks.onComplete?.(parsed);
@@ -368,3 +404,62 @@ export async function streamWorkspaceAgent(
 }
 
 export const streamNotebookAgent = streamWorkspaceAgent;
+
+export async function createTextSource(
+  payload: { title: string; content: string; workspace_id: string },
+  token: string,
+): Promise<DocumentItem> {
+  return api<DocumentItem>("/documents/text", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createUrlSource(
+  payload: { url: string; workspace_id: string },
+  token: string,
+): Promise<DocumentItem> {
+  return api<DocumentItem>("/documents/url", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createYouTubeSource(
+  payload: { url: string; workspace_id: string },
+  token: string,
+): Promise<DocumentItem> {
+  return api<DocumentItem>("/documents/youtube", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function formatDateTime(isoString?: string | null): string {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function formatFullDateTime(isoString?: string | null): string {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+

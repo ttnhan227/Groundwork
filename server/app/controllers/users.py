@@ -311,7 +311,7 @@ async def dashboard(user: User = Depends(current_user), session: AsyncSession = 
         generated_files=values.generated_files,
         failed_jobs=values.failed_jobs,
         recent_documents=documents,
-        recent_jobs=jobs
+        recent_jobs=jobs,
     )
 
 

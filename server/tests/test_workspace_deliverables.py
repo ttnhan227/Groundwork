@@ -106,7 +106,6 @@ def test_workspace_api_exposes_domain_routes() -> None:
         '"/native-documents/{native_id}/readiness"',
         '"/review-findings/{finding_id}/decision"',
         '"/native-documents/{native_id}/export"',
-        '"/workspaces/{workspace_id}/demo"',
         '"/workspaces/{workspace_id}/events"',
     ):
         assert route in source

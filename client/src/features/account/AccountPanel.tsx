@@ -21,16 +21,8 @@ import {
   UserRound,
   Users,
   X,
-  Lock,
-  Globe,
-  Sun,
-  Moon,
-  Sparkles,
   Download,
   AlertTriangle,
-  Layers,
-  Activity,
-  Check,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -144,7 +136,7 @@ export function AccountPanel({
   onClose: () => void;
   onSignOut: () => void;
 }) {
-  const { t, language, setLanguage, languageOptions } = useTranslation();
+  const { language, setLanguage, languageOptions } = useTranslation();
   const [tab, setTab] = useState<AccountTab>("profile");
 
   const tabsList = useMemo<
@@ -171,7 +163,7 @@ export function AccountPanel({
       },
       {
         id: "defaults",
-        label: "Document Defaults",
+        label: "Response Defaults",
         detail: "Tone, citation style & export format",
         icon: <FileCog size={15} />,
       },
@@ -196,7 +188,7 @@ export function AccountPanel({
       {
         id: "team",
         label: "Team",
-        detail: "Collaborators & workspace roles",
+        detail: "Collaborators & response roles",
         icon: <Users size={15} />,
       },
       {
@@ -592,8 +584,8 @@ export function AccountPanel({
                       Personal Information
                     </h3>
                     <p className="text-xs text-[var(--ink-muted)] mt-0.5">
-                      This display name appears across shared research
-                      workspaces and deliverable revision history.
+                      This display name appears across shared bid responses and
+                      their revision history.
                     </p>
                   </div>
 
@@ -875,9 +867,9 @@ export function AccountPanel({
             {tab === "defaults" && (
               <div className="space-y-6 min-w-0">
                 <Heading
-                  eyebrow="Document Defaults"
-                  title="Deliverable & Writing Defaults"
-                  detail="Guide automated AI drafting, verification style, and deliverable export formatting."
+                  eyebrow="Response Defaults"
+                  title="Response & Writing Defaults"
+                  detail="Set the language, tone, citations, and export format used for new responses."
                 />
 
                 <section className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] space-y-4 min-w-0">
@@ -1029,7 +1021,7 @@ export function AccountPanel({
                       })
                     }
                     title="Completed processing and exports"
-                    detail="Notify me when source uploads, AI multi-step tasks, and deliverable exports finish."
+                    detail="Notify me when source uploads, AI tasks, and response exports finish."
                   />
                   <div className="border-t border-[var(--hairline-subtle)]" />
                   <Toggle
@@ -1082,7 +1074,7 @@ export function AccountPanel({
                 <Heading
                   eyebrow="Privacy & Data"
                   title="Data Retention & Privacy Controls"
-                  detail="Download your account data, manage workspace activity retention, or purge history."
+                  detail="Download your account data, manage response activity retention, or purge history."
                 />
 
                 <section className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] space-y-4 min-w-0">
@@ -1095,7 +1087,7 @@ export function AccountPanel({
                       })
                     }
                     title="Keep activity history"
-                    detail="Retain revision timeline and citation verification history across workspaces."
+                    detail="Retain revision timelines and citation verification history across responses."
                   />
 
                   <div>
@@ -1219,8 +1211,8 @@ export function AccountPanel({
                             Delete Groundwork account
                           </strong>
                           <p className="text-[11px] text-[var(--danger)] opacity-80">
-                            Permanently purges your account, workspaces, and
-                            stored files. This cannot be undone.
+                            Permanently purges your account, response workspaces,
+                            and stored files. This cannot be undone.
                           </p>
                         </div>
                       </div>
@@ -1258,7 +1250,7 @@ export function AccountPanel({
                 <Heading
                   eyebrow="Usage Telemetry"
                   title="Storage & AI Activity"
-                  detail="Monitor document volume, indexed pages, background task executions, and AI quotas."
+                  detail="Monitor source volume, indexed pages, background tasks, and AI usage."
                 />
 
                 {/* Top Metrics Cards */}
@@ -1416,14 +1408,14 @@ export function AccountPanel({
               <div className="space-y-6 min-w-0">
                 <Heading
                   eyebrow="Team Access"
-                  title="Workspace Collaboration"
-                  detail="Invite collaborators to your research workspaces and assign editor or viewer roles."
+                  title="Response Collaboration"
+                  detail="Invite collaborators to bid responses and assign editor or viewer roles."
                 />
 
                 <section className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] space-y-4 min-w-0">
                   <div>
                     <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
-                      Workspace
+                      Response
                     </label>
                     <select
                       value={workspaceId}

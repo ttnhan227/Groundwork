@@ -9,18 +9,12 @@ import {
   ChevronRight,
   ChevronDown,
   Layers,
-  ShieldCheck,
-  FolderPlus,
   PanelLeftClose,
-  PanelLeft,
   CheckCircle2,
-  Trash2,
-  Edit2,
 } from "lucide-react";
 import type { Workspace, NativeDocument, AuthResult } from "../../types";
 import { BrandMark } from "../common/BrandMark";
 import { Button } from "../ui/Button";
-import { useTranslation } from "../../i18n";
 
 export interface SidebarProps {
   auth: AuthResult;
@@ -33,12 +27,12 @@ export interface SidebarProps {
   onToggleOpen: () => void;
   onSelectWorkspace: (wsId: string) => void;
   onSelectDoc: (docId: string) => void;
-  onCreateWorkspace: () => void;
   onCreateDoc?: (workspaceId: string) => void;
   onDeleteWorkspace?: (workspaceId: string) => void;
   onRenameWorkspace?: (workspaceId: string) => void;
   onOpenCommandPalette: () => void;
   onOpenAccount: () => void;
+  onBackToLibrary: () => void;
   onToggleTheme: () => void;
 }
 
@@ -53,15 +47,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleOpen,
   onSelectWorkspace,
   onSelectDoc,
-  onCreateWorkspace,
   onCreateDoc,
-  onDeleteWorkspace,
-  onRenameWorkspace,
   onOpenCommandPalette,
   onOpenAccount,
+  onBackToLibrary,
   onToggleTheme,
 }) => {
-  const { t } = useTranslation();
   const [expandedWorkspaces, setExpandedWorkspaces] = React.useState<
     Record<string, boolean>
   >(() => {
@@ -86,10 +77,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="w-[260px] h-full flex flex-col flex-shrink-0 min-w-0">
         {/* Top Brand & Workspace Switcher */}
         <div className="p-3 border-b border-[var(--hairline-subtle)] flex items-center justify-between min-w-0">
-          <div
+          <button
+            type="button"
             className="flex items-center gap-2 px-1.5 py-1 rounded-[var(--radius-sm)] hover:bg-[var(--surface-hover)] cursor-pointer transition-colors flex-1 min-w-0"
-            onClick={onOpenAccount}
-            title="Account profile & settings"
+            onClick={onBackToLibrary}
+            title="All responses"
           >
             <BrandMark size={18} />
             <div className="flex flex-col min-w-0 flex-1">
@@ -100,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {auth.user.display_name}
               </span>
             </div>
-          </div>
+          </button>
 
           <Button
             variant="ghost"
@@ -132,32 +124,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </kbd>
           </button>
 
-          <button
-            onClick={onCreateWorkspace}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)] rounded-[var(--radius-sm)] transition-colors cursor-pointer min-w-0"
-          >
-            <FolderPlus
-              size={14}
-              className="text-[var(--ink-muted)] flex-shrink-0"
-            />
-            <span className="truncate">New workspace</span>
-          </button>
         </div>
 
         {/* Page Tree / Workspaces Section */}
         <div className="flex-1 overflow-y-auto p-2 space-y-3 min-w-0">
           <div>
             <div className="flex items-center justify-between px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--ink-faint)]">
-              <span>Workspaces</span>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={onCreateWorkspace}
-                className="h-4 w-4 p-0 text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                title="Add workspace"
+              <button
+                type="button"
+                onClick={onBackToLibrary}
+                className="hover:text-[var(--ink)]"
               >
-                <Plus size={12} />
-              </Button>
+                Responses
+              </button>
             </div>
 
             <div className="space-y-0.5 mt-0.5">
@@ -204,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
 
                       {/* Hover Actions */}
-                      <div className="opacity-0 group-hover/ws:opacity-100 flex items-center gap-0.5 transition-opacity flex-shrink-0">
+                      <div className="opacity-60 group-hover/ws:opacity-100 group-focus-within/ws:opacity-100 flex items-center gap-0.5 transition-opacity flex-shrink-0">
                         {onCreateDoc && (
                           <Button
                             variant="ghost"
@@ -214,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               onCreateDoc(ws.id);
                             }}
-                            title="Add document"
+                            title="Add response draft"
                           >
                             <Plus size={12} />
                           </Button>
@@ -249,7 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 }
                               />
                               <span className="truncate flex-1">
-                                {doc.title || "Untitled Document"}
+                                {doc.title || "Untitled response"}
                               </span>
                               {doc.status === "complete" && (
                                 <CheckCircle2
@@ -263,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                         {wsDocs.length === 0 && (
                           <div className="px-2 py-1 text-[11px] text-[var(--ink-faint)] italic">
-                            No documents yet
+                            No response drafts yet
                           </div>
                         )}
                       </div>

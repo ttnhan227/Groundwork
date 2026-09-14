@@ -26,6 +26,20 @@ async function readImplementation() {
       new URL("../src/features/workspace/CommandPalette.tsx", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../src/features/verification/TraceabilityMatrix.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/features/change-log/ReviewFindingsAudit.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
     readFile(new URL("../src/i18n/index.ts", import.meta.url), "utf8"),
   ]);
   return files.join("\n");
@@ -56,11 +70,11 @@ describe("background operation and workspace client", () => {
     expect(source).toContain("applyPreferences");
   });
 
-  test("implements a grounded-to-verified-deliverable workflow", async () => {
+  test("implements a source-backed draft review workflow", async () => {
     const source = await readImplementation();
-    expect(source).toContain("Verifiable Requirements");
-    expect(source).toContain("Review Findings");
-    expect(source).toContain("Export Deliverable");
+    expect(source).toContain("Requirements Traceability Matrix");
+    expect(source).toContain("Review findings");
+    expect(source).toContain("Export response");
     expect(source).toContain("authenticatedFetch");
     expect(source).toContain("tokenExpiresSoon");
   });

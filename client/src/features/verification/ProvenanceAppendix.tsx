@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, FileCheck2 } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import type { DeliverableRequirement, NativeDocument } from "../../types";
 
 export interface ProvenanceAppendixProps {
@@ -18,10 +18,10 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
       <div className="flex items-center justify-between pb-2 border-b border-[var(--hairline)] min-w-0">
         <div className="min-w-0">
           <h4 className="font-serif text-sm font-semibold text-[var(--ink)] truncate">
-            Audit Provenance Appendix
+            Evidence appendix
           </h4>
           <p className="text-xs text-[var(--ink-muted)] break-words">
-            Cryptographic delivery stamp & evidence verification ledger.
+            Requirements and the source records currently linked to them.
           </p>
         </div>
       </div>
@@ -29,10 +29,10 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
       <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--surface)] border border-[var(--hairline)] shadow-[var(--shadow-subtle)] space-y-3 min-w-0">
         <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-[var(--hairline-subtle)] min-w-0">
           <span className="text-[var(--ink-muted)] flex-shrink-0">
-            Deliverable:
+            Response:
           </span>
           <strong className="text-[var(--ink)] truncate max-w-[160px] ml-2">
-            {activeArtifact?.title || "Technical Deliverable"}
+            {activeArtifact?.title || "Response draft"}
           </strong>
         </div>
 
@@ -57,7 +57,7 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
                   <td className="py-2 px-2 font-mono text-[var(--ink-blue)] truncate max-w-[100px] sm:max-w-[120px]">
                     {req.evidence?.[0]
                       ? `${req.evidence[0].document_name} (p. ${req.evidence[0].page_number})`
-                      : "Direct Spec"}
+                      : "No linked evidence"}
                   </td>
                   <td className="py-2 pl-2 text-right">
                     <span
@@ -67,7 +67,7 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
                           : "bg-[var(--warning-bg)] text-[var(--warning)]"
                       }`}
                     >
-                      {req.status === "covered" ? "Verified" : "Unverified"}
+                      {req.status === "covered" ? "Covered" : "Needs review"}
                     </span>
                   </td>
                 </tr>
@@ -76,7 +76,7 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
           </table>
         </div>
 
-        {/* Cryptographic Stamp */}
+        {/* Readiness summary */}
         <div className="p-2.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] flex items-center gap-2 text-xs text-[var(--ink-secondary)] min-w-0">
           <ShieldCheck
             size={16}
@@ -84,10 +84,10 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
           />
           <div className="flex-1 min-w-0 font-mono text-[10px]">
             <p className="font-semibold text-[var(--ink)] truncate">
-              Deterministic Verification Seal
+              Review readiness
             </p>
             <p className="text-[var(--ink-muted)] truncate">
-              SHA-256: 8f4c2e1a9b7d3f0e5a8c2d1b...
+              {readinessScore}% based on requirement coverage and open findings.
             </p>
           </div>
         </div>

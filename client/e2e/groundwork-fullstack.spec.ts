@@ -5,28 +5,17 @@ test.describe("Groundwork Full-Stack E2E Journey", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
   });
 
-  test("1. Platform landing simulator transitions & insights navigation", async ({ page }) => {
+  test("1. Landing page explains the workflow and shows the real product", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("header")).toBeVisible();
-    await expect(page.locator("h1")).toContainText(/AI drafts your proposal/i);
+    await expect(page.locator("h1")).toContainText(/Keep the response defensible/i);
 
-    // Verify Simulator Section
-    const simulator = page.locator("#simulator");
-    await expect(simulator).toBeVisible();
-
-    // Verify initial blocked state
-    const blockedState = page.getByText(/83% Blocked/i);
-    await expect(blockedState).toBeVisible();
-
-    // Toggle Simulator to Resolved State
-    const resolveBtn = page.getByRole("button", { name: /2. Resolved State/i });
-    await resolveBtn.click();
-    await expect(page.getByText(/100% Passed/i)).toBeVisible();
-
-    // Switch back to Blocked State
-    const blockedBtn = page.getByRole("button", { name: /1. Blocked State/i });
-    await blockedBtn.click();
-    await expect(page.getByText(/83% Blocked/i)).toBeVisible();
+    const productScreen = page.getByRole("img", {
+      name: /Groundwork response workspace/i,
+    });
+    await expect(productScreen).toBeVisible();
+    await expect(productScreen).toHaveAttribute("src", "/groundwork-workspace-real.png");
+    expect(await productScreen.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1440);
   });
 
   test("2. User registration, theme persistence, and command palette navigation", async ({ page }) => {
@@ -50,7 +39,8 @@ test.describe("Groundwork Full-Stack E2E Journey", () => {
 
     // Assert successful registration and landing in app root
     await expect(page.locator(".groundwork-app-root")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Research Workspaces/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Responses \(1\)/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "First RFP response" })).toBeVisible();
 
     // Test Theme Toggle and Persistence
     const themeBtn = page.getByRole("button", { name: /Toggle light\/dark mode/i });
@@ -69,7 +59,7 @@ test.describe("Groundwork Full-Stack E2E Journey", () => {
 
     // Test Command Palette (Ctrl+K or Meta+K)
     await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
-    const cmdDialog = page.getByRole("dialog", { name: /Workspace commands/i });
+    const cmdDialog = page.getByRole("dialog", { name: /Groundwork commands/i });
     await expect(cmdDialog).toBeVisible();
     
     // Close with Escape
@@ -77,7 +67,7 @@ test.describe("Groundwork Full-Stack E2E Journey", () => {
     await expect(cmdDialog).not.toBeVisible();
   });
 
-  test("3. Research workspace: source activation, inline citations, claim verification & export gate", async ({ page }) => {
+  test("3. New user can create and enter an empty review workspace", async ({ page }) => {
     await page.goto("/?app=1");
 
     // Register a fresh user
@@ -92,14 +82,24 @@ test.describe("Groundwork Full-Stack E2E Journey", () => {
       await expect(page.locator(".groundwork-app-root")).toBeVisible({ timeout: 15_000 });
     }
 
-    // Enter the first proposal workspace
-    const workspaceCard = page.getByText(/Regulatory Review|Proposal|Compliance/i).first();
-    if (await workspaceCard.isVisible()) {
-      await workspaceCard.click();
-    }
+    await page.getByRole("button", { name: "New Response", exact: true }).click();
+    await page.getByLabel("Response Name").fill("Source review test");
+    await page.getByRole("button", { name: "Create Response" }).last().click();
 
-    // Assert workspace or 3-column layout is visible
-    await expect(page.locator(".groundwork-app-root")).toBeVisible();
+    await expect(page.locator(".groundwork-col-sources")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".groundwork-col-draft")).toBeVisible();
+    await expect(page.locator(".groundwork-col-audit")).toBeVisible();
+    const assistantTab = page.getByRole("tab", { name: "Assistant" });
+    await expect(assistantTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("Ask about this response")).toBeVisible();
+    await expect(page.getByLabel("Ask Groundwork AI")).toBeDisabled();
+    await page.getByRole("tab", { name: "Review" }).click();
+    await expect(page.getByRole("heading", { name: /Upload the RFP first/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Nothing to review yet/i })).toBeVisible();
+
+    await page.getByRole("button", { name: "Start blank draft" }).click();
+    await expect(page.getByRole("heading", { name: "Source review test" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit Text" })).toBeVisible();
   });
 
   test("4. Account Settings Panel tabs and user preferences", async ({ page }) => {
@@ -128,7 +128,7 @@ test.describe("Groundwork Full-Stack E2E Journey", () => {
         await securityTab.click();
       }
 
-      const defaultsTab = page.getByRole("button", { name: /Document Defaults|Defaults/i });
+      const defaultsTab = page.getByRole("button", { name: /Response Defaults|Defaults/i });
       if (await defaultsTab.isVisible()) {
         await defaultsTab.click();
       }

@@ -127,7 +127,7 @@ export const TraceabilityMatrix: React.FC<TraceabilityMatrixProps> = ({
 
         {requirements.length === 0 && (
           <div className="p-4 text-center text-xs text-[var(--ink-muted)] min-w-0">
-            No requirements extracted yet. Ask the agent to analyze the uploaded
+            No requirements extracted yet. Ask Groundwork AI to analyze the uploaded
             RFP.
           </div>
         )}

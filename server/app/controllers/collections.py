@@ -45,44 +45,32 @@ async def create_collection(
 ) -> Collection:
     # Validate required field 'name' first
     if not isinstance(payload.name, str):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Field 'name' must be a string"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'name' must be a string")
+
     if not payload.name or not payload.name.strip():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Field 'name' is required"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'name' is required")
+
     # Validate name length to prevent oversized inputs
     if len(payload.name) > 255:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Field 'name' must be 255 characters or less"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'name' must be 255 characters or less"
         )
-    
+
     # Validate 'color' field is a string if provided
     if payload.color is not None and not isinstance(payload.color, str):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Field 'color' must be a string if provided"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'color' must be a string if provided"
         )
-    
+
     # Validate 'color' field is not an empty string
     if payload.color is not None and not payload.color.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Field 'color' must not be empty if provided"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'color' must not be empty if provided"
         )
-    
+
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
     existing = await session.scalar(
         select(Collection).where(Collection.owner_id == user.id, Collection.name == payload.name.strip())
     )
@@ -106,45 +94,40 @@ async def update_collection(
     session: AsyncSession = Depends(get_session),
 ) -> Collection:
     collection = await owned_collection(collection_id, user, session)
-    
+
     # Only validate fields that are actually provided in the payload
     if payload.name is not None:
         # Validate 'name' field if provided
         if not isinstance(payload.name, str):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Field 'name' must be a string"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'name' must be a string"
             )
-        
+
         if not payload.name.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Field 'name' must not be empty if provided"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'name' must not be empty if provided"
             )
-        
+
         # Validate name length to prevent oversized inputs
         if len(payload.name) > 255:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Field 'name' must be 255 characters or less"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'name' must be 255 characters or less"
             )
         collection.name = payload.name.strip()
-    
+
     # Validate 'color' field if provided
     if payload.color is not None:
         if not isinstance(payload.color, str):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Field 'color' must be a string if provided"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'color' must be a string if provided"
             )
-        
+
         if not payload.color.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Field 'color' must not be empty if provided"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'color' must not be empty if provided"
             )
         collection.color = payload.color
-    
+
     await session.commit()
     await session.refresh(collection)
     return collection
@@ -157,11 +140,8 @@ async def delete_collection(
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
     collection = await owned_collection(collection_id, user, session)
     await session.delete(collection)
     await session.commit()

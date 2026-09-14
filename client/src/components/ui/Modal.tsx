@@ -50,7 +50,7 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Dialog Surface */}
       <div
-        className={`relative z-10 w-full ${widthClasses[maxWidth]} bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col max-h-[90vh] overflow-hidden`}
+        className={`relative z-10 w-full ${widthClasses[maxWidth]} bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col max-h-[90vh] overflow-hidden select-text`}
         role="dialog"
         aria-modal="true"
       >

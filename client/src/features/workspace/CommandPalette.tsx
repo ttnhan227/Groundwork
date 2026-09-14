@@ -72,7 +72,7 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
         className="command-palette relative z-10 w-full max-w-xl bg-[var(--surface)] border border-[var(--hairline-strong)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
-        aria-label="Workspace commands"
+        aria-label="Groundwork commands"
       >
         {/* Search Header */}
         <header className="flex items-center gap-3 px-4 py-3.5 border-b border-[var(--hairline)] bg-[var(--surface)]">

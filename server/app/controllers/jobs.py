@@ -132,15 +132,12 @@ async def create_images_to_pdf_job(
     session: AsyncSession = Depends(get_session),
 ) -> ProcessingJob:
     if not files:
-        raise HTTPException(
-            status_code=422,
-            detail="The 'files' field is required and must contain at least one image"
-        )
+        raise HTTPException(status_code=422, detail="The 'files' field is required and must contain at least one image")
     if not 1 <= len(files) <= 50:
         raise HTTPException(status_code=422, detail="Upload between 1 and 50 images")
     if any(file.content_type not in {"image/png", "image/jpeg"} for file in files):
         raise HTTPException(status_code=415, detail="Only PNG and JPEG images are accepted")
-    
+
     # Validate save_sources is a boolean
     if isinstance(save_sources, str):
         if save_sources.lower() in ("true", "1"):
@@ -148,11 +145,8 @@ async def create_images_to_pdf_job(
         elif save_sources.lower() in ("false", "0"):
             save_sources = False
         else:
-            raise HTTPException(
-                status_code=422,
-                detail="'save_sources' must be a boolean value (true/false)"
-            )
-    
+            raise HTTPException(status_code=422, detail="'save_sources' must be a boolean value (true/false)")
+
     storage = ObjectStorage()
     staged: list[str] = []
     source_files: list[dict[str, str]] = []
@@ -200,65 +194,41 @@ async def create_watermark_job(
     # Check if user is authenticated before processing
     if user is None:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     # Validate document_id is not an object/type mismatch
     if isinstance(document_id, dict):
-        raise HTTPException(
-            status_code=422,
-            detail="document_id must be a string or UUID, not an object"
-        )
-    
+        raise HTTPException(status_code=422, detail="document_id must be a string or UUID, not an object")
+
     if document_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail="document_id is required"
-        )
-    
+        raise HTTPException(status_code=422, detail="document_id is required")
+
     # Validate document_id length to prevent potential crashes from oversized strings
     if isinstance(document_id, str):
         if len(document_id) > 36:  # UUID length
-            raise HTTPException(
-                status_code=422,
-                detail="document_id must be a valid UUID"
-            )
+            raise HTTPException(status_code=422, detail="document_id must be a valid UUID")
         try:
             document_id = uuid.UUID(document_id)
         except ValueError:
-            raise HTTPException(
-                status_code=422,
-                detail="document_id must be a valid UUID"
-            )
-    
+            raise HTTPException(status_code=422, detail="document_id must be a valid UUID")
+
     # Explicitly check for empty string case
     if isinstance(document_id, str) and document_id.strip() == "":
-        raise HTTPException(
-            status_code=422,
-            detail="document_id cannot be an empty string"
-        )
-    
+        raise HTTPException(status_code=422, detail="document_id cannot be an empty string")
+
     await owned_document(document_id, user, session)
-    
+
     # Validate text is not an object and not empty when provided
     if isinstance(text, dict):
-        raise HTTPException(
-            status_code=422,
-            detail="text must be a string, not an object"
-        )
-    
+        raise HTTPException(status_code=422, detail="text must be a string, not an object")
+
     # Validate text is not empty when provided
     if text is not None and text.strip() == "":
-        raise HTTPException(
-            status_code=422,
-            detail="text cannot be an empty string"
-        )
-    
+        raise HTTPException(status_code=422, detail="text cannot be an empty string")
+
     # Validate page_numbers is not empty when it should contain values
     if page_numbers.strip() == "":
-        raise HTTPException(
-            status_code=422,
-            detail="page_numbers must be provided as comma-separated numbers"
-        )
-    
+        raise HTTPException(status_code=422, detail="page_numbers must be provided as comma-separated numbers")
+
     try:
         pages = [int(item.strip()) for item in page_numbers.split(",") if item.strip()]
     except ValueError as exc:
@@ -303,49 +273,43 @@ async def create_docx_conversion_job(
     # Check authentication first before any other processing
     if user is None:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     # Validate file is provided and not empty
     if file is None:
         raise HTTPException(status_code=422, detail="File is required")
-    
+
     # Validate file is a string (not an object) - handle malformed payloads
     if isinstance(file, dict):
-        raise HTTPException(
-            status_code=422,
-            detail="'file' must be a string or file upload, not an object"
-        )
-    
+        raise HTTPException(status_code=422, detail="'file' must be a string or file upload, not an object")
+
     # Validate file.filename is not empty
     if not file.filename:
         raise HTTPException(status_code=422, detail="Filename is required")
-    
+
     # Validate target is provided and matches expected pattern
     if not target or target not in ("pdf", "markdown"):
         raise HTTPException(status_code=422, detail="Target must be either 'pdf' or 'markdown'")
-    
+
     # Validate target is not an object/type mismatch
     if isinstance(target, dict):
-        raise HTTPException(
-            status_code=422,
-            detail="'target' must be a string, not an object"
-        )
-    
+        raise HTTPException(status_code=422, detail="'target' must be a string, not an object")
+
     # Explicitly check for empty string case for target
     if isinstance(target, str) and target.strip() == "":
         raise HTTPException(status_code=422, detail="Target cannot be an empty string")
-    
+
     filename = safe_filename(file.filename or "document.docx")
     if not filename.lower().endswith(".docx"):
         raise HTTPException(status_code=415, detail="Upload a DOCX Word document")
-    
+
     # Validate file content is not empty
     content = await file.read(1)
     if not content:
         await file.close()
         raise HTTPException(status_code=422, detail="File content cannot be empty")
-    
+
     settings = get_settings()
-    
+
     # Read file content in chunks to validate size without loading entire file into memory
     max_size_bytes = settings.max_file_size_mb * 1024 * 1024
     try:
@@ -356,20 +320,17 @@ async def create_docx_conversion_job(
             content += chunk
             if len(content) > max_size_bytes:
                 await file.close()
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"File exceeds {settings.max_file_size_mb} MB"
-                )
+                raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_file_size_mb} MB")
     except Exception as exc:
         await file.close()
         raise HTTPException(status_code=422, detail="Error reading file") from exc
-    
+
     try:
         validate_docx(content)
     except ValueError as exc:
         await file.close()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    
+
     staged_key = f"{user.id}/staging/{uuid.uuid4()}/{filename}"
     ObjectStorage().upload(
         staged_key,

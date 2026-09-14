@@ -83,10 +83,10 @@ services:
       - model_cache:/root/.cache/huggingface
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.tasks.celery_app:celery_app inspect ping -d celery@$$HOSTNAME"]
-      interval: 15s
-      timeout: 10s
+      interval: 30s
+      timeout: 30s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
 
   client:

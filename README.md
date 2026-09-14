@@ -1,217 +1,148 @@
-<p align="center">
-  <img src="docs/assets/banner.svg" alt="Groundwork Banner" width="100%">
-</p>
+# Groundwork
 
-<p align="center">
-  <strong>An AI-powered document workspace that drafts proposals, reports, and deliverables grounded in your source documents and verifies claims before export.</strong>
-</p>
+Groundwork is an AI-powered research and note-taking platform that answers questions, extracts key insights, and creates summaries based only on the specific documents you upload (inspired by Google NotebookLM).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12-blue.svg" alt="Python Version">
-  <img src="https://img.shields.io/badge/React-19-61dafb.svg" alt="React 19">
-  <img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-336791.svg" alt="PostgreSQL pgvector">
-  <img src="https://github.com/ttnhan227/Groundwork/actions/workflows/ci.yml/badge.svg" alt="CI">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-</p>
+It acts as a personal research assistant by grounding its answers directly in your files. This source-grounded design prevents the AI from making up facts or hallucinating, ensuring every assertion can be verified against the exact source page.
 
----
+### Key Features
+- **Source-Grounded Answers**: The AI limits its responses to your provided files and includes clickable citations pointing back to the original text and page numbers.
+- **Multi-Format Document Support**: Upload PDF documents, Word/DOCX files, Markdown, plain text, and images with automatic text extraction, chunking, and semantic indexing.
+- **Interactive Studio Chat & Study Guides**: Query your sources to generate comprehensive study guides, FAQs, extract core concepts, find connections across multiple documents, and organize complex topics.
+- **3-Column Research Environment**:
+  - **Left (Sources)**: Manage reference documents and selectively toggle which files are active in the AI's context window.
+  - **Center (Notes & Synthesis Canvas)**: Draft structured notes, technical reports, or proposals with inline citations and version tracking.
+  - **Right (Studio & Assistant)**: Real-time streaming assistant with automated verification audits to detect unsupported statements.
+- **Interactive PDF Viewer with Auto-Fit**: Click any citation chip to open the integrated PDF viewer, automatically fit the page to your screen, and view highlighted source passages.
 
-## Platform Visual Preview
+### How It Works
+1. **Create a Workspace**: Set up a new project notebook for your specific research topic, study material, or report.
+2. **Add Sources**: Upload files or notes into the workspace so the AI can index them.
+3. **Ask and Explore**: Use the Studio chat panel to ask questions, request summaries, generate study guides, and synthesize notes with page-level citations.
 
-| Landing & Verification Simulator | Grounded Authoring Studio & Evidence Rail |
-|:---:|:---:|
-| ![Groundwork Landing & Simulator](docs/screenshots/groundwork-landing.png) | ![Grounded Studio & Assistant](docs/screenshots/groundwork-studio.png) |
-| **Document Library & Compliance Dossiers** | **Regulatory Insights & Citation Audit** |
-| ![Document Library & Dossiers](docs/screenshots/groundwork-library.png) | ![Regulatory Insights & Audit](docs/screenshots/groundwork-insights.png) |
+## Data, privacy, and AI behavior
 
----
+- API queries enforce signed-in user and workspace access. The test suite includes static and runtime checks for tenant scoping.
+- Metadata and extracted text are stored in PostgreSQL. Original uploads are stored in the configured S3-compatible object store (MinIO in local Docker). Redis and Celery handle background jobs.
+- When a user starts a Groundwork AI action, the selected source context, relevant draft content, requirements, findings, recent conversation messages, and workspace notes may be sent to the configured external AI endpoint.
+- AI actions are explicit; navigation and rendering do not automatically generate a new AI response.
+- Identical concurrent AI requests are deduplicated per API process for ten minutes. Completed and failed request keys are released. Results are not reused as cross-user page caches.
+- If the external AI service is unavailable, Groundwork returns a clear fallback status and does not silently modify records. Manual editing and deterministic workflow controls remain available.
+- Applying a suggested revision, waiving a finding, deleting data, and exporting are explicit user actions.
 
-## DevOps & Infrastructure
+For a production deployment, review the retention settings, object-store policy, external AI provider terms, CORS origins, secrets, and database backups for your environment.
 
-Groundwork is containerized and deployed through a full CI/CD pipeline to Google Cloud Run.
+## Run with Docker
 
-### CI/CD Pipeline
-
-```
-GitHub (push / pull request)
-        │
-        ▼
-  GitHub Actions
-        │
-        ├── backend ─── ruff lint + 102 pytest tests
-        │                  (includes AST-level data-isolation guard)
-        │
-        ├── frontend ── ESLint + Vitest unit tests
-        │
-        ├── docker ──── docker compose build smoke-test
-        │               (gated on backend + frontend passing)
-        │
-        └── e2e ──────── Playwright browser tests against full stack
-                         (docker compose up --build)
-
-  On merge to main → deploy.yml
-        │
-        ├── Build & push to Artifact Registry (with layer caching)
-        │
-        ├── Deploy API → Cloud Run   ──► POST-deploy /health check
-        │
-        └── Deploy Worker → Cloud Run Jobs
-```
-
-### Services
-
-| Service | Technology | Role |
-|---|---|---|
-| API | FastAPI + Uvicorn | REST API, SSE streaming, auth |
-| Worker | Celery + Redis | PDF OCR, async embedding generation |
-| Database | PostgreSQL 16 + pgvector | Relational data + vector search |
-| Object Storage | MinIO (S3-compatible) | Uploaded source documents |
-| Reverse Proxy | Nginx | TLS termination, routing |
-| Frontend | React 19 + Vite | Single-page application |
-
-### Key Infrastructure Decisions
-
-- **Workload Identity Federation** — CI/CD authenticates to GCP without long-lived service account keys
-- **Secret Manager** — All credentials injected at runtime via Cloud Run's `--secrets` flag
-- **Health-check–gated deploys** — `deploy.yml` calls `GET /health` after each deploy; failures block the workflow
-- **Layer-cached Docker builds** — Artifact Registry cache halves average build time
-- **Zero-downtime rollout** — Cloud Run traffic-splitting enables instant rollback to any prior revision
-- **Multi-stage healthchecks** — Every service in `docker-compose.yml` uses `healthcheck` + `depends_on: condition: service_healthy`
-
----
-
-## Features
-
-- **Document Ingestion & RAG**: Extract text and page numbers from PDFs with vector search (`pgvector`).
-- **Context-Aware AI Assistant**: Drafts and edits sections directly inside the workspace with live context.
-- **Traceability & Auditing**: Tracks acceptance requirements and verifies numbers/claims against source pages.
-- **Multi-Language Support**: 9 interface languages (English, Vietnamese, Spanish, Japanese, German, French, Chinese, Korean, Portuguese).
-- **Export Formats**: Export verified documents to PDF, DOCX, or Markdown.
-
----
-
-## Tech Stack
-
-- **Frontend**: React 19, TypeScript, Vite
-- **Backend**: FastAPI, SQLAlchemy Async, Pydantic v2
-- **Database & Queue**: PostgreSQL 16 (`pgvector`), Redis 7, Celery
-- **Storage**: MinIO (S3-compatible)
-- **Infrastructure**: Docker, Docker Compose, Google Cloud Run, GitHub Actions
-
----
-
-## Getting Started
-
-### 1. Clone repository & configure `.env`
+Requirements: Docker Desktop or Docker Engine with Compose.
 
 ```bash
-git clone https://github.com/ttnhan227/Groundwork.git
-cd Groundwork
 cp .env.example .env
-```
-
-Configure your `LLM_API_KEY` and settings in `.env`.
-
-### 2. Start with Docker Compose
-
-```bash
 docker compose up -d --build
 ```
 
-| Endpoint | URL |
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
+
+Default local endpoints:
+
+| Service | URL |
 |---|---|
-| Web Application | http://localhost:8080 |
-| API Documentation | http://localhost:8000/docs |
-| MinIO Console | http://localhost:9001 |
+| Groundwork | http://localhost:8080 |
+| API and OpenAPI docs | http://localhost:8000/docs |
+| MinIO console | http://localhost:9001 |
 
----
-
-## Environment Variables Reference
-
-| Variable | Description | Default / Example |
-|---|---|---|
-| `ENVIRONMENT` | Runtime environment (`development` or `production`) | `development` |
-| `JWT_SECRET` | Secret key for HS256 JWT access tokens (required in prod) | `change-in-production` |
-| `DATABASE_URL` | Async PostgreSQL connection string with pgvector | `postgresql+asyncpg://groundwork:groundwork@postgres:5432/groundwork` |
-| `REDIS_URL` | Redis URL for Celery broker and rate-limiting | `redis://redis:6379/0` |
-| `LLM_API_KEY` | API Key for LLM provider (Gemini or OpenAI compatible) | Required for AI operations |
-| `LLM_MODEL` | Target language model for drafting and verification | `gemini-flash-latest` |
-| `LLM_BASE_URL` | Base URL for OpenAI-compatible endpoint | `https://generativelanguage.googleapis.com/v1beta/openai` |
-| `EMBEDDING_MODEL` | Embedding model for semantic vector search | `gemini-embedding-001` |
-| `MINIO_ENDPOINT` | MinIO / S3 endpoint address | `minio:9000` |
-| `MINIO_ACCESS_KEY` | Storage access key | `groundwork` |
-| `MINIO_SECRET_KEY` | Storage secret key | `groundwork-secret` |
-| `MINIO_BUCKET_ORIGINALS` | S3 bucket name for uploaded source documents | `original-documents` |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID for backend auth verification | Optional (empty = disabled) |
-| `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client ID for frontend button initialization | Optional |
-| `ADMIN_EMAIL` | Administrator account email (seeded on startup if provided — you can set any email you like) | `admin@groundwork.dev` (or any custom email) |
-| `ADMIN_PASSWORD` | Administrator account password (seeded on startup — you can set any password you like) | `Admin123456!` (or custom secure password) |
-| `CORS_ORIGINS` | Comma-separated allowed origins | `http://localhost:5173,http://localhost:3000,http://localhost:8080` |
-
----
-
-## Testing & Quality Assurance
-
-### Backend Tests
+Check the stack:
 
 ```bash
-cd server
-python -m pytest tests/ -v
+docker compose ps
+curl http://localhost:8080/health
+curl http://localhost:8000/health
 ```
 
-102 tests across 19 test files covering:
-- Multi-tenant data isolation (AST-level static analysis guard)
-- AI orchestration & hallucination detection
-- Deliverable generation & verification lifecycle
-- Background job processing
+The development Compose file mounts the backend source and runs Uvicorn with reload. Change development credentials and secrets before exposing the stack beyond a trusted local machine.
 
-### Frontend Tests
+## Configuration
 
-```bash
-cd client
-npm test        # Unit tests (Vitest)
-npm run test:e2e  # Playwright end-to-end
-```
+Copy `.env.example` and adjust at least the production secrets and any AI settings you plan to use.
 
----
+| Variable | Purpose |
+|---|---|
+| `ENVIRONMENT` | `development` or `production` runtime validation |
+| `JWT_SECRET` | Signing secret; production requires a non-default value |
+| `DATABASE_URL` | PostgreSQL connection |
+| `REDIS_URL` | Celery broker and job state |
+| `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | S3-compatible original-file storage |
+| `LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL` | OpenAI-compatible external AI endpoint |
+| `EMBEDDING_MODEL` | Embedding model used for semantic source retrieval |
+| `GOOGLE_CLIENT_ID`, `VITE_GOOGLE_CLIENT_ID` | Optional Google sign-in |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Optional local admin seed account |
+| `CORS_ORIGINS` | Allowed browser origins |
 
-## Local Development (Without Docker)
+AI credentials are optional for manual workspace and editing features, but AI drafting, semantic retrieval, and AI-assisted review require a working compatible endpoint.
 
-### Backend & Worker
+## Local development without Docker
+
+Backend (Python 3.12):
 
 ```bash
 cd server
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Windows: .venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-
 alembic upgrade head
-python -m app.seeders.seed
-
-# API server
 uvicorn app.main:app --reload --port 8000
-
-# Celery worker (separate terminal)
-celery -A app.tasks.celery_app.celery_app worker --loglevel=info
 ```
 
-### Frontend
+Run the worker in another shell:
+
+```bash
+cd server
+celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO --pool=solo --concurrency=1
+```
+
+Frontend (Node 22):
 
 ```bash
 cd client
-npm install
+npm ci
 npm run dev
 ```
 
----
+## Tests and verification
 
-## Documentation
+Backend:
 
-- [System Architecture & Multi-Tenant Isolation](docs/ARCHITECTURE.md)
-- [Production Deployment Guide](docs/DEPLOYMENT.md)
-- [Troubleshooting Runbook](docs/TROUBLESHOOTING.md)
-- [Verification & Audit Workflow](docs/VERIFICATION_WORKFLOW.md)
+```bash
+cd server
+ruff check app tests
+python -m pytest -q
+```
+
+Frontend:
+
+```bash
+cd client
+npm run lint
+npm test
+npm run test:e2e
+```
+
+Full-stack verification:
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+Playwright uses the running Docker app at `http://127.0.0.1:8080` by default. The E2E suite covers the public page, authentication, workspace entry, review controls, responsive layouts, and account settings.
+
+## Known limitations
+
+- The browser application currently uses query parameters (`?app=1` and `?ws=<id>`) rather than a multi-page URL router.
+- Concurrent Groundwork AI deduplication is process-local. A multi-replica deployment needs a shared lock, for example in Redis.
+- The UI language preference changes AI suggestion language and document defaults, but the whole interface is not fully translated.
+- OCR and Office conversion depend on Tesseract and LibreOffice in the backend image.
+- A clear automated review does not replace subject-matter, legal, financial, security, or compliance review.
 
 ## License
 

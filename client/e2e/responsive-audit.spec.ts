@@ -7,6 +7,47 @@ const VIEWPORTS = [
 ];
 
 test.describe("Visual and Responsive Self-Audit across Viewports", () => {
+  test("RFP upload card keeps readable contrast in dark mode", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/?app=1");
+    await page.getByLabel("Email").fill(process.env.E2E_EMAIL || "admin@groundwork.dev");
+    await page.getByLabel("Password").fill(process.env.E2E_PASSWORD || "Admin123456!");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.locator(".groundwork-app-root")).toBeVisible({ timeout: 15_000 });
+
+    if ((await page.locator("html").getAttribute("data-theme")) !== "dark") {
+      await page.getByTitle("Toggle color theme").click();
+    }
+
+    const card = page.getByTestId("rfp-upload-card");
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId("rfp-upload-title")).toBeVisible();
+
+    const titleContrast = await card.evaluate((element) => {
+      const title = element.querySelector<HTMLElement>("[data-testid='rfp-upload-title']");
+      if (!title) return 0;
+
+      const rgb = (value: string) =>
+        value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+      const luminance = (value: string) => {
+        const channels = rgb(value).map((channel) => {
+          const normalized = channel / 255;
+          return normalized <= 0.03928
+            ? normalized / 12.92
+            : ((normalized + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+      };
+
+      const foreground = luminance(getComputedStyle(title).color);
+      const background = luminance(getComputedStyle(element).backgroundColor);
+      return (Math.max(foreground, background) + 0.05) /
+        (Math.min(foreground, background) + 0.05);
+    });
+
+    expect(titleContrast).toBeGreaterThanOrEqual(4.5);
+  });
+
   for (const vp of VIEWPORTS) {
     test(`Landing page layout and heading wrapping at ${vp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -33,24 +74,14 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
       });
       expect(docOverflow).toBe(false);
 
-      // Verify Simulator Card at this viewport
-      const simulator = page.locator("#simulator");
-      await expect(simulator).toBeVisible();
-
-      // Toggle Simulator States (Blocked -> Resolved)
-      const resolveBtn = page.getByRole("button", { name: /2. Resolved State/i });
-      await resolveBtn.click();
-      await expect(page.getByText("100% Passed")).toBeVisible();
-
-      const blockedBtn = page.getByRole("button", { name: /1. Blocked State/i });
-      await blockedBtn.click();
-      await expect(page.getByText("83% Blocked")).toBeVisible();
-
-      // Take screenshot artifact for visual audit
-      await page.screenshot({
-        path: `e2e/screenshots/landing_${vp.name}.png`,
-        fullPage: true,
+      // Verify the real product capture is visible and loaded at this viewport.
+      const productScreen = page.getByRole("img", {
+        name: /Groundwork response workspace/i,
       });
+      await expect(productScreen).toBeVisible();
+      expect(
+        await productScreen.evaluate((image: HTMLImageElement) => image.naturalWidth),
+      ).toBe(1440);
     });
 
     test(`Authentication screen layout at ${vp.name}`, async ({ page }) => {
@@ -66,9 +97,51 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
       });
       expect(docOverflow).toBe(false);
 
-      await page.screenshot({
-        path: `e2e/screenshots/auth_${vp.name}.png`,
-      });
+    });
+  }
+
+  for (const vp of [
+    { name: "mobile response", width: 375, height: 667, minimumDraftWidth: 250 },
+    { name: "compact desktop response", width: 1024, height: 768, minimumDraftWidth: 600 },
+  ]) {
+    test(`${vp.name} keeps the setup workflow readable`, async ({ page }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto("/?app=1");
+      await page.getByRole("button", { name: "Need an account? Register" }).click();
+      const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      await page.locator("input[name='display_name']").fill("Responsive reviewer");
+      await page.locator("input[name='email']").fill(`responsive-${suffix}@example.com`);
+      await page.locator("input[name='password']").fill("GroundworkResponsive!42");
+      await page.getByRole("button", { name: /Create account/i }).click();
+      await expect(page.locator(".groundwork-app-root")).toBeVisible({ timeout: 15_000 });
+      await page.getByRole("button", { name: "Open response" }).first().click();
+
+      await expect(page.getByRole("button", { name: "All responses" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /Upload the RFP first/i })).toBeVisible();
+      const draftBox = await page.locator(".groundwork-col-draft").boundingBox();
+      expect(draftBox).not.toBeNull();
+      expect(draftBox!.width).toBeGreaterThanOrEqual(vp.minimumDraftWidth);
+      expect(await page.locator(".groundwork-col-audit").count()).toBe(0);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > window.innerWidth,
+        ),
+      ).toBe(false);
+
+      await page.getByRole("button", { name: "Open workspace tools" }).click();
+      const toolsPanel = page.locator(".groundwork-col-tools");
+      await expect(toolsPanel).toBeVisible();
+      await expect(page.getByRole("tab", { name: "Assistant" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      const toolsBox = await toolsPanel.boundingBox();
+      expect(toolsBox).not.toBeNull();
+      expect(toolsBox!.width).toBeLessThanOrEqual(vp.width - 44);
+      await toolsPanel
+        .getByRole("button", { name: "Collapse workspace tools" })
+        .click();
+      await expect(toolsPanel).not.toBeVisible();
     });
   }
 
@@ -83,7 +156,7 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
         body: JSON.stringify([
           {
             id: "ws-1",
-            name: "Apex Horizon Cloud Modernization Proposal",
+            name: "Proposal review workspace",
             kind: "personal",
             template: "proposal",
             created_at: "2026-08-25T00:00:00Z",
@@ -199,8 +272,7 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
     await page.goto("/?app=1");
 
     // Open User Settings panel via sidebar settings button or top header avatar
-    const settingsBtn = page.getByTitle(/Account profile & (preferences|settings)/i).or(page.getByRole("button", { name: /Settings|Lead Engineer/i })).first();
-    await settingsBtn.click();
+    await page.getByRole("button", { name: "Lead Engineer", exact: true }).click();
 
     // Verify Account Settings modal is displayed
     const accountPanel = page.locator(".account-panel-dialog");
@@ -214,17 +286,14 @@ test.describe("Visual and Responsive Self-Audit across Viewports", () => {
     await page.locator(".account-settings-nav button", { hasText: "Security" }).click();
     await expect(page.getByText("Password & Active Sessions")).toBeVisible();
 
-    // Navigate to Document Defaults tab
-    await page.locator(".account-settings-nav button", { hasText: "Document Defaults" }).click();
-    await expect(page.getByText("Deliverable & Writing Defaults")).toBeVisible();
+    // Navigate to Response Defaults tab
+    await page.locator(".account-settings-nav button", { hasText: "Response Defaults" }).click();
+    await expect(page.getByText("Response & Writing Defaults")).toBeVisible();
 
     // Navigate to Usage tab
     await page.locator(".account-settings-nav button", { hasText: "Usage" }).click();
     await expect(page.getByText("Storage Allocation")).toBeVisible();
     await expect(page.getByText("Pages indexed")).toBeVisible();
-
-    // Take screenshot of redesigned Account Settings
-    await page.screenshot({ path: "e2e/screenshots/user_settings_redesign.png" });
 
     // Close panel
     const closeBtn = page.getByRole("button", { name: "Close account settings" });

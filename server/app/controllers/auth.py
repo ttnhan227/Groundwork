@@ -85,6 +85,9 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
     )
     session.add(user)
     await session.flush()
+    from app.controllers.deliverables import ensure_personal_workspace
+
+    await ensure_personal_workspace(user, session)
     return await issue_tokens(user, session)
 
 
@@ -99,17 +102,17 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
                     "type": "value_error.missing",
                     "loc": ["body", "email"],
                     "msg": "Email is required",
-                    "input": payload.email
+                    "input": payload.email,
                 },
                 {
                     "type": "value_error.missing",
                     "loc": ["body", "password"],
                     "msg": "Password is required",
-                    "input": payload.password
-                }
-            ]
+                    "input": payload.password,
+                },
+            ],
         )
-    
+
     # Explicit validation for empty string password
     if payload.password == "":
         raise HTTPException(
@@ -119,11 +122,11 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
                     "type": "value_error.empty",
                     "loc": ["body", "password"],
                     "msg": "Password cannot be empty",
-                    "input": ""
+                    "input": "",
                 }
-            ]
+            ],
         )
-    
+
     user = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -137,10 +140,7 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
 @router.post("/google", response_model=TokenResponse)
 async def google_login(payload: GoogleLoginRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
     if not payload.credential or not payload.credential.strip():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Google credential is required"
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Google credential is required")
     settings = get_settings()
     try:
         claims = await asyncio.to_thread(verify_google_credential, payload.credential, settings.google_client_id)
@@ -173,6 +173,9 @@ async def google_login(payload: GoogleLoginRequest, session: AsyncSession = Depe
             )
             session.add(user)
             await session.flush()
+            from app.controllers.deliverables import ensure_personal_workspace
+
+            await ensure_personal_workspace(user, session)
 
     if user.email != email:
         raise HTTPException(status_code=409, detail="Google account identity does not match the linked user")
@@ -191,11 +194,11 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_s
                     "type": "value_error.missing",
                     "loc": ["body", "refresh_token"],
                     "msg": "Refresh token is required",
-                    "input": payload.refresh_token
+                    "input": payload.refresh_token,
                 }
-            ]
+            ],
         )
-    
+
     if payload.refresh_token == "":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -204,11 +207,11 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_s
                     "type": "value_error.empty",
                     "loc": ["body", "refresh_token"],
                     "msg": "Refresh token cannot be empty",
-                    "input": ""
+                    "input": "",
                 }
-            ]
+            ],
         )
-    
+
     # Validate refresh_token length to prevent potential DoS
     if len(payload.refresh_token) > 1024:
         raise HTTPException(
@@ -219,11 +222,11 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_s
                     "loc": ["body", "refresh_token"],
                     "msg": "String should have at most 1024 characters",
                     "input": payload.refresh_token,
-                    "ctx": {"max_length": 1024}
+                    "ctx": {"max_length": 1024},
                 }
-            ]
+            ],
         )
-    
+
     token = await session.scalar(
         select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token))
     )
@@ -248,11 +251,11 @@ async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_se
                     "type": "value_error.missing",
                     "loc": ["body", "refresh_token"],
                     "msg": "Refresh token is required",
-                    "input": payload.refresh_token
+                    "input": payload.refresh_token,
                 }
-            ]
+            ],
         )
-    
+
     if payload.refresh_token == "":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -261,11 +264,11 @@ async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_se
                     "type": "value_error.empty",
                     "loc": ["body", "refresh_token"],
                     "msg": "Refresh token cannot be empty",
-                    "input": ""
+                    "input": "",
                 }
-            ]
+            ],
         )
-    
+
     # Validate refresh_token length to prevent potential DoS
     if len(payload.refresh_token) > 1024:
         raise HTTPException(
@@ -276,11 +279,11 @@ async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_se
                     "loc": ["body", "refresh_token"],
                     "msg": "String should have at most 1024 characters",
                     "input": payload.refresh_token,
-                    "ctx": {"max_length": 1024}
+                    "ctx": {"max_length": 1024},
                 }
-            ]
+            ],
         )
-    
+
     token = await session.scalar(
         select(RefreshToken).where(RefreshToken.token_hash == hash_token(payload.refresh_token))
     )

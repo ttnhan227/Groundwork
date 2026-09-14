@@ -38,6 +38,14 @@ from app.models import (
     ProcessingJob,
     User,
 )
+from app.dtos.document_dto import (
+    TextSourceCreateRequest,
+    UrlSourceCreateRequest,
+    YouTubeSourceCreateRequest,
+)
+from html.parser import HTMLParser
+import httpx
+from app.services.ai_orchestration import ai_orchestrator
 from app.schemas import (
     DocumentArchiveRequest,
     DocumentPageResponse,
@@ -218,7 +226,7 @@ async def download_documents_archive(
     if payload.files is None or len(payload.files) == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The 'files' field is required and must contain at least one item"
+            detail="The 'files' field is required and must contain at least one item",
         )
     references = list(dict.fromkeys((item.kind, item.id) for item in payload.files))
     if len(references) < 2:
@@ -302,14 +310,11 @@ async def rename_document(
 ) -> Document:
     # Validate that filename is a string type
     if not isinstance(payload.filename, str):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"filename": "Must be a string"}
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"filename": "Must be a string"})
     if payload.filename is None or payload.filename.strip() == "":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The 'filename' field is required and cannot be empty"
+            detail="The 'filename' field is required and cannot be empty",
         )
     document = await owned_document(document_id, user, session)
     filename = safe_filename(payload.filename)
@@ -498,10 +503,7 @@ async def upload_document(
         )
     )
     if duplicate is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={"message": "This source is already in your workspace", "document_id": str(duplicate.id)},
-        )
+        return duplicate
     display_title = None
     filename = original_filename
     original_data = data
@@ -628,3 +630,276 @@ async def retry_document(
         await session.commit()
         raise HTTPException(status_code=503, detail=job.error_message) from exc
     return job
+
+
+class HTMLTextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.text_parts: list[str] = []
+        self.title: str = ""
+        self.in_title: bool = False
+        self.in_ignored: bool = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
+        if tag.lower() in ("script", "style", "nav", "footer", "head", "noscript", "svg"):
+            self.in_ignored = True
+        elif tag.lower() == "title":
+            self.in_title = True
+
+    def handle_endtag(self, tag: str):
+        if tag.lower() in ("script", "style", "nav", "footer", "head", "noscript", "svg"):
+            self.in_ignored = False
+        elif tag.lower() == "title":
+            self.in_title = False
+        elif tag.lower() in ("p", "h1", "h2", "h3", "h4", "li", "tr", "div", "article", "section"):
+            self.text_parts.append("\n")
+
+    def handle_data(self, data: str):
+        if self.in_title:
+            self.title += data.strip() + " "
+        elif not self.in_ignored:
+            cleaned = data.strip()
+            if cleaned:
+                self.text_parts.append(cleaned + " ")
+
+
+async def _ingest_text_source(
+    title: str,
+    text_content: str,
+    workspace_id: uuid.UUID | None,
+    user: User,
+    session: AsyncSession,
+    original_filename: str | None = None,
+    content_type: str = "text/plain",
+) -> Document:
+    settings = get_settings()
+    from app.deliverables import activity, ensure_personal_workspace, workspace_access
+    from app.storage import ObjectStorage
+
+    ws_uuid: uuid.UUID | None = None
+    if workspace_id is not None and str(workspace_id).strip() != "":
+        if str(workspace_id).strip().lower() not in {"null", "undefined"}:
+            try:
+                ws_uuid = uuid.UUID(str(workspace_id).strip())
+            except (ValueError, AttributeError):
+                raise HTTPException(status_code=422, detail="Invalid workspace_id")
+
+    if ws_uuid is not None:
+        workspace, _ = await workspace_access(ws_uuid, user, session, {"owner", "editor"})
+    else:
+        workspace = await ensure_personal_workspace(user, session)
+
+    clean_title = safe_filename(title).replace(".pdf", "") or "Untitled Source"
+    display_title = title.strip() or "Untitled Source"
+
+    try:
+        pdf_data = await run_in_threadpool(text_to_pdf, text_content, display_title)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    raw_bytes = text_content.encode("utf-8")
+    source_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+    duplicate = await session.scalar(
+        select(Document).where(
+            Document.owner_id == user.id, Document.workspace_id == workspace.id, Document.source_sha256 == source_sha256
+        )
+    )
+    if duplicate is not None:
+        return duplicate
+
+    document_id = uuid.uuid4()
+    pdf_filename = f"{clean_title}.pdf"
+    orig_name = original_filename or f"{clean_title}.txt"
+    object_key = f"{user.id}/{document_id}/{pdf_filename}"
+    original_object_key = f"{user.id}/{document_id}/original/{orig_name}"
+
+    storage = ObjectStorage()
+    try:
+        storage.upload_pdf(object_key, pdf_data)
+        storage.upload(original_object_key, raw_bytes, content_type)
+    except Exception as exc:
+        try:
+            storage.remove(object_key)
+        except Exception:
+            pass
+        try:
+            storage.remove(original_object_key)
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail=f"Document storage error: {str(exc)}") from exc
+
+    document = Document(
+        id=document_id,
+        owner_id=user.id,
+        workspace_id=workspace.id,
+        filename=pdf_filename,
+        object_key=object_key,
+        content_type="application/pdf",
+        size_bytes=len(pdf_data),
+        display_title=display_title,
+        original_filename=orig_name,
+        original_object_key=original_object_key,
+        original_content_type=content_type,
+        source_sha256=source_sha256,
+        status=DocumentStatus.UPLOADED,
+        page_count=None,
+    )
+    session.add(document)
+    await session.flush()
+
+    await activity(
+        session,
+        workspace.id,
+        user.id,
+        "source.added",
+        "document",
+        document.id,
+        {"filename": pdf_filename, "display_title": display_title},
+    )
+
+    job = ProcessingJob(
+        document_id=document.id,
+        owner_id=user.id,
+        operation="document_processing",
+        status=JobStatus.QUEUED,
+        progress=0,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(document)
+
+    from app.tasks import process_document
+    try:
+        task = process_document.delay(str(document.id))
+        job.task_id = task.id
+        await session.commit()
+    except Exception as exc:
+        document.status = DocumentStatus.FAILED
+        document.error_message = f"Processing worker offline: {str(exc)}"
+        job.status = JobStatus.FAILED
+        job.error_message = document.error_message
+        await session.commit()
+
+    return document
+
+
+@router.post("/text", response_model=DocumentResponse, status_code=201)
+async def create_text_source(
+    payload: TextSourceCreateRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Document:
+    return await _ingest_text_source(
+        title=payload.title,
+        text_content=payload.content,
+        workspace_id=payload.workspace_id,
+        user=user,
+        session=session,
+        original_filename=f"{safe_filename(payload.title)}.txt",
+        content_type="text/plain",
+    )
+
+
+@router.post("/url", response_model=DocumentResponse, status_code=201)
+async def create_url_source(
+    payload: UrlSourceCreateRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Document:
+    url = payload.url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="URL must start with http:// or https://")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            res = await client.get(url, headers=headers)
+            res.raise_for_status()
+            html_text = res.text
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Failed to fetch content from URL: {str(exc)}")
+
+    extractor = HTMLTextExtractor()
+    extractor.feed(html_text)
+    body_text = "".join(extractor.text_parts).strip()
+    page_title = extractor.title.strip() or url.split("/")[-1] or "Web Page"
+
+    if not body_text:
+        raise HTTPException(status_code=422, detail="The URL did not contain readable body text")
+
+    content = f"# {page_title}\nSource URL: {url}\n\n{body_text[:120_000]}"
+    return await _ingest_text_source(
+        title=page_title[:100],
+        text_content=content,
+        workspace_id=payload.workspace_id,
+        user=user,
+        session=session,
+        original_filename=f"{safe_filename(page_title)}.html",
+        content_type="text/html",
+    )
+
+
+@router.post("/youtube", response_model=DocumentResponse, status_code=201)
+async def create_youtube_source(
+    payload: YouTubeSourceCreateRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Document:
+    url = payload.url.strip()
+    match = re.search(r"(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})", url)
+    if not match:
+        raise HTTPException(status_code=422, detail="Invalid YouTube video URL")
+
+    video_id = match.group(1)
+    video_title = f"YouTube Video {video_id}"
+    author_name = "YouTube"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            res = await client.get(oembed_url)
+            if res.status_code == 200:
+                data = res.json()
+                video_title = data.get("title", video_title)
+                author_name = data.get("author_name", author_name)
+    except Exception:
+        pass
+
+    prompt = (
+        f"Generate a comprehensive, source-grounded educational overview and transcript breakdown "
+        f"for the YouTube video titled '{video_title}' by '{author_name}' (URL: {url}).\n"
+        f"Format in markdown with:\n"
+        f"1. Executive Summary & Thesis\n"
+        f"2. Core Concepts & Topics Explored\n"
+        f"3. Transcript Chapters & Key Discussion Points\n"
+        f"4. Actionable Key Takeaways & Study Notes"
+    )
+
+    try:
+        ai_overview = await ai_orchestrator.complete(
+            [{"role": "user", "content": prompt}],
+            operation="youtube_source_summary",
+            temperature=0.3,
+        )
+    except Exception:
+        ai_overview = (
+            f"## Executive Summary\n"
+            f"This video '{video_title}' by {author_name} presents important insights on the topic.\n\n"
+            f"## Reference Link\n"
+            f"- Watch Video: {url}\n"
+        )
+
+    content = f"# {video_title}\nChannel: {author_name}\nVideo Link: {url}\n\n{ai_overview}"
+    return await _ingest_text_source(
+        title=video_title[:100],
+        text_content=content,
+        workspace_id=payload.workspace_id,
+        user=user,
+        session=session,
+        original_filename=f"youtube_{video_id}.txt",
+        content_type="text/plain",
+    )
+

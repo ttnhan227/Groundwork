@@ -13,7 +13,10 @@ import uuid
 from pathlib import Path
 
 from app.controllers.workspace_agent import (
+    _ACTIVE_AGENT_EXECUTIONS,
+    _AGENT_EXECUTION_TTL_SECONDS,
     WorkspaceAgentRequest,
+    _claim_agent_execution,
     _generate_idempotency_key,
 )
 from app.services.deliverable_review import (
@@ -144,3 +147,19 @@ def test_idempotency_key_generation_is_deterministic():
 
     assert key_a == key_b
     assert len(key_a) == 64
+
+
+def test_execution_claim_deduplicates_concurrent_requests_and_expires_stale_keys():
+    _ACTIVE_AGENT_EXECUTIONS.clear()
+    try:
+        assert _claim_agent_execution("same-request", now=100.0) is True
+        assert _claim_agent_execution("same-request", now=101.0) is False
+        assert (
+            _claim_agent_execution(
+                "same-request",
+                now=100.0 + _AGENT_EXECUTION_TTL_SECONDS,
+            )
+            is True
+        )
+    finally:
+        _ACTIVE_AGENT_EXECUTIONS.clear()

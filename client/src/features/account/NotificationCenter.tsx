@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Trash2,
   X,
-  Sparkles,
 } from "lucide-react";
 import { api } from "../../api/client";
 import type { Job, NotificationItem } from "../../types";

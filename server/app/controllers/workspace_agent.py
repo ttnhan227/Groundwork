@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai_orchestration import ai_orchestrator
+from app.ai_orchestration import AIProviderError, ai_orchestrator
 from app.database import SessionLocal, get_session
 from app.deliverable_review import (
     extract_requirements,
@@ -118,6 +118,7 @@ class WorkspaceAgentRequest(BaseModel):
 
 # In-memory execution registry for task deduplication
 _ACTIVE_AGENT_EXECUTIONS: dict[str, float] = {}
+_AGENT_EXECUTION_TTL_SECONDS = 600
 
 
 def _generate_idempotency_key(payload: WorkspaceAgentRequest, user_id: uuid.UUID) -> str:
@@ -126,6 +127,22 @@ def _generate_idempotency_key(payload: WorkspaceAgentRequest, user_id: uuid.UUID
     sorted_sources = ",".join(str(s) for s in sorted(payload.source_document_ids))
     raw = f"{user_id}:{payload.workspace_id}:{payload.action_type or 'chat'}:{payload.prompt.strip()}:{sorted_sources}"
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _claim_agent_execution(idempotency_key: str, now: float | None = None) -> bool:
+    """Atomically claim a request key within this API process."""
+    timestamp = time.time() if now is None else now
+    stale_keys = [
+        key
+        for key, started_at in _ACTIVE_AGENT_EXECUTIONS.items()
+        if timestamp - started_at >= _AGENT_EXECUTION_TTL_SECONDS
+    ]
+    for key in stale_keys:
+        _ACTIVE_AGENT_EXECUTIONS.pop(key, None)
+    if idempotency_key in _ACTIVE_AGENT_EXECUTIONS:
+        return False
+    _ACTIVE_AGENT_EXECUTIONS[idempotency_key] = timestamp
+    return True
 
 
 # Backward-compatibility alias
@@ -229,7 +246,7 @@ async def _build_workspace_context_snapshot(
         "\n".join(
             f'- [{f.severity.upper()}] Claim: "{f.claim_text}" | Issue: {f.explanation}' for f in open_findings[:10]
         )
-        or "All claims verified (0 open review findings)."
+        or "No open review findings are recorded."
     )
 
     notes_summary = "\n".join(f"- {m.key}: {m.value}" for m in memories) or "No workspace notes recorded."
@@ -262,6 +279,47 @@ async def _build_workspace_context_snapshot(
 
 def _classify_intent(prompt: str, action_type: str | None) -> str:
     prompt_lower = prompt.lower()
+    if action_type == "studio_audio_overview" or any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(audio overview|deep dive podcast|podcast episode|podcast overview|audio discussion|audio conversation)\b",
+            r"\b(two hosts?|host 1|host 2)\b.*\b(discuss|overview|conversation)\b",
+        ]
+    ):
+        return "studio_audio_overview"
+
+    if action_type == "studio_study_guide" or any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(study guide|flashcards|practice quiz|quiz questions|study notes|study material)\b",
+        ]
+    ):
+        return "studio_study_guide"
+
+    if action_type == "studio_faq" or any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(faq|frequently asked questions|common questions|q&a sheet|q&a list)\b",
+        ]
+    ):
+        return "studio_faq"
+
+    if action_type == "studio_video_overview" or any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(video overview|video summary|storyboard|visual summary|video presentation|slide presentation)\b",
+        ]
+    ):
+        return "studio_video_overview"
+
+    if action_type == "studio_briefing_doc" or any(
+        re.search(pat, prompt_lower)
+        for pat in [
+            r"\b(briefing doc|briefing document|executive briefing|research briefing)\b",
+        ]
+    ):
+        return "studio_briefing_doc"
+
     if action_type in {"report", "proposal", "presentation", "summary", "technical_doc"}:
         return "generate_artifact"
     if action_type == "verify":
@@ -309,49 +367,66 @@ async def execute_workspace_agent(
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
     workspace, _ = await workspace_access(payload.workspace_id, user, session, {"owner", "editor"})
+    idempotency_key = _generate_idempotency_key(payload, user.id)
 
-    # Ensure conversation exists
-    conversation: Conversation | None = None
-    if payload.conversation_id:
-        conversation = await session.scalar(
-            select(Conversation).where(
-                Conversation.id == payload.conversation_id, Conversation.workspace_id == workspace.id
+    if not _claim_agent_execution(idempotency_key):
+
+        async def duplicate_event() -> AsyncIterator[str]:
+            yield _sse_event(
+                "error",
+                {
+                    "message": "This Groundwork AI request is already running. Wait for it to finish before sending it again."
+                },
+            )
+
+        return StreamingResponse(
+            duplicate_event(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    try:
+        # Ensure conversation exists
+        conversation: Conversation | None = None
+        if payload.conversation_id:
+            conversation = await session.scalar(
+                select(Conversation).where(
+                    Conversation.id == payload.conversation_id, Conversation.workspace_id == workspace.id
+                )
+            )
+        if conversation is None:
+            title = payload.prompt[:50].strip() or "Workspace conversation"
+            conversation = Conversation(
+                owner_id=user.id,
+                workspace_id=workspace.id,
+                title=title,
+            )
+            session.add(conversation)
+            await session.flush()
+
+        # Load recent conversation history before stream generator
+        message_rows = list(
+            await session.scalars(
+                select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.asc())
             )
         )
-    if conversation is None:
-        title = payload.prompt[:50].strip() or "Workspace conversation"
-        conversation = Conversation(
-            owner_id=user.id,
-            workspace_id=workspace.id,
-            title=title,
-        )
-        session.add(conversation)
-        await session.flush()
+        chat_history: list[dict[str, str]] = [{"role": m.role.value, "content": m.content} for m in message_rows]
 
-    # Load recent conversation history before stream generator
-    message_rows = list(
-        await session.scalars(
-            select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.asc())
+        # Add user message only after the request has claimed its execution key.
+        user_msg = Message(
+            conversation_id=conversation.id,
+            role=MessageRole.USER,
+            content=payload.prompt,
         )
-    )
-    chat_history: list[dict[str, str]] = [{"role": m.role.value, "content": m.content} for m in message_rows]
-
-    # Add user message
-    user_msg = Message(
-        conversation_id=conversation.id,
-        role=MessageRole.USER,
-        content=payload.prompt,
-    )
-    session.add(user_msg)
-    await session.commit()
+        session.add(user_msg)
+        await session.commit()
+    except Exception:
+        _ACTIVE_AGENT_EXECUTIONS.pop(idempotency_key, None)
+        raise
 
     conversation_id = conversation.id
     workspace_id = workspace.id
     intent = _classify_intent(payload.prompt, payload.action_type)
-    idempotency_key = _generate_idempotency_key(payload, user.id)
-
-    now = time.time()
-    _ACTIVE_AGENT_EXECUTIONS[idempotency_key] = now
 
     async def event_generator() -> AsyncIterator[str]:
         async with SessionLocal() as db_session:
@@ -396,16 +471,36 @@ async def execute_workspace_agent(
                     ):
                         yield chunk
 
+                elif intent.startswith("studio_"):
+                    async for chunk in _orchestrate_studio_action(
+                        workspace_obj, conversation_id, sources_list, payload, user, db_session, studio_type=intent
+                    ):
+                        yield chunk
+
                 else:
                     async for chunk in _orchestrate_grounded_qa(
                         workspace_obj, conversation_id, sources_list, chat_history, payload, user, db_session
                     ):
                         yield chunk
 
+            except AIProviderError as exc:
+                logger.warning("workspace_ai_unavailable: %s", exc)
+                yield _sse_event(
+                    "error",
+                    {
+                        "message": (
+                            "Groundwork AI is unavailable right now. No records were changed. "
+                            "You can keep editing manually and try this action again later."
+                        ),
+                        "fallback": True,
+                    },
+                )
             except Exception as exc:
                 logger.exception("workspace_agent_error: %s", exc)
                 error_msg = str(exc).strip() or f"Error: {type(exc).__name__}"
                 yield _sse_event("error", {"message": error_msg})
+            finally:
+                _ACTIVE_AGENT_EXECUTIONS.pop(idempotency_key, None)
 
     return StreamingResponse(
         event_generator(),
@@ -650,7 +745,7 @@ async def _orchestrate_artifact_generation(
         f"- **Verification Status**: {readiness_res.status.replace('_', ' ').title()} "
         f"({readiness_res.unsupported_claims} unsupported claims, {readiness_res.open_findings} findings for review)\n"
         f"- **Sections Created**: {len([b for b in blocks if b.get('type') == 'heading'])}\n\n"
-        f"The deliverable is available in your **Studio / Artifacts** panel. You can inspect requirements, review findings, or ask me to refine specific sections."
+        f"The draft is available in your **response workspace**. You can inspect requirements, review findings, or ask me to refine specific sections."
     )
 
     asst_msg = Message(
@@ -685,7 +780,7 @@ async def _orchestrate_artifact_modification(
     user: User,
     session: AsyncSession,
 ) -> AsyncIterator[str]:
-    yield _sse_event("status", {"step": "analyzing_sources", "label": "Retrieving active deliverable draft..."})
+    yield _sse_event("status", {"step": "analyzing_sources", "label": "Opening the active response draft..."})
 
     target_artifact: NativeDocument | None = None
     if payload.artifact_id:
@@ -769,7 +864,7 @@ async def _orchestrate_artifact_modification(
     readiness_res = await readiness(target_artifact, session)
     native_resp = await native_response(target_artifact, session)
 
-    reply_text = f'I\'ve updated **{target_artifact.title}** (Revision {target_artifact.revision}) based on your instruction: *"{payload.prompt}"*.\n\nYou can review the updated sections and version history in the Studio panel.'
+    reply_text = f'I\'ve updated **{target_artifact.title}** (Revision {target_artifact.revision}) based on your instruction: *"{payload.prompt}"*.\n\nReview the updated sections, citations, and findings in the response workspace.'
 
     asst_msg = Message(
         conversation_id=conversation_id,
@@ -881,7 +976,7 @@ async def _orchestrate_artifact_verification(
         verification_summary += "**Items needing attention:**\n" + "\n".join(f"- {b}" for b in readiness_res.blockers)
     else:
         verification_summary += (
-            "All requirements are covered and claims are grounded in your sources! The deliverable is ready to export."
+            "No automated blockers are recorded. Complete a final human review before using the export."
         )
 
     asst_msg = Message(
@@ -940,6 +1035,230 @@ async def _orchestrate_create_note(
         {
             "message_id": str(asst_msg.id),
             "conversation_id": str(conversation_id),
+        },
+    )
+
+
+async def _orchestrate_studio_action(
+    workspace: Workspace,
+    conversation_id: uuid.UUID,
+    sources: list[Document],
+    payload: WorkspaceAgentRequest,
+    user: User,
+    session: AsyncSession,
+    studio_type: str,
+) -> AsyncIterator[str]:
+    type_meta = {
+        "studio_audio_overview": ("Audio Overview: Deep Dive", "Generating conversational podcast script between two AI hosts..."),
+        "studio_study_guide": ("Study Guide", "Generating comprehensive study guide, quiz questions, and glossary..."),
+        "studio_faq": ("FAQ Document", "Synthesizing Frequently Asked Questions grounded in sources..."),
+        "studio_briefing_doc": ("Executive Briefing", "Compiling Executive Briefing Document from sources..."),
+        "studio_video_overview": ("Video Overview Storyboard", "Generating visual storyboard and video overview scenes..."),
+    }
+    title_default, step_label = type_meta.get(studio_type, ("Studio Synthesis", "Synthesizing studio output..."))
+
+    yield _sse_event(
+        "status", {"step": "analyzing_sources", "label": f"Analyzing {len(sources)} source document(s)..."}
+    )
+
+    source_pages = (
+        list(
+            await session.scalars(
+                select(DocumentPage)
+                .where(DocumentPage.document_id.in_([s.id for s in sources]))
+                .order_by(DocumentPage.document_id, DocumentPage.page_number)
+                .limit(100)
+            )
+        )
+        if sources
+        else []
+    )
+
+    source_context_str = "\n\n".join(
+        f"[Source: {next((s.filename for s in sources if s.id == p.document_id), 'Document')}, Page {p.page_number}]\n{p.text[:3000]}"
+        for p in source_pages
+    )[:80_000]
+
+    yield _sse_event("status", {"step": "drafting", "label": step_label})
+
+    context_data = await _build_workspace_context_snapshot(workspace, None, sources, session, user)
+    user_prefs = user.preferences or {}
+    user_lang = user_prefs.get("document_language") or user_prefs.get("language") or "English"
+
+    if studio_type == "studio_audio_overview":
+        system_prompt = (
+            f"You are Groundwork Notebook's Audio Overview producer for notebook '{workspace.name}'.\n"
+            f"Generate a lively, engaging, two-host conversational podcast script ('Deep Dive') discussing the uploaded sources.\n"
+            f"Hosts:\n"
+            f"- **Alex**: Analytical co-host, digs into specific data points, technical details, and citations.\n"
+            f"- **Jordan**: Inquisitive co-host, frames big-picture questions, connects themes, and draws out practical implications.\n\n"
+            f"Requirements:\n"
+            f"1. Language: {user_lang}.\n"
+            f"2. Every major claim or factual finding MUST cite the source with [Source: filename, p. X].\n"
+            f"3. Format dialogue turns clearly with **Alex**: and **Jordan**: prefixes.\n"
+            f"4. Begin with an energetic intro welcoming the listener to the Deep Dive.\n"
+            f"5. Provide an insightful, nuanced synthesis of key themes and surprising findings.\n"
+            f"6. End with key takeaways and open questions for future research.\n\n"
+            f"{context_data['formatted_context']}"
+        )
+    elif studio_type == "studio_study_guide":
+        system_prompt = (
+            f"You are Groundwork Notebook's Study Guide generator for notebook '{workspace.name}'.\n"
+            f"Synthesize an organized, comprehensive Study Guide based strictly on the provided sources.\n"
+            f"Language: {user_lang}.\n"
+            f"Structure the document into three distinct sections with markdown headings:\n"
+            f"# 1. Key Concepts & Principles\n"
+            f"Explain foundational ideas and core findings clearly. Ground every key concept with [Source: filename, p. X].\n\n"
+            f"# 2. Practice & Review Questions\n"
+            f"Create 5-8 short-answer and conceptual questions with detailed answer keys based on source evidence.\n\n"
+            f"# 3. Glossary of Terms\n"
+            f"Alphabetical listing of key terminology and definitions extracted from the sources.\n\n"
+            f"{context_data['formatted_context']}"
+        )
+    elif studio_type == "studio_faq":
+        system_prompt = (
+            f"You are Groundwork Notebook's FAQ Synthesizer for notebook '{workspace.name}'.\n"
+            f"Create a high-impact Frequently Asked Questions (FAQ) document based strictly on the uploaded sources.\n"
+            f"Language: {user_lang}.\n"
+            f"Requirements:\n"
+            f"1. Formulate 8-10 essential, high-value questions.\n"
+            f"2. Provide direct, thorough, and authoritative answers grounded in the text.\n"
+            f"3. Include citations like [Source: filename, p. X] for every fact, statistic, or policy.\n\n"
+            f"{context_data['formatted_context']}"
+        )
+    elif studio_type == "studio_video_overview":
+        system_prompt = (
+            f"You are Groundwork Notebook's Video Overview and Storyboard Producer for notebook '{workspace.name}'.\n"
+            f"Generate an engaging, structured visual storyboard and script for an educational video overview based strictly on the uploaded sources.\n"
+            f"Language: {user_lang}.\n"
+            f"Produce 4 to 6 sequential scenes. For each scene, use the following exact markdown format:\n\n"
+            f"### Scene [Number]: [Scene Title]\n"
+            f"- **Visual**: [Description of on-screen visuals, motion graphics, charts, or bullet callouts]\n"
+            f"- **Narration**: [Engaging voiceover script explaining the concepts with citation tags like [Source: filename, p. X]]\n"
+            f"- **Key Takeaway**: [One concise takeaway sentence for the viewer]\n\n"
+            f"Requirements:\n"
+            f"1. Ground all facts and insights strictly in the sources.\n"
+            f"2. Make the narration clear, lively, and educational.\n"
+            f"3. Include a memorable concluding scene summarizing the big picture.\n\n"
+            f"{context_data['formatted_context']}"
+        )
+    else:  # studio_briefing_doc
+        system_prompt = (
+            f"You are Groundwork Notebook's Executive Briefing generator for notebook '{workspace.name}'.\n"
+            f"Draft a concise, high-value Executive Briefing Document synthesized from the sources.\n"
+            f"Language: {user_lang}.\n"
+            f"Sections to include with markdown headings:\n"
+            f"# Executive Summary\n"
+            f"The essential thesis and high-level synthesis.\n\n"
+            f"# Key Themes & Strategic Findings\n"
+            f"Major findings backed by specific citations [Source: filename, p. X].\n\n"
+            f"# Evidence & Metrics\n"
+            f"Quantifiable findings, comparisons, and benchmarks from the sources.\n\n"
+            f"# Critical Considerations & Next Steps\n"
+            f"Strategic implications and open questions.\n\n"
+            f"{context_data['formatted_context']}"
+        )
+
+    user_content = (
+        f"Request: {payload.prompt}\n\n"
+        f"Sources ({len(sources)} total):\n{source_context_str if source_context_str else 'No sources attached.'}"
+    )
+
+    t0 = time.time()
+    generated_text = await ai_orchestrator.complete(
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        operation=f"workspace_agent.{studio_type}",
+        temperature=0.3,
+    )
+    latency_ms = int((time.time() - t0) * 1000)
+
+    await _record_ai_usage(
+        session=session,
+        owner_id=user.id,
+        workspace_id=workspace.id,
+        feature=f"workspace_agent.{studio_type}",
+        prompt=payload.prompt,
+        completion=generated_text,
+        latency_ms=latency_ms,
+        idempotency_key=payload.idempotency_key,
+    )
+
+    asst_msg = Message(
+        conversation_id=conversation_id,
+        role=MessageRole.ASSISTANT,
+        content=generated_text,
+    )
+    session.add(asst_msg)
+    await session.flush()
+
+    citations_data = []
+    # Query matching chunks for proper foreign key reference
+    chunks_stmt = select(DocumentChunk).where(DocumentChunk.document_id.in_([s.id for s in sources])).limit(6)
+    db_chunks = list(await session.scalars(chunks_stmt))
+
+    if db_chunks:
+        for c in db_chunks:
+            s_name = next((s.filename for s in sources if s.id == c.document_id), "Document")
+            snippet = relevant_snippet(c.text, generated_text, payload.prompt)
+            citation = Citation(
+                message_id=asst_msg.id,
+                chunk_id=c.id,
+                document_id=c.document_id,
+                page_number=c.page_number,
+                snippet=snippet,
+            )
+            session.add(citation)
+            citations_data.append({
+                "document_id": str(c.document_id),
+                "document_name": s_name,
+                "page_number": c.page_number,
+                "snippet": snippet,
+            })
+    else:
+        for s in sources[:4]:
+            for p in [p for p in source_pages if p.document_id == s.id][:2]:
+                snippet = relevant_snippet(p.text, generated_text, payload.prompt)
+                citations_data.append({
+                    "document_id": str(s.id),
+                    "document_name": s.filename,
+                    "page_number": p.page_number,
+                    "snippet": snippet,
+                })
+
+    memory_key = f"{studio_type}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+    session.add(
+        WorkspaceMemory(
+            owner_id=user.id,
+            workspace_id=workspace.id,
+            key=memory_key,
+            value=f"{title_default}: {generated_text[:400]}...",
+        )
+    )
+    await session.commit()
+    await session.refresh(asst_msg)
+
+    if citations_data:
+        yield _sse_event("citation", {"citations": citations_data})
+
+    yield _sse_event(
+        "studio_artifact",
+        {
+            "type": studio_type,
+            "title": f"{workspace.name} - {title_default}",
+            "content": generated_text,
+            "citations": citations_data,
+        },
+    )
+    yield _sse_event("token", {"text": generated_text})
+    yield _sse_event(
+        "complete",
+        {
+            "message_id": str(asst_msg.id),
+            "conversation_id": str(conversation_id),
+            "studio_type": studio_type,
         },
     )
 
@@ -1004,9 +1323,9 @@ async def _orchestrate_grounded_qa(
     )
 
     system_prompt = (
-        "You are Groundwork AI, the intelligent, context-aware co-pilot embedded inside this workspace.\n"
-        "You possess complete awareness of the workspace metadata, active deliverable draft, "
-        "traceability requirements matrix, audit findings, and source evidence.\n\n"
+        "You are Groundwork AI. Use only the authorized workspace context supplied below.\n"
+        "The context may include workspace metadata, a deliverable draft, requirements, review findings, "
+        "and extracted source evidence, and it may be incomplete.\n\n"
         "Instructions:\n"
         "1. Respond directly, accurately, and professionally based on the workspace context and retrieved sources.\n"
         "2. If the user asks about the draft, requirements, or audit findings, reference the active deliverable, sections, and requirements matrix.\n"

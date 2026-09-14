@@ -1,28 +1,20 @@
 import React, { useState } from "react";
 import {
   PanelLeft,
-  PanelLeftClose,
   PanelRight,
   PanelRightClose,
   ShieldCheck,
   Lock,
   Unlock,
-  Download,
   FileText,
   FileCheck2,
   FileCode,
   RefreshCw,
-  Sparkles,
   ChevronRight,
-  ExternalLink,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "../ui/Button";
-import { Badge } from "../ui/Badge";
-import type {
-  Workspace,
-  NativeDocument,
-  DeliverableReadiness,
-} from "../../types";
+import type { Workspace, NativeDocument } from "../../types";
 
 export interface TopBarProps {
   workspace: Workspace;
@@ -34,10 +26,13 @@ export interface TopBarProps {
   readinessScore: number;
   isExportBlocked: boolean;
   openFindingsCount: number;
+  readinessStatus: "setup_needed" | "needs_review" | "ready" | null;
+  readinessBlockers: string[];
   isSidebarOpen: boolean;
   isSourcesOpen?: boolean;
   isRightPanelOpen?: boolean;
   onToggleSidebar: () => void;
+  onBackToLibrary: () => void;
   onToggleSources?: () => void;
   onToggleRightPanel?: () => void;
   onOpenAudit: () => void;
@@ -54,11 +49,12 @@ export const TopBar: React.FC<TopBarProps> = ({
   readinessScore,
   isExportBlocked,
   openFindingsCount,
+  readinessStatus,
+  readinessBlockers,
   isSidebarOpen,
-  isSourcesOpen = true,
   isRightPanelOpen = true,
   onToggleSidebar,
-  onToggleSources,
+  onBackToLibrary,
   onToggleRightPanel,
   onOpenAudit,
   onExport,
@@ -95,6 +91,26 @@ export const TopBar: React.FC<TopBarProps> = ({
           aria-label="Breadcrumb"
           className="flex items-center gap-1.5 text-xs text-[var(--ink-muted)] min-w-0 flex-1"
         >
+          <button
+            type="button"
+            onClick={onBackToLibrary}
+            className="sm:hidden inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--paper-subtle)] hover:text-[var(--ink-blue)] flex-shrink-0"
+            title="All responses"
+            aria-label="All responses"
+          >
+            <ArrowLeft size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={onBackToLibrary}
+            className="hidden sm:inline text-[var(--ink-muted)] hover:text-[var(--ink-blue)]"
+          >
+            All responses
+          </button>
+          <ChevronRight
+            size={12}
+            className="hidden sm:block text-[var(--ink-faint)] flex-shrink-0"
+          />
           <span className="truncate max-w-[100px] sm:max-w-[140px] text-[var(--ink-secondary)] font-medium">
             {workspace.name}
           </span>
@@ -103,7 +119,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             className="text-[var(--ink-faint)] flex-shrink-0"
           />
           <span className="font-serif font-semibold text-[13px] text-[var(--ink)] truncate max-w-[120px] sm:max-w-[200px]">
-            {activeDoc?.title || "Untitled Document"}
+            {activeDoc?.title || "Response setup"}
           </span>
           {activeDoc?.revision && (
             <span className="hidden xs:inline text-[10px] font-mono px-1 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
@@ -113,14 +129,14 @@ export const TopBar: React.FC<TopBarProps> = ({
         </nav>
       </div>
 
-      {/* Center: Evidence Grounding Pill & Agent Working Status */}
+      {/* Center: selected source and AI status */}
       <div className="hidden lg:flex items-center gap-3 px-2 flex-shrink-0">
         <div
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-full)] bg-[var(--paper-subtle)] border border-[var(--hairline)] text-xs text-[var(--ink-secondary)] font-medium"
-          title={`${selectedSourcesCount} of ${sourcesCount} documents actively used for claim grounding`}
+          title={`${selectedSourcesCount} of ${sourcesCount} research documents selected as context`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />
-          <span>{selectedSourcesCount} Sources Grounded</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-blue)]" />
+          <span>{selectedSourcesCount} research sources</span>
         </div>
 
         {isAgentRunning && (
@@ -130,7 +146,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <RefreshCw size={11} className="spin text-[var(--ink-sepia)]" />
             <span className="truncate max-w-[150px]">
-              {activeAgentStepLabel || "Agent drafting…"}
+              {activeAgentStepLabel || "Groundwork AI is working…"}
             </span>
           </div>
         )}
@@ -147,15 +163,29 @@ export const TopBar: React.FC<TopBarProps> = ({
               : "bg-[var(--success-bg)] border-[var(--success-border)] text-[var(--success)] hover:bg-[var(--paper-subtle)]"
           }`}
           title={
-            isExportBlocked
-              ? `${openFindingsCount} unverified claims require review before export.`
-              : "All claims verified against active source documentation."
+            !activeDoc
+              ? "Create a response draft before review and export."
+              : readinessBlockers.length > 0
+                ? readinessBlockers.join(" · ")
+              : isExportBlocked
+                ? "Finish the response check before export."
+                : "No blocking review findings are currently open."
           }
         >
           <ShieldCheck size={14} className="text-current flex-shrink-0" />
-          <span className="font-semibold">{readinessScore}%</span>
+          <span className="font-semibold">
+            {activeDoc && readinessStatus !== "setup_needed"
+              ? `${readinessScore}%`
+              : "Setup"}
+          </span>
           <span className="hidden md:inline text-[11px] opacity-80">
-            {isExportBlocked ? `${openFindingsCount} Issues` : "Verified"}
+            {!activeDoc
+              ? "No draft"
+              : readinessStatus === "setup_needed"
+                ? "Needs mapping"
+                : isExportBlocked
+                  ? `${readinessBlockers.length || openFindingsCount} blockers`
+                  : "Review clear"}
           </span>
         </button>
 
@@ -174,12 +204,14 @@ export const TopBar: React.FC<TopBarProps> = ({
             }}
             title={
               isExportBlocked
-                ? "Export is blocked until all review findings are verified"
-                : "Export deliverable"
+                ? !activeDoc
+                  ? "Create a response draft before export"
+                  : "Export is blocked until all review findings are verified"
+                : "Export response"
             }
           >
             {isExportBlocked ? <Lock size={12} /> : <Unlock size={12} />}
-            <span>Export</span>
+            <span>Export response</span>
           </Button>
 
           {/* Export Dropdown Menu */}
@@ -192,10 +224,10 @@ export const TopBar: React.FC<TopBarProps> = ({
               <div className="absolute right-0 mt-1.5 w-52 bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-popover)] p-1 z-40 animate-in fade-in zoom-in-95">
                 <div className="px-2.5 py-1.5 border-b border-[var(--hairline-subtle)] mb-1">
                   <p className="text-[11px] font-semibold text-[var(--ink)]">
-                    Export Verified Deliverable
+                    Export response
                   </p>
                   <p className="text-[10px] text-[var(--ink-muted)]">
-                    Includes Cryptographic Provenance
+                    Choose a file format
                   </p>
                 </div>
 
@@ -257,10 +289,10 @@ export const TopBar: React.FC<TopBarProps> = ({
               onClick={onToggleRightPanel}
               className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0 ml-1"
               title={
-                isRightPanelOpen ? "Collapse audit panel" : "Open audit panel"
+                isRightPanelOpen ? "Collapse workspace tools" : "Open workspace tools"
               }
               aria-label={
-                isRightPanelOpen ? "Collapse audit panel" : "Open audit panel"
+                isRightPanelOpen ? "Collapse workspace tools" : "Open workspace tools"
               }
             >
               {isRightPanelOpen ? (

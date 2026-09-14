@@ -1,18 +1,18 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   FileText,
   CheckSquare,
   Square as SquareOutline,
-  Eye,
   Trash2,
   RefreshCw,
   AlertTriangle,
   Check,
   Upload,
   Plus,
+  Download,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import { API } from "../../api/client";
+import { API, formatDateTime } from "../../api/client";
 import type { DocumentItem } from "../../types";
 
 export interface SourcesSidebarProps {
@@ -26,6 +26,7 @@ export interface SourcesSidebarProps {
   onDeleteSource: (id: string) => void;
   onRetrySource: (id: string) => void;
   onOpenViewer: (id: string, page?: number) => void;
+  onOpenAddSourceModal?: () => void;
 }
 
 export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
@@ -39,9 +40,20 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
   onDeleteSource,
   onRetrySource,
   onOpenViewer,
+  onOpenAddSourceModal,
 }) => {
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleAddClick = () => {
+    if (onOpenAddSourceModal) {
+      onOpenAddSourceModal();
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
   return (
-    <aside className="w-64 flex-shrink-0 flex flex-col bg-[var(--paper)] border-r border-[var(--hairline)] select-none groundwork-col-sources min-w-0">
+    <aside className="w-64 flex-shrink-0 flex flex-col bg-[var(--paper)] border-r border-[var(--hairline)] groundwork-col-sources min-w-0">
       {/* Header */}
       <div className="p-3 border-b border-[var(--hairline)] flex items-center justify-between min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -50,22 +62,27 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
             className="text-[var(--ink-blue)] flex-shrink-0"
           />
           <strong className="font-serif text-xs font-semibold text-[var(--ink)] truncate">
-            Evidence Sources
+            Sources
           </strong>
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
             {sources.length}
           </span>
         </div>
 
-        <label
-          className={`cursor-pointer inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink-blue)] hover:text-[var(--ink-blue-hover)] flex-shrink-0 ${
-            isUploading ? "opacity-50 pointer-events-none" : ""
-          }`}
-          title="Upload new source document"
-        >
-          <Plus size={13} />
-          <span>{isUploading ? "Uploading…" : "Add"}</span>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={handleAddClick}
+            className={`inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink-blue)] hover:text-[var(--ink-blue-hover)] flex-shrink-0 cursor-pointer ${
+              isUploading ? "opacity-50 pointer-events-none" : ""
+            }`}
+            title="Add a source document, web URL, or notes"
+          >
+            <Plus size={13} />
+            <span>{isUploading ? "Uploading…" : "Add"}</span>
+          </button>
           <input
+            ref={fileInputRef}
             type="file"
             disabled={isUploading}
             style={{ display: "none" }}
@@ -77,13 +94,16 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
               }
             }}
           />
-        </label>
+        </div>
       </div>
 
-      {/* Grounding Toggle Bar */}
+      {/* Source selection */}
       <div className="px-3 py-2 border-b border-[var(--hairline-subtle)] flex items-center justify-between text-[11px] text-[var(--ink-muted)] min-w-0">
-        <span className="truncate">
-          {selectedSourceIds.length} active in grounding
+        <span
+          className="truncate"
+          title={`${selectedSourceIds.length} selected as response context`}
+        >
+          {selectedSourceIds.length} active in context
         </span>
         <div className="flex items-center gap-1 font-mono flex-shrink-0 ml-1">
           <button
@@ -120,6 +140,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 type="button"
                 onClick={() => onToggleSource(doc.id)}
                 className="mt-0.5 text-[var(--ink-muted)] hover:text-[var(--ink-blue)] cursor-pointer flex-shrink-0"
+                aria-label={`${isSelected ? "Exclude" : "Include"} ${doc.filename} in AI actions`}
               >
                 {isSelected ? (
                   <CheckSquare size={13} className="text-[var(--ink-blue)]" />
@@ -128,96 +149,89 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 )}
               </button>
 
-              {/* Document Cover Thumbnail */}
-              <img
-                src={
-                  doc.filename.toLowerCase().includes("rfp") ||
-                  doc.filename.toLowerCase().includes("horizon")
-                    ? "/doc-dod-rfp.jpg"
-                    : doc.filename.toLowerCase().includes("security") ||
-                        doc.filename.toLowerCase().includes("soc")
-                      ? "/doc-audit-soc2.jpg"
-                      : "/doc-sec-10k.jpg"
-                }
-                alt="Doc Cover"
-                className="w-7 h-9 object-cover rounded shadow-xs border border-[var(--hairline)] shrink-0 bg-white"
-              />
-
-              <div
-                className="flex-1 min-w-0 cursor-pointer"
-                onClick={() => onToggleSource(doc.id)}
+              <button
+                type="button"
+                onClick={() => onOpenViewer(doc.id, 1)}
+                className="flex items-start gap-2 flex-1 min-w-0 text-left cursor-pointer group/title"
+                title={`View ${doc.filename}`}
               >
-                <p
-                  className="font-medium text-[var(--ink)] truncate text-xs"
-                  title={doc.filename}
-                >
-                  {doc.filename}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[var(--ink-muted)] font-mono">
-                  <span>
-                    {doc.page_count ? `${doc.page_count} pgs` : "1 pg"}
-                  </span>
-                  {doc.status === "failed" ? (
-                    <span className="text-[var(--danger)] flex items-center gap-0.5 truncate">
-                      <AlertTriangle size={9} /> Failed
-                    </span>
-                  ) : doc.status === "processing" ? (
-                    <span className="text-[var(--warning)] flex items-center gap-0.5 truncate">
-                      <RefreshCw size={9} className="spin" /> Indexing
-                    </span>
-                  ) : (
-                    <span className="text-[var(--success)] flex items-center gap-0.5 truncate font-semibold">
-                      <Check size={9} /> Grounded
-                    </span>
-                  )}
+                <div className="flex h-9 w-7 shrink-0 items-center justify-center rounded border border-[var(--hairline)] bg-[var(--surface)] text-[var(--ink-blue)] group-hover/title:border-[var(--ink-blue)] transition-colors">
+                  <FileText size={14} aria-hidden="true" />
                 </div>
-              </div>
 
-              {/* Actions on Hover */}
-              <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity flex-shrink-0">
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="font-medium text-[var(--ink)] truncate text-xs select-text group-hover/title:text-[var(--ink-blue)] transition-colors"
+                    title={doc.filename}
+                  >
+                    {doc.filename}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[var(--ink-muted)] font-mono">
+                    <span>
+                      {doc.page_count ? `${doc.page_count} pgs` : "1 pg"}
+                    </span>
+                    {doc.status === "failed" ? (
+                      <span className="text-[var(--danger)] flex items-center gap-0.5 truncate">
+                        <AlertTriangle size={9} /> Failed
+                      </span>
+                    ) : doc.status === "processing" ? (
+                      <span className="text-[var(--warning)] flex items-center gap-0.5 truncate">
+                        <RefreshCw size={9} className="spin" /> Indexing
+                      </span>
+                    ) : (
+                      <span className="text-[var(--success)] flex items-center gap-0.5 truncate font-semibold">
+                        <Check size={9} /> Ready
+                      </span>
+                    )}
+                    {doc.created_at && (
+                      <span
+                        title={`Uploaded: ${new Date(doc.created_at).toLocaleString()}`}
+                        className="truncate text-[var(--ink-faint)]"
+                      >
+                        • {formatDateTime(doc.created_at)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+
+              {/* Quick actions: download original and delete (no redundant details action) */}
+              <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="ghost"
                   size="xs"
-                  className="h-5 w-5 p-0 text-[var(--ink-muted)] hover:text-[var(--ink)]"
-                  onClick={() => onOpenViewer(doc.id, 1)}
-                  title="Inspect document in viewer"
-                >
-                  <Eye size={12} />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  className="h-5 w-5 p-0 text-[var(--ink-muted)] hover:text-[var(--ink)]"
+                  className="h-6 w-6 p-0 text-[var(--ink-muted)] hover:text-[var(--ink)]"
                   onClick={() =>
                     window.open(`${API}/documents/${doc.id}/download`, "_blank")
                   }
                   title="Download original"
-                  aria-label="Download original"
+                  aria-label={`Download ${doc.filename}`}
                 >
-                  <FileText size={12} />
+                  <Download size={13} />
                 </Button>
 
                 {doc.status === "failed" && (
                   <Button
                     variant="ghost"
                     size="xs"
-                    className="h-5 w-5 p-0 text-[var(--warning)] hover:text-[var(--ink)]"
+                    className="h-6 w-6 p-0 text-[var(--warning)] hover:text-[var(--ink)]"
                     onClick={() => onRetrySource(doc.id)}
                     title="Retry processing"
+                    aria-label={`Retry ${doc.filename}`}
                   >
-                    <RefreshCw size={12} />
+                    <RefreshCw size={13} />
                   </Button>
                 )}
 
                 <Button
                   variant="ghost"
                   size="xs"
-                  className="h-5 w-5 p-0 text-[var(--danger)] hover:bg-[var(--danger-bg)]"
+                  className="h-6 w-6 p-0 text-[var(--danger)] hover:bg-[var(--danger-bg)]"
                   onClick={() => onDeleteSource(doc.id)}
                   title="Delete source"
+                  aria-label={`Delete ${doc.filename}`}
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={13} />
                 </Button>
               </div>
             </div>
@@ -225,9 +239,13 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
         })}
 
         {sources.length === 0 && (
-          <div className="p-4 text-center text-xs text-[var(--ink-faint)]">
+          <div className="p-4 text-center text-xs text-[var(--ink-muted)]">
             <Upload size={20} className="mx-auto mb-1 opacity-50" />
-            <p>No source documents attached yet.</p>
+            <p className="font-medium text-[var(--ink)]">Add source documents</p>
+            <p className="mt-1 leading-relaxed">
+              Add reference PDFs, notes, or research papers here to ground the
+              AI assistant and cite verified evidence.
+            </p>
           </div>
         )}
       </div>

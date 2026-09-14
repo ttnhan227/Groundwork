@@ -1,13 +1,11 @@
 import React, { useState } from "react";
 import {
   GripVertical,
-  Plus,
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
   ShieldCheck,
   Search,
-  Check,
   Sparkles,
 } from "lucide-react";
 import type {
@@ -35,7 +33,7 @@ export interface BlockItemProps {
 
 export const BlockItem: React.FC<BlockItemProps> = ({
   block,
-  index,
+  index: _index,
   isEditing,
   matchedFinding,
   sources,
@@ -47,8 +45,41 @@ export const BlockItem: React.FC<BlockItemProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Helper to parse citations from text [Source: Document.pdf, p. 4]
-  const renderTextWithCitations = (text: string) => {
+  // Helper to parse formatting tokens (bold, code, italic)
+  const renderFormattingOnly = (raw: string, prefix: string): React.ReactNode => {
+    const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+    const tokens = raw.split(tokenRegex);
+    return tokens.map((tok, i) => {
+      if (tok.startsWith("**") && tok.endsWith("**") && tok.length > 4) {
+        return (
+          <strong key={`${prefix}-b-${i}`} className="font-semibold text-[var(--ink)]">
+            {tok.slice(2, -2)}
+          </strong>
+        );
+      }
+      if (tok.startsWith("`") && tok.endsWith("`") && tok.length > 2) {
+        return (
+          <code
+            key={`${prefix}-c-${i}`}
+            className="px-1 py-0.5 rounded bg-[var(--surface-muted)] text-[12px] font-mono text-[var(--ink-blue)]"
+          >
+            {tok.slice(1, -1)}
+          </code>
+        );
+      }
+      if (tok.startsWith("*") && tok.endsWith("*") && tok.length > 2) {
+        return (
+          <em key={`${prefix}-i-${i}`} className="italic text-[var(--ink)]">
+            {tok.slice(1, -1)}
+          </em>
+        );
+      }
+      return tok;
+    });
+  };
+
+  // Helper to parse citations and inline formatting from text [Source: Document.pdf, p. 4]
+  const renderInlineContent = (text: string, keyPrefix = "inline"): React.ReactNode => {
     const citationRegex =
       /\[(?:Source|Evidence):\s*([^,\]]+)(?:,\s*p(?:age)?\.?\s*(\d+))?\]/gi;
     const parts: (string | React.ReactNode)[] = [];
@@ -57,7 +88,12 @@ export const BlockItem: React.FC<BlockItemProps> = ({
 
     while ((match = citationRegex.exec(text)) !== null) {
       if (match.index > lastIndex) {
-        parts.push(text.slice(lastIndex, match.index));
+        parts.push(
+          renderFormattingOnly(
+            text.slice(lastIndex, match.index),
+            `${keyPrefix}-${lastIndex}`,
+          ),
+        );
       }
       const docName = match[1]?.trim();
       const pageNum = match[2] ? parseInt(match[2], 10) : 1;
@@ -69,7 +105,7 @@ export const BlockItem: React.FC<BlockItemProps> = ({
 
       parts.push(
         <button
-          key={match.index}
+          key={`${keyPrefix}-cit-${match.index}`}
           type="button"
           onClick={() => {
             if (matchedDoc) {
@@ -79,7 +115,7 @@ export const BlockItem: React.FC<BlockItemProps> = ({
             }
           }}
           className="inline-flex items-center gap-1 mx-1 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)] text-xs font-mono font-medium hover:bg-[var(--surface-hover)] cursor-pointer select-none transition-colors align-baseline"
-          title={`Inspect verified evidence on page ${pageNum} of ${docName}`}
+          title={`Inspect cited evidence on page ${pageNum} of ${docName}`}
         >
           <ExternalLink size={9} />
           <span className="truncate max-w-[120px]">{docName}</span>
@@ -90,10 +126,147 @@ export const BlockItem: React.FC<BlockItemProps> = ({
     }
 
     if (lastIndex < text.length) {
-      parts.push(text.slice(lastIndex));
+      parts.push(
+        renderFormattingOnly(
+          text.slice(lastIndex),
+          `${keyPrefix}-${lastIndex}`,
+        ),
+      );
     }
 
     return parts;
+  };
+
+  // Structured multi-line Markdown parser for notes and synthesis documents
+  const renderFormattedContent = (content: string) => {
+    const lines = content.split("\n");
+    const elements: React.ReactNode[] = [];
+    let bulletGroup: string[] = [];
+    let numGroup: string[] = [];
+
+    const flushLists = (idx: number) => {
+      if (bulletGroup.length > 0) {
+        elements.push(
+          <ul key={`ul-${idx}`} className="my-2 pl-5 list-disc space-y-1 text-[13px] text-[var(--ink)] leading-relaxed">
+            {bulletGroup.map((bText, bIdx) => (
+              <li key={`b-${idx}-${bIdx}`}>
+                {renderInlineContent(bText, `b-${idx}-${bIdx}`)}
+              </li>
+            ))}
+          </ul>,
+        );
+        bulletGroup = [];
+      }
+      if (numGroup.length > 0) {
+        elements.push(
+          <ol key={`ol-${idx}`} className="my-2 pl-5 list-decimal space-y-1 text-[13px] text-[var(--ink)] leading-relaxed">
+            {numGroup.map((nText, nIdx) => (
+              <li key={`n-${idx}-${nIdx}`}>
+                {renderInlineContent(nText, `n-${idx}-${nIdx}`)}
+              </li>
+            ))}
+          </ol>,
+        );
+        numGroup = [];
+      }
+    };
+
+    lines.forEach((line, lIdx) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        flushLists(lIdx);
+        return;
+      }
+
+      // Horizontal rules
+      if (/^(---|___|\*\*\*)$/.test(trimmed)) {
+        flushLists(lIdx);
+        elements.push(
+          <hr key={`hr-${lIdx}`} className="my-3 border-t border-[var(--hairline-strong)]" />,
+        );
+        return;
+      }
+
+      // Markdown Headings
+      if (trimmed.startsWith("### ")) {
+        flushLists(lIdx);
+        elements.push(
+          <h4
+            key={`h4-${lIdx}`}
+            className="font-sans text-xs font-bold uppercase tracking-wider text-[var(--ink-sepia)] mt-3 mb-1"
+          >
+            {renderInlineContent(trimmed.slice(4), `h4-${lIdx}`)}
+          </h4>,
+        );
+        return;
+      }
+      if (trimmed.startsWith("## ")) {
+        flushLists(lIdx);
+        elements.push(
+          <h3
+            key={`h3-${lIdx}`}
+            className="font-serif text-base font-bold text-[var(--ink)] mt-3.5 mb-1 text-[var(--ink)]"
+          >
+            {renderInlineContent(trimmed.slice(3), `h3-${lIdx}`)}
+          </h3>,
+        );
+        return;
+      }
+      if (trimmed.startsWith("# ")) {
+        flushLists(lIdx);
+        elements.push(
+          <h2
+            key={`h2-${lIdx}`}
+            className="font-serif text-lg font-bold text-[var(--ink)] mt-4 mb-2 pb-1 border-b border-[var(--hairline)]"
+          >
+            {renderInlineContent(trimmed.slice(2), `h2-${lIdx}`)}
+          </h2>,
+        );
+        return;
+      }
+
+      // Blockquotes
+      if (trimmed.startsWith("> ")) {
+        flushLists(lIdx);
+        elements.push(
+          <blockquote
+            key={`quote-${lIdx}`}
+            className="my-2 pl-3 border-l-2 border-[var(--ink-blue)] italic text-[13px] text-[var(--ink-secondary)] bg-[var(--ink-blue-subtle)] py-1.5 rounded-r"
+          >
+            {renderInlineContent(trimmed.slice(2), `quote-${lIdx}`)}
+          </blockquote>,
+        );
+        return;
+      }
+
+      // Bullet lists (- or * or •)
+      const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
+      if (bulletMatch) {
+        if (numGroup.length > 0) flushLists(lIdx);
+        bulletGroup.push(bulletMatch[1]);
+        return;
+      }
+
+      // Numbered lists (1. 2. etc.)
+      const numMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+      if (numMatch) {
+        if (bulletGroup.length > 0) flushLists(lIdx);
+        numGroup.push(numMatch[1]);
+        return;
+      }
+
+      // Regular paragraph line
+      flushLists(lIdx);
+      elements.push(
+        <p key={`p-${lIdx}`} className="text-[14px] text-[var(--ink)] leading-relaxed font-sans my-1">
+          {renderInlineContent(trimmed, `p-${lIdx}`)}
+        </p>,
+      );
+    });
+
+    flushLists(lines.length);
+    return elements.length > 0 ? elements : renderInlineContent(content);
   };
 
   // Section Heading
@@ -163,9 +336,9 @@ export const BlockItem: React.FC<BlockItemProps> = ({
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="text-[14px] text-[var(--ink)] leading-relaxed font-sans">
-            {renderTextWithCitations(block.text)}
-          </p>
+          <div className="text-[14px] text-[var(--ink)] leading-relaxed font-sans">
+            {renderFormattedContent(block.text)}
+          </div>
 
           {/* Inline Finding Alert Callout on Flagged Claim */}
           {matchedFinding && (
@@ -202,7 +375,7 @@ export const BlockItem: React.FC<BlockItemProps> = ({
                     disabled={isResolvingFinding}
                   >
                     <CheckCircle2 size={12} />
-                    <span>Apply Verified Revision</span>
+                    <span>Apply suggested revision</span>
                   </Button>
                 )}
 
@@ -217,7 +390,7 @@ export const BlockItem: React.FC<BlockItemProps> = ({
                     }
                   >
                     <Search size={12} />
-                    <span>Audit Evidence</span>
+                    <span>Review evidence</span>
                   </Button>
                 )}
 
@@ -258,13 +431,13 @@ export const BlockItem: React.FC<BlockItemProps> = ({
                 size="xs"
                 onClick={() =>
                   onPromptSection(
-                    `Audit section for missing RFP requirements: "${block.text.slice(0, 80)}..."`,
+                    `Audit section against source evidence: "${block.text.slice(0, 80)}..."`,
                   )
                 }
                 className="text-[11px] text-[var(--ink-muted)] hover:text-[var(--ink-sepia)] h-5 px-1.5"
               >
                 <Sparkles size={11} className="text-[var(--ink-sepia)]" />
-                <span>Audit Section</span>
+                <span>Review section</span>
               </Button>
             </div>
           )}

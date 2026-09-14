@@ -1,7 +1,6 @@
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import {
   ExternalLink,
-  RefreshCw,
   Search,
   X,
   ZoomIn,
@@ -111,10 +110,12 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
   onClose,
 }) => {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [pdfSource, setPdfSource] = useState("");
   const [page, setPage] = useState(initialPage);
-  const [scale, setScale] = useState(1.2);
+  const [scale, setScale] = useState(0.85);
+  const [hasAutoFitted, setHasAutoFitted] = useState(false);
   const [activeSearch, setActiveSearch] = useState(initialSearch);
   const [highlightBoxes, setHighlightBoxes] = useState<
     { left: number; top: number; width: number; height: number }[]
@@ -124,15 +125,55 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
   >("idle");
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [error, setError] = useState("");
-  const [searchResults, setSearchResults] = useState<
+  const [, setSearchResults] = useState<
     { page: number; snippet: string }[]
   >([]);
-  const [searching, setSearching] = useState(false);
-  const [sideMode, setSideMode] = useState<"pages" | "search">("pages");
-  const [loadStage, setLoadStage] = useState<
+  const [, setSearching] = useState(false);
+  const [, setSideMode] = useState<"pages" | "search">("pages");
+  const [, setLoadStage] = useState<
     "downloading" | "opening" | "rendering" | "ready"
   >("downloading");
-  const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+  const [, setDownloadPercent] = useState<number | null>(null);
+
+  const calculateFitScale = (unscaledViewport: { width: number; height: number }) => {
+    if (!stageContainerRef.current) return 0.85;
+    const availW = Math.max(260, stageContainerRef.current.clientWidth - 48);
+    const availH = Math.max(260, stageContainerRef.current.clientHeight - 48);
+    const scaleFactor = Math.min(availW / unscaledViewport.width, availH / unscaledViewport.height);
+    return Math.max(0.4, Math.min(1.8, Math.round(scaleFactor * 100) / 100));
+  };
+
+  const handleFitToPage = async () => {
+    if (!pdf) return;
+    try {
+      const pdfPage = await pdf.getPage(page);
+      const unscaled = pdfPage.getViewport({ scale: 1.0 });
+      const fitScale = calculateFitScale(unscaled);
+      setScale(fitScale);
+    } catch {
+      setScale(0.85);
+    }
+  };
+
+  useEffect(() => {
+    if (!pdf || hasAutoFitted) return;
+    let active = true;
+    (async () => {
+      try {
+        const pdfPage = await pdf.getPage(page);
+        if (!active) return;
+        const unscaled = pdfPage.getViewport({ scale: 1.0 });
+        const fitScale = calculateFitScale(unscaled);
+        setScale(fitScale);
+        setHasAutoFitted(true);
+      } catch {
+        // fallback
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [pdf, hasAutoFitted, page]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -354,7 +395,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-5xl h-[88vh] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-6xl h-[92vh] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] flex flex-col overflow-hidden">
         {/* Toolbar */}
         <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-4 flex items-center justify-between text-xs">
           <div className="flex items-center gap-3 min-w-0">
@@ -391,22 +432,36 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Button
               variant="ghost"
               size="xs"
-              onClick={() => setScale((v) => Math.max(0.6, v - 0.2))}
+              onClick={() => setScale((v) => Math.max(0.4, Number((v - 0.15).toFixed(2))))}
               title="Zoom out"
+              aria-label="Zoom out"
             >
               <ZoomOut size={14} />
+            </Button>
+            <span className="font-mono text-[11px] text-[var(--ink-muted)] min-w-[3.5ch] text-center select-none">
+              {Math.round(scale * 100)}%
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setScale((v) => Math.min(2.5, Number((v + 0.15).toFixed(2))))}
+              title="Zoom in"
+              aria-label="Zoom in"
+            >
+              <ZoomIn size={14} />
             </Button>
             <Button
               variant="ghost"
               size="xs"
-              onClick={() => setScale((v) => Math.min(2.4, v + 0.2))}
-              title="Zoom in"
+              onClick={handleFitToPage}
+              title="Fit entire page in view (Full view)"
+              className="text-[11px] font-mono px-2 text-[var(--ink-muted)] hover:text-[var(--ink)]"
             >
-              <ZoomIn size={14} />
+              Fit
             </Button>
 
             <form onSubmit={searchPdf} className="relative flex items-center">
@@ -468,7 +523,10 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
           </aside>
 
           {/* Main Canvas Stage */}
-          <div className="flex-1 overflow-auto bg-[var(--paper-subtle)] p-6 flex items-center justify-center">
+          <div
+            ref={stageContainerRef}
+            className="flex-1 overflow-auto bg-[var(--paper-subtle)] p-4 sm:p-6 flex items-center justify-center min-w-0 min-h-0"
+          >
             {error ? (
               <p className="text-xs text-[var(--danger)]">{error}</p>
             ) : (

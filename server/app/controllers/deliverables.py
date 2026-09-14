@@ -1,4 +1,3 @@
-import hashlib
 import uuid
 from datetime import UTC, datetime
 from io import BytesIO
@@ -19,7 +18,6 @@ from app.models import (
     Document,
     DocumentComment,
     DocumentPage,
-    DocumentStatus,
     NativeDocument,
     NativeDocumentSource,
     NativeDocumentVersion,
@@ -62,80 +60,13 @@ from app.schemas import (
 router = APIRouter(tags=["Workspaces and native deliverables"])
 
 
-DEMO_TITLE = "[Demo] Apex Horizon Cloud Modernization RFP Proposal"
-DEMO_SOURCES = {
-    "Apex Horizon RFP - Cloud Modernization Brief (Demo).pdf": """APEX HORIZON ENTERPRISE — CLOUD MODERNIZATION & SECURITY RFP (RFP-2026-88)
-
-1. Scope & Objective:
-Apex Horizon requires a technical proposal to migrate our transactional core to a multi-region cloud architecture.
-Audience: Technical Review Committee and Executive Leadership.
-
-2. Mandatory Technical & Operational Requirements:
-- Requirement RFP-01: Executive summary detailing cloud architecture strategy and business continuity.
-- Requirement RFP-02: Guaranteed high availability SLA of 99.99% across active-active cloud regions.
-- Requirement RFP-03: Zero-trust data security with AES-256 envelope encryption at rest and TLS 1.3 in transit.
-- Requirement RFP-04: SOC2 Type II and ISO/IEC 27001 compliance audit coverage.
-- Requirement RFP-05: 30-day phased cutover with Disaster Recovery RTO under 15 minutes and RPO under 1 minute.
-- Requirement RFP-06: All architectural claims, benchmark stats, and SLA commitments must cite supporting documentation.
-
-3. Deliverable Format:
-Technical Proposal with compliance matrix and verification provenance.
-""",
-    "Apex Cloud Infrastructure & Security Spec (Demo).pdf": """APEX HORIZON — TECHNICAL ARCHITECTURE & SECURITY SPECIFICATION
-
-Architecture Specification:
-- High Availability: Multi-region active-active cluster deployment engineered for 99.99% availability with automated sub-minute DNS failover.
-- Data Protection: AES-256 KMS envelope encryption for all database volumes; TLS 1.3 enforced for public endpoints.
-- Compliance Certifications: Dedicated audit logging satisfying SOC2 Type II, ISO/IEC 27001, and HIPAA compliance mandates.
-- Operational SLOs: Automated health probes with 30-second interval checks and cross-region replication lag under 800ms.
-""",
-    "Q2 Benchmark & Performance Testing Report (Demo).pdf": """APEX HORIZON — SYSTEM BENCHMARK & MIGRATION PERFORMANCE REPORT
-
-Empirical Testing Summary:
-- Disaster Recovery: Simulated region failover achieved a verified RTO of 11.4 minutes (target < 15 min) and RPO of 18 seconds (target < 1 min).
-- Phased Cutover: Pilot database synchronization achieved zero packet loss across 2.4 million test transactions.
-- Capacity: Sustained 45,000 requests/sec at peak load with 99.99% service availability.
-- Cost Efficiency: Modernized serverless compute allocation reduces baseline operational expenditure by 28%.
-""",
-}
-
-
-DEMO_BLOCKS = [
-    {"type": "heading", "text": "Executive Summary"},
-    {
-        "type": "paragraph",
-        "text": "Apex Horizon requires a resilient, multi-region cloud modernization proposal that delivers high availability, zero-trust security, and zero-downtime cutover. Our technical approach migrates core workloads to active-active clusters while maintaining continuous SOC2 Type II compliance. [Source: Apex Horizon RFP - Cloud Modernization Brief (Demo).pdf, p. 1]",
-    },
-    {"type": "heading", "text": "Cloud Architecture & High Availability SLA"},
-    {
-        "type": "paragraph",
-        "text": "The modernized cloud infrastructure guarantees 99.999% uptime with under 10-second automated failover across all multi-region clusters.",
-    },
-    {"type": "heading", "text": "Security, Compliance & Envelope Encryption"},
-    {
-        "type": "paragraph",
-        "text": "All data at rest is secured via AES-256 envelope encryption with KMS key rotation, while TLS 1.3 is strictly enforced for all service transit. Dedicated immutable audit logs ensure full SOC2 Type II and ISO/IEC 27001 compliance. [Source: Apex Cloud Infrastructure & Security Spec (Demo).pdf, p. 1]",
-    },
-    {"type": "heading", "text": "Disaster Recovery & Phased Migration Plan"},
-    {
-        "type": "paragraph",
-        "text": "Disaster recovery benchmarks demonstrate a verified RTO of 11.4 minutes and an RPO of 18 seconds under full region failover simulation. The 30-day phased cutover plan isolates risk through parallel run verification and live database replication. [Source: Q2 Benchmark & Performance Testing Report (Demo).pdf, p. 1]",
-    },
-    {"type": "heading", "text": "Verification & Evidence Provenance"},
-    {
-        "type": "paragraph",
-        "text": "This deliverable is cross-referenced against client RFP-2026-88 and technical specifications. Every factual claim and performance metric is grounded in verifiable project evidence.",
-    },
-]
-
-
 async def ensure_personal_workspace(user: User, session: AsyncSession) -> Workspace:
     workspace = await session.scalar(
         select(Workspace).where(Workspace.owner_id == user.id).order_by(Workspace.created_at)
     )
     if workspace is not None:
         return workspace
-    workspace = Workspace(owner_id=user.id, name=f"{user.display_name}'s workspace", kind="personal")
+    workspace = Workspace(owner_id=user.id, name="First RFP response", kind="personal")
     session.add(workspace)
     await session.flush()
     session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner"))
@@ -438,7 +369,6 @@ async def activity(
 async def list_workspaces(
     user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
 ) -> list[WorkspaceResponse]:
-    await ensure_personal_workspace(user, session)
     rows = (
         await session.execute(
             select(Workspace, WorkspaceMember)
@@ -710,209 +640,6 @@ async def create_native_document(
         session.add(NativeDocumentSource(native_document_id=item.id, document_id=source_id))
     await activity(
         session, workspace_id, user.id, "deliverable.created", "native_document", item.id, {"title": item.title}
-    )
-    await session.commit()
-    await session.refresh(item)
-    return await native_response(item, session)
-
-
-@router.post("/workspaces/{workspace_id}/demo", response_model=NativeDocumentResponse, status_code=201)
-async def create_demo_project(
-    workspace_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
-) -> NativeDocumentResponse:
-    """Create an idempotent, fully inspectable ready-to-export walkthrough."""
-    await workspace_access(workspace_id, user, session, {"owner", "editor"})
-    existing = await session.scalar(
-        select(NativeDocument).where(
-            NativeDocument.workspace_id == workspace_id,
-            NativeDocument.owner_id == user.id,
-            NativeDocument.title == DEMO_TITLE,
-        )
-    )
-    if existing is not None:
-        return await native_response(existing, session)
-
-    from starlette.concurrency import run_in_threadpool
-
-    from app.documents import text_to_pdf
-    from app.storage import ObjectStorage
-
-    source_items: list[Document] = []
-    storage = ObjectStorage()
-    for filename, source_text in DEMO_SOURCES.items():
-        source = await session.scalar(
-            select(Document).where(
-                Document.owner_id == user.id,
-                Document.filename == filename,
-            )
-        )
-        if source is None:
-            source_id = uuid.uuid4()
-            data = text_to_pdf(source_text, filename.removesuffix(".pdf"))
-            object_key = f"{user.id}/demo/{source_id}.pdf"
-            await run_in_threadpool(storage.upload_pdf, object_key, data)
-            source = Document(
-                id=source_id,
-                owner_id=user.id,
-                workspace_id=workspace_id,
-                filename=filename,
-                object_key=object_key,
-                original_filename=filename,
-                original_content_type="application/pdf",
-                source_sha256=hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
-                content_type="application/pdf",
-                size_bytes=len(data),
-                status=DocumentStatus.READY,
-                page_count=1,
-                display_title=filename.removesuffix(" (Demo).pdf"),
-                tags=["groundwork-demo", "northstar"],
-            )
-            session.add(source)
-            session.add(
-                DocumentPage(
-                    document_id=source.id,
-                    page_number=1,
-                    text=source_text,
-                    extraction_method="demo",
-                )
-            )
-        source_items.append(source)
-
-    item = NativeDocument(
-        workspace_id=workspace_id,
-        owner_id=user.id,
-        title=DEMO_TITLE,
-        content={"type": "doc", "blocks": DEMO_BLOCKS},
-        status="complete",
-    )
-    session.add(item)
-    await session.flush()
-    session.add(
-        NativeDocumentVersion(
-            native_document_id=item.id,
-            version_number=1,
-            title=item.title,
-            content=item.content,
-            change_summary="Guided demo: verified client-ready report",
-            created_by=user.id,
-        )
-    )
-    for source in source_items:
-        session.add(NativeDocumentSource(native_document_id=item.id, document_id=source.id))
-
-    rfp_brief = next((s for s in source_items if "RFP" in s.filename), source_items[0])
-    tech_spec = next(
-        (s for s in source_items if "Spec" in s.filename), source_items[1] if len(source_items) > 1 else source_items[0]
-    )
-    benchmark_rep = next((s for s in source_items if "Benchmark" in s.filename), source_items[-1])
-
-    requirements = [
-        (
-            "Requirement RFP-01: Executive summary detailing cloud architecture strategy and business continuity",
-            "Executive Summary",
-            rfp_brief,
-            "Scope & Objective: Apex Horizon requires a technical proposal to migrate our transactional core to a multi-region cloud architecture.",
-            "covered",
-        ),
-        (
-            "Requirement RFP-02: Guaranteed high availability SLA of 99.99% across active-active cloud regions",
-            "Cloud Architecture & High Availability SLA",
-            tech_spec,
-            "Multi-region active-active cluster deployment engineered for 99.99% availability with automated sub-minute DNS failover.",
-            "unverified",
-        ),
-        (
-            "Requirement RFP-03: Zero-trust data security with AES-256 envelope encryption at rest and TLS 1.3 in transit",
-            "Security, Compliance & Envelope Encryption",
-            tech_spec,
-            "Data Protection: AES-256 KMS envelope encryption for all database volumes; TLS 1.3 enforced for public endpoints.",
-            "covered",
-        ),
-        (
-            "Requirement RFP-04: SOC2 Type II and ISO/IEC 27001 compliance audit coverage",
-            "Security, Compliance & Envelope Encryption",
-            tech_spec,
-            "Dedicated audit logging satisfying SOC2 Type II, ISO/IEC 27001, and HIPAA compliance mandates.",
-            "covered",
-        ),
-        (
-            "Requirement RFP-05: 30-day phased cutover with Disaster Recovery RTO under 15 minutes and RPO under 1 minute",
-            "Disaster Recovery & Phased Migration Plan",
-            benchmark_rep,
-            "Simulated region failover achieved a verified RTO of 11.4 minutes and RPO of 18 seconds.",
-            "covered",
-        ),
-        (
-            "Requirement RFP-06: All architectural claims, benchmark stats, and SLA commitments must cite supporting documentation",
-            "Verification & Evidence Provenance",
-            rfp_brief,
-            "All architectural claims, benchmark stats, and SLA commitments must cite supporting documentation.",
-            "covered",
-        ),
-    ]
-    for position, (text, section_name, source, quote, status) in enumerate(requirements):
-        session.add(
-            DeliverableRequirement(
-                native_document_id=item.id,
-                created_by=user.id,
-                text=text,
-                kind="section" if position < 5 else "evidence",
-                status=status,
-                is_required=True,
-                position=position,
-                origin="ai",
-                evidence=[
-                    {
-                        "document_id": str(source.id),
-                        "document_name": source.filename,
-                        "page_number": 1,
-                        "snippet": quote,
-                    }
-                ],
-                linked_sections=[section_name],
-            )
-        )
-
-    initial_finding = DeliverableReviewFinding(
-        native_document_id=item.id,
-        created_by=user.id,
-        kind="unsupported_claim",
-        claim_type="number_stat",
-        severity="high",
-        status="open",
-        claim_text="The modernized cloud infrastructure guarantees 99.999% uptime with under 10-second automated failover across all multi-region clusters.",
-        explanation="Source documents only establish 99.99% availability with sub-minute failover (Apex Cloud Infrastructure & Security Spec.pdf, p. 1). The 99.999% claim is unsupported by evidence and blocks export.",
-        proposed_text="The modernized cloud infrastructure guarantees 99.99% high availability with sub-minute automated failover across all multi-region clusters. [Source: Apex Cloud Infrastructure & Security Spec (Demo).pdf, p. 1]",
-        citations=[
-            {
-                "document_id": str(tech_spec.id),
-                "document_name": tech_spec.filename,
-                "page_number": 1,
-                "snippet": "Multi-region active-active cluster deployment engineered for 99.99% availability with automated sub-minute DNS failover.",
-            }
-        ],
-    )
-    session.add(initial_finding)
-
-    await activity(
-        session,
-        workspace_id,
-        user.id,
-        "onboarding.demo_created",
-        "native_document",
-        item.id,
-        {"sources": len(source_items), "requirements": len(requirements)},
-    )
-    await activity(
-        session,
-        workspace_id,
-        user.id,
-        "deliverable.reviewed",
-        "native_document",
-        item.id,
-        {"findings": 1, "demo": True},
     )
     await session.commit()
     await session.refresh(item)

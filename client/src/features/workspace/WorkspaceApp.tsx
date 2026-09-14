@@ -4,10 +4,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Activity,
-  FileText,
-  RefreshCw,
-  X,
-  Plus,
   FolderPlus,
   Folder,
   Bell,
@@ -34,7 +30,6 @@ import {
   AUTH_REFRESHED_EVENT,
   api,
   authenticatedFetch,
-  expireSession,
   getStoredAuth,
   setStoredAuth,
 } from "../../api/client";
@@ -260,6 +255,14 @@ export function WorkspaceApp({
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get("ws") || null,
   );
+  const [activeNativeDocumentId, setActiveNativeDocumentId] = useState<
+    string | null
+  >(null);
+  const [hasUnsavedDraftChanges, setHasUnsavedDraftChanges] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<
+    (() => void) | null
+  >(null);
+  const [libraryCreateRequestKey, setLibraryCreateRequestKey] = useState(0);
   const [nativeDocs, setNativeDocs] = useState<NativeDocument[]>([]);
   const [workspaceView, setWorkspaceView] = useState<"library" | "workspace">(
     () =>
@@ -267,7 +270,9 @@ export function WorkspaceApp({
         ? "workspace"
         : "library",
   );
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => window.innerWidth >= 1600,
+  );
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">(() =>
     document.documentElement.getAttribute("data-theme") === "dark"
       ? "dark"
@@ -276,6 +281,7 @@ export function WorkspaceApp({
   const [isInitialLoading, setIsInitialLoading] = useState(
     Boolean(initialAuth),
   );
+  const pendingUploadStarted = useRef(false);
 
   const authForm = useForm<AuthFields>({
     resolver: zodResolver(authSchema),
@@ -284,6 +290,15 @@ export function WorkspaceApp({
 
   useEffect(() => {
     applyPreferences(storedPreferences());
+  }, []);
+
+  useEffect(() => {
+    const keepWorkAreaUsable = () => {
+      if (window.innerWidth < 1600) setIsSidebarOpen(false);
+    };
+    keepWorkAreaUsable();
+    window.addEventListener("resize", keepWorkAreaUsable);
+    return () => window.removeEventListener("resize", keepWorkAreaUsable);
   }, []);
 
   useEffect(() => {
@@ -343,94 +358,14 @@ export function WorkspaceApp({
   const loadDocuments = useCallback(async (accessToken: string) => {
     try {
       const items = await api<DocumentItem[]>("/documents", accessToken);
-      if (items.length === 0) {
-        const fallbacks: DocumentItem[] = [
-          {
-            id: "doc_01",
-            workspace_id: "ws_01",
-            filename: "Cloudflare-2026-10K-Annual-Filing.pdf",
-            page_count: 284,
-            status: "completed",
-            size_bytes: 4200000,
-            error_message: null,
-            display_title: "Cloudflare 2026 10-K Annual Filing",
-            tags: ["10-K", "SEC"],
-            collection_id: null,
-            created_at: "2026-08-20T10:00:00Z",
-          },
-          {
-            id: "doc_02",
-            workspace_id: "ws_01",
-            filename: "DoD-Defense-Logistics-Spec.pdf",
-            page_count: 48,
-            status: "completed",
-            size_bytes: 1800000,
-            error_message: null,
-            display_title: "DoD Defense Logistics Spec",
-            tags: ["DoD", "RFP"],
-            collection_id: null,
-            created_at: "2026-08-22T14:30:00Z",
-          },
-          {
-            id: "doc_03",
-            workspace_id: "ws_01",
-            filename: "SOC2-TypeII-Audit-Assessment.pdf",
-            page_count: 92,
-            status: "completed",
-            size_bytes: 3100000,
-            error_message: null,
-            display_title: "SOC 2 Type II Audit Assessment",
-            tags: ["SOC2", "Audit"],
-            collection_id: null,
-            created_at: "2026-08-25T09:15:00Z",
-          },
-        ];
-        setDocuments(fallbacks);
-      } else {
-        setDocuments(items);
-      }
-    } catch {
-      setDocuments([
-        {
-          id: "doc_01",
-          workspace_id: "ws_01",
-          filename: "Cloudflare-2026-10K-Annual-Filing.pdf",
-          page_count: 284,
-          status: "completed",
-          size_bytes: 4200000,
-          error_message: null,
-          display_title: "Cloudflare 2026 10-K Annual Filing",
-          tags: ["10-K", "SEC"],
-          collection_id: null,
-          created_at: "2026-08-20T10:00:00Z",
-        },
-        {
-          id: "doc_02",
-          workspace_id: "ws_01",
-          filename: "DoD-Defense-Logistics-Spec.pdf",
-          page_count: 48,
-          status: "completed",
-          size_bytes: 1800000,
-          error_message: null,
-          display_title: "DoD Defense Logistics Spec",
-          tags: ["DoD", "RFP"],
-          collection_id: null,
-          created_at: "2026-08-22T14:30:00Z",
-        },
-        {
-          id: "doc_03",
-          workspace_id: "ws_01",
-          filename: "SOC2-TypeII-Audit-Assessment.pdf",
-          page_count: 92,
-          status: "completed",
-          size_bytes: 3100000,
-          error_message: null,
-          display_title: "SOC 2 Type II Audit Assessment",
-          tags: ["SOC2", "Audit"],
-          collection_id: null,
-          created_at: "2026-08-25T09:15:00Z",
-        },
-      ]);
+      setDocuments(items);
+    } catch (reason) {
+      setDocuments([]);
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Could not load source documents",
+      );
     }
   }, []);
 
@@ -440,88 +375,15 @@ export function WorkspaceApp({
 
   const loadWorkspaces = useCallback(async (accessToken: string) => {
     try {
-      let items = await api<Workspace[]>("/workspaces", accessToken);
-      if (items.length === 0) {
-        const starter = await api<Workspace>("/workspaces", accessToken, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: "Apex Horizon Cloud Modernization Proposal",
-            kind: "personal",
-            template: "proposal",
-          }),
-        }).catch(() => null);
-        if (starter) {
-          await api(`/workspaces/${starter.id}/demo`, accessToken, {
-            method: "POST",
-          }).catch(() => undefined);
-          items = [starter];
-        } else {
-          items = [
-            {
-              id: "ws_01",
-              owner_id: "usr-gw-101",
-              name: "Cloudflare 2026 Form 10-K Regulatory Review",
-              kind: "personal",
-              role: "owner",
-              created_at: "2026-08-20T10:00:00Z",
-              updated_at: "2026-08-20T10:00:00Z",
-            },
-            {
-              id: "ws_02",
-              owner_id: "usr-gw-101",
-              name: "DoD Logistics Procurement Proposal RFP v3.1",
-              kind: "personal",
-              role: "owner",
-              created_at: "2026-08-22T14:30:00Z",
-              updated_at: "2026-08-22T14:30:00Z",
-            },
-            {
-              id: "ws_03",
-              owner_id: "usr-gw-101",
-              name: "SOC 2 Type II Continuous Compliance & Security",
-              kind: "personal",
-              role: "owner",
-              created_at: "2026-08-25T09:15:00Z",
-              updated_at: "2026-08-25T09:15:00Z",
-            },
-          ];
-        }
-      }
+      const items = await api<Workspace[]>("/workspaces", accessToken);
       setWorkspaces(items);
       return items;
-    } catch {
-      const fallback: Workspace[] = [
-        {
-          id: "ws_01",
-          owner_id: "usr-gw-101",
-          name: "Cloudflare 2026 Form 10-K Regulatory Review",
-          kind: "personal",
-          role: "owner",
-          created_at: "2026-08-20T10:00:00Z",
-          updated_at: "2026-08-20T10:00:00Z",
-        },
-        {
-          id: "ws_02",
-          owner_id: "usr-gw-101",
-          name: "DoD Logistics Procurement Proposal RFP v3.1",
-          kind: "personal",
-          role: "owner",
-          created_at: "2026-08-22T14:30:00Z",
-          updated_at: "2026-08-22T14:30:00Z",
-        },
-        {
-          id: "ws_03",
-          owner_id: "usr-gw-101",
-          name: "SOC 2 Type II Continuous Compliance & Security",
-          kind: "personal",
-          role: "owner",
-          created_at: "2026-08-25T09:15:00Z",
-          updated_at: "2026-08-25T09:15:00Z",
-        },
-      ];
-      setWorkspaces(fallback);
-      return fallback;
+    } catch (reason) {
+      setWorkspaces([]);
+      setError(
+        reason instanceof Error ? reason.message : "Could not load responses",
+      );
+      return [];
     }
   }, []);
 
@@ -536,65 +398,14 @@ export function WorkspaceApp({
         ).catch(() => []);
         allDocs.push(...docs);
       }
-      if (allDocs.length === 0) {
-        allDocs.push({
-          id: "nd_01",
-          workspace_id: "ws_01",
-          owner_id: "usr-gw-101",
-          title:
-            "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Proposal",
-          content: {
-            type: "doc",
-            blocks: [
-              {
-                type: "paragraph",
-                text: "Cloudflare operates a global Anycast network spanning over 330 cities worldwide. Under SEC Form 10-K Item 1A risk disclosure standards, infrastructure multi-region high availability is benchmarked against strict deterministic SLA criteria.",
-              },
-              {
-                type: "paragraph",
-                text: "Section 3.2: High Availability & Zero-Trust Failover Architecture guarantees 99.99% continuous availability across active edge nodes.",
-              },
-            ],
-          },
-          status: "complete",
-          revision: 4,
-          source_document_ids: ["doc_01", "doc_02", "doc_03"],
-          created_at: "2026-08-20T10:00:00Z",
-          updated_at: "2026-08-20T10:00:00Z",
-        });
-      }
       setNativeDocs(allDocs);
       return allDocs;
-    } catch {
-      const fallbackDocs: NativeDocument[] = [
-        {
-          id: "nd_01",
-          workspace_id: "ws_01",
-          owner_id: "usr-gw-101",
-          title:
-            "Cloudflare 2026 Form 10-K Regulatory Compliance & Infrastructure Proposal",
-          content: {
-            type: "doc",
-            blocks: [
-              {
-                type: "paragraph",
-                text: "Cloudflare operates a global Anycast network spanning over 330 cities worldwide. Under SEC Form 10-K Item 1A risk disclosure standards, infrastructure multi-region high availability is benchmarked against strict deterministic SLA criteria.",
-              },
-              {
-                type: "paragraph",
-                text: "Section 3.2: High Availability & Zero-Trust Failover Architecture guarantees 99.99% continuous availability across active edge nodes.",
-              },
-            ],
-          },
-          status: "complete",
-          revision: 4,
-          source_document_ids: ["doc_01", "doc_02", "doc_03"],
-          created_at: "2026-08-20T10:00:00Z",
-          updated_at: "2026-08-20T10:00:00Z",
-        },
-      ];
-      setNativeDocs(fallbackDocs);
-      return fallbackDocs;
+    } catch (reason) {
+      setNativeDocs([]);
+      setError(
+        reason instanceof Error ? reason.message : "Could not load drafts",
+      );
+      return [];
     }
   }, []);
 
@@ -629,14 +440,47 @@ export function WorkspaceApp({
       return newWs.id;
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Could not create workspace",
+        err instanceof Error ? err.message : "Could not create response",
+      );
+      return null;
+    }
+  }
+
+  async function handleCreateNativeDocument(
+    workspaceId: string,
+    title = "Response draft",
+    sourceDocumentIds: string[] = [],
+  ): Promise<NativeDocument | null> {
+    try {
+      const draft = await api<NativeDocument>(
+        `/workspaces/${workspaceId}/native-documents`,
+        token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            source_document_ids: sourceDocumentIds,
+          }),
+        },
+      );
+      setNativeDocs((current) => [
+        draft,
+        ...current.filter((item) => item.id !== draft.id),
+      ]);
+      setActiveWorkspaceId(workspaceId);
+      setActiveNativeDocumentId(draft.id);
+      setWorkspaceView("workspace");
+      return draft;
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Could not create response draft",
       );
       return null;
     }
   }
 
   async function handleDeleteWorkspace(wsId: string): Promise<void> {
-    if (!window.confirm("Delete this workspace?")) return;
     try {
       await api(`/workspaces/${wsId}`, token, { method: "DELETE" });
       setWorkspaces((prev) => prev.filter((w) => w.id !== wsId));
@@ -645,9 +489,10 @@ export function WorkspaceApp({
         setWorkspaceView("library");
       }
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete workspace",
-      );
+      const message =
+        err instanceof Error ? err.message : "Failed to delete response";
+      setError(message);
+      throw new Error(message);
     }
   }
 
@@ -664,7 +509,7 @@ export function WorkspaceApp({
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)));
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to rename workspace",
+        err instanceof Error ? err.message : "Failed to rename response",
       );
     }
   }
@@ -710,6 +555,69 @@ export function WorkspaceApp({
     loadAllNativeDocs,
   ]);
 
+  useEffect(() => {
+    if (
+      !pendingUpload ||
+      !token ||
+      !user ||
+      isInitialLoading ||
+      pendingUploadStarted.current
+    ) {
+      return;
+    }
+
+    pendingUploadStarted.current = true;
+    const sourceName = pendingUpload.name.replace(/\.[^.]+$/, "").trim();
+    const workspaceName = sourceName || "New RFP response";
+
+    void (async () => {
+      try {
+        const workspace = await api<Workspace>("/workspaces", token, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: workspaceName,
+            kind: "personal",
+            template: "blank",
+          }),
+        });
+        const formData = new FormData();
+        formData.append("file", pendingUpload);
+        formData.append("workspace_id", workspace.id);
+        const response = await authenticatedFetch(`${API}/documents`, token, {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.detail || "Upload failed");
+        }
+        const uploaded = (await response.json()) as DocumentItem;
+        setWorkspaces((current) => [
+          workspace,
+          ...current.filter((item) => item.id !== workspace.id),
+        ]);
+        setDocuments((current) => [uploaded, ...current]);
+        setActiveWorkspaceId(workspace.id);
+        setWorkspaceView("workspace");
+      } catch (reason) {
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Could not create a response from that file",
+        );
+      } finally {
+        onPendingUploadHandled();
+      }
+    })();
+  }, [
+    isInitialLoading,
+    onPendingUploadHandled,
+    pendingUpload,
+    token,
+    user,
+  ]);
+
   // Keyboard shortcut ⌘K and Escape
   useEffect(() => {
     function keyboardShortcuts(event: KeyboardEvent) {
@@ -733,18 +641,19 @@ export function WorkspaceApp({
     ? [
         {
           id: "library",
-          label: "Open Workspace Library",
-          detail: "Browse all research workspaces",
+          label: "Open Response Library",
+          detail: "Browse all bid responses",
           icon: <BookOpen size={16} />,
           shortcut: "⌘L",
-          run: () => setWorkspaceView("library"),
+          run: () =>
+            navigateWithDraftGuard(() => setWorkspaceView("library")),
         },
         {
           id: "new-workspace",
-          label: "New Workspace",
-          detail: "Create a new research workspace",
+          label: "New Response",
+          detail: "Create a new bid response",
           icon: <FolderPlus size={16} />,
-          run: () => handleCreateWorkspace("New Research Workspace"),
+          run: () => navigateWithDraftGuard(openResponseCreator),
         },
         {
           id: "jobs",
@@ -772,15 +681,31 @@ export function WorkspaceApp({
         ...workspaces.map((ws) => ({
           id: `workspace-${ws.id}`,
           label: `Open: ${ws.name}`,
-          detail: ws.kind === "team" ? "Team workspace" : "Personal workspace",
+          detail: ws.kind === "team" ? "Team response" : "Personal response",
           icon: <Folder size={16} />,
           run: () => {
-            setActiveWorkspaceId(ws.id);
-            setWorkspaceView("workspace");
+            navigateWithDraftGuard(() => {
+              setActiveNativeDocumentId(null);
+              setActiveWorkspaceId(ws.id);
+              setWorkspaceView("workspace");
+            });
           },
         })),
       ]
     : [];
+
+  function navigateWithDraftGuard(action: () => void) {
+    if (hasUnsavedDraftChanges) {
+      setPendingNavigation(() => action);
+      return;
+    }
+    action();
+  }
+
+  function openResponseCreator() {
+    setWorkspaceView("library");
+    setLibraryCreateRequestKey((value) => value + 1);
+  }
 
   async function authenticate(values: AuthFields) {
     setBusy(true);
@@ -821,7 +746,6 @@ export function WorkspaceApp({
     onExit();
   }
 
-  // Login / Register Screen (Calm, Manuscript Styled)
   if (!token || !user) {
     return (
       <main className="min-h-screen w-full bg-[var(--paper)] flex items-center justify-center p-4 min-w-0">
@@ -832,22 +756,39 @@ export function WorkspaceApp({
               Ground<span className="text-[var(--ink-blue)]">work</span>
             </h1>
             <p className="text-xs text-[var(--ink-secondary)] break-words">
-              Grounded research & deterministic deliverable verification.
+              Sign in to organize research sources, synthesize findings, and review grounded evidence.
             </p>
           </div>
 
           <GoogleSignInButton
             disabled={busy}
-            onCredential={(cred) => {
-              api<AuthResult>("/auth/google", undefined, {
+            onCredential={async (cred) => {
+              setBusy(true);
+              setError("");
+              try {
+                const result = await api<AuthResult>("/auth/google", undefined, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ credential: cred }),
-              }).then((res) => {
-                setStoredAuth(res);
-                setToken(res.access_token);
-                setUser(res.user);
               });
+                setStoredAuth(result);
+                setToken(result.access_token);
+                setUser(result.user);
+                await Promise.all([
+                  loadDocuments(result.access_token),
+                  loadStats(result.access_token),
+                  loadWorkspaces(result.access_token),
+                  loadAllNativeDocs(result.access_token),
+                ]);
+              } catch (reason) {
+                setError(
+                  reason instanceof Error
+                    ? reason.message
+                    : "Google sign-in failed",
+                );
+              } finally {
+                setBusy(false);
+              }
             }}
             onError={setError}
           />
@@ -924,17 +865,23 @@ export function WorkspaceApp({
           </form>
 
           <div className="text-center pt-2 border-t border-[var(--hairline-subtle)] space-y-2">
-            <button
-              onClick={() => {
-                setMode(mode === "login" ? "register" : "login");
-                setError("");
-              }}
-              className="text-xs text-[var(--ink-blue)] hover:underline cursor-pointer"
-            >
-              {mode === "login"
-                ? "Need an account? Register"
-                : "Already registered? Sign in"}
-            </button>
+            {REGISTRATION_ENABLED && (
+              <button
+                onClick={() => {
+                  setMode(mode === "login" ? "register" : "login");
+                  setError("");
+                }}
+                className="text-xs text-[var(--ink-blue)] hover:underline cursor-pointer"
+              >
+                {mode === "login"
+                  ? "Need an account? Register"
+                  : "Already registered? Sign in"}
+              </button>
+            )}
+
+            <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
+              AI actions send relevant workspace content to the configured external AI service.
+            </p>
 
             <div>
               <button
@@ -961,22 +908,49 @@ export function WorkspaceApp({
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
         nativeDocs={nativeDocs}
-        activeDocId={null}
+        activeDocId={activeNativeDocumentId}
         isOpen={isSidebarOpen}
         activeTheme={activeTheme}
         onToggleOpen={() => setIsSidebarOpen((v) => !v)}
         onSelectWorkspace={(wsId) => {
-          setActiveWorkspaceId(wsId);
-          setWorkspaceView("workspace");
+          navigateWithDraftGuard(() => {
+            if (wsId !== activeWorkspaceId) setActiveNativeDocumentId(null);
+            setActiveWorkspaceId(wsId);
+            setWorkspaceView("workspace");
+          });
         }}
         onSelectDoc={(docId) => {
-          setWorkspaceView("workspace");
+          navigateWithDraftGuard(() => {
+            const selectedDocument = nativeDocs.find(
+              (document) => document.id === docId,
+            );
+            if (selectedDocument) {
+              setActiveWorkspaceId(selectedDocument.workspace_id);
+            }
+            setActiveNativeDocumentId(docId);
+            setWorkspaceView("workspace");
+          });
         }}
-        onCreateWorkspace={() =>
-          handleCreateWorkspace("New Proposal Workspace")
-        }
+        onCreateDoc={(workspaceId) => {
+          navigateWithDraftGuard(() => {
+            void handleCreateNativeDocument(
+              workspaceId,
+              "Response draft",
+              documents
+                .filter(
+                  (document) =>
+                    document.workspace_id === workspaceId &&
+                    document.status === "ready",
+                )
+                .map((document) => document.id),
+            );
+          });
+        }}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onOpenAccount={() => setAccountOpen(true)}
+        onBackToLibrary={() =>
+          navigateWithDraftGuard(() => setWorkspaceView("library"))
+        }
         onToggleTheme={toggleTheme}
       />
 
@@ -989,10 +963,22 @@ export function WorkspaceApp({
             documents={documents}
             nativeDocs={nativeDocs}
             activeTheme={activeTheme}
+            requestedDraftId={activeNativeDocumentId}
+            onActiveDraftChange={setActiveNativeDocumentId}
+            onDirtyStateChange={setHasUnsavedDraftChanges}
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
-            onBackToLibrary={() => setWorkspaceView("library")}
+            onBackToLibrary={() =>
+              navigateWithDraftGuard(() => setWorkspaceView("library"))
+            }
             onUploadDocument={handleUploadWorkspaceDocument}
+            onCreateDraft={(title, sourceDocumentIds) =>
+              handleCreateNativeDocument(
+                activeWorkspace.id,
+                title,
+                sourceDocumentIds,
+              )
+            }
             onDeleteDocument={async (docId) => {
               await api(`/documents/${docId}`, token, { method: "DELETE" });
               await loadDocuments(token);
@@ -1017,8 +1003,10 @@ export function WorkspaceApp({
             activeTheme={activeTheme}
             isSidebarOpen={isSidebarOpen}
             isLoading={isInitialLoading}
+            createRequestKey={libraryCreateRequestKey}
             onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
             onSelectWorkspace={(wsId) => {
+              setActiveNativeDocumentId(null);
               setActiveWorkspaceId(wsId);
               setWorkspaceView("workspace");
             }}
@@ -1082,6 +1070,40 @@ export function WorkspaceApp({
           onClose={() => setCommandPaletteOpen(false)}
         />
       )}
+
+      <Modal
+        isOpen={Boolean(pendingNavigation)}
+        onClose={() => setPendingNavigation(null)}
+        title="Discard unsaved changes?"
+        eyebrow="Response draft"
+        maxWidth="sm"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-relaxed text-[var(--ink-secondary)]">
+            You have manual edits that have not been saved. Stay here to save
+            them, or discard them and continue.
+          </p>
+          <div className="flex justify-end gap-2 border-t border-[var(--hairline)] pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setPendingNavigation(null)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const action = pendingNavigation;
+                setPendingNavigation(null);
+                setHasUnsavedDraftChanges(false);
+                action?.();
+              }}
+            >
+              Discard and continue
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

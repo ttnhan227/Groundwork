@@ -161,25 +161,17 @@ async def create_conversation(
 ) -> ConversationResponse:
     if not payload.document_ids:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="At least one document must be selected"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="At least one document must be selected"
         )
     if not payload.title or not payload.title.strip():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Title must not be empty"
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title must not be empty")
     # Validate title is a string type
     if not isinstance(payload.title, str):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Title must be a string"
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title must be a string")
     # Validate title length to prevent oversized strings
     if len(payload.title) > 200:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Title must be 200 characters or less"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title must be 200 characters or less"
         )
     documents = list(
         await session.scalars(
@@ -225,32 +217,23 @@ async def update_conversation(
     conversation = await owned_conversation(conversation_id, user, session)
     if payload.title is not None:
         if not isinstance(payload.title, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Title must be a string"
-            )
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title must be a string")
         if not payload.title.strip():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Title must not be empty"
-            )
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title must not be empty")
         if len(payload.title) > 200:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Title must be 200 characters or less"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title must be 200 characters or less"
             )
         conversation.title = payload.title.strip()
     if payload.document_ids is not None:
         # Validate document_ids is a list of strings/UUIDs, not an object
         if not isinstance(payload.document_ids, list):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="document_ids must be an array of UUID strings"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="document_ids must be an array of UUID strings"
             )
         if not payload.document_ids:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="At least one document must be selected"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="At least one document must be selected"
             )
         documents = list(
             await session.scalars(

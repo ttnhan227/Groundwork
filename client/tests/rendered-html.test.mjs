@@ -63,14 +63,14 @@ test("includes research workspace workflows and export options", async () => {
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
   for (const label of [
-    "Technical Proposal",
-    "Client Research Report",
-    "Executive Presentation",
-    "Blank Workspace",
+    "RFP Response",
+    "Security Questionnaire",
+    "Vendor Due Diligence",
+    "Blank Response",
   ]) {
     assert.match(page, new RegExp(label));
   }
-  assert.match(page, /Export Deliverable/);
+  assert.match(page, /Export response/);
   assert.match(css, /\.notebook-template-card/);
 });
 
@@ -106,7 +106,7 @@ test("includes complete account settings and durable notifications", async () =>
   for (const value of [
     "Profile",
     "Security",
-    "Document Defaults",
+    "Response Defaults",
     "Notifications",
     "Privacy & Data",
     "Usage",
@@ -130,19 +130,17 @@ test("includes complete account settings and durable notifications", async () =>
   assert.match(css, /data-interface-size/);
 });
 
-test("centers the product on the Research Workspace agentic workflow", async () => {
+test("centers the product on the source, draft, review, export workflow", async () => {
   const [page, css] = await Promise.all([
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /Research Workspaces/);
-  assert.match(page, /New Workspace/);
-  assert.match(page, /Recommended Workflows/);
-  assert.match(page, /Technical Proposal/);
-  assert.match(page, /Sources/);
-  assert.match(page, /Grounded Agent/);
-  assert.match(page, /Studio/);
-  assert.match(page, /Deliverables/);
+  assert.match(page, /Turn a bid pack into a controlled response/);
+  assert.match(page, /New Response/);
+  assert.match(page, /RFP Response/);
+  assert.match(page, /Groundwork AI/);
+  assert.match(page, /Review findings/);
+  assert.match(page, /Evidence appendix/);
   assert.match(css, /\.notebook-library-container/);
   assert.match(css, /\.notebook-workspace-3col/);
   assert.match(css, /\.agent-composer-container/);
@@ -185,8 +183,8 @@ test("guides user through verifiable deliverable review and audit findings", asy
     readSourceTree(),
     readFile(new URL("../src/index.css", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /Verifiable Requirements/);
-  assert.match(page, /Review Findings/);
-  assert.match(page, /Export Deliverable/);
+  assert.match(page, /Requirements Traceability Matrix/);
+  assert.match(page, /Review findings/);
+  assert.match(page, /Export response/);
   assert.match(css, /\.agent-citation-chip/);
 });
