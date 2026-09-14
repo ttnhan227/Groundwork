@@ -113,7 +113,7 @@ export function LandingPage({
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 bg-[var(--control-room)] px-5 text-sm font-bold text-white transition-colors hover:bg-[var(--control-room-hover)]">
                 <Upload size={15} />
-                Load a document or RFP
+                Load a document or research paper
                 <input
                   className="sr-only"
                   type="file"
@@ -144,14 +144,14 @@ export function LandingPage({
                 <span className="h-2.5 w-2.5 rounded-full bg-[#d5d0c3] border border-black/10" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#d5d0c3] border border-black/10" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#d5d0c3] border border-black/10" />
-                <span className="ml-2 font-mono text-[11px] text-[var(--ink-muted)]">groundwork · response setup</span>
+                <span className="ml-2 font-mono text-[11px] text-[var(--ink-muted)]">groundwork · research workspace studio</span>
               </div>
               <img
                 src="/groundwork-workspace-real.png"
                 width="1440"
-                height="540"
+                height="810"
                 className="block h-auto w-full"
-                alt="Groundwork response workspace showing bid sources, response setup, upload controls, and the review panel"
+                alt="Groundwork AI research workspace showing grounded sources, research canvas, and source-backed AI assistant"
               />
             </div>
           </div>
