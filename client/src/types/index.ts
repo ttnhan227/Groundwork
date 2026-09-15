@@ -4,5 +4,6 @@ export * from "./chat";
 export * from "./deliverable";
 export * from "./document";
 export * from "./job";
+export * from "./note";
 export * from "./notification";
 export * from "./workspace";

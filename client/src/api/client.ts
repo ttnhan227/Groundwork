@@ -1,4 +1,4 @@
-import type { AuthResult, Citation, DocumentItem, Job, NativeDocument } from "../types";
+import type { AuthResult, Citation, DocumentItem, DocumentPage, Job, NativeDocument, Note, NoteCreateInput, NoteUpdateInput } from "../types";
 
 export const API = import.meta.env.VITE_API_URL ?? "/api/v1";
 export const AUTH_STORAGE_KEY = "groundwork-auth";
@@ -121,7 +121,7 @@ export async function api<T>(
   token?: string,
   init?: RequestInit,
 ): Promise<T> {
-  if (init?.body && typeof init.body === "string" && init.body.trim() === "") {
+  if (init?.body !== undefined && typeof init.body === "string" && init.body.trim() === "") {
     return Promise.reject({
       status: 400,
       detail: "Request body cannot be empty",
@@ -180,6 +180,22 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch (err) {
     console.error("Failed to copy text to clipboard:", err);
     return false;
+  }
+}
+
+export function formatDateTime(isoString: string | null | undefined): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString);
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(isoString);
   }
 }
 
@@ -438,28 +454,63 @@ export async function createYouTubeSource(
   });
 }
 
-export function formatDateTime(isoString?: string | null): string {
-  if (!isoString) return "";
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+export async function fetchWorkspaceNotes(
+  workspaceId: string,
+  token: string,
+  type?: string,
+): Promise<Note[]> {
+  const query = type ? `?type=${encodeURIComponent(type)}` : "";
+  return api<Note[]>(`/workspaces/${workspaceId}/notes${query}`, token);
+}
+
+export async function createWorkspaceNote(
+  workspaceId: string,
+  payload: NoteCreateInput,
+  token: string,
+): Promise<Note> {
+  return api<Note>(`/workspaces/${workspaceId}/notes`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 }
 
-export function formatFullDateTime(isoString?: string | null): string {
-  if (!isoString) return "";
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+export async function updateWorkspaceNote(
+  workspaceId: string,
+  noteId: string,
+  payload: NoteUpdateInput,
+  token: string,
+): Promise<Note> {
+  return api<Note>(`/workspaces/${workspaceId}/notes/${noteId}`, token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
+}
+
+export async function deleteWorkspaceNote(
+  workspaceId: string,
+  noteId: string,
+  token: string,
+): Promise<void> {
+  return api<void>(`/workspaces/${workspaceId}/notes/${noteId}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function retryDocumentProcessing(
+  documentId: string,
+  token: string,
+): Promise<Job> {
+  return api<Job>(`/documents/${documentId}/retry`, token, {
+    method: "POST",
+  });
+}
+
+export async function fetchDocumentPages(
+  documentId: string,
+  token: string,
+): Promise<DocumentPage[]> {
+  return api<DocumentPage[]>(`/documents/${documentId}/pages`, token);
 }
 

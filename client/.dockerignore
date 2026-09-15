@@ -1,6 +1,33 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
 dist/
-.next/
-.vinext/
+build/
+
+# Testing & coverage
 coverage/
+tests/
+
+# Debug logs
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Git & IDEs
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+*.md
+
+# Docker files
+Dockerfile*
+.dockerignore*

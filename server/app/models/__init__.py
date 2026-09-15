@@ -40,6 +40,7 @@ from app.models.job import (
     WorkflowRun,
     WorkflowStepRun,
 )
+from app.models.note import Note
 from app.models.notification import Notification
 from app.models.usage import AIUsageRecord
 from app.models.user import RefreshToken, User
@@ -65,6 +66,8 @@ __all__ = [
     "WorkspaceMember",
     "WorkspaceMemory",
     "ActivityEvent",
+    # Notes
+    "Note",
     # Document
     "Document",
     "DocumentPage",

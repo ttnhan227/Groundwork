@@ -135,6 +135,7 @@ async def upsert_memory(
         session.add(memory)
     else:
         memory.value = payload.value
+        session.add(memory)
     await session.commit()
     await session.refresh(memory)
     return memory

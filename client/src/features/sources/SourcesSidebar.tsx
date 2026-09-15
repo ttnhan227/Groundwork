@@ -10,15 +10,41 @@ import {
   Upload,
   Plus,
   Download,
+  Globe,
+  Video,
+  FileCode,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { API, formatDateTime } from "../../api/client";
 import type { DocumentItem } from "../../types";
 
+function getDocTypeIcon(doc: DocumentItem) {
+  const name = (doc.filename || "").toLowerCase();
+  if (name.endsWith(".html") || name.endsWith(".htm") || doc.tags?.includes("web")) {
+    return <Globe size={14} className="text-emerald-600 flex-shrink-0" />;
+  }
+  if (
+    name.endsWith(".mp4") ||
+    name.endsWith(".mov") ||
+    doc.tags?.includes("youtube") ||
+    doc.tags?.includes("video")
+  ) {
+    return <Video size={14} className="text-rose-600 flex-shrink-0" />;
+  }
+  if (name.endsWith(".md") || name.endsWith(".txt") || name.endsWith(".json")) {
+    return <FileCode size={14} className="text-amber-600 flex-shrink-0" />;
+  }
+  return <FileText size={14} className="text-[var(--ink-blue)] flex-shrink-0" />;
+}
+
 export interface SourcesSidebarProps {
   sources: DocumentItem[];
   selectedSourceIds: string[];
   isUploading: boolean;
+  activeSourceId?: string | null;
+  evidenceSourceId?: string | null;
+  onSelectSource?: (id: string) => void;
   onToggleSource: (id: string) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
@@ -33,6 +59,9 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
   sources,
   selectedSourceIds,
   isUploading,
+  activeSourceId = null,
+  evidenceSourceId = null,
+  onSelectSource,
   onToggleSource,
   onSelectAll,
   onDeselectAll,
@@ -101,7 +130,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
       <div className="px-3 py-2 border-b border-[var(--hairline-subtle)] flex items-center justify-between text-[11px] text-[var(--ink-muted)] min-w-0">
         <span
           className="truncate"
-          title={`${selectedSourceIds.length} selected as response context`}
+          title={`${selectedSourceIds.length} of ${sources.length} sources active in context`}
         >
           {selectedSourceIds.length} active in context
         </span>
@@ -126,14 +155,20 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5 min-w-0">
         {sources.map((doc) => {
           const isSelected = selectedSourceIds.includes(doc.id);
+          const isActive = activeSourceId === doc.id;
+          const isEvidence = evidenceSourceId === doc.id;
 
           return (
             <div
               key={doc.id}
-              className={`p-2 rounded-[var(--radius-sm)] border transition-all text-xs group flex items-start gap-2 min-w-0 ${
-                isSelected
-                  ? "bg-[var(--surface)] border-[var(--ink-blue-border)] shadow-[var(--shadow-subtle)]"
-                  : "bg-transparent border-transparent hover:bg-[var(--surface-hover)]"
+              className={`p-2 rounded-[var(--radius-sm)] border transition-all text-xs group flex items-start gap-2 min-w-0 relative ${
+                isActive
+                  ? "bg-[var(--surface)] border-[var(--ink-blue)] shadow-[var(--shadow-subtle)] ring-1 ring-[var(--ink-blue)]"
+                  : isEvidence
+                    ? "bg-amber-50/60 dark:bg-amber-950/30 border-amber-400 dark:border-amber-700 shadow-xs"
+                    : isSelected
+                      ? "bg-[var(--surface)] border-[var(--ink-blue-border)] shadow-[var(--shadow-subtle)]"
+                      : "bg-transparent border-transparent hover:bg-[var(--surface-hover)]"
               }`}
             >
               <button
@@ -151,22 +186,48 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
 
               <button
                 type="button"
-                onClick={() => onOpenViewer(doc.id, 1)}
+                onClick={() => {
+                  onSelectSource?.(doc.id);
+                  onOpenViewer(doc.id, 1);
+                }}
                 className="flex items-start gap-2 flex-1 min-w-0 text-left cursor-pointer group/title"
                 title={`View ${doc.filename}`}
               >
-                <div className="flex h-9 w-7 shrink-0 items-center justify-center rounded border border-[var(--hairline)] bg-[var(--surface)] text-[var(--ink-blue)] group-hover/title:border-[var(--ink-blue)] transition-colors">
-                  <FileText size={14} aria-hidden="true" />
+                <div
+                  className={`flex h-9 w-7 shrink-0 items-center justify-center rounded border bg-[var(--surface)] group-hover/title:border-[var(--ink-blue)] transition-colors ${
+                    isActive
+                      ? "border-[var(--ink-blue)] bg-[var(--ink-blue-subtle)]"
+                      : isEvidence
+                        ? "border-amber-400 bg-amber-100/50"
+                        : "border-[var(--hairline)]"
+                  }`}
+                >
+                  {getDocTypeIcon(doc)}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p
-                    className="font-medium text-[var(--ink)] truncate text-xs select-text group-hover/title:text-[var(--ink-blue)] transition-colors"
-                    title={doc.filename}
-                  >
-                    {doc.filename}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[var(--ink-muted)] font-mono">
+                  <div className="flex items-center gap-1.5">
+                    <p
+                      className={`font-medium truncate text-xs select-text transition-colors ${
+                        isActive
+                          ? "text-[var(--ink-blue)] font-semibold"
+                          : "text-[var(--ink)] group-hover/title:text-[var(--ink-blue)]"
+                      }`}
+                      title={doc.filename}
+                    >
+                      {doc.filename}
+                    </p>
+                  </div>
+
+                  {isEvidence && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-1 py-0.2 rounded border border-amber-300 dark:border-amber-800">
+                        <Sparkles size={8} /> Evidence source
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-[var(--ink-muted)] font-mono flex-wrap">
                     <span>
                       {doc.page_count ? `${doc.page_count} pgs` : "1 pg"}
                     </span>
@@ -174,12 +235,12 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                       <span className="text-[var(--danger)] flex items-center gap-0.5 truncate">
                         <AlertTriangle size={9} /> Failed
                       </span>
-                    ) : doc.status === "processing" ? (
-                      <span className="text-[var(--warning)] flex items-center gap-0.5 truncate">
+                    ) : ["processing", "uploaded", "extracting", "ocr_processing", "indexing"].includes(doc.status) ? (
+                      <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5 truncate">
                         <RefreshCw size={9} className="spin" /> Indexing
                       </span>
                     ) : (
-                      <span className="text-[var(--success)] flex items-center gap-0.5 truncate font-semibold">
+                      <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 truncate font-semibold">
                         <Check size={9} /> Ready
                       </span>
                     )}
@@ -195,7 +256,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 </div>
               </button>
 
-              {/* Quick actions: download original and delete (no redundant details action) */}
+              {/* Quick actions: download original, retry and delete */}
               <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="ghost"

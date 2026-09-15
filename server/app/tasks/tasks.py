@@ -130,12 +130,12 @@ async def _complete(document_id: uuid.UUID, pages: list[ExtractedPage]) -> None:
         job.completed_at = datetime.now(UTC)
         user = await session.get(User, document.owner_id)
         if user is not None:
-            from app.deliverables import activity, ensure_personal_workspace
+            from app.deliverables import activity
 
-            workspace = await ensure_personal_workspace(user, session)
+            ws_id = document.workspace_id
             await activity(
                 session,
-                workspace.id,
+                ws_id,
                 user.id,
                 "source.ready",
                 "document",
@@ -163,18 +163,22 @@ async def _set_ocr_processing(document_id: uuid.UUID) -> None:
 async def _fail(document_id: uuid.UUID, message: str, retries: int) -> None:
     async with SessionLocal() as session:
         document = await session.get(Document, document_id)
-        job = await session.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id))
+        job = await session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.document_id == document_id)
+            .order_by(ProcessingJob.created_at.desc())
+        )
         if document:
             document.status = DocumentStatus.FAILED
             document.error_message = message[:2000]
             user = await session.get(User, document.owner_id)
             if user is not None:
-                from app.deliverables import activity, ensure_personal_workspace
+                from app.deliverables import activity
 
-                workspace = await ensure_personal_workspace(user, session)
+                ws_id = document.workspace_id
                 await activity(
                     session,
-                    workspace.id,
+                    ws_id,
                     user.id,
                     "source.failed",
                     "document",

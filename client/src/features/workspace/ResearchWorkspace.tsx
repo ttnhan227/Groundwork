@@ -18,13 +18,9 @@ import {
   BookOpen,
   HelpCircle,
   FileSpreadsheet,
-  Play,
-  Pause,
   Copy,
   Pin,
   Plus,
-  ChevronDown,
-  ChevronUp,
   Download,
   Bot,
   User,
@@ -42,6 +38,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
 import { Tabs } from "../../components/ui/Tabs";
 import { TopBar } from "../../components/layout/TopBar";
+import { FormattedAnswer } from "../../components/common/FormattedAnswer";
 import { SourcesSidebar } from "../sources/SourcesSidebar";
 import { AddSourceModal } from "../sources/AddSourceModal";
 import { BlockItem } from "../editor/BlockItem";
@@ -57,6 +54,10 @@ import {
   downloadTextFile,
   copyTextToClipboard,
   formatDateTime,
+  fetchWorkspaceNotes,
+  createWorkspaceNote,
+  updateWorkspaceNote,
+  deleteWorkspaceNote,
 } from "../../api/client";
 import type {
   Workspace,
@@ -70,7 +71,11 @@ import type {
   Citation,
   AgentTaskStep,
   AuthResult,
+  Note,
+  NoteType,
 } from "../../types";
+import { NotesCanvas } from "./NotesCanvas";
+import { DocumentReader } from "../reader/DocumentReader";
 
 export interface ResearchWorkspaceProps {
   auth: AuthResult;
@@ -95,7 +100,7 @@ export interface ResearchWorkspaceProps {
   onDeleteDocument: (docId: string) => Promise<void>;
   onOpenAccount?: () => void;
   onToggleTheme?: () => void;
-  onOpenViewer?: (docId: string, pageNumber?: number) => void;
+  onOpenViewer?: (docId: string, pageNumber?: number, snippet?: string) => void;
 }
 
 const SOURCE_UPLOAD_ACCEPT =
@@ -172,7 +177,7 @@ export function ResearchWorkspace({
   onDeleteDocument,
   onOpenAccount: _onOpenAccount,
   onToggleTheme: _onToggleTheme,
-  onOpenViewer,
+  onOpenViewer: _onOpenViewer,
 }: ResearchWorkspaceProps) {
   const [localAddedSources, setLocalAddedSources] = useState<DocumentItem[]>([]);
 
@@ -284,17 +289,60 @@ export function ResearchWorkspace({
   const savedBlocksRef = useRef<NativeBlock[]>([]);
 
   // NotebookLM Studio & Research state
-  const [centerView, setCenterView] = useState<"studio" | "document">("document");
+  const [centerView, setCenterView] = useState<
+    "studio" | "document" | "notes" | "reader"
+  >("document");
+  const [readerSourceId, setReaderSourceId] = useState<string | null>(null);
+  const [readerPage, setReaderPage] = useState<number>(1);
+  const [readerSearch, setReaderSearch] = useState<string>("");
+  const [readerEvidenceSnippet, setReaderEvidenceSnippet] = useState<string | null>(null);
+  const [readerEvidencePage, setReaderEvidencePage] = useState<number | null>(null);
+
+  const activeReaderDoc = useMemo(() => {
+    return (
+      workspaceSources.find((s) => s.id === readerSourceId) ||
+      workspaceSources[0] ||
+      null
+    );
+  }, [workspaceSources, readerSourceId]);
+
+  const handleOpenReader = (
+    docId: string,
+    pageNumber?: number,
+    snippet?: string,
+  ) => {
+    setReaderSourceId(docId);
+    setReaderPage(pageNumber || 1);
+    setReaderSearch(snippet || "");
+    setReaderEvidenceSnippet(snippet || null);
+    setReaderEvidencePage(pageNumber || null);
+    setCenterView("reader");
+  };
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+
+  const loadNotes = async () => {
+    if (!workspace.id || !auth.access_token) return;
+    setIsLoadingNotes(true);
+    try {
+      const fetched = await fetchWorkspaceNotes(workspace.id, auth.access_token);
+      setNotes(fetched || []);
+    } catch (err) {
+      console.error("Failed to fetch workspace notes", err);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace.id, auth.access_token]);
   const [audioOverview, setAudioOverview] = useState<{
     title: string;
     hosts: string[];
     transcript: string;
-    duration: string;
   } | null>(null);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [audioProgress, setAudioProgress] = useState(15);
-  const [audioSpeed, setAudioSpeed] = useState(1);
-  const [isAudioTranscriptOpen, setIsAudioTranscriptOpen] = useState(false);
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -309,42 +357,7 @@ export function ResearchWorkspace({
       takeaway: string;
     }[];
     currentSceneIndex: number;
-    isPlaying: boolean;
   } | null>(null);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (isAudioPlaying) {
-      timer = setInterval(() => {
-        setAudioProgress((prev) => {
-          if (prev >= 100) {
-            setIsAudioPlaying(false);
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, Math.round(500 / audioSpeed));
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isAudioPlaying, audioSpeed]);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (videoOverview?.isPlaying && videoOverview.scenes.length > 1) {
-      timer = setInterval(() => {
-        setVideoOverview((prev) => {
-          if (!prev || !prev.isPlaying) return prev;
-          const nextIdx = (prev.currentSceneIndex + 1) % prev.scenes.length;
-          return { ...prev, currentSceneIndex: nextIdx };
-        });
-      }, 8000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [videoOverview?.isPlaying, videoOverview?.scenes.length]);
 
   const hasUnsavedChanges = useMemo(
     () =>
@@ -536,16 +549,13 @@ export function ResearchWorkspace({
                 title: art.title,
                 hosts: ["Alex", "Jordan"],
                 transcript: art.content,
-                duration: "06:42",
               });
-              setIsAudioPlaying(true);
             } else if (art.type === "studio_video_overview") {
               const scenes = parseVideoScenes(art.content);
               setVideoOverview({
                 title: art.title,
                 scenes,
                 currentSceneIndex: 0,
-                isPlaying: true,
               });
             }
             setCenterView("studio");
@@ -577,6 +587,7 @@ export function ResearchWorkspace({
               message: "Groundwork AI finished. Review the draft changes and citations before export.",
             });
             reloadArtifactDetails();
+            loadNotes();
           },
           onError: (errStr) => {
             setActiveSteps((prev) =>
@@ -641,13 +652,6 @@ export function ResearchWorkspace({
     }
   }
 
-  function formatAudioTime(pct: number, totalSeconds: number = 402): string {
-    const current = Math.floor((pct / 100) * totalSeconds);
-    const mins = Math.floor(current / 60);
-    const secs = current % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  }
-
   function handleTriggerStudioAction(actionType: string) {
     if (workspaceSources.length === 0) {
       setWorkspaceNotice({
@@ -682,10 +686,35 @@ export function ResearchWorkspace({
     );
   }
 
-  async function handleSaveAsNote(content: string, noteTitle?: string) {
+  async function handleSaveAsNote(
+    content: string,
+    noteTitle?: string,
+    citations?: Citation[],
+  ) {
     if (!content.trim()) return;
     try {
       const heading = noteTitle || "Pinned Research Note";
+
+      // 1. Persist to durable workspace Note table
+      try {
+        const createdNote = await createWorkspaceNote(
+          workspace.id,
+          {
+            title: heading,
+            content: content.trim(),
+            note_type: citations && citations.length > 0 ? "saved_answer" : "user",
+            citations: citations || [],
+          },
+          auth.access_token,
+        );
+        if (createdNote) {
+          setNotes((prev) => [createdNote, ...prev]);
+        }
+      } catch (noteErr) {
+        console.error("Failed to save note record", noteErr);
+      }
+
+      // 2. Also append block to active draft deliverable
       const newBlock: NativeBlock = {
         type: "paragraph",
         text: `### ${heading}\n\n${content.trim()}`,
@@ -723,7 +752,7 @@ export function ResearchWorkspace({
 
       setWorkspaceNotice({
         tone: "success",
-        message: "Saved note to your Notes & Document canvas.",
+        message: "Saved note to your Research Notes and document canvas.",
       });
     } catch (err) {
       console.error("Failed to save note", err);
@@ -733,6 +762,79 @@ export function ResearchWorkspace({
       });
     }
   }
+
+  const handleCreateNoteFromCanvas = async (
+    title: string,
+    content: string,
+    noteType?: NoteType,
+  ) => {
+    try {
+      const created = await createWorkspaceNote(
+        workspace.id,
+        {
+          title,
+          content,
+          note_type: noteType || "user",
+        },
+        auth.access_token,
+      );
+      setNotes((prev) => [created, ...prev]);
+      setWorkspaceNotice({
+        tone: "success",
+        message: "Note saved to your workspace notebook.",
+      });
+      return created;
+    } catch (err: unknown) {
+      setWorkspaceNotice({
+        tone: "error",
+        message: (err as Error)?.message || "Failed to save note.",
+      });
+      return null;
+    }
+  };
+
+  const handleUpdateNoteFromCanvas = async (
+    noteId: string,
+    title: string,
+    content: string,
+  ) => {
+    try {
+      const updated = await updateWorkspaceNote(
+        workspace.id,
+        noteId,
+        { title, content },
+        auth.access_token,
+      );
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)));
+      setWorkspaceNotice({
+        tone: "success",
+        message: "Note updated.",
+      });
+      return updated;
+    } catch (err: unknown) {
+      setWorkspaceNotice({
+        tone: "error",
+        message: (err as Error)?.message || "Failed to update note.",
+      });
+      return null;
+    }
+  };
+
+  const handleDeleteNoteFromCanvas = async (noteId: string) => {
+    try {
+      await deleteWorkspaceNote(workspace.id, noteId, auth.access_token);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      setWorkspaceNotice({
+        tone: "info",
+        message: "Note deleted.",
+      });
+    } catch (err: unknown) {
+      setWorkspaceNotice({
+        tone: "error",
+        message: (err as Error)?.message || "Failed to delete note.",
+      });
+    }
+  };
 
   async function handleCreateCustomNote() {
     if (!newNoteContent.trim() || isSavingNote) return;
@@ -1080,7 +1182,10 @@ export function ResearchWorkspace({
                   });
               }
             }}
-            onOpenViewer={(id, page) => onOpenViewer?.(id, page)}
+            activeSourceId={centerView === "reader" ? activeReaderDoc?.id : null}
+            evidenceSourceId={readerEvidenceSnippet ? readerSourceId : null}
+            onSelectSource={(id) => handleOpenReader(id, 1)}
+            onOpenViewer={(id, page) => handleOpenReader(id, page)}
             onOpenAddSourceModal={() => setIsAddSourceModalOpen(true)}
           />
         ) : (
@@ -1125,6 +1230,24 @@ export function ResearchWorkspace({
 
               <button
                 type="button"
+                onClick={() => setCenterView("notes")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                  centerView === "notes"
+                    ? "bg-[var(--success-bg)] text-[var(--success)] border border-[var(--success-border)]"
+                    : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
+                }`}
+              >
+                <Pin size={13} className="text-[var(--success)] flex-shrink-0" />
+                <span className="truncate">Research Notes</span>
+                {notes.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--success)] text-white text-[9px] font-mono">
+                    {notes.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setCenterView("document")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
                   centerView === "document"
@@ -1137,6 +1260,24 @@ export function ResearchWorkspace({
                 {activeArtifact && (
                   <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--ink-sepia)] text-white text-[9px] font-mono">
                     v{activeArtifact.revision || 1}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCenterView("reader")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                  centerView === "reader"
+                    ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)] font-semibold"
+                    : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
+                }`}
+              >
+                <BookOpen size={13} className="text-[var(--ink-blue)] flex-shrink-0" />
+                <span className="truncate">Document Reader</span>
+                {activeReaderDoc && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--ink-blue)] text-white text-[9px] font-mono truncate max-w-[90px]">
+                    {activeReaderDoc.filename}
                   </span>
                 )}
               </button>
@@ -1323,7 +1464,7 @@ export function ResearchWorkspace({
                   </div>
                 </div>
 
-                {/* Audio Overview Player (if present) */}
+                {/* Audio Overview Script (if present) */}
                 {audioOverview && (
                   <div className="p-4 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
                     <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--hairline)] flex-wrap">
@@ -1334,7 +1475,7 @@ export function ResearchWorkspace({
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-blue)] bg-[var(--ink-blue-subtle)] px-1.5 py-0.5 rounded">
-                              Audio Overview · Deep Dive
+                              Audio Overview · Podcast Script
                             </span>
                             <span className="text-xs text-[var(--ink-muted)]">Alex &amp; Jordan</span>
                           </div>
@@ -1345,15 +1486,6 @@ export function ResearchWorkspace({
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          onClick={() => setIsAudioTranscriptOpen(!isAudioTranscriptOpen)}
-                          className="text-xs text-[var(--ink-secondary)]"
-                        >
-                          {isAudioTranscriptOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                          {isAudioTranscriptOpen ? "Hide Script" : "View Script"}
-                        </Button>
                         <Button
                           variant="ghost"
                           size="xs"
@@ -1372,98 +1504,38 @@ export function ResearchWorkspace({
                         >
                           <Download size={12} />
                         </Button>
-                      </div>
-                    </div>
-
-                    {/* Audio Player Controls */}
-                    <div className="pt-3 flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsAudioPlaying(!isAudioPlaying)}
-                        className="w-10 h-10 rounded-full bg-[var(--ink-blue)] hover:bg-[var(--ink-blue-hover)] text-white flex items-center justify-center flex-shrink-0 transition-transform active:scale-95 shadow-sm cursor-pointer"
-                        aria-label={isAudioPlaying ? "Pause audio overview" : "Play audio overview"}
-                      >
-                        {isAudioPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
-                      </button>
-
-                      {/* Animated Waveform */}
-                      <div className="flex items-center gap-1 h-6 px-1 flex-shrink-0">
-                        {[40, 75, 30, 95, 60, 100, 45, 80, 55, 90, 35, 70, 50, 85, 65, 40].map((h, i) => (
-                          <span
-                            key={i}
-                            className={`w-1 rounded-full bg-[var(--ink-blue)] transition-all duration-200 ${
-                              isAudioPlaying ? "soundwave-active" : ""
-                            }`}
-                            style={{
-                              height: isAudioPlaying ? `${Math.max(4, (h * ((i % 3) + 1)) % 22)}px` : "4px",
-                              opacity: isAudioPlaying ? 0.9 : 0.35,
-                              animationDelay: `${i * 0.08}s`,
-                            }}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Scrubber Bar */}
-                      <div className="flex-1 flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-[var(--ink-muted)] w-10 text-right">
-                          {formatAudioTime(audioProgress)}
-                        </span>
-                        <div
-                          className="flex-1 h-2 bg-[var(--paper-subtle)] rounded-full overflow-hidden cursor-pointer relative border border-[var(--hairline)]"
-                          onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-                            setAudioProgress(pct);
-                          }}
+                        <button
+                          type="button"
+                          onClick={() => setAudioOverview(null)}
+                          className="text-[var(--ink-muted)] hover:text-[var(--ink)] p-1 rounded transition-colors cursor-pointer"
+                          title="Dismiss Audio Overview"
                         >
-                          <div
-                            className="h-full bg-[var(--ink-blue)] rounded-full transition-all duration-150"
-                            style={{ width: `${audioProgress}%` }}
-                          />
-                        </div>
-                        <span className="font-mono text-[11px] text-[var(--ink-muted)] w-10">
-                          {audioOverview.duration || "06:42"}
-                        </span>
+                          <X size={14} />
+                        </button>
                       </div>
-
-                      {/* Speed Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const speeds = [1, 1.25, 1.5];
-                          const nextIdx = (speeds.indexOf(audioSpeed) + 1) % speeds.length;
-                          setAudioSpeed(speeds[nextIdx]);
-                        }}
-                        className="px-2 py-0.5 rounded font-mono text-[10px] font-bold border border-[var(--hairline)] bg-[var(--paper)] text-[var(--ink-secondary)] hover:text-[var(--ink)] cursor-pointer"
-                        title="Change playback speed"
-                      >
-                        {audioSpeed}x
-                      </button>
                     </div>
 
-                    {/* Expandable Script Transcript */}
-                    {isAudioTranscriptOpen && (
-                      <div className="mt-4 p-4 rounded-[var(--radius-sm)] bg-[var(--paper-subtle)] border border-[var(--hairline)] max-h-72 overflow-y-auto font-sans text-xs space-y-2.5 leading-relaxed">
-                        {audioOverview.transcript.split("\n\n").map((para, pIdx) => {
-                          const isAlex = para.includes("Alex:") || para.includes("**Alex**");
-                          const isJordan = para.includes("Jordan:") || para.includes("**Jordan**");
-                          return (
-                            <div key={pIdx} className="flex gap-2.5 items-start">
-                              <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded h-fit flex-shrink-0 mt-0.5 ${
-                                isAlex ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)]" :
-                                isJordan ? "bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)]" :
-                                "bg-[var(--paper)] text-[var(--ink-muted)]"
-                              }`}>
-                                {isAlex ? "Alex" : isJordan ? "Jordan" : "Overview"}
-                              </span>
-                              <p className="text-[var(--ink)] flex-1 whitespace-pre-wrap">
-                                {para.replace(/^(?:\*\*Alex\*\*|\*\*Jordan\*\*|Alex:|Jordan:)\s*/i, "")}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    {/* Script Transcript */}
+                    <div className="mt-4 p-4 rounded-[var(--radius-sm)] bg-[var(--paper-subtle)] border border-[var(--hairline)] max-h-72 overflow-y-auto font-sans text-xs space-y-2.5 leading-relaxed">
+                      {audioOverview.transcript.split("\n\n").map((para, pIdx) => {
+                        const isAlex = para.includes("Alex:") || para.includes("**Alex**");
+                        const isJordan = para.includes("Jordan:") || para.includes("**Jordan**");
+                        return (
+                          <div key={pIdx} className="flex gap-2.5 items-start">
+                            <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded h-fit flex-shrink-0 mt-0.5 ${
+                              isAlex ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)]" :
+                              isJordan ? "bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)]" :
+                              "bg-[var(--paper)] text-[var(--ink-muted)]"
+                            }`}>
+                              {isAlex ? "Alex" : isJordan ? "Jordan" : "Overview"}
+                            </span>
+                            <p className="text-[var(--ink)] flex-1 whitespace-pre-wrap">
+                              {para.replace(/^(?:\*\*Alex\*\*|\*\*Jordan\*\*|Alex:|Jordan:)\s*/i, "")}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -1605,32 +1677,9 @@ export function ResearchWorkspace({
                                   <ChevronLeft size={14} />
                                 </Button>
 
-                                <Button
-                                  variant="ghost"
-                                  size="xs"
-                                  onClick={() =>
-                                    setVideoOverview((prev) =>
-                                      prev
-                                        ? { ...prev, isPlaying: !prev.isPlaying }
-                                        : null,
-                                    )
-                                  }
-                                  className="text-slate-200 hover:text-white hover:bg-slate-800 h-7 px-2 text-xs flex items-center gap-1"
-                                  title={
-                                    videoOverview.isPlaying
-                                      ? "Pause auto-slide"
-                                      : "Play auto-slide"
-                                  }
-                                >
-                                  {videoOverview.isPlaying ? (
-                                    <Pause size={12} />
-                                  ) : (
-                                    <Play size={12} />
-                                  )}
-                                  <span className="text-[10px] font-mono">
-                                    {videoOverview.isPlaying ? "Pause" : "Play"}
-                                  </span>
-                                </Button>
+                                <span className="text-[10px] font-mono text-slate-400 px-2">
+                                  {videoOverview.currentSceneIndex + 1} / {videoOverview.scenes.length}
+                                </span>
 
                                 <Button
                                   variant="ghost"
@@ -1763,7 +1812,7 @@ export function ResearchWorkspace({
                             <Button
                               variant="ghost"
                               size="xs"
-                              onClick={() => handleSaveAsNote(msg.content)}
+                              onClick={() => handleSaveAsNote(msg.content, "Saved AI Response", msg.citations)}
                               className="text-[10px] text-[var(--ink-blue)] h-6 px-2"
                               title="Save this response to Notes & Document Canvas"
                             >
@@ -1789,9 +1838,17 @@ export function ResearchWorkspace({
                         )}
                       </div>
 
-                      <div className="font-sans whitespace-pre-wrap break-words text-[13px] text-[var(--ink)] select-text">
-                        {msg.content}
-                      </div>
+                      {msg.role === "assistant" ? (
+                        <FormattedAnswer
+                          content={msg.content}
+                          citations={msg.citations}
+                          onOpenViewer={handleOpenReader}
+                        />
+                      ) : (
+                        <div className="font-sans whitespace-pre-wrap break-words text-[13px] text-[var(--ink)] select-text">
+                          {msg.content}
+                        </div>
+                      )}
 
                       {/* Citations Chips */}
                       {msg.citations && msg.citations.length > 0 && (
@@ -1803,8 +1860,8 @@ export function ResearchWorkspace({
                             <button
                               key={cIdx}
                               type="button"
-                              onClick={() => onOpenViewer?.(c.document_id, c.page_number)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--paper)] hover:bg-[var(--paper-subtle)] border border-[var(--hairline)] text-[11px] font-mono text-[var(--ink-blue)] cursor-pointer transition-colors"
+                              onClick={() => handleOpenReader(c.document_id, c.page_number, c.snippet)}
+                              className="agent-citation-chip inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--paper)] hover:bg-[var(--paper-subtle)] border border-[var(--hairline)] text-[11px] font-mono text-[var(--ink-blue)] cursor-pointer transition-colors"
                               title={`View ${c.document_name} page ${c.page_number}`}
                             >
                               <ExternalLink size={10} />
@@ -1883,6 +1940,51 @@ export function ResearchWorkspace({
                 </div>
               </div>
             </div>
+          ) : centerView === "notes" ? (
+            <NotesCanvas
+              notes={notes}
+              isLoading={isLoadingNotes}
+              onCreateNote={handleCreateNoteFromCanvas}
+              onUpdateNote={handleUpdateNoteFromCanvas}
+              onDeleteNote={handleDeleteNoteFromCanvas}
+              onOpenViewer={handleOpenReader}
+            />
+          ) : centerView === "reader" ? (
+            <DocumentReader
+              document={activeReaderDoc}
+              token={auth.access_token}
+              initialPage={readerPage}
+              initialSearch={readerSearch}
+              evidenceSnippet={readerEvidenceSnippet}
+              evidencePage={readerEvidencePage}
+              isScopedToSource={selectedSourceIds.length === 1 && selectedSourceIds[0] === activeReaderDoc?.id}
+              onToggleScopeSource={(docId) => {
+                if (selectedSourceIds.length === 1 && selectedSourceIds[0] === docId) {
+                  selectAllSources();
+                } else {
+                  setSelectedSourceIds([docId]);
+                }
+              }}
+              onClose={() => setCenterView("studio")}
+              onRetryProcessing={async (docId) => {
+                try {
+                  await api(`/documents/${docId}/retry`, auth.access_token, {
+                    method: "POST",
+                  });
+                  setWorkspaceNotice({
+                    tone: "info",
+                    message: "Source reprocessing scheduled.",
+                  });
+                } catch (err: unknown) {
+                  setWorkspaceNotice({
+                    tone: "error",
+                    message: (err as Error)?.message || "Source retry failed.",
+                  });
+                }
+              }}
+              allSources={workspaceSources}
+              onSelectSource={(docId) => handleOpenReader(docId, 1)}
+            />
           ) : (
             activeArtifact ? (
             <div className="flex-1 flex overflow-y-auto justify-center px-4 sm:px-8 md:px-12 py-8 sm:py-12 min-w-0">
@@ -2003,7 +2105,7 @@ export function ResearchWorkspace({
                           setEditableBlocks(next);
                         }}
                         onOpenViewer={(docId, page) =>
-                          onOpenViewer?.(docId, page)
+                          handleOpenReader(docId, page)
                         }
                         onResolveFinding={handleResolveFinding}
                         onPromptSection={(prompt) => handleSendPrompt(prompt)}
@@ -2300,7 +2402,7 @@ export function ResearchWorkspace({
                     streamingText={streamingText}
                     onStopAgent={handleStopAgent}
                     onClearHistory={handleClearConversation}
-                    onOpenViewer={onOpenViewer}
+                    onOpenViewer={handleOpenReader}
                   />
                   <AgentBottomBar
                     compact
@@ -2336,7 +2438,7 @@ export function ResearchWorkspace({
                     isResolvingFindingId={isResolvingFindingId}
                     onRunAudit={handleRunAudit}
                     onResolveFinding={handleResolveFinding}
-                    onOpenViewer={(docId, page) => onOpenViewer?.(docId, page)}
+                    onOpenViewer={(docId, page) => handleOpenReader(docId, page)}
                     onPromptAgent={handleSendPrompt}
                     onExport={() => handleExport("pdf")}
                   />
@@ -2381,7 +2483,7 @@ export function ResearchWorkspace({
                 <TraceabilityMatrix
                   requirements={requirements}
                   onPromptAgent={handleSendPrompt}
-                  onOpenViewer={(docId, page) => onOpenViewer?.(docId, page)}
+                  onOpenViewer={(docId, page) => handleOpenReader(docId, page)}
                 />
                 </div>
               )}

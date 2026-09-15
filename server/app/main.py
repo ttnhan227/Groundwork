@@ -14,6 +14,7 @@ from app.controllers import (
     documents_router,
     generation_router,
     jobs_router,
+    notes_router,
     notifications_router,
     users_router,
     workspace_agent_router,
@@ -66,6 +67,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(collections_router, prefix="/api/v1")
 app.include_router(workspace_router, prefix="/api/v1")
+app.include_router(notes_router, prefix="/api/v1")
 app.include_router(deliverables_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(workspace_agent_router, prefix="/api/v1")

@@ -66,7 +66,7 @@ async def ensure_personal_workspace(user: User, session: AsyncSession) -> Worksp
     )
     if workspace is not None:
         return workspace
-    workspace = Workspace(owner_id=user.id, name="First RFP response", kind="personal")
+    workspace = Workspace(owner_id=user.id, name="Research Workspace", kind="personal")
     session.add(workspace)
     await session.flush()
     session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner"))

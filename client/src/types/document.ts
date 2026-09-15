@@ -14,6 +14,13 @@ export type DocumentItem = {
   created_at: string;
 };
 
+export type DocumentPage = {
+  id: string;
+  document_id: string;
+  page_number: number;
+  text: string;
+};
+
 export type Collection = {
   id: string;
   name: string;

@@ -4,6 +4,7 @@ from app.services import ai_orchestration, deliverable_review, processing, rag
 from app.services.auth_service import AuthService
 from app.services.deliverable_service import DeliverableService
 from app.services.document_service import DocumentService
+from app.services.note_service import NoteService
 from app.services.notification_service import NotificationService
 from app.services.pdf_service import PdfService
 from app.services.user_service import UserService
@@ -13,6 +14,7 @@ __all__ = [
     "AuthService",
     "DeliverableService",
     "DocumentService",
+    "NoteService",
     "NotificationService",
     "PdfService",
     "UserService",

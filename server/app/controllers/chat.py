@@ -30,6 +30,7 @@ from app.rag import (
     cited_sources,
     clean_user_answer,
     embed_texts_async,
+    format_grounded_answer,
     generate_answer,
     generate_visual_answer,
     is_casual_message,
@@ -314,6 +315,7 @@ async def ask_question(
                 .where(
                     DocumentChunk.document_id.in_(document_ids),
                     Document.owner_id == user.id,
+                    Document.workspace_id == conversation.workspace_id,
                 )
                 .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
                 .limit(settings.rag_top_k)
@@ -338,14 +340,27 @@ async def ask_question(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (KeyError, IndexError) as exc:
         raise HTTPException(status_code=502, detail="The configured language model is unavailable") from exc
-    cited_chunks = cited_sources(raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number))
-    cited_visuals = cited_sources(raw_answer, visual_sources, lambda item: (item[0].id, item[1]))
-    if not cited_chunks and not cited_visuals and not answer_declines_context(raw_answer):
-        if visual_mode:
-            cited_visuals = visual_sources[:1]
-        else:
-            cited_chunks = chunks[:1]
-    answer = clean_user_answer(raw_answer)
+
+    ref_matches = [int(m) for m in re.findall(r"\[Source\s+(\d+)\]", raw_answer, re.IGNORECASE)]
+    seen_refs: set[int] = set()
+    ordered_refs: list[int] = []
+    for ref in ref_matches:
+        if ref not in seen_refs:
+            seen_refs.add(ref)
+            ordered_refs.append(ref)
+
+    if visual_mode:
+        valid_refs = [r for r in ordered_refs if 1 <= r <= len(visual_sources)]
+        source_mapping = {r: i for i, r in enumerate(valid_refs, 1)}
+        cited_visuals = [visual_sources[r - 1] for r in valid_refs]
+        cited_chunks = []
+    else:
+        valid_refs = [r for r in ordered_refs if 1 <= r <= len(chunks)]
+        source_mapping = {r: i for i, r in enumerate(valid_refs, 1)}
+        cited_chunks = [chunks[r - 1] for r in valid_refs]
+        cited_visuals = []
+
+    answer = format_grounded_answer(raw_answer, source_mapping)
     user_message = Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question)
     assistant_message = Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer)
     session.add_all([user_message, assistant_message])
@@ -424,6 +439,7 @@ async def stream_question(
                     .where(
                         DocumentChunk.document_id.in_(document_ids),
                         Document.owner_id == user.id,
+                        Document.workspace_id == conversation.workspace_id,
                     )
                     .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
                     .limit(settings.rag_top_k)
@@ -460,14 +476,26 @@ async def stream_question(
                     yield _sse("token", {"text": token_part})
 
             raw_answer = "".join(raw_parts).strip()
-            cited_chunks = cited_sources(raw_answer, chunks, lambda chunk: (chunk.document_id, chunk.page_number))
-            cited_visuals = cited_sources(raw_answer, visual_sources, lambda item: (item[0].id, item[1]))
-            if not general_mode and not cited_chunks and not cited_visuals and not answer_declines_context(raw_answer):
-                if visual_mode:
-                    cited_visuals = visual_sources[:1]
-                else:
-                    cited_chunks = chunks[:1]
-            answer = clean_user_answer(raw_answer)
+            ref_matches = [int(m) for m in re.findall(r"\[Source\s+(\d+)\]", raw_answer, re.IGNORECASE)]
+            seen_refs: set[int] = set()
+            ordered_refs: list[int] = []
+            for ref in ref_matches:
+                if ref not in seen_refs:
+                    seen_refs.add(ref)
+                    ordered_refs.append(ref)
+
+            if visual_mode:
+                valid_refs = [r for r in ordered_refs if 1 <= r <= len(visual_sources)]
+                source_mapping = {r: i for i, r in enumerate(valid_refs, 1)}
+                cited_visuals = [visual_sources[r - 1] for r in valid_refs]
+                cited_chunks = []
+            else:
+                valid_refs = [r for r in ordered_refs if 1 <= r <= len(chunks)]
+                source_mapping = {r: i for i, r in enumerate(valid_refs, 1)}
+                cited_chunks = [chunks[r - 1] for r in valid_refs]
+                cited_visuals = []
+
+            answer = format_grounded_answer(raw_answer, source_mapping)
             user_message = Message(conversation_id=conversation.id, role=MessageRole.USER, content=payload.question)
             assistant_message = Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=answer)
             session.add_all([user_message, assistant_message])

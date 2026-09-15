@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import re
 import tempfile
 import textwrap
@@ -22,8 +23,12 @@ from fastapi.responses import StreamingResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pptx import Presentation
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
+
+logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.database import get_session
@@ -45,6 +50,7 @@ from app.dtos.document_dto import (
 )
 from html.parser import HTMLParser
 import httpx
+from app.utils.security_ssrf import safe_fetch_url
 from app.services.ai_orchestration import ai_orchestrator
 from app.schemas import (
     DocumentArchiveRequest,
@@ -284,6 +290,7 @@ async def download_documents_archive(
             "Content-Disposition": 'attachment; filename="groundwork-documents.zip"',
             "X-File-Count": str(len(files)),
         },
+        background=BackgroundTask(archive.close),
     )
 
 
@@ -335,13 +342,13 @@ async def delete_document(
     document = await owned_document(document_id, user, session)
     try:
         ObjectStorage().remove(document.object_key)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to remove document storage key %s: %s", document.object_key, exc)
     if document.original_object_key:
         try:
             ObjectStorage().remove(document.original_object_key)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to remove original document storage key %s: %s", document.original_object_key, exc)
     await session.delete(document)
     await session.commit()
     return Response(status_code=204)
@@ -359,6 +366,42 @@ async def get_processing_job(
     )
     if job is None:
         raise HTTPException(status_code=404, detail="Processing job not found")
+    return job
+
+
+@router.post("/{document_id}/retry", response_model=ProcessingJobResponse)
+async def retry_document_processing(
+    document_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProcessingJob:
+    document = await owned_document(document_id, user, session)
+    document.status = DocumentStatus.UPLOADED
+    document.error_message = None
+
+    job = ProcessingJob(
+        document_id=document.id,
+        owner_id=user.id,
+        operation="document_processing",
+        status=JobStatus.QUEUED,
+        progress=0,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    from app.tasks import process_document
+    try:
+        task = process_document.delay(str(document.id))
+        job.task_id = task.id
+        await session.commit()
+    except Exception as exc:
+        document.status = DocumentStatus.FAILED
+        document.error_message = f"Processing worker offline: {str(exc)}"
+        job.status = JobStatus.FAILED
+        job.error_message = document.error_message
+        await session.commit()
+
     return job
 
 
@@ -565,8 +608,29 @@ async def upload_document(
         status=JobStatus.QUEUED,
         progress=0,
     )
-    session.add(job)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        duplicate = await session.scalar(
+            select(Document).where(
+                Document.owner_id == user.id,
+                Document.workspace_id == workspace.id,
+                Document.source_sha256 == source_sha256,
+            )
+        )
+        if duplicate is not None:
+            try:
+                storage.remove(object_key)
+            except Exception:
+                pass
+            if original_object_key:
+                try:
+                    storage.remove(original_object_key)
+                except Exception:
+                    pass
+            return duplicate
+        raise
     await session.refresh(document)
     from app.tasks import process_document
 
@@ -707,6 +771,14 @@ async def _ingest_text_source(
     if duplicate is not None:
         return duplicate
 
+    page_count: int | None = None
+    try:
+        doc = fitz.open(stream=pdf_data, filetype="pdf")
+        page_count = doc.page_count
+        doc.close()
+    except Exception:
+        page_count = 1
+
     document_id = uuid.uuid4()
     pdf_filename = f"{clean_title}.pdf"
     orig_name = original_filename or f"{clean_title}.txt"
@@ -742,20 +814,9 @@ async def _ingest_text_source(
         original_content_type=content_type,
         source_sha256=source_sha256,
         status=DocumentStatus.UPLOADED,
-        page_count=None,
+        page_count=page_count,
     )
     session.add(document)
-    await session.flush()
-
-    await activity(
-        session,
-        workspace.id,
-        user.id,
-        "source.added",
-        "document",
-        document.id,
-        {"filename": pdf_filename, "display_title": display_title},
-    )
 
     job = ProcessingJob(
         document_id=document.id,
@@ -765,7 +826,39 @@ async def _ingest_text_source(
         progress=0,
     )
     session.add(job)
-    await session.commit()
+
+    try:
+        await session.flush()
+        await activity(
+            session,
+            workspace.id,
+            user.id,
+            "source.added",
+            "document",
+            document.id,
+            {"filename": pdf_filename, "display_title": display_title},
+        )
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        duplicate = await session.scalar(
+            select(Document).where(
+                Document.owner_id == user.id,
+                Document.workspace_id == workspace.id,
+                Document.source_sha256 == source_sha256,
+            )
+        )
+        if duplicate is not None:
+            try:
+                storage.remove(object_key)
+            except Exception:
+                pass
+            try:
+                storage.remove(original_object_key)
+            except Exception:
+                pass
+            return duplicate
+        raise
     await session.refresh(document)
 
     from app.tasks import process_document
@@ -789,6 +882,9 @@ async def create_text_source(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
+    if payload.workspace_id is not None:
+        from app.controllers.deliverables import workspace_access
+        await workspace_access(payload.workspace_id, user, session, {"owner", "editor"})
     return await _ingest_text_source(
         title=payload.title,
         text_content=payload.content,
@@ -806,19 +902,16 @@ async def create_url_source(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
+    if payload.workspace_id is not None:
+        from app.controllers.deliverables import workspace_access
+        await workspace_access(payload.workspace_id, user, session, {"owner", "editor"})
+
     url = payload.url.strip()
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=422, detail="URL must start with http:// or https://")
 
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            }
-            res = await client.get(url, headers=headers)
-            res.raise_for_status()
-            html_text = res.text
+        html_text, final_url = await safe_fetch_url(url)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Failed to fetch content from URL: {str(exc)}")
 
@@ -848,6 +941,10 @@ async def create_youtube_source(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
+    if payload.workspace_id is not None:
+        from app.controllers.deliverables import workspace_access
+        await workspace_access(payload.workspace_id, user, session, {"owner", "editor"})
+
     url = payload.url.strip()
     match = re.search(r"(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})", url)
     if not match:

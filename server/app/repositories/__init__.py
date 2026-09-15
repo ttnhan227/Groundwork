@@ -6,6 +6,7 @@ from app.repositories.chat_repository import ChatRepository
 from app.repositories.deliverable_repository import DeliverableRepository
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.job_repository import JobRepository
+from app.repositories.note_repository import NoteRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_repository import WorkspaceRepository
@@ -17,6 +18,7 @@ __all__ = [
     "DeliverableRepository",
     "DocumentRepository",
     "JobRepository",
+    "NoteRepository",
     "NotificationRepository",
     "UserRepository",
     "WorkspaceRepository",

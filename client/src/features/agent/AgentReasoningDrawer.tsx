@@ -11,106 +11,9 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { FormattedAnswer } from "../../components/common/FormattedAnswer";
 import { copyTextToClipboard, formatDateTime } from "../../api/client";
 import type { ChatMessage, AgentTaskStep } from "../../types";
-
-function renderInlineMarkdown(text: string, keyPrefix: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
-  return parts.filter(Boolean).map((part, index) => {
-    const key = `${keyPrefix}-${index}`;
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={key}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return (
-        <code
-          key={key}
-          className="rounded bg-[var(--paper-subtle)] px-1 py-0.5 font-mono text-[11px]"
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-    if (part.startsWith("*") && part.endsWith("*")) {
-      return <em key={key}>{part.slice(1, -1)}</em>;
-    }
-    return <span key={key}>{part}</span>;
-  });
-}
-
-function AssistantMessageContent({ content }: { content: string }) {
-  const lines = content.split("\n");
-  const blocks: React.ReactNode[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index].trim();
-    if (!line) {
-      index += 1;
-      continue;
-    }
-
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const text = headingMatch[2];
-      const headingClass =
-        level === 1
-          ? "font-serif text-sm font-bold text-[var(--ink)] mt-2 mb-1"
-          : level === 2
-            ? "font-serif text-xs font-bold text-[var(--ink)] mt-2 mb-1"
-            : "font-mono text-[11px] font-semibold text-[var(--ink-secondary)] mt-1.5 mb-0.5 uppercase tracking-wide";
-      blocks.push(
-        <div key={`heading-${index}`} className={headingClass}>
-          {renderInlineMarkdown(text, `heading-${index}`)}
-        </div>,
-      );
-      index += 1;
-      continue;
-    }
-
-    if (/^[-*]\s+/.test(line)) {
-      const items: string[] = [];
-      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().replace(/^[-*]\s+/, ""));
-        index += 1;
-      }
-      blocks.push(
-        <ul
-          key={`list-${index}`}
-          className="my-1 list-disc space-y-1 pl-4 text-xs leading-relaxed"
-        >
-          {items.map((item, itemIndex) => (
-            <li key={`${item}-${itemIndex}`}>
-              {renderInlineMarkdown(item, `item-${index}-${itemIndex}`)}
-            </li>
-          ))}
-        </ul>,
-      );
-      continue;
-    }
-
-    const paragraphLines = [line];
-    index += 1;
-    while (
-      index < lines.length &&
-      lines[index].trim() &&
-      !/^(#{1,3})\s+/.test(lines[index].trim()) &&
-      !/^[-*]\s+/.test(lines[index].trim())
-    ) {
-      paragraphLines.push(lines[index].trim());
-      index += 1;
-    }
-    const paragraph = paragraphLines.join(" ");
-    blocks.push(
-      <p key={`paragraph-${index}`} className="my-1 text-xs leading-relaxed">
-        {renderInlineMarkdown(paragraph, `paragraph-${index}`)}
-      </p>,
-    );
-  }
-
-  return <div className="space-y-1">{blocks}</div>;
-}
 
 export interface AgentReasoningDrawerProps {
   isAgentRunning: boolean;
@@ -120,7 +23,7 @@ export interface AgentReasoningDrawerProps {
   placement?: "inline" | "side";
   onStopAgent: () => void;
   onClearHistory?: () => void;
-  onOpenViewer?: (docId: string, pageNumber?: number) => void;
+  onOpenViewer?: (docId: string, pageNumber?: number, snippet?: string) => void;
 }
 
 export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
@@ -264,7 +167,11 @@ export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
 
             <div className="font-sans break-words select-text">
               {msg.role === "assistant" ? (
-                <AssistantMessageContent content={msg.content} />
+                <FormattedAnswer
+                  content={msg.content}
+                  citations={msg.citations}
+                  onOpenViewer={onOpenViewer}
+                />
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -277,7 +184,7 @@ export const AgentReasoningDrawer: React.FC<AgentReasoningDrawerProps> = ({
                   <button
                     key={cIdx}
                     type="button"
-                    onClick={() => onOpenViewer?.(c.document_id, c.page_number)}
+                    onClick={() => onOpenViewer?.(c.document_id, c.page_number, c.snippet)}
                     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--surface)] hover:bg-[var(--paper)] border border-[var(--hairline)] text-[10px] font-mono text-[var(--ink-blue)] transition-colors cursor-pointer max-w-full truncate"
                   >
                     <ExternalLink size={9} className="flex-shrink-0" />

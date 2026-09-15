@@ -985,11 +985,11 @@ export function WorkspaceApp({
             }}
             onOpenAccount={() => setAccountOpen(true)}
             onToggleTheme={toggleTheme}
-            onOpenViewer={(docId, pageNumber) => {
+            onOpenViewer={(docId, pageNumber, snippet) => {
               const doc = documents.find((d) => d.id === docId);
               if (doc) {
                 setViewerPage(pageNumber || 1);
-                setViewerSearch("");
+                setViewerSearch(snippet || "");
                 setViewer(doc);
               }
             }}

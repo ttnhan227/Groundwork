@@ -10,7 +10,7 @@ from google.oauth2 import id_token as google_id_token
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app.configs import get_settings
 from app.database import get_session
 from app.dependencies import current_user
 from app.models import RefreshToken, User
@@ -22,7 +22,7 @@ from app.schemas import (
     TokenResponse,
     UserResponse,
 )
-from app.security import (
+from app.utils.security import (
     create_access_token,
     create_refresh_token,
     hash_password,
@@ -110,20 +110,6 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
                     "msg": "Password is required",
                     "input": payload.password,
                 },
-            ],
-        )
-
-    # Explicit validation for empty string password
-    if payload.password == "":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[
-                {
-                    "type": "value_error.empty",
-                    "loc": ["body", "password"],
-                    "msg": "Password cannot be empty",
-                    "input": "",
-                }
             ],
         )
 
