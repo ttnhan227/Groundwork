@@ -7,17 +7,15 @@ WORKDIR /app
 # Build args for configuration
 ARG VITE_API_URL=/api/v1
 ARG VITE_GOOGLE_CLIENT_ID=""
-ARG NODE_ENV=production
 
 ENV VITE_API_URL=$VITE_API_URL \
-    VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
-    NODE_ENV=$NODE_ENV
+    VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 
 # Copy package manifests
 COPY package*.json ./
 
-# Install dependencies needed for compilation
-RUN npm ci
+# Install ALL dependencies (including devDependencies like vite and tsc)
+RUN npm ci --include=dev
 
 # Copy source code and build
 COPY . .

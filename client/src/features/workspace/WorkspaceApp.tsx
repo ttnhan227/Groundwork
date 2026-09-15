@@ -983,6 +983,19 @@ export function WorkspaceApp({
               await api(`/documents/${docId}`, token, { method: "DELETE" });
               await loadDocuments(token);
             }}
+            onDeleteDraft={async (draftId) => {
+              await api(
+                `/workspaces/${activeWorkspace.id}/native-documents/${draftId}`,
+                token,
+                { method: "DELETE" },
+              );
+              setNativeDocs((current) =>
+                current.filter((item) => item.id !== draftId),
+              );
+              if (activeNativeDocumentId === draftId) {
+                setActiveNativeDocumentId(null);
+              }
+            }}
             onOpenAccount={() => setAccountOpen(true)}
             onToggleTheme={toggleTheme}
             onOpenViewer={(docId, pageNumber, snippet) => {

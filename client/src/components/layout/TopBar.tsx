@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   PanelLeft,
+  PanelLeftClose,
   PanelRight,
   PanelRightClose,
   ShieldCheck,
@@ -52,9 +53,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   readinessStatus,
   readinessBlockers,
   isSidebarOpen,
+  isSourcesOpen = true,
   isRightPanelOpen = true,
   onToggleSidebar,
   onBackToLibrary,
+  onToggleSources,
   onToggleRightPanel,
   onOpenAudit,
   onExport,
@@ -84,6 +87,31 @@ export const TopBar: React.FC<TopBarProps> = ({
             aria-label="Open sidebar"
           >
             <PanelLeft size={16} />
+          </Button>
+        )}
+
+        {onToggleSources && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleSources}
+            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
+            title={
+              isSourcesOpen
+                ? "Collapse workspace navigator"
+                : "Open workspace navigator (deliverable & sources)"
+            }
+            aria-label={
+              isSourcesOpen
+                ? "Collapse workspace navigator"
+                : "Open workspace navigator"
+            }
+          >
+            {isSourcesOpen ? (
+              <PanelLeftClose size={15} />
+            ) : (
+              <PanelLeft size={15} />
+            )}
           </Button>
         )}
 

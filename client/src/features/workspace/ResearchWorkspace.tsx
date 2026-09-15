@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Film,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -98,6 +99,7 @@ export interface ResearchWorkspaceProps {
     sourceDocumentIds: string[],
   ) => Promise<NativeDocument | null>;
   onDeleteDocument: (docId: string) => Promise<void>;
+  onDeleteDraft?: (draftId: string) => Promise<void>;
   onOpenAccount?: () => void;
   onToggleTheme?: () => void;
   onOpenViewer?: (docId: string, pageNumber?: number, snippet?: string) => void;
@@ -175,6 +177,7 @@ export function ResearchWorkspace({
   onUploadDocument,
   onCreateDraft,
   onDeleteDocument,
+  onDeleteDraft,
   onOpenAccount: _onOpenAccount,
   onToggleTheme: _onToggleTheme,
   onOpenViewer: _onOpenViewer,
@@ -286,6 +289,9 @@ export function ResearchWorkspace({
   const [sourcePendingDeletion, setSourcePendingDeletion] =
     useState<DocumentItem | null>(null);
   const [isDeletingSource, setIsDeletingSource] = useState(false);
+  const [draftPendingDeletion, setDraftPendingDeletion] =
+    useState<NativeDocument | null>(null);
+  const [isDeletingDraft, setIsDeletingDraft] = useState(false);
   const savedBlocksRef = useRef<NativeBlock[]>([]);
 
   // NotebookLM Studio & Research state
@@ -649,6 +655,44 @@ export function ResearchWorkspace({
       }
     } finally {
       setIsCreatingBlankDraft(false);
+    }
+  }
+
+  async function handleDeleteDraft() {
+    if (!draftPendingDeletion || isDeletingDraft) return;
+    setIsDeletingDraft(true);
+    try {
+      if (onDeleteDraft) {
+        await onDeleteDraft(draftPendingDeletion.id);
+      } else {
+        await api(
+          `/workspaces/${workspace.id}/native-documents/${draftPendingDeletion.id}`,
+          auth.access_token,
+          { method: "DELETE" },
+        );
+      }
+      setWorkspaceNotice({
+        tone: "success",
+        message: `Response "${draftPendingDeletion.title}" was deleted.`,
+      });
+      const remaining = workspaceArtifacts.filter(
+        (a) => a.id !== draftPendingDeletion.id,
+      );
+      if (remaining.length > 0) {
+        setActiveArtifactId(remaining[0].id);
+        onActiveDraftChange(remaining[0].id);
+      } else {
+        setActiveArtifactId(null);
+        onActiveDraftChange(null);
+      }
+      setDraftPendingDeletion(null);
+    } catch (err: unknown) {
+      setWorkspaceNotice({
+        tone: "error",
+        message: (err as Error)?.message || "Failed to delete response.",
+      });
+    } finally {
+      setIsDeletingDraft(false);
     }
   }
 
@@ -1151,6 +1195,34 @@ export function ResearchWorkspace({
         {/* Left: Sources & Grounding Sidebar */}
         {isSourcesOpen ? (
           <SourcesSidebar
+            responses={workspaceArtifacts}
+            activeResponseId={activeArtifact?.id}
+            onSelectResponse={(id) => {
+              setActiveArtifactId(id);
+              onActiveDraftChange(id);
+              setCenterView("document");
+            }}
+            onCreateResponse={handleCreateBlankDraft}
+            onViewSources={() => {
+              setCenterView("reader");
+              if (workspaceSources.length > 0 && !readerSourceId) {
+                setReaderSourceId(workspaceSources[0].id);
+              }
+            }}
+            onDeleteResponse={(id) => {
+              const draft = workspaceArtifacts.find((a) => a.id === id);
+              if (draft) setDraftPendingDeletion(draft);
+            }}
+            readinessScore={readinessScore}
+            readinessStatus={
+              !activeArtifact
+                ? "setup_needed"
+                : requirements.length === 0
+                  ? "setup_needed"
+                  : openFindings.length > 0
+                    ? "needs_review"
+                    : "ready"
+            }
             sources={workspaceSources}
             selectedSourceIds={selectedSourceIds}
             isUploading={isUploadingSource}
@@ -1195,13 +1267,21 @@ export function ResearchWorkspace({
               size="xs"
               onClick={() => setIsSourcesOpen(true)}
               className="text-[var(--ink-muted)] hover:text-[var(--ink)]"
-              title="Expand Evidence Sources"
+              title={activeArtifact ? `Deliverable: ${activeArtifact.title}` : "Expand Navigator"}
             >
               <FileText size={15} />
             </Button>
-            <span className="text-[10px] font-mono font-bold text-[var(--ink-blue)] px-1 py-0.5 rounded bg-[var(--ink-blue-subtle)]">
-              {workspaceSources.length}
-            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setIsSourcesOpen(true)}
+              className="text-[var(--ink-muted)] hover:text-[var(--ink)]"
+              title="Expand Evidence Sources"
+            >
+              <span className="text-[10px] font-mono font-bold text-[var(--ink-blue)] px-1 py-0.5 rounded bg-[var(--ink-blue-subtle)]">
+                {workspaceSources.length}
+              </span>
+            </Button>
           </div>
         )}
 
@@ -1283,28 +1363,76 @@ export function ResearchWorkspace({
               </button>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setCenterView("reader");
+                  if (workspaceSources.length > 0 && !readerSourceId) {
+                    setReaderSourceId(workspaceSources[0].id);
+                  }
+                }}
+                className={`text-xs font-medium ${
+                  centerView === "reader"
+                    ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)]"
+                    : "text-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)]"
+                }`}
+                title="View and read grounded research sources"
+              >
+                <BookOpen size={12} />
+                <span className="hidden sm:inline">View Sources</span>
+                <span className="font-mono text-[10px] ml-0.5">({workspaceSources.length})</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setIsAddSourceModalOpen(true)}
+                className="text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)]"
+                title="Add reference document, web URL, or notes"
+              >
+                <Upload size={12} />
+                <span className="hidden sm:inline">Add Source</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setIsAddNoteModalOpen(true)}
+                className="text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)]"
+                title="Add a quick note to this workspace"
+              >
+                <Pin size={12} />
+                <span className="hidden sm:inline">Add Note</span>
+              </Button>
+
+              {activeArtifact && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => handleExport("pdf")}
+                  className="text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)] hidden md:inline-flex"
+                  title="Export response deliverable"
+                >
+                  <Download size={12} />
+                  <span>Export</span>
+                </Button>
+              )}
+
               {centerView === "document" && (
                 <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => handleTriggerStudioAction("studio_audio_overview")}
                   disabled={isAgentRunning}
-                  className="text-xs text-[var(--ink-blue)] hidden md:inline-flex"
+                  className="text-xs text-[var(--ink-blue)] hidden lg:inline-flex"
                   title="Generate deep-dive audio overview podcast"
                 >
-                  <Headphones size={12} /> Audio Overview
+                  <Headphones size={12} />
+                  <span>Audio Overview</span>
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setIsAddNoteModalOpen(true)}
-                className="text-xs text-[var(--ink-secondary)]"
-                title="Add a quick note to this notebook"
-              >
-                <Plus size={12} /> Add Note
-              </Button>
             </div>
           </div>
 
@@ -1965,7 +2093,12 @@ export function ResearchWorkspace({
                   setSelectedSourceIds([docId]);
                 }
               }}
-              onClose={() => setCenterView("studio")}
+              onClose={() => setCenterView(activeArtifact ? "document" : "studio")}
+              onDeleteSource={(docId) =>
+                setSourcePendingDeletion(
+                  workspaceSources.find((s) => s.id === docId) ?? null,
+                )
+              }
               onRetryProcessing={async (docId) => {
                 try {
                   await api(`/documents/${docId}/retry`, auth.access_token, {
@@ -2004,7 +2137,23 @@ export function ResearchWorkspace({
                       </Badge>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          setCenterView("reader");
+                          if (workspaceSources.length > 0 && !readerSourceId) {
+                            setReaderSourceId(workspaceSources[0].id);
+                          }
+                        }}
+                        className="text-xs text-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)] gap-1"
+                        title="View and read grounded research sources"
+                      >
+                        <BookOpen size={11} />
+                        <span>View sources</span>
+                      </Button>
+
                       {isEditingContent ? (
                         <>
                           <Button
@@ -2030,9 +2179,10 @@ export function ResearchWorkspace({
                           variant="ghost"
                           size="xs"
                           onClick={() => setIsEditingContent(true)}
-                          className="text-[var(--ink-secondary)] hover:text-[var(--ink)]"
+                          className="text-[var(--ink-secondary)] hover:text-[var(--ink)] gap-1"
                         >
-                          Edit text
+                          <PenLine size={11} />
+                          <span>Edit text</span>
                         </Button>
                       )}
 
@@ -2047,6 +2197,28 @@ export function ResearchWorkspace({
                           className={isRunningAudit ? "spin" : ""}
                         />
                         <span>{isRunningAudit ? "Checking…" : "Check response"}</span>
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => handleExport("pdf")}
+                        className="text-[var(--ink-secondary)] hover:text-[var(--ink)] gap-1"
+                        title="Export this response"
+                      >
+                        <Download size={11} />
+                        <span>Export</span>
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setDraftPendingDeletion(activeArtifact)}
+                        className="h-7 w-7 p-0 text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)]"
+                        title="Delete this response draft"
+                        aria-label="Delete response"
+                      >
+                        <Trash2 size={12} />
                       </Button>
                     </div>
                   </div>
@@ -2561,6 +2733,52 @@ export function ResearchWorkspace({
               isLoading={isDeletingSource}
             >
               Delete source
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Response Draft Modal */}
+      <Modal
+        isOpen={Boolean(draftPendingDeletion)}
+        onClose={() => {
+          if (!isDeletingDraft) {
+            setDraftPendingDeletion(null);
+          }
+        }}
+        title="Delete response draft?"
+        eyebrow="Permanent action"
+        maxWidth="sm"
+      >
+        <div className="space-y-5">
+          <div className="rounded-[var(--radius-md)] border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4 text-sm text-[var(--danger)]">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="leading-relaxed">
+                  Delete{" "}
+                  <strong className="select-text font-mono font-semibold break-all bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded border border-[var(--danger-border)]">
+                    {draftPendingDeletion?.title}
+                  </strong>
+                  ? Its blocks, citations, and review checklist will also be removed.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setDraftPendingDeletion(null)}
+              disabled={isDeletingDraft}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => handleDeleteDraft().catch(() => undefined)}
+              isLoading={isDeletingDraft}
+            >
+              Delete response
             </Button>
           </div>
         </div>

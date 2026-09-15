@@ -22,6 +22,7 @@ import {
   FileCode,
   Globe,
   Video,
+  Trash2,
 } from "lucide-react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -162,6 +163,7 @@ export interface DocumentReaderProps {
   onRetryProcessing?: (docId: string) => Promise<void> | void;
   allSources?: DocumentItem[];
   onSelectSource?: (docId: string) => void;
+  onDeleteSource?: (docId: string) => void;
 }
 
 export const DocumentReader: React.FC<DocumentReaderProps> = ({
@@ -177,6 +179,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   onRetryProcessing,
   allSources = [],
   onSelectSource,
+  onDeleteSource,
 }) => {
   const canvas = useRef<HTMLCanvasElement>(null);
   const stageContainerRef = useRef<HTMLDivElement>(null);
@@ -689,6 +692,19 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
       <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-4 flex items-center justify-between text-xs flex-shrink-0 z-10 gap-2">
         {/* Left: Document Info & Status */}
         <div className="flex items-center gap-2.5 min-w-0">
+          {onClose && (
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={onClose}
+              className="text-xs font-medium text-[var(--ink-secondary)] hover:text-[var(--ink)] gap-1 shrink-0"
+              title="Return to document / studio"
+            >
+              <ChevronLeft size={13} />
+              <span className="hidden sm:inline">Back</span>
+            </Button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsThumbnailsOpen((v) => !v)}
@@ -947,6 +963,20 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
           >
             <Download size={14} />
           </Button>
+
+          {/* Delete Source */}
+          {onDeleteSource && (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-7 w-7 p-0 text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)]"
+              onClick={() => onDeleteSource(document.id)}
+              title="Delete this source"
+              aria-label="Delete source"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
 
           {/* Close button if provided */}
           {onClose && (
