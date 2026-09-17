@@ -139,18 +139,18 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
 
   return (
     <aside className="w-72 flex-shrink-0 flex flex-col bg-[var(--paper)] border-r border-[var(--hairline)] groundwork-col-sources min-w-0">
-      {/* 1. Combined Response / Deliverable Selector */}
+      {/* 1. Combined Document / Draft Selector */}
       <div
         className="p-3 border-b border-[var(--hairline)] bg-[var(--surface)] relative min-w-0"
         ref={dropdownRef}
       >
         <div className="flex items-center justify-between mb-1.5 min-w-0">
           <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
-            Response Deliverable
+            Active Document
           </span>
           {responses.length > 1 && (
             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
-              {responses.length} responses
+              {responses.length} documents
             </span>
           )}
         </div>
@@ -165,7 +165,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                   ? "border-[var(--ink-blue)] bg-[var(--paper)] shadow-[var(--shadow-subtle)] ring-1 ring-[var(--ink-blue)]"
                   : "border-[var(--hairline)] bg-[var(--paper)] hover:border-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
               }`}
-              title="Click to switch responses or create a new response"
+              title="Click to switch documents or create a new document"
               aria-expanded={isResponseDropdownOpen}
               aria-haspopup="listbox"
             >
@@ -175,7 +175,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-xs text-[var(--ink)] truncate group-hover:text-[var(--ink-blue)] transition-colors">
-                    {activeResponse.title || "Untitled response"}
+                    {activeResponse.title || "Untitled document"}
                   </p>
                   <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--ink-muted)]">
                     <span>v{activeResponse.revision || 1}</span>
@@ -202,30 +202,18 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
               />
             </button>
 
-            {/* Quick Actions Bar for Deliverable */}
+            {/* Quick Actions Bar for Document */}
             <div className="flex items-center gap-1.5 pt-0.5">
-              {onViewSources && (
+              {onCreateResponse && (
                 <Button
                   variant="secondary"
                   size="xs"
-                  className="flex-1 text-[11px] font-medium text-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)]"
-                  onClick={onViewSources}
-                  title="View and read grounded research sources for this response"
-                >
-                  <BookOpen size={11} />
-                  <span>View Sources</span>
-                </Button>
-              )}
-              {onCreateResponse && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  className="text-[11px] text-[var(--ink-secondary)] hover:text-[var(--ink)]"
+                  className="flex-1 text-[11px] text-[var(--ink-secondary)] hover:text-[var(--ink)] gap-1"
                   onClick={onCreateResponse}
-                  title="Create another response deliverable"
+                  title="Create another document draft"
                 >
                   <Plus size={11} />
-                  <span>New</span>
+                  <span>New Document</span>
                 </Button>
               )}
               {onDeleteResponse && (
@@ -234,8 +222,8 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                   size="xs"
                   className="h-6 w-6 p-0 text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)]"
                   onClick={() => onDeleteResponse(activeResponse.id)}
-                  title="Delete this response draft"
-                  aria-label="Delete response"
+                  title="Delete this document draft"
+                  aria-label="Delete document"
                 >
                   <Trash2 size={12} />
                 </Button>
@@ -247,7 +235,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
               <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-popover)] overflow-hidden animate-in fade-in zoom-in-95">
                 <div className="px-2.5 py-1.5 border-b border-[var(--hairline-subtle)] bg-[var(--paper-subtle)] flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--ink-muted)]">
-                    Switch Response
+                    Switch Document
                   </span>
                   <span className="text-[10px] font-mono text-[var(--ink-muted)]">
                     {responses.length} total
@@ -284,7 +272,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                           />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-medium">
-                              {resp.title || "Untitled response"}
+                              {resp.title || "Untitled document"}
                             </p>
                             <p className="text-[10px] font-mono text-[var(--ink-muted)]">
                               v{resp.revision || 1}
@@ -311,7 +299,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                                 onDeleteResponse(resp.id);
                               }}
                               className="p-1 text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)] rounded transition-colors cursor-pointer"
-                              title={`Delete ${resp.title}`}
+                              title={`Delete ${resp.title || "document"}`}
                             >
                               <Trash2 size={12} />
                             </button>
@@ -333,7 +321,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                       className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-xs)] text-xs font-semibold text-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)] transition-colors cursor-pointer"
                     >
                       <Plus size={13} />
-                      <span>New Response</span>
+                      <span>New Document</span>
                     </button>
                   </div>
                 )}
@@ -342,7 +330,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
           </div>
         ) : (
           <div className="p-2.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--hairline)] bg-[var(--paper-subtle)] text-center">
-            <p className="text-xs text-[var(--ink-muted)] mb-2">No response drafted yet</p>
+            <p className="text-xs text-[var(--ink-muted)] mb-2">No document drafted yet</p>
             {onCreateResponse && (
               <Button
                 variant="secondary"
@@ -350,7 +338,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                 className="w-full text-xs text-[var(--ink-blue)]"
                 onClick={onCreateResponse}
               >
-                <Plus size={12} /> New Response
+                <Plus size={12} /> New Document
               </Button>
             )}
           </div>

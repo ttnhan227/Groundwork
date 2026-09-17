@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Plus,
   Search,
@@ -83,6 +83,8 @@ export function WorkspaceLibrary({
   );
   const [renameValue, setRenameValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isModalDragging, setIsModalDragging] = useState(false);
+  const modalFileInputRef = useRef<HTMLInputElement>(null);
   const [workspacePendingDeletion, setWorkspacePendingDeletion] =
     useState<Workspace | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
@@ -164,7 +166,7 @@ export function WorkspaceLibrary({
       setDeleteError(
         reason instanceof Error
           ? reason.message
-          : "The response workspace could not be deleted.",
+          : "The workspace could not be deleted.",
       );
     } finally {
       setIsDeleting(false);
@@ -284,7 +286,7 @@ export function WorkspaceLibrary({
 
           {isSidebarOpen ? (
             <strong className="font-serif text-sm font-bold text-[var(--ink)] truncate">
-              Notebooks &amp; Responses
+              Notebooks &amp; Documents
             </strong>
           ) : (
             <>
@@ -292,8 +294,11 @@ export function WorkspaceLibrary({
               <strong className="font-serif text-sm font-bold text-[var(--ink)] truncate">
                 Ground<span className="text-[var(--ink-blue)]">work</span>
               </strong>
-              <span className="hidden xs:inline text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] ml-1 flex-shrink-0">
-                Bid responses
+              <span
+                className="hidden xs:inline text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] ml-1 flex-shrink-0"
+                title="Documents (Bid responses)"
+              >
+                Documents
               </span>
             </>
           )}
@@ -303,7 +308,7 @@ export function WorkspaceLibrary({
           <div className="relative w-36 sm:w-64 hidden xs:block">
             <Input
               icon={<Search size={13} />}
-              placeholder="Search responses &amp; notebooks… (⌘K)"
+              placeholder="Search documents &amp; notebooks… (⌘K)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-8 text-xs bg-[var(--paper)]"
@@ -323,7 +328,7 @@ export function WorkspaceLibrary({
           <Button
             variant="human"
             size="sm"
-            aria-label="New Response"
+            aria-label="New Document (New Response)"
             onClick={() => {
               setNewWorkspaceName("");
               setIsCreateModalOpen(true);
@@ -331,7 +336,7 @@ export function WorkspaceLibrary({
             className="flex-shrink-0"
           >
             <Plus size={13} />
-            <span className="hidden sm:inline">New Notebook</span>
+            <span className="hidden sm:inline">New Document</span>
             <span className="sm:hidden">New</span>
           </Button>
 
@@ -443,10 +448,10 @@ export function WorkspaceLibrary({
         <section className="space-y-4 min-w-0 w-full">
           <div className="flex items-center justify-between border-b border-[var(--hairline)] pb-2 min-w-0">
             <h2 className="font-serif text-base sm:text-lg font-bold text-[var(--ink)] truncate">
-              Notebooks &amp; Responses ({filteredWorkspaces.length})
+              Notebooks &amp; Documents ({filteredWorkspaces.length})
             </h2>
             <span className="text-xs text-[var(--ink-muted)] font-mono flex-shrink-0">
-              {documents.length} sources · {workspaces.length} responses
+              {documents.length} sources · {workspaces.length} documents
             </span>
           </div>
 
@@ -595,14 +600,14 @@ export function WorkspaceLibrary({
                   <div className="flex items-center justify-between pt-3 border-t border-[var(--hairline-subtle)] text-xs min-w-0">
                     <span className="inline-flex items-center gap-1 text-[var(--ink-muted)] font-mono text-[11px] truncate">
                       <FileText size={12} className="flex-shrink-0" />
-                      <span>{stats.hasDraft ? "Response in progress" : "No response draft"}</span>
+                      <span>{stats.hasDraft ? "Document in progress" : "No document draft"}</span>
                     </span>
 
                     <button
                       onClick={() => selectWs(ws.id)}
                       className="inline-flex items-center gap-1 text-[var(--ink-blue)] font-medium hover:underline cursor-pointer flex-shrink-0 ml-2"
                     >
-                      <span>Open response</span>
+                      <span>Open document</span>
                       <ArrowRight size={12} />
                     </button>
                   </div>
@@ -618,7 +623,7 @@ export function WorkspaceLibrary({
                 className="mx-auto text-[var(--ink-faint)]"
               />
               <p className="font-serif text-sm font-semibold text-[var(--ink)]">
-                {searchQuery ? "No matching responses" : "No responses yet"}
+                {searchQuery ? "No matching documents" : "No documents yet"}
               </p>
               <p>
                 {searchQuery
@@ -634,7 +639,7 @@ export function WorkspaceLibrary({
                 }}
               >
                 <Plus size={13} />
-                <span>Create Response</span>
+                <span>Create Document</span>
               </Button>
             </div>
           )}
@@ -644,7 +649,7 @@ export function WorkspaceLibrary({
       <Modal
         isOpen={Boolean(workspacePendingDeletion)}
         onClose={closeDeleteDialog}
-        title="Delete response workspace?"
+        title="Delete workspace?"
         eyebrow="Permanent action"
         maxWidth="sm"
       >
@@ -660,7 +665,7 @@ export function WorkspaceLibrary({
               <Trash2 size={18} className="mt-0.5 shrink-0" />
               <p className="leading-relaxed">
                 This permanently deletes the workspace, its uploaded source
-                files, response drafts, requirements, and review history. This
+                files, document drafts, requirements, and review history. This
                 cannot be undone.
               </p>
             </div>
@@ -730,43 +735,79 @@ export function WorkspaceLibrary({
         </form>
       </Modal>
 
-      {/* Create Response Modal */}
+      {/* Create Document Modal */}
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title="Create notebook or response"
+        title="Create notebook or document"
         eyebrow="Grounded AI · Sources · Citations · Studio"
       >
         <div className="space-y-4">
           {/* Dropzone */}
           <div
-            className="p-6 rounded-[var(--radius-md)] border-2 border-dashed border-[var(--hairline-strong)] bg-[var(--paper)] text-center space-y-1.5 cursor-pointer hover:border-[var(--ink-blue)] transition-colors"
-            onClick={() => {}}
+            className={`p-6 rounded-[var(--radius-md)] border-2 border-dashed text-center space-y-2 cursor-pointer transition-colors ${
+              isModalDragging
+                ? "border-[var(--ink-blue)] bg-[var(--ink-blue-subtle)]"
+                : "border-[var(--hairline-strong)] bg-[var(--paper)] hover:border-[var(--ink-blue)] hover:bg-[var(--paper-subtle)]"
+            }`}
+            onClick={() => modalFileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsModalDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsModalDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsModalDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) {
+                setIsCreateModalOpen(false);
+                onUploadToNewWorkspace(file).catch(() => undefined);
+              }
+            }}
           >
-            <Upload size={20} className="mx-auto text-[var(--ink-muted)]" />
-            <p className="text-xs font-semibold text-[var(--ink)]">
-              Start with a source document or dataset
-            </p>
-            <p className="text-[11px] text-[var(--ink-muted)]">
-              Groundwork creates your workspace and indexes the file for
-              grounded chat and page-level citations.
-            </p>
-            <label className="inline-block mt-2">
-              <Button variant="secondary" size="xs" type="button">
+            <Upload size={24} className="mx-auto text-[var(--ink-blue)]" />
+            <div>
+              <p className="text-sm font-semibold text-[var(--ink)]">
+                Start with a source document or dataset
+              </p>
+              <p className="text-xs text-[var(--ink-muted)] mt-1">
+                Drag and drop your file here, or click anywhere to browse from your computer.
+              </p>
+            </div>
+            <div className="pt-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  modalFileInputRef.current?.click();
+                }}
+              >
                 Browse file
               </Button>
-              <input
-                type="file"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setIsCreateModalOpen(false);
-                    onUploadToNewWorkspace(file).catch(() => undefined);
-                  }
-                }}
-              />
-            </label>
+            </div>
+            <input
+              ref={modalFileInputRef}
+              type="file"
+              className="sr-only"
+              accept=".pdf,.docx,.pptx,.md,.markdown,.txt,.rtf,.png,.jpg,.jpeg,.webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setIsCreateModalOpen(false);
+                  onUploadToNewWorkspace(file).catch(() => undefined);
+                }
+                e.target.value = "";
+              }}
+            />
           </div>
 
           <div className="flex items-center gap-3">
@@ -780,7 +821,7 @@ export function WorkspaceLibrary({
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label htmlFor="new-workspace-name" className="block text-xs font-medium text-[var(--ink)] mb-1">
-                Response Name
+                Document / Notebook Name
               </label>
               <Input
                 id="new-workspace-name"
@@ -807,7 +848,7 @@ export function WorkspaceLibrary({
                 type="submit"
                 disabled={!newWorkspaceName.trim() || isCreating}
               >
-                {isCreating ? "Creating…" : "Create Response"}
+                {isCreating ? "Creating…" : "Create Document"}
               </Button>
             </div>
           </form>

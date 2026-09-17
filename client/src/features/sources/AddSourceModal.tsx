@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Upload,
   Globe,
@@ -40,6 +40,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
   const [webUrl, setWebUrl] = useState("");
@@ -76,11 +78,13 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
       setError((err as Error)?.message || "Failed to upload file");
     } finally {
       setLoading(false);
+      e.target.value = "";
     }
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     setError(null);
@@ -263,9 +267,21 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
         {/* Tab 1: File Upload */}
         {activeTab === "file" && (
           <div
-            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+            }}
             onDrop={handleDrop}
-            className="border-2 border-dashed border-[var(--hairline)] hover:border-[var(--ink-blue)] rounded-[var(--radius-md)] p-8 text-center bg-[var(--surface-hover)]/30 transition-colors"
+            className={`border-2 border-dashed rounded-[var(--radius-md)] p-8 text-center transition-colors cursor-pointer ${
+              isDragging
+                ? "border-[var(--ink-blue)] bg-[var(--ink-blue-subtle)]"
+                : "border-[var(--hairline)] hover:border-[var(--ink-blue)] bg-[var(--surface-hover)]/30 hover:bg-[var(--surface-hover)]/50"
+            }`}
           >
             <Upload
               size={32}
@@ -278,7 +294,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               Supported formats: PDF, Word (.docx), PowerPoint (.pptx), Markdown
               (.md), Plain Text (.txt)
             </p>
-            <label className="inline-block cursor-pointer">
+            <div className="inline-block">
               <Button
                 variant="primary"
                 size="sm"
@@ -295,13 +311,14 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                 )}
               </Button>
               <input
+                ref={fileInputRef}
                 type="file"
                 disabled={loading}
                 className="hidden"
                 accept=".pdf,.docx,.pptx,.txt,.md,.rtf"
                 onChange={handleFileUpload}
               />
-            </label>
+            </div>
           </div>
         )}
 

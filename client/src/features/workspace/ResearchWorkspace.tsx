@@ -20,7 +20,6 @@ import {
   FileSpreadsheet,
   Copy,
   Pin,
-  Plus,
   Download,
   Bot,
   User,
@@ -257,8 +256,8 @@ export function ResearchWorkspace({
     () => window.innerWidth >= 1280,
   );
   const [rightPanelTab, setRightPanelTab] = useState<
-    "assistant" | "audit" | "matrix" | "appendix"
-  >("assistant");
+    "studio" | "assistant" | "audit" | "matrix" | "appendix"
+  >("studio");
 
   // Agent & Execution state
   const [promptInput, setPromptInput] = useState("");
@@ -297,7 +296,7 @@ export function ResearchWorkspace({
   // NotebookLM Studio & Research state
   const [centerView, setCenterView] = useState<
     "studio" | "document" | "notes" | "reader"
-  >("document");
+  >(() => (requestedDraftId ? "document" : "studio"));
   const [readerSourceId, setReaderSourceId] = useState<string | null>(null);
   const [readerPage, setReaderPage] = useState<number>(1);
   const [readerSearch, setReaderSearch] = useState<string>("");
@@ -941,7 +940,7 @@ export function ResearchWorkspace({
       );
       savedBlocksRef.current = editableBlocks;
       setIsEditingContent(false);
-      setWorkspaceNotice({ tone: "success", message: "Response changes saved." });
+      setWorkspaceNotice({ tone: "success", message: "Document changes saved." });
       await reloadArtifactDetails();
     } catch (err) {
       console.error("Failed to save draft blocks", err);
@@ -1048,13 +1047,13 @@ export function ResearchWorkspace({
       await reloadArtifactDetails();
       setWorkspaceNotice({
         tone: "success",
-        message: "Response check complete. Review any blockers before export.",
+        message: "Document review complete. Check any findings before export.",
       });
     } catch (err) {
       console.error("Audit run failed", err);
       setWorkspaceNotice({
         tone: "error",
-        message: "The response check could not finish. Your draft was not changed.",
+        message: "The document review could not finish. Your draft was not changed.",
       });
     } finally {
       setIsRunningAudit(false);
@@ -1295,12 +1294,13 @@ export function ResearchWorkspace({
                 onClick={() => setCenterView("studio")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
                   centerView === "studio"
-                    ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)]"
+                    ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)] font-semibold"
                     : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
                 }`}
+                title="Source-grounded conversational chat"
               >
-                <Headphones size={13} className="text-[var(--ink-blue)] flex-shrink-0" />
-                <span className="truncate">Studio &amp; Grounded Chat</span>
+                <Sparkles size={13} className="text-[var(--ink-blue)] flex-shrink-0" />
+                <span className="truncate">Grounded Chat</span>
                 {messages.length > 0 && (
                   <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--ink-blue)] text-white text-[9px] font-mono">
                     {messages.length}
@@ -1310,33 +1310,16 @@ export function ResearchWorkspace({
 
               <button
                 type="button"
-                onClick={() => setCenterView("notes")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-                  centerView === "notes"
-                    ? "bg-[var(--success-bg)] text-[var(--success)] border border-[var(--success-border)]"
-                    : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
-                }`}
-              >
-                <Pin size={13} className="text-[var(--success)] flex-shrink-0" />
-                <span className="truncate">Research Notes</span>
-                {notes.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--success)] text-white text-[9px] font-mono">
-                    {notes.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setCenterView("document")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
                   centerView === "document"
-                    ? "bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)] border border-[var(--ink-sepia-border)]"
+                    ? "bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)] border border-[var(--ink-sepia-border)] font-semibold"
                     : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
                 }`}
+                title="Full document canvas and draft review"
               >
                 <FileText size={13} className="text-[var(--ink-sepia)] flex-shrink-0" />
-                <span className="truncate">Notes &amp; Document Canvas</span>
+                <span className="truncate">Document Canvas</span>
                 {activeArtifact && (
                   <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--ink-sepia)] text-white text-[9px] font-mono">
                     v{activeArtifact.revision || 1}
@@ -1352,6 +1335,7 @@ export function ResearchWorkspace({
                     ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)] font-semibold"
                     : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
                 }`}
+                title="Read and highlight source document citations"
               >
                 <BookOpen size={13} className="text-[var(--ink-blue)] flex-shrink-0" />
                 <span className="truncate">Document Reader</span>
@@ -1361,236 +1345,49 @@ export function ResearchWorkspace({
                   </span>
                 )}
               </button>
+
+              <button
+                type="button"
+                onClick={() => setCenterView("notes")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                  centerView === "notes"
+                    ? "bg-[var(--success-bg)] text-[var(--success)] border border-[var(--success-border)] font-semibold"
+                    : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--paper)]"
+                }`}
+                title="Sticky research notes and bookmarks"
+              >
+                <Pin size={13} className="text-[var(--success)] flex-shrink-0" />
+                <span className="truncate">Research Notes</span>
+                {notes.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--success)] text-white text-[9px] font-mono">
+                    {notes.length}
+                  </span>
+                )}
+              </button>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  setCenterView("reader");
-                  if (workspaceSources.length > 0 && !readerSourceId) {
-                    setReaderSourceId(workspaceSources[0].id);
-                  }
-                }}
-                className={`text-xs font-medium ${
-                  centerView === "reader"
-                    ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] border border-[var(--ink-blue-border)]"
-                    : "text-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)]"
-                }`}
-                title="View and read grounded research sources"
-              >
-                <BookOpen size={12} />
-                <span className="hidden sm:inline">View Sources</span>
-                <span className="font-mono text-[10px] ml-0.5">({workspaceSources.length})</span>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setIsAddSourceModalOpen(true)}
-                className="text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)]"
-                title="Add reference document, web URL, or notes"
-              >
-                <Upload size={12} />
-                <span className="hidden sm:inline">Add Source</span>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setIsAddNoteModalOpen(true)}
-                className="text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)]"
-                title="Add a quick note to this workspace"
-              >
-                <Pin size={12} />
-                <span className="hidden sm:inline">Add Note</span>
-              </Button>
-
-              {activeArtifact && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => handleExport("pdf")}
-                  className="text-xs text-[var(--ink-secondary)] hover:text-[var(--ink)] hidden md:inline-flex"
-                  title="Export response deliverable"
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {messages.length > 0 && centerView === "studio" && (
+                <button
+                  type="button"
+                  onClick={handleClearConversation}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--ink-muted)] hover:text-[var(--danger)] transition-colors cursor-pointer px-2 py-1 rounded hover:bg-[var(--paper-subtle)]"
+                  title="Clear conversation history and start over"
                 >
-                  <Download size={12} />
-                  <span>Export</span>
-                </Button>
+                  <RotateCcw size={11} />
+                  <span className="hidden sm:inline">Clear chat</span>
+                </button>
               )}
-
-              {centerView === "document" && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => handleTriggerStudioAction("studio_audio_overview")}
-                  disabled={isAgentRunning}
-                  className="text-xs text-[var(--ink-blue)] hidden lg:inline-flex"
-                  title="Generate deep-dive audio overview podcast"
-                >
-                  <Headphones size={12} />
-                  <span>Audio Overview</span>
-                </Button>
-              )}
+              <span className="text-[11px] font-mono text-[var(--ink-muted)] bg-[var(--paper-subtle)] px-2 py-0.5 rounded border border-[var(--hairline-subtle)]">
+                Grounded in {selectedSourceIds.length} of {workspaceSources.length} sources
+              </span>
             </div>
           </div>
 
           {centerView === "studio" ? (
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--paper)]">
-              {/* Studio Stream Content */}
+              {/* Grounded Chat Stream Content */}
               <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 max-w-4xl mx-auto w-full space-y-6 min-w-0">
-                {/* 5-Card Studio Actions Grid */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
-                      Workspace Actions
-                    </h3>
-                    <div className="flex items-center gap-3">
-                      {messages.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleClearConversation}
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--ink-muted)] hover:text-[var(--danger)] transition-colors cursor-pointer"
-                          title="Clear conversation history and start over"
-                        >
-                          <RotateCcw size={10} />
-                          <span>Clear chat</span>
-                        </button>
-                      )}
-                      <span className="text-[11px] text-[var(--ink-muted)]">
-                        Grounded in {selectedSourceIds.length} of {workspaceSources.length} sources
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                    {/* 1. Audio Overview */}
-                    <button
-                      type="button"
-                      onClick={() => handleTriggerStudioAction("studio_audio_overview")}
-                      disabled={isAgentRunning}
-                      className="p-3 text-left rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--ink-blue)] hover:shadow-[var(--shadow-card)] transition-all group relative overflow-hidden cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Headphones size={15} />
-                        </div>
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--ink-blue)] font-bold">Audio</span>
-                      </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
-                        Audio Overview
-                      </div>
-                      <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2 mt-0.5 leading-snug">
-                        Two-host deep-dive podcast discussing your sources
-                      </p>
-                    </button>
-
-                    {/* 2. Video Overview */}
-                    <button
-                      type="button"
-                      onClick={() => handleTriggerStudioAction("studio_video_overview")}
-                      disabled={isAgentRunning}
-                      className="p-3 text-left rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-rose-500 hover:shadow-[var(--shadow-card)] transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-rose-500/10 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Video size={15} />
-                        </div>
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-rose-600 font-bold">Video</span>
-                      </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)] group-hover:text-rose-600 transition-colors">
-                        Video Overview
-                      </div>
-                      <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2 mt-0.5 leading-snug">
-                        Visual storyboard scenes &amp; voiceover narration
-                      </p>
-                    </button>
-
-                    {/* 3. Study Guide */}
-                    <button
-                      type="button"
-                      onClick={() => handleTriggerStudioAction("studio_study_guide")}
-                      disabled={isAgentRunning}
-                      className="p-3 text-left rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--ink-sepia)] hover:shadow-[var(--shadow-card)] transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-[var(--ink-sepia-subtle)] text-[var(--ink-sepia)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <BookOpen size={15} />
-                        </div>
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--ink-sepia)] font-bold">Guide</span>
-                      </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)] group-hover:text-[var(--ink-sepia)] transition-colors">
-                        Study Guide
-                      </div>
-                      <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2 mt-0.5 leading-snug">
-                        Key concepts, practice quiz questions &amp; glossary
-                      </p>
-                    </button>
-
-                    {/* 4. FAQ */}
-                    <button
-                      type="button"
-                      onClick={() => handleTriggerStudioAction("studio_faq")}
-                      disabled={isAgentRunning}
-                      className="p-3 text-left rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--success)] hover:shadow-[var(--shadow-card)] transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-[var(--success-bg)] text-[var(--success)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <HelpCircle size={15} />
-                        </div>
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--success)] font-bold">FAQ</span>
-                      </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)] group-hover:text-[var(--success)] transition-colors">
-                        FAQ Document
-                      </div>
-                      <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2 mt-0.5 leading-snug">
-                        Frequently asked questions synthesized with citations
-                      </p>
-                    </button>
-
-                    {/* 5. Briefing Doc */}
-                    <button
-                      type="button"
-                      onClick={() => handleTriggerStudioAction("studio_briefing_doc")}
-                      disabled={isAgentRunning}
-                      className="p-3 text-left rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--ink-blue)] hover:shadow-[var(--shadow-card)] transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <FileSpreadsheet size={15} />
-                        </div>
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--ink-blue)] font-bold">Brief</span>
-                      </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
-                        Briefing Doc
-                      </div>
-                      <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2 mt-0.5 leading-snug">
-                        Executive summary, key themes &amp; source takeaways
-                      </p>
-                    </button>
-
-                    {/* 6. Add Note */}
-                    <button
-                      type="button"
-                      onClick={() => setIsAddNoteModalOpen(true)}
-                      className="p-3 text-left rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--ink-primary)] hover:shadow-[var(--shadow-card)] transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-[var(--paper-subtle)] text-[var(--ink)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Plus size={15} />
-                        </div>
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--ink-muted)] font-bold">Note</span>
-                      </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)] group-hover:text-[var(--ink-primary)] transition-colors">
-                        Add Note
-                      </div>
-                      <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2 mt-0.5 leading-snug">
-                        Pin your own research notes or ideas to this notebook
-                      </p>
-                    </button>
-                  </div>
-                </div>
 
                 {/* Audio Overview Script (if present) */}
                 {audioOverview && (
@@ -2133,26 +1930,11 @@ export function ResearchWorkspace({
                         icon={<ShieldCheck size={12} />}
                         className="font-mono font-bold whitespace-nowrap"
                       >
-                        Response draft · v{activeArtifact?.revision ?? 1} · Human review required
+                        Document draft · v{activeArtifact?.revision ?? 1} · Human review required
                       </Badge>
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Button
-                        variant="secondary"
-                        size="xs"
-                        onClick={() => {
-                          setCenterView("reader");
-                          if (workspaceSources.length > 0 && !readerSourceId) {
-                            setReaderSourceId(workspaceSources[0].id);
-                          }
-                        }}
-                        className="text-xs text-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)] gap-1"
-                        title="View and read grounded research sources"
-                      >
-                        <BookOpen size={11} />
-                        <span>View sources</span>
-                      </Button>
 
                       {isEditingContent ? (
                         <>
@@ -2196,7 +1978,7 @@ export function ResearchWorkspace({
                           size={11}
                           className={isRunningAudit ? "spin" : ""}
                         />
-                        <span>{isRunningAudit ? "Checking…" : "Check response"}</span>
+                        <span>{isRunningAudit ? "Checking…" : "Verify document"}</span>
                       </Button>
 
                       <Button
@@ -2204,7 +1986,7 @@ export function ResearchWorkspace({
                         size="xs"
                         onClick={() => handleExport("pdf")}
                         className="text-[var(--ink-secondary)] hover:text-[var(--ink)] gap-1"
-                        title="Export this response"
+                        title="Export this document"
                       >
                         <Download size={11} />
                         <span>Export</span>
@@ -2215,8 +1997,8 @@ export function ResearchWorkspace({
                         size="xs"
                         onClick={() => setDraftPendingDeletion(activeArtifact)}
                         className="h-7 w-7 p-0 text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)]"
-                        title="Delete this response draft"
-                        aria-label="Delete response"
+                        title="Delete this document draft"
+                        aria-label="Delete document (Delete response)"
                       >
                         <Trash2 size={12} />
                       </Button>
@@ -2513,9 +2295,9 @@ export function ResearchWorkspace({
             <div className="border-b border-[var(--hairline)] bg-[var(--surface)] px-4 pt-3 min-w-0">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold text-[var(--ink)]">Studio &amp; Assistant</p>
+                  <p className="text-xs font-bold text-[var(--ink)]">Studio &amp; Tools</p>
                   <p className="mt-0.5 text-[10px] text-[var(--ink-muted)]">
-                    Chat, review findings, and source evidence
+                    Audio overview, studio generators, and review findings
                   </p>
                 </div>
                 <Button
@@ -2534,6 +2316,10 @@ export function ResearchWorkspace({
                 size="sm"
                 className="mt-3 w-full justify-between"
                 tabs={[
+                  {
+                    id: "studio",
+                    label: "Studio",
+                  },
                   {
                     id: "assistant",
                     label: "Assistant",
@@ -2558,12 +2344,273 @@ export function ResearchWorkspace({
                   },
                 ]}
                 activeTab={rightPanelTab}
-                onChange={(t) => setRightPanelTab(t)}
+                onChange={(t) =>
+                  setRightPanelTab(
+                    t as "studio" | "assistant" | "audit" | "matrix" | "appendix",
+                  )
+                }
               />
             </div>
 
             {/* Tab Pane Body */}
             <div className="flex-1 min-h-0 min-w-0">
+              {rightPanelTab === "studio" && (
+                <div className="flex h-full min-h-0 flex-col overflow-y-auto p-4 space-y-4">
+                  {/* Studio Audio Overview Card */}
+                  <div className="p-3.5 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-subtle)] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center">
+                          <Headphones size={16} />
+                        </div>
+                        <div>
+                          <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-blue)]">
+                            Audio Overview
+                          </span>
+                          <h4 className="font-serif text-xs font-bold text-[var(--ink)]">
+                            Deep Dive Podcast
+                          </h4>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-[var(--ink-muted)]">Alex &amp; Jordan</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--ink-muted)] leading-relaxed">
+                      Two AI hosts explore, summarize, and debate your grounded source evidence.
+                    </p>
+                    {audioOverview ? (
+                      <div className="space-y-2 pt-1 border-t border-[var(--hairline)]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-[var(--ink)] truncate max-w-[200px]">
+                            {audioOverview.title}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => handleSaveAsNote(audioOverview.transcript, "Audio Overview Podcast Script")}
+                              className="text-xs text-[var(--ink-blue)]"
+                              title="Save transcript as note"
+                            >
+                              <Pin size={11} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => downloadTextFile(`${workspace.name}-audio-overview.txt`, audioOverview.transcript)}
+                              className="text-xs text-[var(--ink-muted)]"
+                              title="Download transcript"
+                            >
+                              <Download size={11} />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)] max-h-36 overflow-y-auto text-[11px] text-[var(--ink)] leading-relaxed space-y-1">
+                          {audioOverview.transcript.slice(0, 350)}...
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="agent"
+                        size="sm"
+                        onClick={() => handleTriggerStudioAction("studio_audio_overview")}
+                        disabled={isAgentRunning || workspaceSources.length === 0}
+                        className="w-full justify-center gap-2"
+                      >
+                        <Headphones size={13} />
+                        <span>Generate Audio Overview</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Studio Video Overview */}
+                  <div className="p-3.5 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-subtle)] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                          <Video size={16} />
+                        </div>
+                        <div>
+                          <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-rose-600">
+                            Video Overview
+                          </span>
+                          <h4 className="font-serif text-xs font-bold text-[var(--ink)]">
+                            Visual Storyboard
+                          </h4>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-[var(--ink-muted)] leading-relaxed">
+                      Cinematic scenes with synthesized visual slides and voiceover narration.
+                    </p>
+                    {videoOverview ? (
+                      <div className="space-y-2 pt-1 border-t border-[var(--hairline)]">
+                        <span className="text-xs font-bold text-[var(--ink)]">
+                          {videoOverview.scenes.length} Scenes Generated
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          onClick={() => setCenterView("studio")}
+                          className="w-full justify-center gap-1 text-xs"
+                        >
+                          <Film size={11} />
+                          <span>View Storyboard in Center</span>
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleTriggerStudioAction("studio_video_overview")}
+                        disabled={isAgentRunning || workspaceSources.length === 0}
+                        className="w-full justify-center gap-2"
+                      >
+                        <Video size={13} />
+                        <span>Generate Video Overview</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Fast Studio Generators */}
+                  <div className="space-y-2">
+                    <h5 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                      Synthesized Guides &amp; Reports
+                    </h5>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerStudioAction("studio_study_guide")}
+                        disabled={isAgentRunning || workspaceSources.length === 0}
+                        className="p-2.5 text-left rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--ink-sepia)] hover:shadow-sm transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 text-[var(--ink-sepia)] mb-1">
+                          <BookOpen size={13} />
+                          <span className="font-serif font-bold text-xs">Study Guide</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2">
+                          Key concepts &amp; practice quiz
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerStudioAction("studio_faq")}
+                        disabled={isAgentRunning || workspaceSources.length === 0}
+                        className="p-2.5 text-left rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--success)] hover:shadow-sm transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 text-[var(--success)] mb-1">
+                          <HelpCircle size={13} />
+                          <span className="font-serif font-bold text-xs">FAQ Sheet</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2">
+                          Frequently asked questions
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerStudioAction("studio_briefing_doc")}
+                        disabled={isAgentRunning || workspaceSources.length === 0}
+                        className="p-2.5 text-left rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-[var(--ink-blue)] hover:shadow-sm transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 text-[var(--ink-blue)] mb-1">
+                          <FileText size={13} />
+                          <span className="font-serif font-bold text-xs">Briefing Doc</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2">
+                          Executive summary &amp; points
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerStudioAction("studio_timeline")}
+                        disabled={isAgentRunning || workspaceSources.length === 0}
+                        className="p-2.5 text-left rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] hover:border-amber-500 hover:shadow-sm transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 text-amber-500 mb-1">
+                          <FileSpreadsheet size={13} />
+                          <span className="font-serif font-bold text-xs">Timeline</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--ink-muted)] line-clamp-2">
+                          Key milestones &amp; sequence
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Active Document Draft Status */}
+                  <div className="p-3.5 rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                        Your Document Draft
+                      </span>
+                      {activeArtifact && (
+                        <Badge variant="human" className="text-[10px] py-0 px-1.5 font-mono">
+                          v{activeArtifact.revision || 1}
+                        </Badge>
+                      )}
+                    </div>
+                    {activeArtifact ? (
+                      <>
+                        <h4 className="font-serif text-xs font-bold text-[var(--ink)] truncate">
+                          {activeArtifact.title}
+                        </h4>
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--ink-muted)]">
+                          <span>Readiness:</span>
+                          <span className="font-mono font-bold text-[var(--success)]">{readinessScore}%</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <Button
+                            variant="human"
+                            size="xs"
+                            onClick={() => setCenterView("document")}
+                            className="flex-1 justify-center gap-1 text-xs"
+                          >
+                            <FileText size={11} />
+                            <span>Open Canvas</span>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={handleRunAudit}
+                            disabled={isRunningAudit}
+                            className="text-xs"
+                            title="Run review audit"
+                          >
+                            <RefreshCw size={11} className={isRunningAudit ? "spin" : ""} />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => handleExport("pdf")}
+                            className="text-xs"
+                            title="Export PDF"
+                          >
+                            <Download size={11} />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-[var(--ink-muted)]">
+                          No document draft created yet.
+                        </p>
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          onClick={handleCreateBlankDraft}
+                          disabled={isCreatingBlankDraft}
+                          className="w-full justify-center text-xs"
+                        >
+                          {isCreatingBlankDraft ? "Creating..." : "+ Start Blank Document"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {rightPanelTab === "assistant" && (
                 <div className="flex h-full min-h-0 flex-col">
                   <AgentReasoningDrawer
@@ -2631,8 +2678,8 @@ export function ResearchWorkspace({
                       <ol className="mt-4 space-y-2 text-xs">
                         {[
                           ["Add source documents", workspaceSources.length > 0],
-                          ["Create response draft", false],
-                          ["Run response check", false],
+                          ["Create document draft", false],
+                          ["Run document review", false],
                         ].map(([label, complete]) => (
                           <li key={String(label)} className="flex items-center gap-2">
                             {complete ? (
@@ -2714,7 +2761,7 @@ export function ResearchWorkspace({
                   <strong className="select-text font-mono font-semibold break-all bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded border border-[var(--danger-border)]">
                     {sourcePendingDeletion?.filename}
                   </strong>{" "}
-                  from this response? Its indexed pages and source links will also be removed.
+                  from this workspace? Its indexed pages and source links will also be removed.
                 </p>
               </div>
             </div>
@@ -2738,7 +2785,7 @@ export function ResearchWorkspace({
         </div>
       </Modal>
 
-      {/* Delete Response Draft Modal */}
+      {/* Delete Document Draft Modal */}
       <Modal
         isOpen={Boolean(draftPendingDeletion)}
         onClose={() => {
@@ -2746,7 +2793,7 @@ export function ResearchWorkspace({
             setDraftPendingDeletion(null);
           }
         }}
-        title="Delete response draft?"
+        title="Delete document draft?"
         eyebrow="Permanent action"
         maxWidth="sm"
       >
@@ -2777,8 +2824,9 @@ export function ResearchWorkspace({
               variant="danger"
               onClick={() => handleDeleteDraft().catch(() => undefined)}
               isLoading={isDeletingDraft}
+              aria-label="Delete document (Delete response)"
             >
-              Delete response
+              Delete document
             </Button>
           </div>
         </div>

@@ -29,7 +29,7 @@ class NativeDocument(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title: Mapped[str] = mapped_column(String(180), default="Untitled client report")
+    title: Mapped[str] = mapped_column(String(180), default="Untitled Document")
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     revision: Mapped[int] = mapped_column(Integer, default=1)

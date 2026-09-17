@@ -298,15 +298,15 @@ async def activity(
         ),
         "deliverable.created": (
             "notify_processing_completed",
-            "Deliverable created",
-            "Your new deliverable is ready for drafting.",
+            "Document created",
+            "Your new document is ready for drafting.",
             "success",
             "deliverables",
         ),
         "deliverable.exported": (
             "notify_processing_completed",
             "Export is ready",
-            "Your deliverable export finished successfully.",
+            "Your document export finished successfully.",
             "success",
             "deliverables",
         ),
@@ -320,7 +320,7 @@ async def activity(
         "comment.created": (
             "notify_comments",
             "New document comment",
-            "A teammate added a comment to a deliverable.",
+            "A teammate added a comment to a document.",
             "info",
             "deliverables",
         ),

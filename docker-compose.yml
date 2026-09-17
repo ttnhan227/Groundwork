@@ -127,6 +127,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-minimum-32-chars-long}
       ENVIRONMENT: ${ENVIRONMENT:-production}
     command: celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO --pool=solo --concurrency=2
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app:celery_app inspect ping --timeout=3 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 20s
     networks:
       - groundwork
     restart: unless-stopped
@@ -143,6 +149,12 @@ services:
       - worker
     ports:
       - "5555:5555"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5555/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - groundwork
     restart: unless-stopped
@@ -162,7 +174,7 @@ services:
     ports:
       - "3000:80"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/index.html"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/index.html"]
       interval: 15s
       timeout: 5s
       retries: 5

@@ -69,3 +69,25 @@ export function useTranslation() {
     languageOptions: LANGUAGE_OPTIONS,
   };
 }
+
+/**
+ * Legacy terminology compatibility dictionary.
+ * Maps legacy RFP/bid response terms to clean document/notebook terminology.
+ */
+export const LEGACY_TERMINOLOGY_MAP = {
+  "Bid responses": "Documents",
+  "New Response": "New Document",
+  "Search responses": "Search documents",
+  "Turn a bid pack into a controlled response": "Turn research sources into controlled documents",
+  "RFP Response": "Research Document",
+  "Security Questionnaire": "Security Assessment",
+  "Vendor Due Diligence": "Due Diligence Document",
+  "Blank Response": "Blank Document",
+  "Drop an RFP here to start a response": "Drop a document here to start a project",
+  "No responses yet": "No documents yet",
+  "Response setup": "Document setup",
+  "Upload the RFP first": "Upload a source document first",
+  "Export response": "Export document",
+  "All responses": "All documents",
+  "Response Defaults": "Document Defaults",
+} as const;

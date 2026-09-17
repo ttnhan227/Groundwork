@@ -163,8 +163,8 @@ export function AccountPanel({
       },
       {
         id: "defaults",
-        label: "Response Defaults",
-        detail: "Tone, citation style & export format",
+        label: "Document Defaults",
+        detail: "Tone, citation style & export format (Response Defaults)",
         icon: <FileCog size={15} />,
       },
       {
@@ -868,8 +868,8 @@ export function AccountPanel({
               <div className="space-y-6 min-w-0">
                 <Heading
                   eyebrow="Response Defaults"
-                  title="Response & Writing Defaults"
-                  detail="Set the language, tone, citations, and export format used for new responses."
+                  title="Document & Writing Defaults"
+                  detail="Set the language, tone, citations, and export format used for new documents."
                 />
 
                 <section className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] space-y-4 min-w-0">
@@ -1408,14 +1408,14 @@ export function AccountPanel({
               <div className="space-y-6 min-w-0">
                 <Heading
                   eyebrow="Team Access"
-                  title="Response Collaboration"
-                  detail="Invite collaborators to bid responses and assign editor or viewer roles."
+                  title="Document Collaboration"
+                  detail="Invite collaborators to workspaces and assign editor or viewer roles."
                 />
 
                 <section className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] space-y-4 min-w-0">
                   <div>
                     <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
-                      Response
+                      Workspace / Document
                     </label>
                     <select
                       value={workspaceId}

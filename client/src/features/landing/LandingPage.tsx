@@ -121,6 +121,7 @@ export function LandingPage({
                   onChange={(event) => {
                     const file = event.target.files?.[0];
                     if (file) onUpload(file);
+                    event.target.value = "";
                   }}
                 />
               </label>
@@ -129,7 +130,7 @@ export function LandingPage({
                   onClick={onOpen}
                   className="text-sm font-semibold text-[var(--ink)] underline decoration-[var(--hairline-strong)] underline-offset-4 hover:decoration-[var(--ink)]"
                 >
-                  {isAuthenticated ? "Open response library" : "Explore the notebook"}
+                  {isAuthenticated ? "Open document library" : "Explore the notebook"}
                 </button>
               </div>
               <p className="mt-5 max-w-md text-xs leading-relaxed text-[var(--ink-muted)]">

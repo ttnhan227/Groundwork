@@ -271,7 +271,9 @@ export function WorkspaceApp({
         : "library",
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(
-    () => window.innerWidth >= 1600,
+    () =>
+      !new URLSearchParams(window.location.search).has("ws") &&
+      window.innerWidth >= 1600,
   );
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">(() =>
     document.documentElement.getAttribute("data-theme") === "dark"
@@ -294,12 +296,14 @@ export function WorkspaceApp({
 
   useEffect(() => {
     const keepWorkAreaUsable = () => {
-      if (window.innerWidth < 1600) setIsSidebarOpen(false);
+      if (window.innerWidth < 1600 || workspaceView === "workspace") {
+        setIsSidebarOpen(false);
+      }
     };
     keepWorkAreaUsable();
     window.addEventListener("resize", keepWorkAreaUsable);
     return () => window.removeEventListener("resize", keepWorkAreaUsable);
-  }, []);
+  }, [workspaceView]);
 
   useEffect(() => {
     function handlePrefsChange(e: Event) {
@@ -448,7 +452,7 @@ export function WorkspaceApp({
 
   async function handleCreateNativeDocument(
     workspaceId: string,
-    title = "Response draft",
+    title = "Untitled Document",
     sourceDocumentIds: string[] = [],
   ): Promise<NativeDocument | null> {
     try {
@@ -474,7 +478,7 @@ export function WorkspaceApp({
       return draft;
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Could not create response draft",
+        err instanceof Error ? err.message : "Could not create document",
       );
       return null;
     }
@@ -568,7 +572,7 @@ export function WorkspaceApp({
 
     pendingUploadStarted.current = true;
     const sourceName = pendingUpload.name.replace(/\.[^.]+$/, "").trim();
-    const workspaceName = sourceName || "New RFP response";
+    const workspaceName = sourceName || "Untitled Notebook";
 
     void (async () => {
       try {
@@ -641,8 +645,8 @@ export function WorkspaceApp({
     ? [
         {
           id: "library",
-          label: "Open Response Library",
-          detail: "Browse all bid responses",
+          label: "Open Document Library",
+          detail: "Browse all notebooks and documents",
           icon: <BookOpen size={16} />,
           shortcut: "⌘L",
           run: () =>
@@ -650,8 +654,8 @@ export function WorkspaceApp({
         },
         {
           id: "new-workspace",
-          label: "New Response",
-          detail: "Create a new bid response",
+          label: "New Document",
+          detail: "Create a new notebook or document",
           icon: <FolderPlus size={16} />,
           run: () => navigateWithDraftGuard(openResponseCreator),
         },
@@ -902,57 +906,131 @@ export function WorkspaceApp({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--paper)] groundwork-app-root min-w-0">
-      {/* Collapsible Left Sidebar */}
-      <Sidebar
-        auth={{ access_token: token, refresh_token: "", user }}
-        workspaces={workspaces}
-        activeWorkspaceId={activeWorkspaceId}
-        nativeDocs={nativeDocs}
-        activeDocId={activeNativeDocumentId}
-        isOpen={isSidebarOpen}
-        activeTheme={activeTheme}
-        onToggleOpen={() => setIsSidebarOpen((v) => !v)}
-        onSelectWorkspace={(wsId) => {
-          navigateWithDraftGuard(() => {
-            if (wsId !== activeWorkspaceId) setActiveNativeDocumentId(null);
-            setActiveWorkspaceId(wsId);
-            setWorkspaceView("workspace");
-          });
-        }}
-        onSelectDoc={(docId) => {
-          navigateWithDraftGuard(() => {
-            const selectedDocument = nativeDocs.find(
-              (document) => document.id === docId,
-            );
-            if (selectedDocument) {
-              setActiveWorkspaceId(selectedDocument.workspace_id);
-            }
-            setActiveNativeDocumentId(docId);
-            setWorkspaceView("workspace");
-          });
-        }}
-        onCreateDoc={(workspaceId) => {
-          navigateWithDraftGuard(() => {
-            void handleCreateNativeDocument(
-              workspaceId,
-              "Response draft",
-              documents
-                .filter(
-                  (document) =>
-                    document.workspace_id === workspaceId &&
-                    document.status === "ready",
-                )
-                .map((document) => document.id),
-            );
-          });
-        }}
-        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-        onOpenAccount={() => setAccountOpen(true)}
-        onBackToLibrary={() =>
-          navigateWithDraftGuard(() => setWorkspaceView("library"))
-        }
-        onToggleTheme={toggleTheme}
-      />
+      {/* Collapsible Left Sidebar: in workspace view, behaves as an overlay drawer to keep strictly 3 panels */}
+      {workspaceView === "workspace" ? (
+        <>
+          {isSidebarOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs transition-opacity"
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Close navigation drawer"
+            />
+          )}
+          <div
+            className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out ${
+              isSidebarOpen
+                ? "translate-x-0 shadow-2xl"
+                : "-translate-x-full pointer-events-none"
+            }`}
+          >
+            <Sidebar
+              auth={{ access_token: token, refresh_token: "", user }}
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+              nativeDocs={nativeDocs}
+              activeDocId={activeNativeDocumentId}
+              isOpen={isSidebarOpen}
+              activeTheme={activeTheme}
+              onToggleOpen={() => setIsSidebarOpen((v) => !v)}
+              onSelectWorkspace={(wsId) => {
+                navigateWithDraftGuard(() => {
+                  if (wsId !== activeWorkspaceId) setActiveNativeDocumentId(null);
+                  setActiveWorkspaceId(wsId);
+                  setWorkspaceView("workspace");
+                  setIsSidebarOpen(false);
+                });
+              }}
+              onSelectDoc={(docId) => {
+                navigateWithDraftGuard(() => {
+                  const selectedDocument = nativeDocs.find(
+                    (document) => document.id === docId,
+                  );
+                  if (selectedDocument) {
+                    setActiveWorkspaceId(selectedDocument.workspace_id);
+                  }
+                  setActiveNativeDocumentId(docId);
+                  setWorkspaceView("workspace");
+                  setIsSidebarOpen(false);
+                });
+              }}
+              onCreateDoc={(workspaceId) => {
+                navigateWithDraftGuard(() => {
+                  void handleCreateNativeDocument(
+                    workspaceId,
+                    "Untitled Document",
+                    documents
+                      .filter(
+                        (document) =>
+                          document.workspace_id === workspaceId &&
+                          document.status === "ready",
+                      )
+                      .map((document) => document.id),
+                  );
+                  setIsSidebarOpen(false);
+                });
+              }}
+              onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+              onOpenAccount={() => setAccountOpen(true)}
+              onBackToLibrary={() => {
+                setIsSidebarOpen(false);
+                navigateWithDraftGuard(() => setWorkspaceView("library"));
+              }}
+              onToggleTheme={toggleTheme}
+            />
+          </div>
+        </>
+      ) : (
+        <Sidebar
+          auth={{ access_token: token, refresh_token: "", user }}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          nativeDocs={nativeDocs}
+          activeDocId={activeNativeDocumentId}
+          isOpen={isSidebarOpen}
+          activeTheme={activeTheme}
+          onToggleOpen={() => setIsSidebarOpen((v) => !v)}
+          onSelectWorkspace={(wsId) => {
+            navigateWithDraftGuard(() => {
+              if (wsId !== activeWorkspaceId) setActiveNativeDocumentId(null);
+              setActiveWorkspaceId(wsId);
+              setWorkspaceView("workspace");
+            });
+          }}
+          onSelectDoc={(docId) => {
+            navigateWithDraftGuard(() => {
+              const selectedDocument = nativeDocs.find(
+                (document) => document.id === docId,
+              );
+              if (selectedDocument) {
+                setActiveWorkspaceId(selectedDocument.workspace_id);
+              }
+              setActiveNativeDocumentId(docId);
+              setWorkspaceView("workspace");
+            });
+          }}
+          onCreateDoc={(workspaceId) => {
+            navigateWithDraftGuard(() => {
+              void handleCreateNativeDocument(
+                workspaceId,
+                "Untitled Document",
+                documents
+                  .filter(
+                    (document) =>
+                      document.workspace_id === workspaceId &&
+                      document.status === "ready",
+                  )
+                  .map((document) => document.id),
+              );
+            });
+          }}
+          onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+          onOpenAccount={() => setAccountOpen(true)}
+          onBackToLibrary={() =>
+            navigateWithDraftGuard(() => setWorkspaceView("library"))
+          }
+          onToggleTheme={toggleTheme}
+        />
+      )}
 
       {/* Main View Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full">
@@ -1088,7 +1166,7 @@ export function WorkspaceApp({
         isOpen={Boolean(pendingNavigation)}
         onClose={() => setPendingNavigation(null)}
         title="Discard unsaved changes?"
-        eyebrow="Response draft"
+        eyebrow="Unsaved document"
         maxWidth="sm"
       >
         <div className="space-y-5">

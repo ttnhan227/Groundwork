@@ -52,10 +52,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   openFindingsCount,
   readinessStatus,
   readinessBlockers,
-  isSidebarOpen,
+  isSidebarOpen: _isSidebarOpen,
   isSourcesOpen = true,
   isRightPanelOpen = true,
-  onToggleSidebar,
+  onToggleSidebar: _onToggleSidebar,
   onBackToLibrary,
   onToggleSources,
   onToggleRightPanel,
@@ -77,19 +77,6 @@ export const TopBar: React.FC<TopBarProps> = ({
     <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-3 sm:px-4 flex items-center justify-between select-none z-20 min-w-0 w-full">
       {/* Left: Sidebar Toggle (when collapsed) + Breadcrumb */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        {!isSidebarOpen && (
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onToggleSidebar}
-            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
-            title="Open sidebar"
-            aria-label="Open sidebar"
-          >
-            <PanelLeft size={16} />
-          </Button>
-        )}
-
         {onToggleSources && (
           <Button
             variant="ghost"
@@ -98,13 +85,13 @@ export const TopBar: React.FC<TopBarProps> = ({
             className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0"
             title={
               isSourcesOpen
-                ? "Collapse workspace navigator"
-                : "Open workspace navigator (deliverable & sources)"
+                ? "Collapse sources panel"
+                : "Open sources panel"
             }
             aria-label={
               isSourcesOpen
-                ? "Collapse workspace navigator"
-                : "Open workspace navigator"
+                ? "Collapse sources panel"
+                : "Open sources panel"
             }
           >
             {isSourcesOpen ? (
@@ -123,8 +110,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             type="button"
             onClick={onBackToLibrary}
             className="sm:hidden inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--paper-subtle)] hover:text-[var(--ink-blue)] flex-shrink-0"
-            title="All responses"
-            aria-label="All responses"
+            title="All documents"
+            aria-label="All documents (All responses)"
           >
             <ArrowLeft size={15} />
           </button>
@@ -132,8 +119,10 @@ export const TopBar: React.FC<TopBarProps> = ({
             type="button"
             onClick={onBackToLibrary}
             className="hidden sm:inline text-[var(--ink-muted)] hover:text-[var(--ink-blue)]"
+            title="All documents"
+            aria-label="All documents"
           >
-            All responses
+            All documents
           </button>
           <ChevronRight
             size={12}
@@ -147,7 +136,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             className="text-[var(--ink-faint)] flex-shrink-0"
           />
           <span className="font-serif font-semibold text-[13px] text-[var(--ink)] truncate max-w-[120px] sm:max-w-[200px]">
-            {activeDoc?.title || "Response setup"}
+            {activeDoc?.title || "Document setup"}
           </span>
           {activeDoc?.revision && (
             <span className="hidden xs:inline text-[10px] font-mono px-1 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
@@ -192,11 +181,11 @@ export const TopBar: React.FC<TopBarProps> = ({
           }`}
           title={
             !activeDoc
-              ? "Create a response draft before review and export."
+              ? "Create a document draft before review and export."
               : readinessBlockers.length > 0
                 ? readinessBlockers.join(" · ")
               : isExportBlocked
-                ? "Finish the response check before export."
+                ? "Finish the document review before export."
                 : "No blocking review findings are currently open."
           }
         >
@@ -233,13 +222,14 @@ export const TopBar: React.FC<TopBarProps> = ({
             title={
               isExportBlocked
                 ? !activeDoc
-                  ? "Create a response draft before export"
+                  ? "Create a document draft before export"
                   : "Export is blocked until all review findings are verified"
-                : "Export response"
+                : "Export document"
             }
+            aria-label="Export document (Export response)"
           >
             {isExportBlocked ? <Lock size={12} /> : <Unlock size={12} />}
-            <span>Export response</span>
+            <span>Export document</span>
           </Button>
 
           {/* Export Dropdown Menu */}
@@ -252,7 +242,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               <div className="absolute right-0 mt-1.5 w-52 bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-popover)] p-1 z-40 animate-in fade-in zoom-in-95">
                 <div className="px-2.5 py-1.5 border-b border-[var(--hairline-subtle)] mb-1">
                   <p className="text-[11px] font-semibold text-[var(--ink)]">
-                    Export response
+                    Export document
                   </p>
                   <p className="text-[10px] text-[var(--ink-muted)]">
                     Choose a file format
@@ -309,28 +299,29 @@ export const TopBar: React.FC<TopBarProps> = ({
               </div>
             </>
           )}
-          {/* Right Panel Toggle */}
-          {onToggleRightPanel && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onToggleRightPanel}
-              className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0 ml-1"
-              title={
-                isRightPanelOpen ? "Collapse workspace tools" : "Open workspace tools"
-              }
-              aria-label={
-                isRightPanelOpen ? "Collapse workspace tools" : "Open workspace tools"
-              }
-            >
-              {isRightPanelOpen ? (
-                <PanelRightClose size={15} />
-              ) : (
-                <PanelRight size={15} />
-              )}
-            </Button>
-          )}
         </div>
+
+        {/* Right Panel Toggle */}
+        {onToggleRightPanel && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleRightPanel}
+            className="text-[var(--ink-muted)] hover:text-[var(--ink)] flex-shrink-0 ml-1"
+            title={
+              isRightPanelOpen ? "Collapse workspace tools" : "Open workspace tools"
+            }
+            aria-label={
+              isRightPanelOpen ? "Collapse workspace tools" : "Open workspace tools"
+            }
+          >
+            {isRightPanelOpen ? (
+              <PanelRightClose size={15} />
+            ) : (
+              <PanelRight size={15} />
+            )}
+          </Button>
+        )}
       </div>
     </header>
   );

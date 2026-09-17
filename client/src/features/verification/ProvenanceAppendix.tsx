@@ -29,10 +29,10 @@ export const ProvenanceAppendix: React.FC<ProvenanceAppendixProps> = ({
       <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--surface)] border border-[var(--hairline)] shadow-[var(--shadow-subtle)] space-y-3 min-w-0">
         <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-[var(--hairline-subtle)] min-w-0">
           <span className="text-[var(--ink-muted)] flex-shrink-0">
-            Response:
+            Document:
           </span>
           <strong className="text-[var(--ink)] truncate max-w-[160px] ml-2">
-            {activeArtifact?.title || "Response draft"}
+            {activeArtifact?.title || "Document draft"}
           </strong>
         </div>
 

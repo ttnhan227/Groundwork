@@ -81,7 +81,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             className="flex items-center gap-2 px-1.5 py-1 rounded-[var(--radius-sm)] hover:bg-[var(--surface-hover)] cursor-pointer transition-colors flex-1 min-w-0"
             onClick={onBackToLibrary}
-            title="All responses"
+            title="All documents"
+            aria-label="All documents (All responses)"
           >
             <BrandMark size={18} />
             <div className="flex flex-col min-w-0 flex-1">
@@ -134,8 +135,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onBackToLibrary}
                 className="hover:text-[var(--ink)]"
+                title="All documents"
               >
-                Responses
+                Documents
               </button>
             </div>
 
@@ -193,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               onCreateDoc(ws.id);
                             }}
-                            title="Add response draft"
+                            title="Add document draft"
                           >
                             <Plus size={12} />
                           </Button>
@@ -228,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 }
                               />
                               <span className="truncate flex-1">
-                                {doc.title || "Untitled response"}
+                                {doc.title || "Untitled document"}
                               </span>
                               {doc.status === "complete" && (
                                 <CheckCircle2
@@ -242,7 +244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                         {wsDocs.length === 0 && (
                           <div className="px-2 py-1 text-[11px] text-[var(--ink-faint)] italic">
-                            No response drafts yet
+                            No documents yet
                           </div>
                         )}
                       </div>
