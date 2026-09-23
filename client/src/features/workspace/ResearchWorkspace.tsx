@@ -140,7 +140,7 @@ function parseVideoScenes(markdown: string): {
         title: firstLine || `Scene ${idx + 1}`,
         visual: visualMatch
           ? visualMatch[1].trim()
-          : "Visual storyboard graphics and cited diagrams from source documents",
+          : "Suggested visuals and source references for this scene",
         narration: narrationMatch
           ? narrationMatch[1].trim()
           : block.slice(0, 450).trim(),
@@ -154,7 +154,7 @@ function parseVideoScenes(markdown: string): {
   return [
     {
       title: "Executive Synthesis",
-      visual: "Visual presentation summarizing key themes and cited findings across sources",
+      visual: "Suggested visual treatment for the main themes and cited findings",
       narration: markdown.slice(0, 500),
       takeaway: "Core synthesis grounded directly in your uploaded materials",
     },
@@ -713,9 +713,9 @@ export function ResearchWorkspace({
     setCenterView("studio");
     const prompts: Record<string, string> = {
       studio_audio_overview:
-        "Generate an Audio Overview deep-dive podcast between two AI hosts analyzing the uploaded sources.",
+        "Generate a two-host podcast script analyzing the uploaded sources.",
       studio_video_overview:
-        "Generate a structured Video Overview and visual storyboard with scene-by-scene slides, visuals, and voiceover narration based on the uploaded sources.",
+        "Generate a structured video storyboard with scene-by-scene visual directions and voiceover scripts based on the uploaded sources.",
       studio_study_guide:
         "Generate a comprehensive Study Guide with key concepts, practice questions with answer keys, and a glossary based on the uploaded sources.",
       studio_faq:
@@ -1389,7 +1389,7 @@ export function ResearchWorkspace({
               {/* Grounded Chat Stream Content */}
               <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 max-w-4xl mx-auto w-full space-y-6 min-w-0">
 
-                {/* Audio Overview Script (if present) */}
+                {/* Podcast Script (if present) */}
                 {audioOverview && (
                   <div className="p-4 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
                     <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--hairline)] flex-wrap">
@@ -1400,7 +1400,7 @@ export function ResearchWorkspace({
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-blue)] bg-[var(--ink-blue-subtle)] px-1.5 py-0.5 rounded">
-                              Audio Overview · Podcast Script
+                              Two-Host Podcast Script
                             </span>
                             <span className="text-xs text-[var(--ink-muted)]">Alex &amp; Jordan</span>
                           </div>
@@ -1414,7 +1414,7 @@ export function ResearchWorkspace({
                         <Button
                           variant="ghost"
                           size="xs"
-                          onClick={() => handleSaveAsNote(audioOverview.transcript, "Audio Overview Podcast Script")}
+                          onClick={() => handleSaveAsNote(audioOverview.transcript, "Two-Host Podcast Script")}
                           className="text-xs text-[var(--ink-blue)]"
                           title="Save transcript to notes canvas"
                         >
@@ -1433,7 +1433,7 @@ export function ResearchWorkspace({
                           type="button"
                           onClick={() => setAudioOverview(null)}
                           className="text-[var(--ink-muted)] hover:text-[var(--ink)] p-1 rounded transition-colors cursor-pointer"
-                          title="Dismiss Audio Overview"
+                          title="Dismiss Podcast Script"
                         >
                           <X size={14} />
                         </button>
@@ -1464,7 +1464,7 @@ export function ResearchWorkspace({
                   </div>
                 )}
 
-                {/* Video Overview Storyboard Player (if present) */}
+                {/* Video Storyboard Player (if present) */}
                 {videoOverview && (
                   <div className="p-4 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-card)] space-y-4">
                     <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--hairline)] flex-wrap">
@@ -1475,7 +1475,7 @@ export function ResearchWorkspace({
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.5 rounded">
-                              Video Overview · Visual Storyboard
+                              Video Storyboard
                             </span>
                             <span className="text-xs text-[var(--ink-muted)]">
                               Scene {videoOverview.currentSceneIndex + 1} of {videoOverview.scenes.length}
@@ -1514,7 +1514,7 @@ export function ResearchWorkspace({
                           type="button"
                           onClick={() => setVideoOverview(null)}
                           className="text-[var(--ink-muted)] hover:text-[var(--ink)] p-1 rounded transition-colors cursor-pointer"
-                          title="Dismiss Video Overview"
+                          title="Dismiss Video Storyboard"
                         >
                           <X size={14} />
                         </button>
@@ -1673,7 +1673,7 @@ export function ResearchWorkspace({
                           Groundwork Workspace Studio
                         </h4>
                         <p className="text-xs text-[var(--ink-muted)] max-w-md mx-auto mt-1">
-                          Ask questions, create study guides, generate deep-dive audio overviews,
+                          Ask questions, create study guides, generate podcast scripts,
                           or synthesize notes grounded directly in your {workspaceSources.length} source file(s).
                         </p>
                       </div>
@@ -2099,8 +2099,8 @@ export function ResearchWorkspace({
                       <div className="w-6 h-6 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center mb-1.5">
                         <Headphones size={13} />
                       </div>
-                      <div className="font-serif font-bold text-xs text-[var(--ink)]">Audio Overview</div>
-                      <p className="text-[10px] text-[var(--ink-muted)] mt-0.5">Podcast deep dive</p>
+                      <div className="font-serif font-bold text-xs text-[var(--ink)]">Podcast Script</div>
+                      <p className="text-[10px] text-[var(--ink-muted)] mt-0.5">Two-host dialogue</p>
                     </button>
                     <button
                       type="button"
@@ -2240,7 +2240,7 @@ export function ResearchWorkspace({
                           </h2>
                           <p className="mt-1 text-xs leading-relaxed text-[var(--ink-secondary)]">
                             {readySourcesCount > 0
-                              ? `${readySourcesCount} source${readySourcesCount === 1 ? " is" : "s are"} ready. Groundwork will synthesize key insights and draft notes with verified citations.`
+                              ? `${readySourcesCount} source${readySourcesCount === 1 ? " is" : "s are"} ready. Groundwork can synthesize key insights and draft notes with page-level citations.`
                               : "You can keep adding supporting files. Drafting becomes available when at least one source is ready."}
                           </p>
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -2356,7 +2356,7 @@ export function ResearchWorkspace({
             <div className="flex-1 min-h-0 min-w-0">
               {rightPanelTab === "studio" && (
                 <div className="flex h-full min-h-0 flex-col overflow-y-auto p-4 space-y-4">
-                  {/* Studio Audio Overview Card */}
+                  {/* Studio Podcast Script Card */}
                   <div className="p-3.5 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-subtle)] space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -2365,7 +2365,7 @@ export function ResearchWorkspace({
                         </div>
                         <div>
                           <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ink-blue)]">
-                            Audio Overview
+                            Podcast Script
                           </span>
                           <h4 className="font-serif text-xs font-bold text-[var(--ink)]">
                             Deep Dive Podcast
@@ -2387,7 +2387,7 @@ export function ResearchWorkspace({
                             <Button
                               variant="ghost"
                               size="xs"
-                              onClick={() => handleSaveAsNote(audioOverview.transcript, "Audio Overview Podcast Script")}
+                              onClick={() => handleSaveAsNote(audioOverview.transcript, "Two-Host Podcast Script")}
                               className="text-xs text-[var(--ink-blue)]"
                               title="Save transcript as note"
                             >
@@ -2417,12 +2417,12 @@ export function ResearchWorkspace({
                         className="w-full justify-center gap-2"
                       >
                         <Headphones size={13} />
-                        <span>Generate Audio Overview</span>
+                        <span>Generate Podcast Script</span>
                       </Button>
                     )}
                   </div>
 
-                  {/* Studio Video Overview */}
+                  {/* Studio Video Storyboard */}
                   <div className="p-3.5 rounded-[var(--radius-md)] border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-[var(--shadow-subtle)] space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -2431,7 +2431,7 @@ export function ResearchWorkspace({
                         </div>
                         <div>
                           <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-rose-600">
-                            Video Overview
+                            Video Storyboard
                           </span>
                           <h4 className="font-serif text-xs font-bold text-[var(--ink)]">
                             Visual Storyboard
@@ -2440,7 +2440,7 @@ export function ResearchWorkspace({
                       </div>
                     </div>
                     <p className="text-[11px] text-[var(--ink-muted)] leading-relaxed">
-                      Cinematic scenes with synthesized visual slides and voiceover narration.
+                      Scene plans with visual directions and voiceover scripts.
                     </p>
                     {videoOverview ? (
                       <div className="space-y-2 pt-1 border-t border-[var(--hairline)]">
@@ -2466,7 +2466,7 @@ export function ResearchWorkspace({
                         className="w-full justify-center gap-2"
                       >
                         <Video size={13} />
-                        <span>Generate Video Overview</span>
+                        <span>Generate Storyboard</span>
                       </Button>
                     )}
                   </div>

@@ -105,7 +105,7 @@ export function WorkspaceLibrary({
       alias: "RFP Response",
       icon: ShieldCheck,
       description:
-        "Synthesize papers, documents, or RFP Response requirements with verified page citations.",
+        "Synthesize papers, documents, or RFP response requirements with reviewable page citations.",
       color: "var(--ink-blue)",
       bg: "var(--ink-blue-subtle)",
     },

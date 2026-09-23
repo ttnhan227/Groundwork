@@ -635,7 +635,7 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
             <p className="font-medium text-[var(--ink)]">Add source documents</p>
             <p className="mt-1 leading-relaxed">
               Add reference PDFs, notes, or research papers here to ground the
-              AI assistant and cite verified evidence.
+              AI assistant and cite source evidence.
             </p>
           </div>
         )}

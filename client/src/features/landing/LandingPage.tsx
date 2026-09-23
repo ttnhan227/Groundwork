@@ -106,7 +106,7 @@ export function LandingPage({
               <p className="mt-6 max-w-lg text-base leading-relaxed text-[var(--ink-secondary)]">
                 Upload your research papers, notes, reports, or project files. Chat with
                 selected sources, generate study guides and outlines, and synthesize notes
-                with verified, page-level citations.
+                with page-level citations that you can review.
               </p>
             </div>
             <div className="mt-9">
@@ -135,7 +135,7 @@ export function LandingPage({
               </div>
               <p className="mt-5 max-w-md text-xs leading-relaxed text-[var(--ink-muted)]">
                 PDF, Word, PowerPoint, text, and markdown files are supported.
-                Every claim is verified against your uploaded sources.
+                Review checks help flag claims that need stronger source support.
               </p>
             </div>
           </div>
@@ -191,13 +191,13 @@ export function LandingPage({
                 icon: FileCheck2,
                 step: "03",
                 title: "Draft with Direct Citations",
-                body: "Synthesize notes and responses where every single factual assertion links directly to the cited page and paragraph.",
+                body: "Synthesize notes and responses with links back to cited pages and supporting passages.",
               },
               {
                 icon: Send,
                 step: "04",
                 title: "Review & Fact-Check",
-                body: "Audit unsupported assertions against source pages, resolve gaps, and export verified documents in PDF, Word, or Markdown.",
+                body: "Review unsupported assertions against source pages, resolve gaps, and export documents in PDF, Word, or Markdown.",
               },
             ].map(({ icon: Icon, step, title, body }) => (
               <li
@@ -225,11 +225,11 @@ export function LandingPage({
             What it solves
           </p>
           <h2 className="mt-2 font-serif text-3xl font-bold tracking-tight">
-            Zero hallucination. Full source provenance.
+            Traceable answers with source provenance.
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-[var(--ink-secondary)]">
             Groundwork is built for professionals, students, and researchers working
-            with dense documents who need answers and drafts they can actually prove and trust.
+            with dense documents who need answers and drafts they can review against the source material.
           </p>
         </div>
         <div className="overflow-hidden border-y border-[var(--hairline-strong)]">

@@ -2,12 +2,13 @@
 
 Groundwork is an AI-powered research and note-taking platform that answers questions, extracts key insights, and creates summaries based only on the specific documents you upload (inspired by Google NotebookLM).
 
-It acts as a personal research assistant by grounding its answers directly in your files. This source-grounded design prevents the AI from making up facts or hallucinating, ensuring every assertion can be verified against the exact source page.
+It acts as a personal research assistant by grounding answers in uploaded files. Page-level citations and review checks help users trace claims back to source material, but generated content should still be reviewed.
 
 ### Key Features
-- **Source-Grounded Answers**: The AI limits its responses to your provided files and includes clickable citations pointing back to the original text and page numbers.
+- **Source-Grounded Answers**: Responses use the selected files as context and can include clickable citations to the relevant text and page numbers.
 - **Multi-Format Document Support**: Upload PDF documents, Word/DOCX files, Markdown, plain text, and images with automatic text extraction, chunking, and semantic indexing.
 - **Interactive Studio Chat & Study Guides**: Query your sources to generate comprehensive study guides, FAQs, extract core concepts, find connections across multiple documents, and organize complex topics.
+- **Lightweight Studio Generators**: Create source-grounded podcast scripts, video storyboards, study guides, and executive briefings as text without requiring audio or video rendering services.
 - **3-Column Research Environment**:
   - **Left (Sources)**: Manage reference documents and selectively toggle which files are active in the AI's context window.
   - **Center (Notes & Synthesis Canvas)**: Draft structured notes, technical reports, or proposals with inline citations and version tracking.
@@ -49,6 +50,7 @@ Default local endpoints:
 | Groundwork | http://localhost:8080 |
 | API and OpenAPI docs | http://localhost:8000/docs |
 | MinIO console | http://localhost:9001 |
+| Celery Flower (Task Monitor) | http://localhost:5555 |
 
 Check the stack:
 

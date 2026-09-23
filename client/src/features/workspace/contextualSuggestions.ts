@@ -99,7 +99,7 @@ export function getContextualSuggestions(params: {
       suggestions.push({
         id: "cross-source-synthesis",
         label: `Synthesize all ${sources.length} sources`,
-        prompt: `Synthesize the overarching themes, arguments, and conclusions across all ${sources.length} selected sources in ${wsName}. Group by theme with verified page citations.`,
+        prompt: `Synthesize the overarching themes, arguments, and conclusions across all ${sources.length} selected sources in ${wsName}. Group by theme with explicit page citations.`,
       });
       suggestions.push({
         id: "study-guide-faq",
