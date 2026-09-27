@@ -93,69 +93,49 @@ export function LandingPage({
         </div>
       </header>
 
-      <section className="border-b border-[var(--hairline-strong)] bg-[#f1efe8] text-[var(--ink)]">
-        <div className="mx-auto grid w-full max-w-7xl border-x border-[var(--hairline-strong)] lg:grid-cols-[0.72fr_1.28fr]">
-          <div className="flex flex-col justify-between border-b border-[var(--hairline-strong)] px-5 py-10 sm:px-8 sm:py-14 lg:border-b-0 lg:border-r lg:py-16">
-            <div>
-              <p className="text-xs font-semibold text-[var(--ink-secondary)]">
-                AI Research Notebook &amp; Document Synthesis
-              </p>
-              <h1 className="mt-5 max-w-xl font-serif text-4xl font-bold leading-[1.06] tracking-[-0.04em] sm:text-[42px] xl:text-5xl">
-                Your AI Research Notebook. Keep the response defensible and grounded in your documents.
-              </h1>
-              <p className="mt-6 max-w-lg text-base leading-relaxed text-[var(--ink-secondary)]">
-                Upload your research papers, notes, reports, or project files. Chat with
-                selected sources, generate study guides and outlines, and synthesize notes
-                with page-level citations that you can review.
-              </p>
-            </div>
-            <div className="mt-9">
-              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 bg-[var(--control-room)] px-5 text-sm font-bold text-white transition-colors hover:bg-[var(--control-room-hover)]">
-                <Upload size={15} />
-                Load a document or research paper
-                <input
-                  className="sr-only"
-                  type="file"
-                  accept={DOCUMENT_UPLOAD_ACCEPT}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) onUpload(file);
-                    event.target.value = "";
-                  }}
-                />
-              </label>
-                <button
-                  type="button"
-                  onClick={onOpen}
-                  className="text-sm font-semibold text-[var(--ink)] underline decoration-[var(--hairline-strong)] underline-offset-4 hover:decoration-[var(--ink)]"
-                >
-                  {isAuthenticated ? "Open document library" : "Explore the notebook"}
-                </button>
-              </div>
-              <p className="mt-5 max-w-md text-xs leading-relaxed text-[var(--ink-muted)]">
-                PDF, Word, PowerPoint, text, and markdown files are supported.
-                Review checks help flag claims that need stronger source support.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center justify-center p-4 sm:p-6 lg:p-8">
-            <div className="w-full overflow-hidden rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] shadow-xl">
-              <div className="flex items-center gap-1.5 border-b border-[var(--hairline)] bg-[#e9e6dd] px-3.5 py-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#d5d0c3] border border-black/10" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#d5d0c3] border border-black/10" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#d5d0c3] border border-black/10" />
-                <span className="ml-2 font-mono text-[11px] text-[var(--ink-muted)]">groundwork · research workspace studio</span>
-              </div>
-              <img
-                src="/groundwork-workspace-real.png"
-                width="1440"
-                height="810"
-                className="block h-auto w-full"
-                alt="Groundwork response workspace showing grounded research sources, workspace studio, and cited AI assistant"
+      <section className="groundwork-notebook-hero flex items-center py-10 sm:py-16">
+        <div className="groundwork-notebook-page">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)]">
+            Source-grounded research
+          </p>
+          <h1 className="mt-5 font-serif text-4xl font-bold leading-[1.04] tracking-[-0.04em] sm:text-5xl">
+            Research you can trace.
+          </h1>
+          <p className="mt-6 max-w-md text-base leading-relaxed text-[var(--ink-secondary)]">
+            Ask your sources, synthesize the useful parts, and follow every
+            claim back to the page that supports it.
+          </p>
+          <div className="groundwork-notebook-rule" />
+          <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink)]">
+            Ask → Synthesize → Verify
+          </p>
+          <div className="mt-9 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 bg-[var(--control-room)] px-5 text-sm font-bold text-white transition-colors hover:bg-[var(--control-room-hover)]">
+              <Upload size={15} />
+              Add your first source
+              <input
+                className="sr-only"
+                type="file"
+                accept={DOCUMENT_UPLOAD_ACCEPT}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) onUpload(file);
+                  event.target.value = "";
+                }}
               />
-            </div>
+            </label>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="text-sm font-semibold text-[var(--ink)] underline decoration-[var(--ink-sepia)] underline-offset-4"
+            >
+              {isAuthenticated ? "Open document library" : "Explore the notebook"}
+            </button>
           </div>
+          <p className="mt-5 text-xs leading-relaxed text-[var(--ink-muted)]">
+            PDF, Word, PowerPoint, text, and markdown supported. Review checks
+            flag claims that need stronger evidence.
+          </p>
         </div>
       </section>
 

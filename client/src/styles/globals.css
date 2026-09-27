@@ -27,6 +27,10 @@ body,
 
 body {
   background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(17, 32, 56, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 32, 56, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -34,6 +38,61 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--ink-sepia-subtle);
+  color: var(--ink);
+}
+
+.groundwork-notebook-hero {
+  position: relative;
+  min-height: 670px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--hairline-strong);
+  background-color: #eee6d7;
+  background-image: url("/brand-notebook-art.png");
+  background-position: center;
+  background-size: cover;
+}
+
+.groundwork-notebook-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(242, 237, 226, 0.18), transparent 62%);
+}
+
+.groundwork-notebook-page {
+  position: relative;
+  z-index: 1;
+  width: min(520px, calc(100% - 32px));
+  margin-left: clamp(16px, 10vw, 150px);
+  padding: clamp(28px, 5vw, 58px);
+  border: 1px solid rgba(188, 176, 158, 0.75);
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.92);
+  box-shadow: 0 24px 65px -34px rgba(17, 32, 56, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.groundwork-notebook-rule {
+  height: 3px;
+  width: 82px;
+  margin-top: 24px;
+  background: var(--ink-blue);
+}
+
+@media (max-width: 720px) {
+  .groundwork-notebook-hero {
+    min-height: 720px;
+    background-position: 58% center;
+  }
+
+  .groundwork-notebook-page {
+    margin: 72px auto 0;
+  }
 }
 
 /* Universal Text & Heading Overflow Protection */
