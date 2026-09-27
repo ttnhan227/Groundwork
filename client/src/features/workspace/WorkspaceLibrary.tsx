@@ -16,6 +16,7 @@ import {
   FileCheck2,
   BookOpen,
   PanelLeft,
+  Loader2,
 } from "lucide-react";
 import type {
   Workspace,
@@ -27,6 +28,7 @@ import { BrandMark } from "../../components/common/BrandMark";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { Input } from "../../components/ui/Input";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { formatDateTime } from "../../api/client";
 
 export interface WorkspaceLibraryProps {
@@ -59,7 +61,7 @@ export function WorkspaceLibrary({
   nativeDocs,
   activeTheme,
   isSidebarOpen = true,
-  isLoading: _isLoading = false,
+  isLoading = false,
   createRequestKey = 0,
   onToggleSidebar = () => {},
   onSelectWorkspace,
@@ -455,6 +457,14 @@ export function WorkspaceLibrary({
             </span>
           </div>
 
+          {isLoading ? (
+            <EmptyState
+              icon={<Loader2 size={22} className="spin text-[var(--ink-blue)]" />}
+              title="Loading notebooks"
+              description="Fetching your documents and research notebooks."
+            />
+          ) : (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full min-w-0">
             {filteredWorkspaces.map((ws) => {
               const stats = workspaceStats[ws.id] || {
@@ -617,31 +627,32 @@ export function WorkspaceLibrary({
           </div>
 
           {filteredWorkspaces.length === 0 && (
-            <div className="py-16 text-center text-xs text-[var(--ink-muted)] space-y-2">
-              <FolderPlus
-                size={32}
-                className="mx-auto text-[var(--ink-faint)]"
-              />
-              <p className="font-serif text-sm font-semibold text-[var(--ink)]">
-                {searchQuery ? "No matching documents" : "No documents yet"}
-              </p>
-              <p>
-                {searchQuery
+            <EmptyState
+              icon={<FolderPlus size={32} />}
+              title={searchQuery ? "No matching documents" : "No documents yet"}
+              description={
+                searchQuery
                   ? "Try a different search."
-                  : "Start from source documents, notes, or blank synthesis."}
-              </p>
-              <Button
-                variant="human"
-                size="sm"
-                onClick={() => {
-                  setNewWorkspaceName("");
-                  setIsCreateModalOpen(true);
-                }}
-              >
-                <Plus size={13} />
-                <span>Create Document</span>
-              </Button>
-            </div>
+                  : "Start from source documents, notes, or blank synthesis."
+              }
+              action={
+                !searchQuery ? (
+                  <Button
+                    variant="human"
+                    size="sm"
+                    onClick={() => {
+                      setNewWorkspaceName("");
+                      setIsCreateModalOpen(true);
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>Create Document</span>
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+          </>
           )}
         </section>
       </main>
@@ -697,6 +708,22 @@ export function WorkspaceLibrary({
               autoFocus
               disabled={isDeleting}
               className="mt-1"
+              error={
+                Boolean(deleteError) ||
+                Boolean(
+                  deleteConfirmation &&
+                    workspacePendingDeletion &&
+                    deleteConfirmation !== workspacePendingDeletion.name,
+                )
+              }
+              aria-invalid={
+                Boolean(deleteError) ||
+                Boolean(
+                  deleteConfirmation &&
+                    workspacePendingDeletion &&
+                    deleteConfirmation !== workspacePendingDeletion.name,
+                )
+              }
             />
             {deleteConfirmation &&
               deleteConfirmation !== workspacePendingDeletion?.name && (

@@ -212,3 +212,29 @@ html[data-theme="dark"] {
 .soundwave-active {
   animation: soundwave 1.2s ease-in-out infinite;
 }
+
+/* Lightweight enter animations (replaces missing tailwindcss-animate) */
+@keyframes gw-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes gw-zoom-in-95 {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-in {
+  animation-fill-mode: both;
+}
+.fade-in {
+  animation-name: gw-fade-in;
+  animation-duration: 150ms;
+  animation-timing-function: ease-out;
+}
+.zoom-in-95 {
+  animation-name: gw-zoom-in-95;
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.duration-150 {
+  animation-duration: 150ms;
+}

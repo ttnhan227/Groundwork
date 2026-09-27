@@ -60,7 +60,6 @@ from app.models import (
 )
 from app.rag import (
     build_retrieval_query,
-    clean_user_answer,
     embed_texts_async,
     format_grounded_answer,
     relevant_snippet,
@@ -1061,11 +1060,11 @@ async def _orchestrate_studio_action(
     studio_type: str,
 ) -> AsyncIterator[str]:
     type_meta = {
-        "studio_audio_overview": ("Audio Overview: Deep Dive", "Generating conversational podcast script between two AI hosts..."),
+        "studio_audio_overview": ("Two-Host Podcast Script", "Generating a conversational podcast script between two hosts..."),
         "studio_study_guide": ("Study Guide", "Generating comprehensive study guide, quiz questions, and glossary..."),
         "studio_faq": ("FAQ Document", "Synthesizing Frequently Asked Questions grounded in sources..."),
         "studio_briefing_doc": ("Executive Briefing", "Compiling Executive Briefing Document from sources..."),
-        "studio_video_overview": ("Video Overview Storyboard", "Generating visual storyboard and video overview scenes..."),
+        "studio_video_overview": ("Video Storyboard", "Generating scene plans and voiceover scripts..."),
     }
     title_default, step_label = type_meta.get(studio_type, ("Studio Synthesis", "Synthesizing studio output..."))
 
@@ -1099,7 +1098,7 @@ async def _orchestrate_studio_action(
 
     if studio_type == "studio_audio_overview":
         system_prompt = (
-            f"You are Groundwork Notebook's Audio Overview producer for notebook '{workspace.name}'.\n"
+            f"You are Groundwork Notebook's podcast script writer for notebook '{workspace.name}'.\n"
             f"Generate a lively, engaging, two-host conversational podcast script ('Deep Dive') discussing the uploaded sources.\n"
             f"Hosts:\n"
             f"- **Alex**: Analytical co-host, digs into specific data points, technical details, and citations.\n"
@@ -1140,8 +1139,8 @@ async def _orchestrate_studio_action(
         )
     elif studio_type == "studio_video_overview":
         system_prompt = (
-            f"You are Groundwork Notebook's Video Overview and Storyboard Producer for notebook '{workspace.name}'.\n"
-            f"Generate an engaging, structured visual storyboard and script for an educational video overview based strictly on the uploaded sources.\n"
+            f"You are Groundwork Notebook's video storyboard writer for notebook '{workspace.name}'.\n"
+            f"Generate an engaging, structured storyboard and voiceover script based strictly on the uploaded sources.\n"
             f"Language: {user_lang}.\n"
             f"Produce 4 to 6 sequential scenes. For each scene, use the following exact markdown format:\n\n"
             f"### Scene [Number]: [Scene Title]\n"
@@ -1335,17 +1334,6 @@ async def _orchestrate_grounded_qa(
             chunks = list(await session.scalars(stmt))
 
     yield _sse_event("status", {"step": "drafting", "label": "Synthesizing context-aware response..."})
-
-    retrieved_items = [
-        (
-            c.document_id,
-            c.page_number,
-            c.text,
-            next((s.filename for s in sources if s.id == c.document_id), "Document"),
-            c.id,
-        )
-        for c in chunks
-    ]
 
     context_data = await _build_workspace_context_snapshot(workspace, payload.artifact_id, sources, session, user)
 

@@ -1,23 +1,24 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app.controllers.documents import (
+    _ingest_text_source,
+    create_text_source,
+    create_url_source,
+    create_youtube_source,
+    delete_document,
+)
+from app.controllers.workspace import upsert_memory
 from app.dtos.auth_dto import LoginRequest
 from app.dtos.document_dto import (
     TextSourceCreateRequest,
     UrlSourceCreateRequest,
     YouTubeSourceCreateRequest,
 )
-from app.controllers.documents import (
-    create_text_source,
-    create_url_source,
-    create_youtube_source,
-    delete_document,
-    _ingest_text_source,
-)
-from app.controllers.workspace import upsert_memory
 from app.dtos.workspace_dto import WorkspaceMemoryUpsert
 from app.models.document import Document
 from app.models.user import User

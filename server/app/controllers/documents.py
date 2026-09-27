@@ -6,9 +6,11 @@ import textwrap
 import uuid
 import zipfile
 from datetime import UTC, datetime
+from html.parser import HTMLParser
 from io import BytesIO
 
 import fitz
+import httpx
 from fastapi import (
     APIRouter,
     Depends,
@@ -28,12 +30,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
-logger = logging.getLogger(__name__)
-
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import current_user
 from app.document_conversions import docx_to_markdown, validate_docx
+from app.dtos.document_dto import (
+    TextSourceCreateRequest,
+    UrlSourceCreateRequest,
+    YouTubeSourceCreateRequest,
+)
 from app.models import (
     Document,
     DocumentPage,
@@ -43,15 +48,6 @@ from app.models import (
     ProcessingJob,
     User,
 )
-from app.dtos.document_dto import (
-    TextSourceCreateRequest,
-    UrlSourceCreateRequest,
-    YouTubeSourceCreateRequest,
-)
-from html.parser import HTMLParser
-import httpx
-from app.utils.security_ssrf import safe_fetch_url
-from app.services.ai_orchestration import ai_orchestrator
 from app.schemas import (
     DocumentArchiveRequest,
     DocumentPageResponse,
@@ -59,7 +55,11 @@ from app.schemas import (
     DocumentResponse,
     ProcessingJobResponse,
 )
+from app.services.ai_orchestration import ai_orchestrator
 from app.storage import ObjectStorage
+from app.utils.security_ssrf import safe_fetch_url
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -736,7 +736,6 @@ async def _ingest_text_source(
     original_filename: str | None = None,
     content_type: str = "text/plain",
 ) -> Document:
-    settings = get_settings()
     from app.deliverables import activity, ensure_personal_workspace, workspace_access
     from app.storage import ObjectStorage
 

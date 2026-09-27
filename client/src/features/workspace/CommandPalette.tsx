@@ -6,6 +6,7 @@ import React, {
   type ReactNode,
 } from "react";
 import { Command, Search, X } from "lucide-react";
+import { EmptyState } from "../../components/ui/EmptyState";
 
 export type WorkspaceCommand = {
   id: string;
@@ -164,9 +165,16 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
             );
           })}
           {!visible.length && (
-            <div className="py-8 text-center text-xs text-[var(--ink-muted)] font-sans">
-              No matching workspace command.
-            </div>
+            <EmptyState
+              compact
+              icon={<Search size={20} />}
+              title="No matching commands"
+              description={
+                query.trim()
+                  ? `Try a different search for “${query.trim()}”.`
+                  : "No commands available in this view."
+              }
+            />
           )}
         </div>
 

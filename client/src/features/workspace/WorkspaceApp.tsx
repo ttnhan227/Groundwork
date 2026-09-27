@@ -9,6 +9,8 @@ import {
   Bell,
   Settings,
   BookOpen,
+  Loader2,
+  Inbox,
 } from "lucide-react";
 import type {
   AuthResult,
@@ -22,6 +24,7 @@ import { BrandMark } from "../../components/common/BrandMark";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { CommandPalette, type WorkspaceCommand } from "./CommandPalette";
 import {
@@ -166,11 +169,16 @@ function ProcessingJobsModal({
 }) {
   const [items, setItems] = useState<Job[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const load = useCallback(
     () =>
       api<Job[]>("/jobs", token)
-        .then(setItems)
-        .catch((reason) => setError(reason.message)),
+        .then((jobs) => {
+          setItems(jobs);
+          setError("");
+        })
+        .catch((reason) => setError(reason.message))
+        .finally(() => setLoading(false)),
     [token],
   );
 
@@ -209,15 +217,26 @@ function ProcessingJobsModal({
                 · {job.progress}%
               </span>
             </div>
-            <span className="job-state font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] font-medium flex-shrink-0">
+            <span className={`job-state ${job.status} font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] font-medium flex-shrink-0`}>
               {job.status}
             </span>
           </div>
         ))}
-        {items.length === 0 && !error && (
-          <p className="text-xs text-[var(--ink-muted)] text-center py-4">
-            No processing jobs active.
-          </p>
+        {loading && items.length === 0 && !error && (
+          <EmptyState
+            compact
+            icon={<Loader2 size={20} className="spin text-[var(--ink-blue)]" />}
+            title="Loading jobs"
+            description="Checking background processing activity."
+          />
+        )}
+        {!loading && items.length === 0 && !error && (
+          <EmptyState
+            compact
+            icon={<Inbox size={22} />}
+            title="No processing jobs active"
+            description="Document indexing and export jobs will appear here while they run."
+          />
         )}
       </div>
     </Modal>
@@ -813,7 +832,14 @@ export function WorkspaceApp({
                   id="auth-display-name"
                   {...authForm.register("display_name")}
                   required
+                  error={Boolean(authForm.formState.errors.display_name)}
+                  aria-invalid={Boolean(authForm.formState.errors.display_name)}
                 />
+                {authForm.formState.errors.display_name && (
+                  <p role="alert" className="mt-1 text-[11px] text-[var(--danger)]">
+                    {authForm.formState.errors.display_name.message}
+                  </p>
+                )}
               </div>
             )}
 
@@ -829,7 +855,14 @@ export function WorkspaceApp({
                 type="email"
                 {...authForm.register("email")}
                 required
+                error={Boolean(authForm.formState.errors.email)}
+                aria-invalid={Boolean(authForm.formState.errors.email)}
               />
+              {authForm.formState.errors.email && (
+                <p role="alert" className="mt-1 text-[11px] text-[var(--danger)]">
+                  {authForm.formState.errors.email.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -844,7 +877,14 @@ export function WorkspaceApp({
                 type="password"
                 {...authForm.register("password")}
                 required
+                error={Boolean(authForm.formState.errors.password)}
+                aria-invalid={Boolean(authForm.formState.errors.password)}
               />
+              {authForm.formState.errors.password && (
+                <p role="alert" className="mt-1 text-[11px] text-[var(--danger)]">
+                  {authForm.formState.errors.password.message}
+                </p>
+              )}
             </div>
 
             {error && (

@@ -75,7 +75,7 @@ export function Tabs<T extends string = string>({
             className={`inline-flex items-center justify-center gap-1.5 font-medium rounded-[var(--radius-xs)] transition-all cursor-pointer select-none ${buttonClass} ${
               isActive
                 ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--shadow-subtle)] font-semibold"
-                : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[rgba(0,0,0,0.02)]"
+                : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--surface-hover)]"
             }`}
           >
             {tab.icon && <span className="text-current">{tab.icon}</span>}

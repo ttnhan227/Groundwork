@@ -16,6 +16,7 @@ class UserResponse(BaseModel):
     role: UserRole
     is_active: bool
     google_linked: bool
+    has_password: bool = True
     created_at: datetime
 
 
@@ -44,7 +45,7 @@ class UserPreferences(BaseModel):
 
 
 class PasswordChangeRequest(BaseModel):
-    current_password: str
+    current_password: str | None = None
     new_password: str = Field(min_length=8, max_length=128)
 
 

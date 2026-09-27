@@ -10,6 +10,7 @@ export type AuthResult = {
     role: "user" | "admin";
     is_active: boolean;
     google_linked: boolean;
+    has_password: boolean;
   };
 };
 

@@ -15,6 +15,7 @@ import {
   Database,
   FileCog,
   LogOut,
+  KeyRound,
   Shield,
   ShieldCheck,
   Trash2,
@@ -23,9 +24,12 @@ import {
   X,
   Download,
   AlertTriangle,
+  Inbox,
+  Activity,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { api, downloadTextFile } from "../../api/client";
 import type {
   AdminUser,
@@ -342,18 +346,25 @@ export function AccountPanel({
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const hasExistingPassword = user.has_password ?? true;
     await perform(async () => {
       await api("/profile/password", token, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          current_password: form.get("current_password"),
+          current_password: form.get("current_password") || null,
           new_password: form.get("new_password"),
         }),
       });
       formElement.reset();
       setSessions([]);
-    }, "Password changed. Existing refresh sessions were revoked.");
+      try {
+        const updated = await api<AuthResult["user"]>("/auth/me", token);
+        onUser(updated);
+      } catch {
+        onUser({ ...user, has_password: true });
+      }
+    }, hasExistingPassword ? "Password changed. Existing refresh sessions were revoked." : "Password created. You can now sign in with either Google or your email and password.");
   }
 
   async function inviteMember(event: FormEvent<HTMLFormElement>) {
@@ -718,30 +729,106 @@ export function AccountPanel({
                 <Heading
                   eyebrow="Security & Access"
                   title="Password & Active Sessions"
-                  detail="Manage account credentials and revoke unrecognized device sessions."
+                  detail="Manage account credentials, authentication methods, and revoke unrecognized device sessions."
                 />
 
-                {/* Change Password */}
+                {/* Authentication Methods Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                  <div className="p-3.5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] flex items-center justify-between gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <CheckCircle2
+                        size={17}
+                        className={
+                          user.google_linked
+                            ? "text-[var(--success)]"
+                            : "text-[var(--ink-faint)]"
+                        }
+                      />
+                      <div className="min-w-0">
+                        <h4 className="font-serif text-xs font-bold text-[var(--ink)] truncate">
+                          Google Account
+                        </h4>
+                        <p className="text-[11px] text-[var(--ink-muted)] truncate">
+                          {user.google_linked
+                            ? "Connected for sign-in"
+                            : "Not connected"}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded flex-shrink-0 ${
+                        user.google_linked
+                          ? "bg-[var(--success-bg)] text-[var(--success)] font-semibold"
+                          : "bg-[var(--paper-subtle)] text-[var(--ink-muted)]"
+                      }`}
+                    >
+                      {user.google_linked ? "Connected" : "Unlinked"}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] flex items-center justify-between gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <KeyRound
+                        size={17}
+                        className={
+                          user.has_password
+                            ? "text-[var(--success)]"
+                            : "text-[var(--ink-faint)]"
+                        }
+                      />
+                      <div className="min-w-0">
+                        <h4 className="font-serif text-xs font-bold text-[var(--ink)] truncate">
+                          Password Access
+                        </h4>
+                        <p className="text-[11px] text-[var(--ink-muted)] truncate">
+                          {user.has_password
+                            ? "Standard sign-in active"
+                            : "No password configured"}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded flex-shrink-0 ${
+                        user.has_password
+                          ? "bg-[var(--success-bg)] text-[var(--success)] font-semibold"
+                          : "bg-[var(--paper-subtle)] text-[var(--ink-muted)]"
+                      }`}
+                    >
+                      {user.has_password ? "Active" : "Not set"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Change or Set Password */}
                 <form
                   onSubmit={changePassword}
                   className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-[var(--paper)] border border-[var(--hairline)] space-y-4 min-w-0"
                 >
-                  <h3 className="font-serif text-sm font-bold text-[var(--ink)]">
-                    Change Password
-                  </h3>
+                  <div>
+                    <h3 className="font-serif text-sm font-bold text-[var(--ink)]">
+                      {user.has_password ? "Change Password" : "Set a Password"}
+                    </h3>
+                    <p className="text-xs text-[var(--ink-muted)] mt-0.5">
+                      {user.has_password
+                        ? "Update your existing account password. Must be at least 8 characters."
+                        : "You signed in with Google. Set a password so you can also log in directly using your email and password."}
+                    </p>
+                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
-                        Current password
-                      </label>
-                      <Input
-                        name="current_password"
-                        type="password"
-                        autoComplete="current-password"
-                        required
-                      />
-                    </div>
+                  <div className={`grid grid-cols-1 ${user.has_password ? "sm:grid-cols-2" : ""} gap-3 min-w-0`}>
+                    {user.has_password && (
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
+                          Current password
+                        </label>
+                        <Input
+                          name="current_password"
+                          type="password"
+                          autoComplete="current-password"
+                          required
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-xs font-medium text-[var(--ink-secondary)] mb-1">
@@ -753,6 +840,7 @@ export function AccountPanel({
                         autoComplete="new-password"
                         minLength={8}
                         required
+                        placeholder="At least 8 characters"
                       />
                     </div>
                   </div>
@@ -764,7 +852,7 @@ export function AccountPanel({
                       type="submit"
                       disabled={busy}
                     >
-                      Update password
+                      {user.has_password ? "Update password" : "Set password"}
                     </Button>
                   </div>
                 </form>
@@ -854,9 +942,12 @@ export function AccountPanel({
                     ))}
 
                     {sessions.length === 0 && (
-                      <p className="text-xs text-[var(--ink-muted)] text-center py-4">
-                        No active refresh sessions stored.
-                      </p>
+                      <EmptyState
+                        compact
+                        icon={<Shield size={20} />}
+                        title="No active sessions"
+                        description="No active refresh sessions are stored for this account."
+                      />
                     )}
                   </div>
                 </section>
@@ -1363,9 +1454,12 @@ export function AccountPanel({
                             ))}
                           {!Object.keys(usage.ai_requests_by_feature)
                             .length && (
-                            <p className="text-xs text-[var(--ink-muted)]">
-                              No AI activity yet.
-                            </p>
+                            <EmptyState
+                              compact
+                              icon={<Activity size={18} />}
+                              title="No AI activity yet"
+                              description="Feature usage will show up after you run research or studio actions."
+                            />
                           )}
                         </div>
                       </section>
@@ -1381,7 +1475,7 @@ export function AccountPanel({
                                 key={key}
                                 className="flex items-center justify-between text-xs font-mono py-1 border-b border-[var(--hairline-subtle)]"
                               >
-                                <span className="job-state capitalize text-[var(--ink-secondary)]">
+                                <span className={`job-state capitalize ${key}`}>
                                   {key}
                                 </span>
                                 <strong className="text-[var(--ink)]">
@@ -1391,9 +1485,12 @@ export function AccountPanel({
                             ),
                           )}
                           {!Object.keys(usage.jobs_by_status).length && (
-                            <p className="text-xs text-[var(--ink-muted)]">
-                              No jobs active.
-                            </p>
+                            <EmptyState
+                              compact
+                              icon={<Inbox size={18} />}
+                              title="No jobs active"
+                              description="Background processing counts will appear when jobs run."
+                            />
                           )}
                         </div>
                       </section>

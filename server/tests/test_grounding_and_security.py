@@ -1,9 +1,9 @@
 import ipaddress
-import pytest
-from unittest.mock import AsyncMock, patch
 
-from app.utils.security_ssrf import is_ip_blocked, validate_url_and_resolve
+import pytest
+
 from app.services.rag import format_grounded_answer
+from app.utils.security_ssrf import is_ip_blocked, validate_url_and_resolve
 
 
 def test_ssrf_blocks_private_and_loopback_ips():

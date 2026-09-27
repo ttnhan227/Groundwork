@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 import uuid
 from collections.abc import AsyncIterator
 
@@ -25,7 +26,6 @@ from app.models import (
     User,
 )
 from app.rag import (
-    answer_declines_context,
     build_retrieval_query,
     cited_sources,
     clean_user_answer,

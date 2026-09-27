@@ -1,10 +1,9 @@
-﻿import uuid
-import pytest
+import uuid
 
-from app.models.note import Note
-from app.dtos.note_dto import NoteCreateRequest, NoteUpdateRequest, NoteResponse
-from app.services.rag import format_grounded_answer
 from app.controllers.workspace_agent import extract_grounded_citations
+from app.dtos.note_dto import NoteCreateRequest, NoteResponse, NoteUpdateRequest
+from app.models.note import Note
+from app.services.rag import format_grounded_answer
 
 
 def test_note_model_attributes_and_defaults():
@@ -77,11 +76,11 @@ def test_note_dto_validation_and_serialization():
 def test_grounded_qa_citation_mapping_and_remapping():
     # Model returns references like [Source 1], [Source 3]
     raw_answer = "The system achieved 99.9% uptime [Source 1] under high throughput [Source 3]."
-    
+
     # Mapping old source 1 -> 1, old source 3 -> 2
     mapping = {1: 1, 3: 2}
     formatted = format_grounded_answer(raw_answer, mapping)
-    
+
     assert "[1]" in formatted
     assert "[2]" in formatted
     assert "[Source" not in formatted

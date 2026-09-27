@@ -25,4 +25,20 @@ export default defineConfig({
   preview: {
     port: 8080,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("pdfjs-dist")) return "pdf";
+            if (id.includes("react") || id.includes("react-dom")) return "react-vendor";
+            if (id.includes("@tanstack/react-query")) return "query-vendor";
+            if (id.includes("lucide-react")) return "icons";
+            return "vendor";
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1200,
+  },
 });

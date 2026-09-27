@@ -16,6 +16,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { copyTextToClipboard, downloadTextFile, formatDateTime } from "../../api/client";
 import type { Note, NoteType } from "../../types";
 
@@ -173,33 +174,40 @@ export const NotesCanvas: React.FC<NotesCanvasProps> = ({
       {/* Notes Grid */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-12 text-xs text-[var(--ink-muted)]">
-            <RefreshCw size={20} className="spin mb-2 text-[var(--ink-blue)]" />
-            <p>Loading research notes…</p>
-          </div>
+          <EmptyState
+            className="my-12"
+            icon={<RefreshCw size={22} className="spin text-[var(--ink-blue)]" />}
+            title="Loading research notes"
+            description="Pulling saved answers, excerpts, and studio outputs."
+          />
         ) : filteredNotes.length === 0 ? (
-          <div className="max-w-md mx-auto my-12 text-center p-8 rounded-[var(--radius-md)] border border-dashed border-[var(--hairline)] bg-[var(--surface)]">
-            <BookOpen size={32} className="mx-auto text-[var(--ink-muted)] mb-3 opacity-60" />
-            <h3 className="font-serif text-sm font-semibold text-[var(--ink)]">
-              {searchQuery ? "No matching notes found" : "No notes yet"}
-            </h3>
-            <p className="text-xs text-[var(--ink-muted)] mt-1.5 leading-relaxed">
-              Save useful answers, excerpts, or your own ideas while you research your sources.
-            </p>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="mt-4 gap-1.5"
-              onClick={() => {
-                setNewTitle("");
-                setNewContent("");
-                setIsCreateModalOpen(true);
-              }}
-            >
-              <Plus size={13} />
-              <span>Create first note</span>
-            </Button>
-          </div>
+          <EmptyState
+            className="max-w-md mx-auto my-12 rounded-[var(--radius-md)] border border-dashed border-[var(--hairline)] bg-[var(--surface)]"
+            icon={<BookOpen size={32} />}
+            title={searchQuery ? "No matching notes found" : "No notes yet"}
+            description={
+              searchQuery
+                ? "Try a different search or clear filters."
+                : "Save useful answers, excerpts, or your own ideas while you research your sources."
+            }
+            action={
+              !searchQuery ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setNewTitle("");
+                    setNewContent("");
+                    setIsCreateModalOpen(true);
+                  }}
+                >
+                  <Plus size={13} />
+                  <span>Create first note</span>
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredNotes.map((note) => (

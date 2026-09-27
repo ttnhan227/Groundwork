@@ -3,6 +3,7 @@
 import ipaddress
 import socket
 from urllib.parse import urljoin, urlparse
+
 import httpx
 
 BLOCKED_IP_NETWORKS = [

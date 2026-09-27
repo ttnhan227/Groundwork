@@ -116,6 +116,11 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
     user = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.has_password:
+        raise HTTPException(
+            status_code=401,
+            detail="This account was created with Google. Please sign in with Google or set a password in your account settings.",
+        )
     if user.password_hash is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
@@ -156,6 +161,7 @@ async def google_login(payload: GoogleLoginRequest, session: AsyncSession = Depe
                 display_name=str(claims.get("name") or email.split("@", 1)[0])[:120],
                 google_sub=google_sub,
                 password_hash=hash_password(secrets.token_urlsafe(32)),
+                has_password=False,
             )
             session.add(user)
             await session.flush()

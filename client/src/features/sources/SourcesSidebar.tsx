@@ -19,6 +19,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { API, formatDateTime } from "../../api/client";
 import type { DocumentItem, NativeDocument } from "../../types";
 
@@ -617,27 +618,31 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
         })}
 
         {filteredSources.length === 0 && sources.length > 0 && (
-          <div className="p-4 text-center text-xs text-[var(--ink-muted)]">
-            <p>No sources match &ldquo;{sourceSearchFilter}&rdquo;</p>
-            <button
-              type="button"
-              onClick={() => setSourceSearchFilter("")}
-              className="mt-1 text-[var(--ink-blue)] hover:underline cursor-pointer"
-            >
-              Clear filter
-            </button>
-          </div>
+          <EmptyState
+            compact
+            icon={<Search size={18} />}
+            title={`No sources match “${sourceSearchFilter}”`}
+            description="Try a different filter or clear it to see all sources."
+            action={
+              <button
+                type="button"
+                onClick={() => setSourceSearchFilter("")}
+                className="text-[11px] font-medium text-[var(--ink-blue)] hover:underline cursor-pointer"
+              >
+                Clear filter
+              </button>
+            }
+          />
         )}
 
         {sources.length === 0 && (
-          <div className="p-4 text-center text-xs text-[var(--ink-muted)]">
-            <Upload size={20} className="mx-auto mb-1 opacity-50" />
-            <p className="font-medium text-[var(--ink)]">Add source documents</p>
-            <p className="mt-1 leading-relaxed">
-              Add reference PDFs, notes, or research papers here to ground the
-              AI assistant and cite source evidence.
-            </p>
-          </div>
+          <EmptyState
+            compact
+            className="rounded-[var(--radius-sm)] border border-dashed border-[var(--hairline)] bg-[var(--paper-subtle)] mx-1"
+            icon={<Upload size={20} />}
+            title="Add source documents"
+            description="Add reference PDFs, notes, or research papers here to ground the AI assistant and cite source evidence."
+          />
         )}
       </div>
     </aside>

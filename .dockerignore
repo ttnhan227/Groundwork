@@ -1,0 +1,13 @@
+.git
+.github
+.vscode
+.idea
+*.log
+.env
+.env.*
+node_modules
+.venv
+__pycache__
+dist
+.pytest_cache
+.ruff_cache

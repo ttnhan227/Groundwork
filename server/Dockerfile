@@ -6,7 +6,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DEFAULT_TIMEOUT=1000 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    HOME=/home/groundwork
 
 # Install runtime dependencies (tesseract, libreoffice for document processing, curl for health check)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,14 +17,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Create non-root system user and group
+RUN groupadd -r -g 1000 groundwork && \
+    useradd -r -u 1000 -g groundwork -m -d /home/groundwork -s /bin/sh groundwork
+
 # Install Python dependencies directly from pre-built wheels
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy application code and set ownership
 COPY . .
-RUN chmod +x /app/start.sh
+RUN chmod +x /app/start.sh && \
+    chown -R groundwork:groundwork /app /home/groundwork
+
+USER groundwork
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

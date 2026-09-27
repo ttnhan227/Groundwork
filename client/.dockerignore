@@ -1,33 +1,16 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-
-# Build outputs
-dist/
-build/
-
-# Testing & coverage
-coverage/
-tests/
-
-# Debug logs
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+.vscode
+.idea
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
-
-# Git & IDEs
-.git/
-.gitignore
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Documentation
-*.md
-
-# Docker files
-Dockerfile*
-.dockerignore*
+tests/
+e2e/
+playwright-report/
+test-results/

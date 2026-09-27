@@ -1,9 +1,14 @@
 .env
 __pycache__/
 .pytest_cache/
+.ruff_cache/
 .venv/
 server/.venv/
 *.pyc
+*.log
+.coverage
+htmlcov/
+trivy-results.sarif
 client/node_modules/
 client/.next/
 client/dist/
@@ -13,4 +18,5 @@ client/playwright-report/
 tmp/
 postgres_data/
 minio_data/
+redis_data/
 Groundwork AI SaaS Application Specification.docx

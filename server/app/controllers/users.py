@@ -104,9 +104,11 @@ async def update_preferences(
 async def change_password(
     payload: PasswordChangeRequest, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
 ):
-    if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=422, detail="Current password is incorrect")
+    if user.has_password:
+        if not payload.current_password or not verify_password(payload.current_password, user.password_hash):
+            raise HTTPException(status_code=422, detail="Current password is incorrect")
     user.password_hash = hash_password(payload.new_password)
+    user.has_password = True
     tokens = list(
         await session.scalars(
             select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))

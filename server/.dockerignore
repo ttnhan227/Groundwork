@@ -1,33 +1,18 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-.venv/
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
 venv/
-env/
 ENV/
-
-# Testing & coverage
-.pytest_cache/
+env/
+.pytest_cache
+.ruff_cache
 .coverage
-.coverage.*
-htmlcov/
-tests/
-
-# Git & IDEs
-.git/
+htmlcov
+.git
 .gitignore
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Documentation & artifacts
-*.md
-docs/
-
-# Docker files
-Dockerfile*
-.dockerignore*
+.env
+.env.*
+tests/

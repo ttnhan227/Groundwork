@@ -13,6 +13,7 @@ import {
 import { api } from "../../api/client";
 import type { Job, NotificationItem } from "../../types";
 import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
 
 type Filter = "all" | "unread" | "attention";
 
@@ -45,6 +46,7 @@ export function NotificationCenter({
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +66,8 @@ export function NotificationCenter({
           ? reason.message
           : "Could not load notifications",
       );
+    } finally {
+      setLoading(false);
     }
   }, [onUnread, token]);
 
@@ -329,24 +333,26 @@ export function NotificationCenter({
             </div>
           ))}
 
-          {visible.length === 0 && (
-            <div className="p-8 text-center text-xs text-[var(--ink-muted)] space-y-1.5">
-              <Bell
-                size={24}
-                className="mx-auto text-[var(--ink-faint)] opacity-60"
-              />
-              <p className="font-serif text-sm font-semibold text-[var(--ink)]">
-                {filter === "unread"
+          {loading && visible.length === 0 && (
+            <EmptyState
+              icon={<RefreshCw size={22} className="spin text-[var(--ink-blue)]" />}
+              title="Loading notifications"
+              description="Checking recent activity and live jobs."
+            />
+          )}
+
+          {!loading && visible.length === 0 && (
+            <EmptyState
+              icon={<Bell size={24} />}
+              title={
+                filter === "unread"
                   ? "No unread notifications"
                   : filter === "attention"
                     ? "Nothing needs attention"
-                    : "No notifications yet"}
-              </p>
-              <p className="text-[11px] max-w-xs mx-auto">
-                Processing updates, completed exports, reviews, and team
-                activity will appear here.
-              </p>
-            </div>
+                    : "No notifications yet"
+              }
+              description="Processing updates, completed exports, reviews, and team activity will appear here."
+            />
           )}
         </main>
       </div>
