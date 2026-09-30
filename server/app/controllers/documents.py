@@ -369,41 +369,6 @@ async def get_processing_job(
     return job
 
 
-@router.post("/{document_id}/retry", response_model=ProcessingJobResponse)
-async def retry_document_processing(
-    document_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
-) -> ProcessingJob:
-    document = await owned_document(document_id, user, session)
-    document.status = DocumentStatus.UPLOADED
-    document.error_message = None
-
-    job = ProcessingJob(
-        document_id=document.id,
-        owner_id=user.id,
-        operation="document_processing",
-        status=JobStatus.QUEUED,
-        progress=0,
-    )
-    session.add(job)
-    await session.commit()
-    await session.refresh(job)
-
-    from app.tasks import process_document
-    try:
-        task = process_document.delay(str(document.id))
-        job.task_id = task.id
-        await session.commit()
-    except Exception as exc:
-        document.status = DocumentStatus.FAILED
-        document.error_message = f"Processing worker offline: {str(exc)}"
-        job.status = JobStatus.FAILED
-        job.error_message = document.error_message
-        await session.commit()
-
-    return job
-
 
 @router.get("/{document_id}/pages", response_model=list[DocumentPageResponse])
 async def get_document_pages(
@@ -666,12 +631,11 @@ async def retry_document(
     document.status = DocumentStatus.UPLOADED
     document.error_message = None
     session.add(job)
-    from app.deliverables import activity, ensure_personal_workspace
+    from app.deliverables import activity
 
-    workspace = await ensure_personal_workspace(user, session)
     await activity(
         session,
-        workspace.id,
+        document.workspace_id,
         user.id,
         "source.processing_retried",
         "document",

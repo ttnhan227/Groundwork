@@ -62,7 +62,7 @@ export function LandingPage({
               Groundwork
             </span>
             <span className="hidden border-l border-white/15 pl-2 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--control-room-muted)] sm:inline">
-              Response control
+              Evidence workspace
             </span>
           </a>
           <nav
@@ -86,7 +86,7 @@ export function LandingPage({
               onClick={onOpen}
               className="inline-flex h-9 items-center justify-center gap-2 border border-white/20 bg-white px-4 text-xs font-bold text-[var(--control-room)] transition-colors hover:bg-[#eef1f5]"
             >
-              {isAuthenticated ? "Open responses" : "Sign in"}
+              {isAuthenticated ? "Open workspace" : "Sign in"}
               <ArrowRight size={13} />
             </button>
           </nav>
@@ -129,7 +129,7 @@ export function LandingPage({
               onClick={onOpen}
               className="text-sm font-semibold text-[var(--ink)] underline decoration-[var(--ink-sepia)] underline-offset-4"
             >
-              {isAuthenticated ? "Open document library" : "Explore the notebook"}
+              {isAuthenticated ? "Open your workspaces" : "Explore the workspace"}
             </button>
           </div>
           <p className="mt-5 text-xs leading-relaxed text-[var(--ink-muted)]">
@@ -272,7 +272,7 @@ export function LandingPage({
           <span className="flex items-center gap-2 font-semibold text-[var(--ink)]">
             <BrandMark size={16} /> Groundwork
           </span>
-          <span>RFP response control with evidence and human review.</span>
+          <span>Evidence-grounded document understanding with source verification.</span>
         </div>
       </footer>
     </main>

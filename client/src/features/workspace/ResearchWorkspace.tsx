@@ -1300,7 +1300,7 @@ export function ResearchWorkspace({
                 title="Source-grounded conversational chat"
               >
                 <Sparkles size={13} className="text-[var(--ink-blue)] flex-shrink-0" />
-                <span className="truncate">Grounded Chat</span>
+                <span className="truncate">Evidence Chat</span>
                 {messages.length > 0 && (
                   <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[var(--ink-blue)] text-white text-[9px] font-mono">
                     {messages.length}
@@ -1664,42 +1664,73 @@ export function ResearchWorkspace({
                 {/* Grounded Conversation Thread */}
                 <div className="space-y-4">
                   {messages.length === 0 && !isAgentRunning && (
-                    <div className="p-8 text-center rounded-[var(--radius-md)] border border-dashed border-[var(--hairline-strong)] bg-[var(--surface)] space-y-3">
-                      <div className="w-10 h-10 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center mx-auto">
-                        <Sparkles size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-serif text-base font-bold text-[var(--ink)]">
-                          Groundwork Workspace Studio
-                        </h4>
-                        <p className="text-xs text-[var(--ink-muted)] max-w-md mx-auto mt-1">
-                          Ask questions, create study guides, generate podcast scripts,
-                          or synthesize notes grounded directly in your {workspaceSources.length} source file(s).
-                        </p>
-                      </div>
-
-                      {/* Suggestion Chips */}
-                      <div className="flex flex-wrap gap-2 justify-center pt-2 max-w-lg mx-auto">
-                        {(contextualSuggestions.length > 0
-                          ? contextualSuggestions
-                          : [
-                              { id: "s1", label: "Summarize main takeaways", prompt: "Summarize main takeaways from active sources." },
-                              { id: "s2", label: "Core arguments across sources", prompt: "What are the core arguments and findings across the sources?" },
-                              { id: "s3", label: "Create a study guide", prompt: "Create a comprehensive study guide and key concepts breakdown." },
-                              { id: "s4", label: "Generate FAQ", prompt: "Generate frequently asked questions (FAQ) based on the sources." },
-                            ]
-                        ).map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => handleSendPrompt(s.prompt)}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--hairline)] bg-[var(--paper)] text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:border-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)] transition-all cursor-pointer"
+                    workspaceSources.length === 0 ? (
+                      <div className="p-8 text-center rounded-[var(--radius-md)] border border-dashed border-[var(--hairline-strong)] bg-[var(--surface)] space-y-4 max-w-lg mx-auto">
+                        <div className="w-12 h-12 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center mx-auto shadow-xs">
+                          <BookOpen size={22} />
+                        </div>
+                        <div>
+                          <h4 className="font-serif text-base font-bold text-[var(--ink)]">
+                            Your workspace is ready
+                          </h4>
+                          <p className="text-xs text-[var(--ink-muted)] max-w-md mx-auto mt-1 leading-relaxed">
+                            Add your source documents on the left (PDF, Word, or Text). Once added, Groundwork indexes every page so you can ask questions with verifiable citations.
+                          </p>
+                        </div>
+                        <div className="pt-1">
+                          <Button
+                            variant="human"
+                            size="sm"
+                            onClick={() => setIsAddSourceModalOpen(true)}
+                            className="gap-1.5"
                           >
-                            {s.label}
-                          </button>
-                        ))}
+                            <Upload size={13} />
+                            <span>Add First Document</span>
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-8 text-center rounded-[var(--radius-md)] border border-dashed border-[var(--hairline-strong)] bg-[var(--surface)] space-y-4 max-w-xl mx-auto">
+                        <div className="w-12 h-12 rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] flex items-center justify-center mx-auto shadow-xs">
+                          <Sparkles size={22} />
+                        </div>
+                        <div>
+                          <h4 className="font-serif text-base font-bold text-[var(--ink)]">
+                            Ask anything about your documents
+                          </h4>
+                          <p className="text-xs text-[var(--ink-muted)] max-w-md mx-auto mt-1 leading-relaxed">
+                            Groundwork searches your {workspaceSources.length} source file(s) and provides answers with exact page-level citations you can inspect.
+                          </p>
+                        </div>
+
+                        {/* Suggestion Chips */}
+                        <div className="flex flex-wrap gap-2 justify-center pt-1 max-w-lg mx-auto">
+                          {(contextualSuggestions.length > 0
+                            ? contextualSuggestions
+                            : [
+                                { id: "s1", label: "Summarize main takeaways", prompt: "Summarize main takeaways from active sources." },
+                                { id: "s2", label: "Core findings & arguments", prompt: "What are the core arguments and findings across the sources?" },
+                                { id: "s3", label: "Key dates, numbers & facts", prompt: "What are the key dates, metrics, and numerical facts mentioned in the sources?" },
+                                { id: "s4", label: "Generate FAQ", prompt: "Generate frequently asked questions (FAQ) based on the sources." },
+                              ]
+                          ).map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => handleSendPrompt(s.prompt)}
+                              className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--hairline)] bg-[var(--paper)] text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:border-[var(--ink-blue)] hover:bg-[var(--ink-blue-subtle)] transition-all cursor-pointer"
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="pt-2 border-t border-[var(--hairline-subtle)] text-[11px] text-[var(--ink-muted)] flex items-center justify-center gap-1.5">
+                          <ShieldCheck size={13} className="text-emerald-600 flex-shrink-0" />
+                          <span>Every answer includes inspectable [1] citations linking back to original pages.</span>
+                        </div>
+                      </div>
+                    )
                   )}
 
                   {messages.map((msg, idx) => (

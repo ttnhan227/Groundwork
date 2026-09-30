@@ -63,6 +63,7 @@ from app.rag import (
     embed_texts_async,
     format_grounded_answer,
     relevant_snippet,
+    retrieve_hybrid_chunks,
 )
 
 logger = logging.getLogger(__name__)
@@ -1325,13 +1326,15 @@ async def _orchestrate_grounded_qa(
         embeddings = await embed_texts_async([query_text], operation="workspace_agent.embed_query")
         if embeddings:
             vector = embeddings[0]
-            stmt = (
-                select(DocumentChunk)
-                .where(DocumentChunk.document_id.in_(source_ids))
-                .order_by(DocumentChunk.embedding.cosine_distance(vector))
-                .limit(8)
+            chunks = await retrieve_hybrid_chunks(
+                session=session,
+                document_ids=source_ids,
+                user_id=user.id,
+                workspace_id=workspace.id,
+                query_text=payload.prompt,
+                query_vector=vector,
+                top_k=8,
             )
-            chunks = list(await session.scalars(stmt))
 
     yield _sse_event("status", {"step": "drafting", "label": "Synthesizing context-aware response..."})
 

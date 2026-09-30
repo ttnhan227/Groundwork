@@ -450,10 +450,10 @@ export function WorkspaceLibrary({
         <section className="space-y-4 min-w-0 w-full">
           <div className="flex items-center justify-between border-b border-[var(--hairline)] pb-2 min-w-0">
             <h2 className="font-serif text-base sm:text-lg font-bold text-[var(--ink)] truncate">
-              Notebooks &amp; Documents ({filteredWorkspaces.length})
+              Workspaces &amp; Research Notebooks ({filteredWorkspaces.length})
             </h2>
             <span className="text-xs text-[var(--ink-muted)] font-mono flex-shrink-0">
-              {documents.length} sources · {workspaces.length} documents
+              {documents.length} sources · {workspaces.length} workspaces
             </span>
           </div>
 
@@ -617,7 +617,7 @@ export function WorkspaceLibrary({
                       onClick={() => selectWs(ws.id)}
                       className="inline-flex items-center gap-1 text-[var(--ink-blue)] font-medium hover:underline cursor-pointer flex-shrink-0 ml-2"
                     >
-                      <span>Open document</span>
+                      <span>Open workspace</span>
                       <ArrowRight size={12} />
                     </button>
                   </div>
@@ -629,11 +629,11 @@ export function WorkspaceLibrary({
           {filteredWorkspaces.length === 0 && (
             <EmptyState
               icon={<FolderPlus size={32} />}
-              title={searchQuery ? "No matching documents" : "No documents yet"}
+              title={searchQuery ? "No matching workspaces" : "No workspaces yet"}
               description={
                 searchQuery
-                  ? "Try a different search."
-                  : "Start from source documents, notes, or blank synthesis."
+                  ? "Try a different search term."
+                  : "Create your first research workspace to organize documents and ask questions."
               }
               action={
                 !searchQuery ? (
@@ -646,7 +646,7 @@ export function WorkspaceLibrary({
                     }}
                   >
                     <Plus size={13} />
-                    <span>Create Document</span>
+                    <span>Create Workspace</span>
                   </Button>
                 ) : undefined
               }

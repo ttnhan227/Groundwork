@@ -140,23 +140,23 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
 
   return (
     <aside className="w-72 flex-shrink-0 flex flex-col bg-[var(--paper)] border-r border-[var(--hairline)] groundwork-col-sources min-w-0">
-      {/* 1. Combined Document / Draft Selector */}
-      <div
-        className="p-3 border-b border-[var(--hairline)] bg-[var(--surface)] relative min-w-0"
-        ref={dropdownRef}
-      >
-        <div className="flex items-center justify-between mb-1.5 min-w-0">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
-            Active Document
-          </span>
-          {responses.length > 1 && (
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
-              {responses.length} documents
+      {/* 1. Combined Document / Draft Selector (displayed when drafts exist) */}
+      {responses.length > 0 && activeResponse && (
+        <div
+          className="p-3 border-b border-[var(--hairline)] bg-[var(--surface)] relative min-w-0"
+          ref={dropdownRef}
+        >
+          <div className="flex items-center justify-between mb-1.5 min-w-0">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+              Active Draft
             </span>
-          )}
-        </div>
+            {responses.length > 1 && (
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-subtle)] text-[var(--ink-muted)] flex-shrink-0">
+                {responses.length} drafts
+              </span>
+            )}
+          </div>
 
-        {activeResponse ? (
           <div className="space-y-1.5">
             <button
               type="button"
@@ -329,22 +329,8 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
               </div>
             )}
           </div>
-        ) : (
-          <div className="p-2.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--hairline)] bg-[var(--paper-subtle)] text-center">
-            <p className="text-xs text-[var(--ink-muted)] mb-2">No document drafted yet</p>
-            {onCreateResponse && (
-              <Button
-                variant="secondary"
-                size="xs"
-                className="w-full text-xs text-[var(--ink-blue)]"
-                onClick={onCreateResponse}
-              >
-                <Plus size={12} /> New Document
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 2. Sources Header */}
       <div className="p-3 border-b border-[var(--hairline)] flex items-center justify-between min-w-0">
@@ -527,15 +513,24 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
                       {doc.page_count ? `${doc.page_count} pgs` : "1 pg"}
                     </span>
                     {doc.status === "failed" ? (
-                      <span className="text-[var(--danger)] flex items-center gap-0.5 truncate">
+                      <span
+                        className="text-[var(--danger)] flex items-center gap-0.5 truncate cursor-help"
+                        title="Processing failed. Click retry to process this document again."
+                      >
                         <AlertTriangle size={9} /> Failed
                       </span>
                     ) : ["processing", "uploaded", "extracting", "ocr_processing", "indexing"].includes(doc.status) ? (
-                      <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5 truncate">
-                        <RefreshCw size={9} className="spin" /> Indexing
+                      <span
+                        className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5 truncate cursor-help"
+                        title="Preparing document and generating search index…"
+                      >
+                        <RefreshCw size={9} className="spin" /> Preparing…
                       </span>
                     ) : (
-                      <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 truncate font-semibold">
+                      <span
+                        className="text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 truncate font-semibold cursor-help"
+                        title="Ready to search with verifiable citations"
+                      >
                         <Check size={9} /> Ready
                       </span>
                     )}
@@ -642,6 +637,17 @@ export const SourcesSidebar: React.FC<SourcesSidebarProps> = ({
             icon={<Upload size={20} />}
             title="Add source documents"
             description="Add reference PDFs, notes, or research papers here to ground the AI assistant and cite source evidence."
+            action={
+              <Button
+                variant="primary"
+                size="xs"
+                onClick={handleAddClick}
+                disabled={isUploading}
+                className="mt-2 text-xs"
+              >
+                <Plus size={12} className="mr-1" /> Add Document
+              </Button>
+            }
           />
         )}
       </div>

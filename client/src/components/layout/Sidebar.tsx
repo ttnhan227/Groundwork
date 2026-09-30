@@ -135,9 +135,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onBackToLibrary}
                 className="hover:text-[var(--ink)]"
-                title="All documents"
+                title="All workspaces"
               >
-                Documents
+                Workspaces
               </button>
             </div>
 

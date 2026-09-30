@@ -513,7 +513,7 @@ export function WorkspaceApp({
       }
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Failed to delete response";
+        err instanceof Error ? err.message : "Failed to delete workspace";
       setError(message);
       throw new Error(message);
     }
@@ -532,7 +532,7 @@ export function WorkspaceApp({
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)));
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to rename response",
+        err instanceof Error ? err.message : "Failed to rename workspace",
       );
     }
   }
@@ -627,7 +627,7 @@ export function WorkspaceApp({
         setError(
           reason instanceof Error
             ? reason.message
-            : "Could not create a response from that file",
+            : "Could not create a workspace from that file",
         );
       } finally {
         onPendingUploadHandled();
@@ -704,7 +704,7 @@ export function WorkspaceApp({
         ...workspaces.map((ws) => ({
           id: `workspace-${ws.id}`,
           label: `Open: ${ws.name}`,
-          detail: ws.kind === "team" ? "Team response" : "Personal response",
+          detail: ws.kind === "team" ? "Team workspace" : "Personal workspace",
           icon: <Folder size={16} />,
           run: () => {
             navigateWithDraftGuard(() => {
