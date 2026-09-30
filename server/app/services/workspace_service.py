@@ -1,52 +1,119 @@
-"""Workspace lifecycle and authorization service."""
+"""Workspace management service for registering, configuring, and querying local workspaces."""
 
 from __future__ import annotations
 
+import json
+import logging
 import uuid
-from collections.abc import Sequence
+from datetime import datetime, timezone
+from pathlib import Path
 
-from app.models import User, Workspace
-from app.repositories.workspace_repository import WorkspaceRepository
+from app.core.config import get_settings
+from app.database.local_db import LocalDatabase, get_db
+from app.models.types import WorkspaceCreate, WorkspaceResponse
+
+logger = logging.getLogger("groundwork.workspaces")
 
 
 class WorkspaceService:
-    """Business logic for Workspace management."""
+    """Manages local workspace folders and their lifecycle."""
 
-    def __init__(self, workspace_repo: WorkspaceRepository) -> None:
-        self.workspace_repo = workspace_repo
+    @property
+    def db(self) -> LocalDatabase:
+        return get_db()
 
-    async def list_workspaces(self, user: User) -> Sequence[Workspace]:
-        await self.workspace_repo.ensure_personal_workspace(user)
-        return await self.workspace_repo.list_for_user(user)
+    def __init__(self) -> None:
+        self.settings = get_settings()
 
-    async def get_workspace(self, workspace_id: uuid.UUID, user: User) -> Workspace:
-        workspace = await self.workspace_repo.get_by_id(workspace_id)
-        if workspace is None:
-            raise ValueError("Workspace not found.")
-        member = await self.workspace_repo.get_member(workspace_id, user.id)
-        if member is None and workspace.owner_id != user.id and user.role != "admin":
-            raise PermissionError("Access denied to this workspace.")
-        return workspace
+    def create_workspace(self, data: WorkspaceCreate) -> WorkspaceResponse:
+        """Registers a new local workspace folder."""
+        path = Path(data.path).resolve()
+        if not path.exists():
+            raise ValueError(f"Path does not exist: {data.path}")
+        if not path.is_dir():
+            raise ValueError(f"Path is not a directory: {data.path}")
 
-    async def create_workspace(self, user: User, name: str, kind: str = "personal") -> Workspace:
-        clean_name = name.strip()
-        if not clean_name:
-            clean_name = "Untitled Workspace"
-        return await self.workspace_repo.create(owner_id=user.id, name=clean_name, kind=kind)
+        ws_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        ignore_patterns = list(set(self.settings.default_ignore_patterns + data.ignore_patterns))
 
-    async def update_workspace(self, workspace_id: uuid.UUID, user: User, name: str | None = None) -> Workspace:
-        workspace = await self.get_workspace(workspace_id, user)
-        if name is not None and name.strip():
-            workspace.name = name.strip()
-        return await self.workspace_repo.update(workspace)
+        conn = self.db.get_connection()
+        with conn:
+            conn.execute("""
+            INSERT INTO workspaces (id, name, path, is_active, ignore_patterns, created_at, updated_at)
+            VALUES (?, ?, ?, 1, ?, ?, ?);
+            """, (
+                ws_id,
+                data.name,
+                str(path),
+                json.dumps(ignore_patterns),
+                now,
+                now,
+            ))
 
-    async def delete_workspace(self, workspace_id: uuid.UUID, user: User) -> None:
-        workspace = await self.get_workspace(workspace_id, user)
-        await self.workspace_repo.delete(workspace)
+        return WorkspaceResponse(
+            id=ws_id,
+            name=data.name,
+            path=str(path),
+            is_active=True,
+            ignore_patterns=ignore_patterns,
+            created_at=now,
+            updated_at=now,
+        )
 
-    # Backward-compatibility aliases
-    list_notebooks = list_workspaces
-    get_notebook = get_workspace
-    create_notebook = create_workspace
-    update_notebook = update_workspace
-    delete_notebook = delete_workspace
+    def list_workspaces(self) -> list[WorkspaceResponse]:
+        """Lists all registered workspaces."""
+        conn = self.db.get_connection()
+        rows = conn.execute("SELECT * FROM workspaces ORDER BY created_at ASC;").fetchall()
+        result: list[WorkspaceResponse] = []
+        for r in rows:
+            result.append(WorkspaceResponse(
+                id=r["id"],
+                name=r["name"],
+                path=r["path"],
+                is_active=bool(r["is_active"]),
+                ignore_patterns=json.loads(r["ignore_patterns"]) if r["ignore_patterns"] else [],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            ))
+        return result
+
+    def get_workspace(self, workspace_id: str) -> WorkspaceResponse | None:
+        """Retrieves a workspace by ID."""
+        conn = self.db.get_connection()
+        r = conn.execute("SELECT * FROM workspaces WHERE id = ?;", (workspace_id,)).fetchone()
+        if not r:
+            return None
+        return WorkspaceResponse(
+            id=r["id"],
+            name=r["name"],
+            path=r["path"],
+            is_active=bool(r["is_active"]),
+            ignore_patterns=json.loads(r["ignore_patterns"]) if r["ignore_patterns"] else [],
+            created_at=r["created_at"],
+            updated_at=r["updated_at"],
+        )
+
+    def delete_workspace(self, workspace_id: str) -> bool:
+        """Deletes a workspace and cascades file, chunk, and FTS entries."""
+        conn = self.db.get_connection()
+        with conn:
+            # Clean FTS entries
+            conn.execute("""
+                DELETE FROM fts_files WHERE file_id IN (
+                    SELECT id FROM files WHERE workspace_id = ?
+                );
+            """, (workspace_id,))
+            conn.execute("""
+                DELETE FROM fts_chunks WHERE file_id IN (
+                    SELECT id FROM files WHERE workspace_id = ?
+                );
+            """, (workspace_id,))
+            res = conn.execute("DELETE FROM workspaces WHERE id = ?;", (workspace_id,))
+            return res.rowcount > 0
+
+    def get_allowed_roots(self) -> list[Path]:
+        """Returns all registered active workspace paths."""
+        conn = self.db.get_connection()
+        rows = conn.execute("SELECT path FROM workspaces WHERE is_active = 1;").fetchall()
+        return [Path(r["path"]).resolve() for r in rows]

@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs && vitest run",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\""

@@ -1,97 +1,102 @@
+"""Groundwork Local - FastAPI Application Core.
+
+Local-first workspace search, project intelligence, and AI context engine.
+"""
+
+from __future__ import annotations
+
 import logging
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from app.configs import get_settings
-from app.controllers import (
+from app.core.config import get_settings
+from app.database.local_db import get_db
+from app.routers.api import (
+    activity_router,
     ai_router,
-    auth_router,
-    chat_router,
-    collections_router,
-    deliverables_router,
-    documents_router,
-    generation_router,
-    jobs_router,
+    context_router,
+    git_router,
+    indexer_router,
     notes_router,
-    notifications_router,
-    users_router,
-    workspace_agent_router,
-    workspace_router,
+    projects_router,
+    saved_searches_router,
+    search_router,
+    sync_router,
+    system_router,
+    workspaces_router,
 )
-from app.middlewares import (
-    RateLimitMiddleware,
-    RequestLoggingMiddleware,
-    SecurityHeadersMiddleware,
-    configure_logging,
-)
+from app.services.indexer_service import IndexerService
+from app.services.watcher_service import WatcherService
 
-configure_logging()
-logger = logging.getLogger("groundwork.errors")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("groundwork.local")
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manages application lifecycle: DB init, watcher startup, and graceful shutdown."""
+    logger.info("Initializing Groundwork Local database...")
+    db = get_db()
+    db.init_schema()
+
+    logger.info("Starting workspace filesystem watcher...")
+    watcher = WatcherService.get_instance()
+    watcher.start()
+
+    yield
+
+    logger.info("Shutting down Groundwork Local...")
+    watcher.stop()
+    IndexerService.get_instance().cancel_indexing()
+
 
 app = FastAPI(
     title=settings.app_name,
-    version="2.5.0",
-    description="Groundwork AI-first document research workspace API with Clean Architecture.",
+    version=settings.app_version,
+    description="Groundwork: Local-first workspace search and AI context tool for developers.",
+    lifespan=lifespan,
 )
 
-# --- Global Middlewares ---
-# Note: In FastAPI/Starlette, user middlewares are executed in reverse addition order.
-# Adding CORSMiddleware last ensures it is the outermost middleware, guaranteeing
-# that all responses (including 429 rate limits, 500 error handlers, and preflight OPTIONS)
-# receive appropriate Access-Control-* headers.
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
-
-cors_kwargs = (
-    {"allow_origin_regex": ".*"} if "*" in settings.cors_origins else {"allow_origins": settings.cors_origin_list}
-)
+# CORS configuration for Tauri desktop application and local dev
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    **cors_kwargs,
 )
 
-# --- API Routers (Controllers) ---
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(documents_router, prefix="/api/v1")
-app.include_router(generation_router, prefix="/api/v1")
-app.include_router(chat_router, prefix="/api/v1")
-app.include_router(ai_router, prefix="/api/v1")
-app.include_router(users_router, prefix="/api/v1")
-app.include_router(jobs_router, prefix="/api/v1")
-app.include_router(collections_router, prefix="/api/v1")
-app.include_router(workspace_router, prefix="/api/v1")
-app.include_router(notes_router, prefix="/api/v1")
-app.include_router(deliverables_router, prefix="/api/v1")
-app.include_router(notifications_router, prefix="/api/v1")
-app.include_router(workspace_agent_router, prefix="/api/v1")
+# Register Routers
+app.include_router(system_router)
+app.include_router(workspaces_router)
+app.include_router(projects_router)
+app.include_router(indexer_router)
+app.include_router(search_router)
+app.include_router(git_router)
+app.include_router(activity_router)
+app.include_router(context_router)
+app.include_router(notes_router)
+app.include_router(saved_searches_router)
+app.include_router(ai_router)
+app.include_router(sync_router)
 
 
 @app.get("/health", tags=["System"])
-async def health() -> dict[str, str]:
-    return {"status": "healthy", "service": "groundwork-api"}
+def health_check() -> dict[str, str]:
+    return {
+        "status": "healthy",
+        "service": "groundwork-local",
+        "version": settings.app_version,
+    }
 
 
-@app.exception_handler(Exception)
-async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
-    logger.exception(
-        "unhandled_request_error",
-        exc_info=error,
-        extra={"method": request.method, "path": request.url.path},
-    )
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": "An unexpected error occurred.",
-                "details": {},
-            }
-        },
-    )
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

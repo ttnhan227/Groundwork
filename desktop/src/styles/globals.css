@@ -1,0 +1,100 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* ==========================================================================
+   GROUNDWORK GLOBAL STYLES & EDITORIAL DESIGN SYSTEM
+   - Calm, flat, typography-led manuscript canvas
+   - High-contrast cobalt actions & amber/sepia verification indicators
+   - Technical paper grid background
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(17, 32, 56, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 32, 56, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--ink-sepia-subtle);
+  color: var(--ink);
+}
+
+/* Typography Role Helpers */
+.font-display,
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-body,
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+.font-agent,
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Minimal Tactile Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hairline-strong);
+}
+
+/* Focus Rings */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ink-blue);
+  outline-offset: 1px;
+}
+
+/* Brand symbol helper */
+.brand-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  flex-shrink: 0;
+}

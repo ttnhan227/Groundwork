@@ -1,0 +1,215 @@
+/* ==========================================================================
+   GROUNDWORK DESIGN TOKENS (Bid Response Control Room & Evidence Workspace)
+   - Cool technical canvas with high-contrast cobalt actions
+   - Acid signal color for requirement and review state
+   - Geometric display, neutral body, and operational mono typography
+   ========================================================================== */
+
+:root {
+  /* ================= CORE PALETTE ================= */
+  --paper: #f2ede2;
+  --paper-subtle: #e8e0d2;
+  --surface: #fffaf0;
+  --surface-hover: #f7f0e4;
+  --surface-active: #eee4d3;
+
+  --ink: #112038;
+  --ink-secondary: #4a5360;
+  --ink-muted: #6f746f;
+  --ink-faint: #9a998f;
+
+  /* Stable inverse surface: intentionally does not invert with the page theme. */
+  --control-room: #112038;
+  --control-room-hover: #1b3151;
+  --control-room-foreground: #ffffff;
+  --control-room-muted: #c3ccda;
+
+  --hairline: #d9d0bf;
+  --hairline-subtle: #ebe4d8;
+  --hairline-strong: #bcb09e;
+
+  /* Human Accent: ink-blue */
+  --ink-blue: #22569e;
+  --ink-blue-hover: #18457f;
+  --ink-blue-subtle: #e9f0f7;
+  --ink-blue-border: #a9bfd6;
+  --ink-blue-faint: rgba(34, 86, 158, 0.1);
+
+  --signal: #65a98f;
+
+  /* Agent Accent: ink-sepia */
+  --ink-sepia: #de4f33;
+  --ink-sepia-hover: #ba3d27;
+  --ink-sepia-subtle: #f9e8df;
+  --ink-sepia-border: #eab7a5;
+  --ink-sepia-faint: rgba(222, 79, 51, 0.1);
+
+  /* Semantic Feedback (Restrained & Warm) */
+  --success: #2f6b4f;
+  --success-bg: #f0f7f3;
+  --success-border: #c8e3d4;
+
+  --warning: #9a6717;
+  --warning-bg: #fdf7ec;
+  --warning-border: #f1ddb5;
+
+  --danger: #9e332b;
+  --danger-bg: #fdf2f1;
+  --danger-border: #f3c9c5;
+
+  --info: #2b556b;
+  --info-bg: #eff6f9;
+  --info-border: #c4dfec;
+
+  /* ================= TYPOGRAPHY ================= */
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+
+  /* Scale */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 38px;
+
+  --leading-tight: 1.22;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
+
+  /* ================= SPACING & DIMENSIONS ================= */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* Layout Widths */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 0px;
+  --canvas-max-width: 720px;
+  --margin-column-width: 280px;
+  --right-panel-width: 340px;
+
+  /* ================= SHADOWS (Flat & Tactile) ================= */
+  --shadow-subtle: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-card:
+    0 8px 24px -16px rgba(16, 24, 40, 0.28), 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-popover:
+    0 12px 30px -10px rgba(16, 24, 40, 0.2),
+    0 2px 6px -1px rgba(16, 24, 40, 0.06);
+  --shadow-modal:
+    0 30px 60px -24px rgba(20, 52, 130, 0.3),
+    0 8px 20px -10px rgba(16, 24, 40, 0.16);
+
+  /* Legacy variable aliases */
+  --bg-app: var(--paper);
+  --bg-surface: var(--surface);
+  --bg-subtle: var(--paper-subtle);
+  --bg-muted: var(--hairline);
+  --bg-hover: var(--surface-hover);
+  --border-default: var(--hairline);
+  --border-subtle: var(--hairline-subtle);
+  --border-strong: var(--hairline-strong);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-secondary);
+  --text-muted: var(--ink-muted);
+  --text-faint: var(--ink-faint);
+  --accent: var(--ink-blue);
+  --accent-hover: var(--ink-blue-hover);
+  --accent-subtle: var(--ink-blue-subtle);
+  --accent-border: var(--ink-blue-border);
+  --control-height: 34px;
+  --control-radius: var(--radius-sm);
+  --panel-radius: var(--radius-md);
+  --modal-radius: var(--radius-lg);
+  --shadow-sm: var(--shadow-subtle);
+  --shadow-md: var(--shadow-card);
+  --shadow-lg: var(--shadow-popover);
+}
+
+/* ================= DARK MODE ================= */
+html[data-theme="dark"],
+[data-theme="dark"] {
+  --paper: #0b1020;
+  --paper-subtle: #121a2d;
+  --surface: #151e31;
+  --surface-hover: #1b2740;
+  --surface-active: #23314e;
+
+  --ink: #f2f5fa;
+  --ink-secondary: #bdc7d8;
+  --ink-muted: #8e9bb0;
+  --ink-faint: #647188;
+
+  --hairline: #26334b;
+  --hairline-subtle: #1d2940;
+  --hairline-strong: #3b4b68;
+
+  --control-room: #070b16;
+  --control-room-hover: #101626;
+  --control-room-foreground: #ffffff;
+  --control-room-muted: #94a3b8;
+
+  /* Human Accent Dark: luminous ink-blue */
+  --ink-blue: #6f91ff;
+  --ink-blue-hover: #91a9ff;
+  --ink-blue-subtle: rgba(111, 145, 255, 0.15);
+  --ink-blue-border: rgba(111, 145, 255, 0.35);
+  --ink-blue-faint: rgba(111, 145, 255, 0.1);
+
+  --signal: #b7eb35;
+
+  /* Agent Accent Dark: luminous ink-sepia */
+  --ink-sepia: #b497ff;
+  --ink-sepia-hover: #c5b0ff;
+  --ink-sepia-subtle: rgba(180, 151, 255, 0.15);
+  --ink-sepia-border: rgba(180, 151, 255, 0.32);
+  --ink-sepia-faint: rgba(180, 151, 255, 0.08);
+
+  /* Semantic Feedback Dark */
+  --success: #4e9a75;
+  --success-bg: rgba(78, 154, 117, 0.15);
+  --success-border: rgba(78, 154, 117, 0.3);
+
+  --warning: #cfa04e;
+  --warning-bg: rgba(207, 160, 78, 0.15);
+  --warning-border: rgba(207, 160, 78, 0.3);
+
+  --danger: #d45f56;
+  --danger-bg: rgba(212, 95, 86, 0.15);
+  --danger-border: rgba(212, 95, 86, 0.3);
+
+  --info: #64a3c2;
+  --info-bg: rgba(100, 163, 194, 0.15);
+  --info-border: rgba(100, 163, 194, 0.3);
+
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-popover:
+    0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-modal:
+    0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+}

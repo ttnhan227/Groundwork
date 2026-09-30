@@ -1,5 +1,5 @@
-"""Database engine, base, and session module for Groundwork."""
+"""Local SQLite Database module for Groundwork."""
 
-from app.database.database import Base, SessionLocal, engine, get_session
+from app.database.local_db import LocalDatabase, get_db, reset_db
 
-__all__ = ["Base", "SessionLocal", "engine", "get_session"]
+__all__ = ["LocalDatabase", "get_db", "reset_db"]

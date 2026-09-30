@@ -1,276 +1,125 @@
+# =====================================================================
+# Groundwork — Full Docker Compose Stack
+# =====================================================================
+# Runs the complete Groundwork environment in Docker:
+# 1. local-core: Local FastAPI search, indexing & AI context engine (port 8000)
+# 2. app-ui: Groundwork App Web Interface (port 5173)
+# 3. website: Marketing, download & documentation website (port 3000)
+# 4. cloud-api: Cloud Sync Backend API (port 8080)
+# 5. cloud-db: PostgreSQL database for cloud sync (port 5432)
+# =====================================================================
+
 services:
-  # PostgreSQL with pgvector extension
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: groundwork-db
-    environment:
-      POSTGRES_DB: ${DB_NAME:-groundwork}
-      POSTGRES_USER: ${DB_USER:-groundwork}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-groundwork}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-groundwork}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - groundwork
-    restart: unless-stopped
-
-  # MinIO Object Storage (S3-compatible)
-  minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    container_name: groundwork-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-groundwork}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-groundwork-secret}
-    volumes:
-      - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - groundwork
-    restart: unless-stopped
-
-  # Redis Cache & Task Broker
-  redis:
-    image: redis:7-alpine
-    container_name: groundwork-redis
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - groundwork
-    restart: unless-stopped
-
-  # FastAPI Backend API
-  api:
-    image: groundwork-server:latest
+  # 1. Groundwork Local Core (FastAPI + SQLite FTS5)
+  local-core:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: groundwork-api
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - path: .env
-        required: false
+    container_name: groundwork-local-core
     environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-groundwork}:${DB_PASSWORD:-groundwork}@postgres:5432/${DB_NAME:-groundwork}
-      REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-groundwork}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-groundwork-secret}
-      MINIO_BUCKET_ORIGINALS: ${MINIO_BUCKET_ORIGINALS:-original-documents}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-minimum-32-chars-long}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      RUN_MIGRATIONS: "true"
-      RUN_WORKER: "false"
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-gemini-flash-latest}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-gemini-embedding-001}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
+      PORT: 8000
+      GROUNDWORK_ENV: development
     ports:
       - "8000:8000"
+    volumes:
+      - .:/workspace:rw
+      - local_data:/root/.groundwork
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 15s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      retries: 5
+      start_period: 10s
     networks:
-      - groundwork
+      - groundwork-net
     restart: unless-stopped
 
-  # Celery Background Worker
-  worker:
-    image: groundwork-server:latest
+  # 2. Groundwork App Interface (React Web Interface on port 5173)
+  app-ui:
     build:
-      context: ./server
+      context: ./desktop
       dockerfile: Dockerfile
-    container_name: groundwork-worker
+    container_name: groundwork-app-ui
     depends_on:
-      postgres:
+      local-core:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-groundwork}:${DB_PASSWORD:-groundwork}@postgres:5432/${DB_NAME:-groundwork}
-      REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-groundwork}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-groundwork-secret}
-      MINIO_BUCKET_ORIGINALS: ${MINIO_BUCKET_ORIGINALS:-original-documents}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-minimum-32-chars-long}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-gemini-flash-latest}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-gemini-embedding-001}
-    command: celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO --pool=solo --concurrency=2
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A app.tasks.celery_app:celery_app inspect ping --timeout=3 || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 20s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - groundwork
-    restart: unless-stopped
-
-  # Celery Flower (Task Monitor)
-  flower:
-    image: groundwork-server:latest
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: groundwork-flower
-    command: celery -A app.tasks.celery_app:celery_app flower --port=5555 --broker=redis://redis:6379/0
-    environment:
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      - redis
-      - worker
     ports:
-      - "5555:5555"
+      - "${APP_PORT:-5174}:80"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5555/ || exit 1"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/index.html"]
+      interval: 15s
+      timeout: 5s
       retries: 3
-      start_period: 20s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
-      - groundwork
+      - groundwork-net
     restart: unless-stopped
 
-  # React Frontend (Nginx SPA)
-  client:
-    image: groundwork-client:latest
+  # 3. Marketing & Documentation Website (port 3000)
+  website:
     build:
       context: ./client
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-/api/v1}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
-    container_name: groundwork-client
-    depends_on:
-      api:
-        condition: service_healthy
+    container_name: groundwork-website
     ports:
       - "3000:80"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/index.html"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 5s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      retries: 3
     networks:
-      - groundwork
+      - groundwork-net
     restart: unless-stopped
 
-  # Gateway Reverse Proxy
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: groundwork-gateway
-    depends_on:
-      api:
-        condition: service_healthy
-      client:
-        condition: service_healthy
-    ports:
-      - "8080:80"
+  # 4. Cloud Database (PostgreSQL for optional Cloud Sync)
+  cloud-db:
+    image: postgres:16-alpine
+    container_name: groundwork-cloud-db
+    environment:
+      POSTGRES_DB: ${CLOUD_DB_NAME:-groundwork_cloud}
+      POSTGRES_USER: ${CLOUD_DB_USER:-groundwork}
+      POSTGRES_PASSWORD: ${CLOUD_DB_PASSWORD:-groundwork_secret}
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - cloud_pgdata:/var/lib/postgresql/data
+    ports:
+      - "${CLOUD_DB_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      test: ["CMD-SHELL", "pg_isready -U ${CLOUD_DB_USER:-groundwork}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - groundwork-net
+    restart: unless-stopped
+
+  # 5. Cloud Sync Backend API (port 8080)
+  cloud-api:
+    build:
+      context: ./cloud
+      dockerfile: Dockerfile
+    container_name: groundwork-cloud-api
+    depends_on:
+      cloud-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${CLOUD_DB_USER:-groundwork}:${CLOUD_DB_PASSWORD:-groundwork_secret}@cloud-db:5432/${CLOUD_DB_NAME:-groundwork_cloud}
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-groundwork-cloud-secret-key-min-32-chars-long}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      retries: 5
     networks:
-      - groundwork
+      - groundwork-net
     restart: unless-stopped
 
 volumes:
-  postgres_data:
-  minio_data:
-  redis_data:
+  local_data:
+  cloud_pgdata:
 
 networks:
-  groundwork:
+  groundwork-net:
     driver: bridge

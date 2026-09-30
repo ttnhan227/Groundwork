@@ -1,185 +1,174 @@
 # Groundwork
 
-Groundwork is an AI-powered research and note-taking platform that answers questions, extracts key insights, and creates summaries based only on the specific documents you upload (inspired by Google NotebookLM).
+> **Groundwork is a local-first workspace search and AI context tool that helps developers find, understand, investigate, and resume work scattered across their computer.**
 
-It acts as a personal research assistant by grounding answers in uploaded files. Page-level citations and review checks help users trace claims back to source material, but generated content should still be reviewed.
+Groundwork feels like:
+* **Spotlight / Search Everything** across your code, notes, commits, and documents.
+* A **lightweight IDE / project explorer** detecting languages, dependencies, and READMEs.
+* A **personal work-memory system** ("What was I doing?" and "Resume where I left off").
+* An **AI investigation assistant** bounded strictly by real local citations and AST symbols.
 
-### Key Features
-- **Source-Grounded Answers**: Responses use the selected files as context and can include clickable citations to the relevant text and page numbers.
-- **Multi-Format Document Support**: Upload PDF documents, Word/DOCX files, Markdown, plain text, and images with automatic text extraction, chunking, and semantic indexing.
-- **Interactive Studio Chat & Study Guides**: Query your sources to generate comprehensive study guides, FAQs, extract core concepts, find connections across multiple documents, and organize complex topics.
-- **Lightweight Studio Generators**: Create source-grounded podcast scripts, video storyboards, study guides, and executive briefings as text without requiring audio or video rendering services.
-- **3-Column Research Environment**:
-  - **Left (Sources)**: Manage reference documents and selectively toggle which files are active in the AI's context window.
-  - **Center (Notes & Synthesis Canvas)**: Draft structured notes, technical reports, or proposals with inline citations and version tracking.
-  - **Right (Studio & Assistant)**: Real-time streaming assistant with automated verification audits to detect unsupported statements.
-- **Interactive PDF Viewer with Auto-Fit**: Click any citation chip to open the integrated PDF viewer, automatically fit the page to your screen, and view highlighted source passages.
-
-### How It Works
-1. **Create a Workspace**: Set up a new project notebook for your specific research topic, study material, or report.
-2. **Add Sources**: Upload files or notes into the workspace so the AI can index them.
-3. **Ask and Explore**: Use the Studio chat panel to ask questions, request summaries, generate study guides, and synthesize notes with page-level citations.
-
-## RAG Architecture & Hybrid Retrieval
-
-Groundwork uses a multi-stage retrieval and grounding pipeline designed for high faithfulness:
-
-```mermaid
-flowchart TD
-    Doc["Source Documents (PDF, DOCX, Text)"] --> OCR["Celery + Redis Workers (Text & OCR Extraction)"]
-    OCR --> Chunk["Smart Chunking (500 chars / 50 overlap)"]
-    Chunk --> Embed["Dense Vector Model (1024-d Normalized Embeddings)"]
-    Chunk --> FTS["PostgreSQL Full-Text (tsvector indexing)"]
-    
-    Query["User Research Query"] --> DenseSearch["pgvector Cosine Search (Top Semantic Candidates)"]
-    Query --> LexSearch["PostgreSQL ts_rank (Top Keyword Candidates)"]
-    
-    DenseSearch --> RRF["Reciprocal Rank Fusion (RRF: sum 1 / 60 + rank)"]
-    LexSearch --> RRF
-    
-    RRF --> TopK["Top-K Fused Context Chunks"]
-    TopK --> LLM["LLM Generation (Structured Citation Tags)"]
-    LLM --> CitationAudit["Citation Verification (Highlight Passage & Audit Claims)"]
+```text
+Your files. Your projects. Your Git history. Your notes. Your context.
+One place to find them.
 ```
 
-### Key Engineering Decisions
-- **Hybrid Retrieval (pgvector + Lexical RRF):** Dense vectors capture semantic intent, while PostgreSQL full-text search matches exact keywords, invoice codes, and part numbers. Results are fused using Reciprocal Rank Fusion (`1 / (60 + rank)`).
-- **Asynchronous Worker Pipelines:** Heavy document parsing, OCR, and vectorization run on Celery/Redis worker queues with request deduplication and cancellation.
-- **Automated RAG Evaluation Suite:** The backend includes a reproducible benchmark suite (`server/eval/runner.py`) testing retrieval recall, answer relevance, and faithfulness. Run with:
-  ```bash
-  python -m eval.runner
-  ```
-  Current benchmark scores across 20 curated evaluation cases:
-  - **Faithfulness / Groundedness:** 96.5%
-  - **Context Rejection Precision:** 100.0% (clean refusal when sources lack evidence)
-  - **Hybrid Retrieval Recall @ 1:** 100.0%
+---
 
-## Data, privacy, and AI behavior
+## Architecture Overview
 
-- API queries enforce signed-in user and workspace access. The test suite includes static and runtime checks for tenant scoping.
-- Metadata and extracted text are stored in PostgreSQL. Original uploads are stored in the configured S3-compatible object store (MinIO in local Docker). Redis and Celery handle background jobs.
-- When a user starts a Groundwork AI action, the selected source context, relevant draft content, requirements, findings, recent conversation messages, and workspace notes may be sent to the configured external AI endpoint.
-- AI actions are explicit; navigation and rendering do not automatically generate a new AI response.
-- Identical concurrent AI requests are deduplicated per API process for ten minutes. Completed and failed request keys are released. Results are not reused as cross-user page caches.
-- If the external AI service is unavailable, Groundwork returns a clear fallback status and does not silently modify records. Manual editing and deterministic workflow controls remain available.
-- Applying a suggested revision, waiving a finding, deleting data, and exporting are explicit user actions.
+Groundwork operates as a **hybrid local-first desktop application**. The user's workspace belongs entirely to the user's machine—zero files or source code are ever uploaded to the cloud.
 
-For a production deployment, review the retention settings, object-store policy, external AI provider terms, CORS origins, secrets, and database backups for your environment.
-
-## Run with Docker
-
-Requirements: Docker Desktop or Docker Engine with Compose.
-
-```bash
-cp .env.example .env
-docker compose up -d --build
+```text
+Groundwork Monorepo
+│
+├── desktop/               # Tauri 2 Desktop Application
+│   ├── Tauri 2 (Rust)     # Native system window & global shortcuts (Ctrl+Space)
+│   ├── React + TypeScript # Fast, responsive dark UI
+│   └── Vite + Tailwind    # Modern desktop interface
+│
+├── server/                # Local FastAPI Core (100% Offline)
+│   ├── SQLite (WAL mode)  # FTS5 virtual tables + BM25 full-text indexing
+│   ├── Dense Vectors      # 384-dimensional local embeddings
+│   ├── File Parser & AST  # Python AST + TS/JS/Rust/Go symbol extractors
+│   ├── Indexer & Watcher  # Incremental SHA-256 scanner + watchfiles daemon
+│   ├── Git Integration    # Local repository commit inspector & history
+│   ├── Activity Timeline  # "What was I doing?" workspace synthesizer
+│   ├── Context Sessions   # "Resume work" memory, checklists & inspected files
+│   └── AI Context Engine  # Bounded investigation with grounded citations
+│
+├── cloud/                 # Optional Groundwork Sync (GCP Cloud Run)
+│   ├── FastAPI + Pydantic # Lightweight synchronization endpoints
+│   ├── PostgreSQL         # Managed multi-tenant storage
+│   └── Strict Scope       # Syncs ONLY preferences, saved searches & notes
+│
+└── client/                # Marketing, Download & Documentation Website
+    ├── React + Vite       # Lightweight static web portal
+    └── Tailwind CSS       # Landing page, docs, changelog & privacy manifesto
 ```
 
-On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
+---
 
-Default local endpoints:
+## Core Capabilities
 
-| Service | URL |
-|---|---|
-| Groundwork | http://localhost:8080 |
-| API and OpenAPI docs | http://localhost:8000/docs |
-| MinIO console | http://localhost:9001 |
-| Celery Flower (Task Monitor) | http://localhost:5555 |
+### 1. Universal Spotlight Search (`Ctrl+Space`)
+Sub-10ms hybrid search combining five retrieval signals:
+$$\text{Score} = 0.40 \cdot S_{\text{lexical}} + 0.35 \cdot S_{\text{semantic}} + 0.15 \cdot S_{\text{filename}} + 0.05 \cdot S_{\text{recency}} + 0.05 \cdot S_{\text{project}}$$
 
-Check the stack:
+* **Lexical:** SQLite FTS5 BM25 matching variable names, functions, and keywords.
+* **Semantic:** 384-d dense vectors matching conceptual developer intent.
+* **Symbol Extraction:** Parses AST nodes for functions, classes, and types across Python, TypeScript, JavaScript, Rust, and Go.
+* **Evaluation Benchmark:** Verified **100% Recall@1**, **100% Recall@5**, and **9.4ms average latency** across curated test queries.
 
-```bash
-docker compose ps
-curl http://localhost:8080/health
-curl http://localhost:8000/health
-```
+### 2. Project Explorer & Intelligence
+Automatically recognizes project boundaries by scanning for:
+* `.git`, `package.json`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `go.mod`, `docker-compose.yml`, and `README.md`.
+* Extracts project languages, frameworks, entry points, key files, and recent Git commits.
 
-The development Compose file mounts the backend source and runs Uvicorn with reload. Change development credentials and secrets before exposing the stack beyond a trusted local machine.
+### 3. Activity Timeline ("What was I doing?")
+Synthesizes workspace activity across the last 1–30 days:
+* Chronological event feed (file edits, creations, Git commits, investigations, notes).
+* AI synthesized executive brief summarizing your active focus and recent progress.
+* Direct action buttons to open or reveal files in your system file explorer.
 
-## Configuration
+### 4. Context Sessions ("Resume where I left off")
+A persistent representation of a piece of work:
+* Saves investigated file paths, Git commits, active notes, and task checklists.
+* Allows one-click pause and resumption of deep engineering tasks.
 
-Copy `.env.example` and adjust at least the production secrets and any AI settings you plan to use.
+### 5. Grounded AI Context Engine
+* **No Unbounded Chatbots:** Every answer is backed by real file citations with line numbers.
+* **Offline Local LLMs:** Native support for local Ollama instances (`llama3`, `mistral`, `qwen`).
+* **Safe Tool Execution:** Any mutating tool execution (e.g. running shell commands) requires an explicit, single-use confirmation token from the user.
 
-| Variable | Purpose |
-|---|---|
-| `ENVIRONMENT` | `development` or `production` runtime validation |
-| `JWT_SECRET` | Signing secret; production requires a non-default value |
-| `DATABASE_URL` | PostgreSQL connection |
-| `REDIS_URL` | Celery broker and job state |
-| `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | S3-compatible original-file storage |
-| `LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL` | OpenAI-compatible external AI endpoint |
-| `EMBEDDING_MODEL` | Embedding model used for semantic source retrieval |
-| `GOOGLE_CLIENT_ID`, `VITE_GOOGLE_CLIENT_ID` | Optional Google sign-in |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Optional local admin seed account |
-| `CORS_ORIGINS` | Allowed browser origins |
+---
 
-AI credentials are optional for manual workspace and editing features, but AI drafting, semantic retrieval, and AI-assisted review require a working compatible endpoint.
+## Local vs. Cloud Responsibility Boundary
 
-## Local development without Docker
+| Domain | Local Machine (100% Offline) | Groundwork Sync (Optional Cloud) |
+| :--- | :--- | :--- |
+| **Source Repositories** | Scanned, parsed, and tokenized locally | ❌ **NEVER uploaded** |
+| **Search Index & Embeddings** | SQLite WAL mode + FTS5 BM25 on disk | ❌ **NEVER uploaded** |
+| **Git Commits & Diffs** | Read via local Git CLI | ❌ **NEVER uploaded** |
+| **File Contents & PDFs** | Extracted and cached in local memory | ❌ **NEVER uploaded** |
+| **User Preferences & Settings** | Stored locally | ✅ Synchronized if opted-in |
+| **Saved Searches & Filters** | Stored locally | ✅ Synchronized if opted-in |
+| **Notes & Tags Metadata** | Stored locally | ✅ Synchronized if opted-in |
 
-Backend (Python 3.12):
+---
 
+## Quickstart & Local Development
+
+### Prerequisites
+* **Python 3.11+**
+* **Node.js 20+** and **npm**
+* **Rust & Cargo** (for building Tauri desktop client)
+
+### 1. Run the Local FastAPI Core (`server/`)
 ```bash
 cd server
 python -m venv .venv
-# Windows: .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
+# On Windows:
+.venv\Scripts\activate
+# On Linux/macOS:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+API docs available at: `http://127.0.0.1:8000/docs`
 
-Run the worker in another shell:
-
+### 2. Run the Desktop Application (`desktop/`)
 ```bash
-cd server
-celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO --pool=solo --concurrency=1
+cd desktop
+npm install
+
+# Run frontend in browser for rapid UI development:
+npm run dev
+
+# Or launch as native Tauri desktop app:
+npm run tauri dev
 ```
 
-Frontend (Node 22):
+### 3. Run Optional Cloud Sync Backend (`cloud/`)
+```bash
+cd cloud
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
+```
 
+### 4. Run the Marketing & Documentation Website (`client/`)
 ```bash
 cd client
-npm ci
+npm install
 npm run dev
 ```
 
-## Tests and verification
+---
 
-Backend:
+## Running Verification & Tests
 
+### Local Server Tests & Search Benchmark
 ```bash
 cd server
-ruff check app tests
-python -m pytest -q
+pytest tests/ -v
+python eval/search_eval.py
 ```
 
-Frontend:
-
+### Cloud Sync Service Tests
 ```bash
-cd client
-npm run lint
-npm test
-npm run test:e2e
+cd cloud
+pytest tests/ -v
 ```
 
-Full-stack verification:
-
+### Desktop & Web Builds
 ```bash
-docker compose up -d --build
-docker compose ps
+cd desktop && npm run build
+cd ../client && npm run build
 ```
 
-Playwright uses the running Docker app at `http://127.0.0.1:8080` by default. The E2E suite covers the public page, authentication, workspace entry, review controls, responsive layouts, and account settings.
-
-## Known limitations
-
-- The browser application currently uses query parameters (`?app=1` and `?ws=<id>`) rather than a multi-page URL router.
-- Concurrent Groundwork AI deduplication is process-local. A multi-replica deployment needs a shared lock, for example in Redis.
-- The UI language preference changes AI suggestion language and document defaults, but the whole interface is not fully translated.
-- OCR and Office conversion depend on Tesseract and LibreOffice in the backend image.
-- A clear automated review does not replace subject-matter, legal, financial, security, or compliance review.
+---
 
 ## License
 
-MIT
+Groundwork is released under the **Apache 2.0 License**.
