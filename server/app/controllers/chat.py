@@ -36,6 +36,7 @@ from app.rag import (
     is_casual_message,
     relevant_snippet,
     requires_visual_answer,
+    retrieve_hybrid_chunks,
     stream_answer,
     stream_general_answer,
     stream_visual_answer,
@@ -308,18 +309,14 @@ async def ask_question(
     if not visual_mode:
         retrieval_query = build_retrieval_query(payload.question, history)
         query_vector = (await embed_texts_async([retrieval_query]))[0]
-        chunks = list(
-            await session.scalars(
-                select(DocumentChunk)
-                .join(Document, Document.id == DocumentChunk.document_id)
-                .where(
-                    DocumentChunk.document_id.in_(document_ids),
-                    Document.owner_id == user.id,
-                    Document.workspace_id == conversation.workspace_id,
-                )
-                .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
-                .limit(settings.rag_top_k)
-            )
+        chunks = await retrieve_hybrid_chunks(
+            session=session,
+            document_ids=document_ids,
+            user_id=user.id,
+            workspace_id=conversation.workspace_id,
+            query_text=payload.question,
+            query_vector=query_vector,
+            top_k=settings.rag_top_k,
         )
         visual_mode = not chunks
     await record_ai_usage(user, "chat", session)
@@ -432,18 +429,14 @@ async def stream_question(
         if not visual_mode:
             retrieval_query = build_retrieval_query(payload.question, history)
             query_vector = (await embed_texts_async([retrieval_query]))[0]
-            chunks = list(
-                await session.scalars(
-                    select(DocumentChunk)
-                    .join(Document, Document.id == DocumentChunk.document_id)
-                    .where(
-                        DocumentChunk.document_id.in_(document_ids),
-                        Document.owner_id == user.id,
-                        Document.workspace_id == conversation.workspace_id,
-                    )
-                    .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
-                    .limit(settings.rag_top_k)
-                )
+            chunks = await retrieve_hybrid_chunks(
+                session=session,
+                document_ids=document_ids,
+                user_id=user.id,
+                workspace_id=conversation.workspace_id,
+                query_text=payload.question,
+                query_vector=query_vector,
+                top_k=settings.rag_top_k,
             )
             visual_mode = not chunks
         visual_sources = _visual_sources(conversation.documents, settings.vision_max_pages) if visual_mode else []

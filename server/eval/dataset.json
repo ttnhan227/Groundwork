@@ -1,0 +1,302 @@
+[
+  {
+    "id": "eval-01",
+    "category": "keyword_exact",
+    "document_name": "infrastructure_spec.pdf",
+    "corpus_chunks": [
+      "The primary database cluster runs PostgreSQL 16 on port 5432 with pgvector enabled.",
+      "Worker tasks are dispatched via Redis running on port 6379 with a max-memory limit of 4GB.",
+      "The Celery flower dashboard is exposed internally on port 5555 behind basic authentication."
+    ],
+    "target_chunk_index": 2,
+    "question": "What port is Celery Flower running on, and what authentication does it require?",
+    "ground_truth_answer": "Celery Flower runs on port 5555 behind basic authentication.",
+    "ground_truth_keywords": ["5555", "basic authentication", "flower"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-02",
+    "category": "keyword_exact",
+    "document_name": "billing_summary_2025.pdf",
+    "corpus_chunks": [
+      "Client Acorn Corp was invoiced under reference INV-98234 for the sum of $14,250 on October 12.",
+      "Client BlueFin Ltd was invoiced under reference INV-98235 for the sum of $8,900 on October 15.",
+      "Client Cranberry LLC had outstanding balances under account ACCT-4402."
+    ],
+    "target_chunk_index": 1,
+    "question": "What is the invoice reference number and amount for BlueFin Ltd?",
+    "ground_truth_answer": "BlueFin Ltd was invoiced under reference INV-98235 for $8,900 on October 15.",
+    "ground_truth_keywords": ["INV-98235", "$8,900", "BlueFin"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-03",
+    "category": "semantic_conceptual",
+    "document_name": "engineering_principles.md",
+    "corpus_chunks": [
+      "We avoid microservices for early-stage features to minimize network serialization latency and operational overhead.",
+      "Modular monolith architectures allow easy boundary refactoring before physical service extraction is justified.",
+      "All persistent state changes must produce an audit event in the same transactional boundary."
+    ],
+    "target_chunk_index": 0,
+    "question": "Why does the engineering team avoid microservices in early feature development?",
+    "ground_truth_answer": "To reduce network serialization latency and operational overhead.",
+    "ground_truth_keywords": ["operational overhead", "serialization latency", "microservices"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-04",
+    "category": "semantic_conceptual",
+    "document_name": "tenancy_model.md",
+    "corpus_chunks": [
+      "Tenant isolation is enforced at the database abstraction layer using global query filters.",
+      "Each request resolves the tenant ID from the verified JWT claims before hitting controller logic.",
+      "Cross-tenant queries are blocked by default and require an explicit system context override."
+    ],
+    "target_chunk_index": 1,
+    "question": "How does the application resolve the tenant ID for each incoming request?",
+    "ground_truth_answer": "It resolves the tenant ID from verified JWT claims before reaching controller logic.",
+    "ground_truth_keywords": ["JWT claims", "tenant ID", "controller"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-05",
+    "category": "negative_unanswerable",
+    "document_name": "security_policy.pdf",
+    "corpus_chunks": [
+      "All API endpoints require TLS 1.3 encryption in transit.",
+      "Passwords must meet a minimum length of 12 characters and undergo bcrypt hashing with cost factor 12.",
+      "Session tokens expire after 24 hours of inactivity."
+    ],
+    "target_chunk_index": -1,
+    "question": "What is the corporate refund policy for canceled enterprise subscriptions?",
+    "ground_truth_answer": "The provided sources do not contain sufficient information to answer this question.",
+    "ground_truth_keywords": ["do not contain", "cannot be found", "insufficient"],
+    "is_unanswerable": true
+  },
+  {
+    "id": "eval-06",
+    "category": "keyword_exact",
+    "document_name": "deployment_manifest.yaml",
+    "corpus_chunks": [
+      "Cloud Run container memory limit is configured to 2048Mi and CPU allocation is set to 2 vCPUs.",
+      "MinIO object storage bucket name is set to 'groundwork-assets-prod'.",
+      "The Redis connection pool timeout is configured to 3000ms with max connections 50."
+    ],
+    "target_chunk_index": 1,
+    "question": "What is the exact bucket name configured for MinIO object storage?",
+    "ground_truth_answer": "The MinIO bucket name is 'groundwork-assets-prod'.",
+    "ground_truth_keywords": ["groundwork-assets-prod", "MinIO"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-07",
+    "category": "semantic_conceptual",
+    "document_name": "rag_architecture.md",
+    "corpus_chunks": [
+      "Document processing occurs asynchronously via Celery worker pools to prevent blocking API threads during heavy OCR operations.",
+      "Extracted text is split into chunks of 500 characters with 50-character overlap to retain context across sentence splits.",
+      "Embeddings are generated using normalized 1024-dimension vectors stored in PostgreSQL with pgvector."
+    ],
+    "target_chunk_index": 0,
+    "question": "Why are document extraction and OCR performed in background worker pools rather than in the API thread?",
+    "ground_truth_answer": "To prevent blocking the API web server threads during computationally heavy OCR tasks.",
+    "ground_truth_keywords": ["blocking", "API", "worker pools", "OCR"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-08",
+    "category": "negative_unanswerable",
+    "document_name": "cloud_run_specs.pdf",
+    "corpus_chunks": [
+      "Auto-scaling configuration maintains a minimum of 1 instance and a maximum of 10 instances.",
+      "Container startup probe pings the /health endpoint with an initial delay of 5 seconds.",
+      "Traffic routing directs 100% of incoming requests to the latest deployed revision."
+    ],
+    "target_chunk_index": -1,
+    "question": "How much does the Google Cloud Run cluster cost per calendar month?",
+    "ground_truth_answer": "The provided sources do not contain sufficient information to answer this question.",
+    "ground_truth_keywords": ["do not contain", "cannot be found", "insufficient"],
+    "is_unanswerable": true
+  },
+  {
+    "id": "eval-09",
+    "category": "keyword_exact",
+    "document_name": "compliance_report.pdf",
+    "corpus_chunks": [
+      "SOC2 Type II certification was completed by Schellman & Company on August 14, 2025.",
+      "ISO 27001 audit remediation actions are tracked in Jira under project COMP-2025.",
+      "Disaster recovery RTO objective is 4 hours, and RPO objective is 15 minutes."
+    ],
+    "target_chunk_index": 2,
+    "question": "What are the target RTO and RPO metrics specified in the disaster recovery plan?",
+    "ground_truth_answer": "The RTO is 4 hours and the RPO is 15 minutes.",
+    "ground_truth_keywords": ["RTO", "4 hours", "RPO", "15 minutes"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-10",
+    "category": "multi_constraint",
+    "document_name": "database_tuning.md",
+    "corpus_chunks": [
+      "For pgvector HNSW indexes, m is tuned to 16 and ef_construction is set to 64 to optimize build memory.",
+      "The shared_buffers parameter is allocated 25% of total host RAM (4GB on a 16GB node).",
+      "Work_mem is set to 32MB per connection to avoid disk spillover during complex joins and sorts."
+    ],
+    "target_chunk_index": 0,
+    "question": "What specific parameter values are configured for the pgvector HNSW index construction?",
+    "ground_truth_answer": "m is set to 16 and ef_construction is set to 64.",
+    "ground_truth_keywords": ["16", "64", "HNSW", "ef_construction"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-11",
+    "category": "keyword_exact",
+    "document_name": "api_routing.md",
+    "corpus_chunks": [
+      "Incoming webhooks from PayPal are validated against webhook ID WH-99482-LIVE.",
+      "Stripe events are dispatched to the /api/v1/payments/stripe-hook endpoint.",
+      "All webhooks verify HMAC-SHA256 signatures before processing order fulfillment."
+    ],
+    "target_chunk_index": 0,
+    "question": "What is the webhook ID used to validate incoming PayPal webhooks?",
+    "ground_truth_answer": "The webhook ID is WH-99482-LIVE.",
+    "ground_truth_keywords": ["WH-99482-LIVE", "PayPal"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-12",
+    "category": "semantic_conceptual",
+    "document_name": "citation_grounding.md",
+    "corpus_chunks": [
+      "LLMs frequently generate confident assertions that are not backed by any source text.",
+      "Groundwork parses generated text for [Source N] markers and cross-references each claim with the physical source chunk.",
+      "If a claim references a non-existent source index, the citation chip is suppressed to prevent phantom grounding."
+    ],
+    "target_chunk_index": 2,
+    "question": "What happens in Groundwork if an LLM references a source index that was never provided in context?",
+    "ground_truth_answer": "The invalid citation chip is suppressed to prevent phantom grounding.",
+    "ground_truth_keywords": ["suppressed", "phantom grounding", "invalid", "index"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-13",
+    "category": "negative_unanswerable",
+    "document_name": "network_topology.md",
+    "corpus_chunks": [
+      "The VPC network is divided into two subnets across us-central1-a and us-central1-b.",
+      "Internal routing uses Cloud NAT for outbound internet egress from private IP instances.",
+      "All ingress traffic is terminated at an external Application Load Balancer."
+    ],
+    "target_chunk_index": -1,
+    "question": "Which employee configured the firewall rules for subnet B?",
+    "ground_truth_answer": "The provided sources do not contain sufficient information to answer this question.",
+    "ground_truth_keywords": ["do not contain", "cannot be found", "insufficient"],
+    "is_unanswerable": true
+  },
+  {
+    "id": "eval-14",
+    "category": "keyword_exact",
+    "document_name": "telemetry_logging.md",
+    "corpus_chunks": [
+      "Request latency metrics are tracked under histogram metric http_request_duration_seconds.",
+      "Token usage telemetry records prompt_tokens and completion_tokens per model operation.",
+      "Error logs are tagged with trace_id and correlation_id for distributed tracing."
+    ],
+    "target_chunk_index": 0,
+    "question": "What is the histogram metric name used to track HTTP request latency?",
+    "ground_truth_answer": "The metric name is http_request_duration_seconds.",
+    "ground_truth_keywords": ["http_request_duration_seconds", "latency"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-15",
+    "category": "semantic_conceptual",
+    "document_name": "idempotency_patterns.md",
+    "corpus_chunks": [
+      "When a client retries a payment or workspace generation request due to a network timeout, duplicate work must be prevented.",
+      "The server computes a SHA-256 idempotency key from the user ID, resource ID, and request payload.",
+      "In-flight requests hold an exclusive Redis lock key with a 10-minute TTL, rejecting concurrent duplicates."
+    ],
+    "target_chunk_index": 1,
+    "question": "How is the idempotency key calculated for in-flight request deduplication?",
+    "ground_truth_answer": "It is calculated as a SHA-256 hash of the user ID, resource ID, and request payload.",
+    "ground_truth_keywords": ["SHA-256", "user ID", "resource ID", "payload"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-16",
+    "category": "keyword_exact",
+    "document_name": "ledger_accounting.md",
+    "corpus_chunks": [
+      "Tenvora enforces double-entry ledger rules where every transaction must balance debits and credits exactly.",
+      "Pessimistic row locking is applied using SELECT FOR UPDATE on account row 1042 during funds transfer.",
+      "The system ledger invariant verifies that sum(debit_amount) minus sum(credit_amount) equals zero across the journal."
+    ],
+    "target_chunk_index": 2,
+    "question": "What is the exact ledger invariant formula verified across the journal?",
+    "ground_truth_answer": "The invariant verifies that sum(debit_amount) - sum(credit_amount) = 0.",
+    "ground_truth_keywords": ["sum(debit_amount)", "sum(credit_amount)", "zero"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-17",
+    "category": "negative_unanswerable",
+    "document_name": "frontend_tech_stack.md",
+    "corpus_chunks": [
+      "The frontend is built with React 19, TypeScript, and Vite.",
+      "State management uses TanStack Query for server cache and Zustand for transient UI state.",
+      "Styling is provided by Tailwind CSS with shadcn/ui component primitives."
+    ],
+    "target_chunk_index": -1,
+    "question": "Does the frontend support offline local storage synchronization with IndexedDB?",
+    "ground_truth_answer": "The provided sources do not contain sufficient information to answer this question.",
+    "ground_truth_keywords": ["do not contain", "cannot be found", "insufficient"],
+    "is_unanswerable": true
+  },
+  {
+    "id": "eval-18",
+    "category": "semantic_conceptual",
+    "document_name": "retrieval_fusion.md",
+    "corpus_chunks": [
+      "Pure dense vector search retrieves conceptually similar passages but struggles with exact codes or uncommon names.",
+      "Lexical search using BM25 or PostgreSQL tsvector matches exact alphanumeric terms but ignores synonyms.",
+      "Reciprocal Rank Fusion (RRF) scores each document as 1 / (60 + rank), combining the top results from both paradigms."
+    ],
+    "target_chunk_index": 2,
+    "question": "How does Reciprocal Rank Fusion (RRF) calculate the combined score of a document?",
+    "ground_truth_answer": "It computes the sum of 1 / (60 + rank) across each retrieval list where the document appears.",
+    "ground_truth_keywords": ["1 / (60 + rank)", "rank", "combining", "60"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-19",
+    "category": "keyword_exact",
+    "document_name": "security_tokens.md",
+    "corpus_chunks": [
+      "Access tokens use asymmetric RS256 signing with a 15-minute expiration time.",
+      "Refresh tokens are stored as SHA-256 hashed values in the refresh_tokens table with a 30-day lifetime.",
+      "Revocation of a refresh token immediately invalidates all child sessions associated with that token family."
+    ],
+    "target_chunk_index": 0,
+    "question": "What algorithm and expiration time are used for API access tokens?",
+    "ground_truth_answer": "Access tokens use RS256 signing with a 15-minute expiration time.",
+    "ground_truth_keywords": ["RS256", "15-minute", "access tokens"],
+    "is_unanswerable": false
+  },
+  {
+    "id": "eval-20",
+    "category": "multi_constraint",
+    "document_name": "data_retention_policy.md",
+    "corpus_chunks": [
+      "Soft-deleted documents remain recoverable in the database for 30 days before permanent deletion.",
+      "Celery task logs and execution telemetry records are purged automatically after 14 days.",
+      "Financial ledger transactions must be retained for 7 years to comply with regulatory standards."
+    ],
+    "target_chunk_index": 2,
+    "question": "What is the mandatory retention period for financial ledger transactions?",
+    "ground_truth_answer": "Financial ledger transactions must be retained for 7 years.",
+    "ground_truth_keywords": ["7 years", "financial ledger", "retained"],
+    "is_unanswerable": false
+  }
+]

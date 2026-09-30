@@ -1,6 +1,7 @@
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -10,6 +11,7 @@ from app.controllers.auth import login
 from app.controllers.users import change_password
 from app.dtos.auth_dto import LoginRequest
 from app.dtos.user_dto import PasswordChangeRequest, UserResponse
+from app.models.enums import UserRole
 from app.models.user import User
 
 ROOT = Path(__file__).parents[1]
@@ -29,11 +31,6 @@ def test_alembic_migration_0025_add_has_password() -> None:
     assert 'down_revision = "0024_document_source_hash_unique"' in content
     assert 'add_column("users", sa.Column("has_password", sa.Boolean()' in content
     assert 'drop_column("users", "has_password")' in content
-
-
-from datetime import UTC, datetime
-
-from app.models.enums import UserRole
 
 
 def test_user_response_dto_includes_has_password() -> None:

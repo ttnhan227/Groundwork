@@ -1,9 +1,9 @@
 import math
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from app.core.config import get_settings
 from app.services.ai_orchestration import ai_orchestrator
@@ -202,6 +202,117 @@ def chunk_pages(pages: list[tuple[int, str]], size: int, overlap: int) -> list[T
                 break
             start = max(start + 1, end - overlap)
     return chunks
+
+
+def compute_reciprocal_rank_fusion(
+    ranked_lists: list[list[T]],
+    k: int = 60,
+    key_func: Callable[[T], Any] | None = None,
+) -> list[T]:
+    """Combine multiple ranked candidate lists using Reciprocal Rank Fusion (RRF).
+
+    For an item d appearing across retrieval lists M:
+        RRF_score(d) = sum(1 / (k + rank_m(d))) for m in M
+
+    Where k (default 60) dampens the impact of high ranks from single lists.
+    This effectively combines dense vector semantic recall with sparse lexical precision.
+    """
+    if not ranked_lists:
+        return []
+
+    getter = key_func if key_func is not None else (lambda x: getattr(x, "id", x))
+    scores: dict[Any, float] = {}
+    item_map: dict[Any, T] = {}
+
+    for ranked_list in ranked_lists:
+        for rank, item in enumerate(ranked_list, start=1):
+            key = getter(item)
+            if key not in item_map:
+                item_map[key] = item
+            scores[key] = scores.get(key, 0.0) + (1.0 / (k + rank))
+
+    sorted_keys = sorted(scores.keys(), key=lambda key: scores[key], reverse=True)
+    return [item_map[key] for key in sorted_keys]
+
+
+async def retrieve_hybrid_chunks(
+    session,
+    document_ids: Sequence[object],
+    user_id: object,
+    workspace_id: object,
+    query_text: str,
+    query_vector: list[float],
+    top_k: int = 5,
+    candidate_pool_size: int = 20,
+):
+    """Retrieve document chunks using hybrid search (pgvector dense + PostgreSQL lexical) fused via RRF.
+
+    1. Dense query: retrieves top candidates by cosine similarity.
+    2. Lexical query: retrieves top candidates matching keywords via full-text search.
+    3. Reciprocal Rank Fusion: balances dense semantic similarity with exact keyword hits.
+    """
+    from sqlalchemy import func, or_, select
+
+    from app.models import Document, DocumentChunk
+
+    base_filter = [
+        DocumentChunk.document_id.in_(document_ids),
+        Document.owner_id == user_id,
+        Document.workspace_id == workspace_id,
+    ]
+
+    # 1. Dense candidate query
+    dense_stmt = (
+        select(DocumentChunk)
+        .join(Document, Document.id == DocumentChunk.document_id)
+        .where(*base_filter)
+        .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
+        .limit(candidate_pool_size)
+    )
+    dense_candidates = list(await session.scalars(dense_stmt))
+
+    # 2. Lexical candidate query
+    lexical_candidates = []
+    search_terms = [t for t in re.findall(r"\w+", query_text) if len(t) > 1]
+    if search_terms:
+        dialect = getattr(session.bind, "dialect", None)
+        dialect_name = getattr(dialect, "name", "") if dialect else ""
+        if dialect_name == "postgresql":
+            try:
+                ts_query = func.plainto_tsquery("english", query_text)
+                ts_vector = func.to_tsvector("english", DocumentChunk.text)
+                lexical_stmt = (
+                    select(DocumentChunk)
+                    .join(Document, Document.id == DocumentChunk.document_id)
+                    .where(*base_filter, ts_vector.op("@@")(ts_query))
+                    .order_by(func.ts_rank(ts_vector, ts_query).desc())
+                    .limit(candidate_pool_size)
+                )
+                lexical_candidates = list(await session.scalars(lexical_stmt))
+            except Exception:
+                lexical_candidates = []
+
+        if not lexical_candidates:
+            # Universal fallback for SQLite / test environments or when tsquery syntax has no matches
+            conditions = [DocumentChunk.text.ilike(f"%{term}%") for term in search_terms[:5]]
+            fallback_stmt = (
+                select(DocumentChunk)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(*base_filter, or_(*conditions))
+                .limit(candidate_pool_size)
+            )
+            lexical_candidates = list(await session.scalars(fallback_stmt))
+
+    # 3. Fuse with RRF
+    if lexical_candidates:
+        fused = compute_reciprocal_rank_fusion(
+            [dense_candidates, lexical_candidates],
+            k=60,
+            key_func=lambda chunk: chunk.id,
+        )
+        return fused[:top_k]
+
+    return dense_candidates[:top_k]
 
 
 @lru_cache(maxsize=1)

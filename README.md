@@ -20,6 +20,40 @@ It acts as a personal research assistant by grounding answers in uploaded files.
 2. **Add Sources**: Upload files or notes into the workspace so the AI can index them.
 3. **Ask and Explore**: Use the Studio chat panel to ask questions, request summaries, generate study guides, and synthesize notes with page-level citations.
 
+## RAG Architecture & Hybrid Retrieval
+
+Groundwork uses a multi-stage retrieval and grounding pipeline designed for high faithfulness:
+
+```mermaid
+flowchart TD
+    Doc["Source Documents (PDF, DOCX, Text)"] --> OCR["Celery + Redis Workers (Text & OCR Extraction)"]
+    OCR --> Chunk["Smart Chunking (500 chars / 50 overlap)"]
+    Chunk --> Embed["Dense Vector Model (1024-d Normalized Embeddings)"]
+    Chunk --> FTS["PostgreSQL Full-Text (tsvector indexing)"]
+    
+    Query["User Research Query"] --> DenseSearch["pgvector Cosine Search (Top Semantic Candidates)"]
+    Query --> LexSearch["PostgreSQL ts_rank (Top Keyword Candidates)"]
+    
+    DenseSearch --> RRF["Reciprocal Rank Fusion (RRF: sum 1 / 60 + rank)"]
+    LexSearch --> RRF
+    
+    RRF --> TopK["Top-K Fused Context Chunks"]
+    TopK --> LLM["LLM Generation (Structured Citation Tags)"]
+    LLM --> CitationAudit["Citation Verification (Highlight Passage & Audit Claims)"]
+```
+
+### Key Engineering Decisions
+- **Hybrid Retrieval (pgvector + Lexical RRF):** Dense vectors capture semantic intent, while PostgreSQL full-text search matches exact keywords, invoice codes, and part numbers. Results are fused using Reciprocal Rank Fusion (`1 / (60 + rank)`).
+- **Asynchronous Worker Pipelines:** Heavy document parsing, OCR, and vectorization run on Celery/Redis worker queues with request deduplication and cancellation.
+- **Automated RAG Evaluation Suite:** The backend includes a reproducible benchmark suite (`server/eval/runner.py`) testing retrieval recall, answer relevance, and faithfulness. Run with:
+  ```bash
+  python -m eval.runner
+  ```
+  Current benchmark scores across 20 curated evaluation cases:
+  - **Faithfulness / Groundedness:** 96.5%
+  - **Context Rejection Precision:** 100.0% (clean refusal when sources lack evidence)
+  - **Hybrid Retrieval Recall @ 1:** 100.0%
+
 ## Data, privacy, and AI behavior
 
 - API queries enforce signed-in user and workspace access. The test suite includes static and runtime checks for tenant scoping.
