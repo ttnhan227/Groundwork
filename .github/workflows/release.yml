@@ -69,7 +69,7 @@ jobs:
         run: |
           $installer = Get-ChildItem -LiteralPath desktop/src-tauri/target/release/bundle/nsis -Filter '*-setup.exe'
           if (@($installer).Count -ne 1) { throw 'Expected exactly one Windows installer' }
-          node desktop/scripts/smoke-installed.cjs $installer.FullName
+          ./desktop/scripts/smoke-installed-ci.ps1 -Installer $installer.FullName
           if ($LASTEXITCODE) { throw 'Installed application checks failed' }
       - name: Prepare stable download name and checksum
         shell: pwsh
@@ -84,6 +84,11 @@ jobs:
           name: verified-windows-release
           path: release-assets/
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-release-test-diagnostics
+          path: desktop/test-results/
 
   publish:
     needs: build-and-test

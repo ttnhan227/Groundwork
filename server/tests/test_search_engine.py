@@ -11,7 +11,7 @@ from app.services.workspace_service import WorkspaceService
 
 def test_hybrid_search_scoring_and_ranking():
     with tempfile.TemporaryDirectory() as tmpdir:
-        root = Path(tmpdir)
+        root = Path(tmpdir).resolve()
         # Create mock project files
         proj_dir = root / "sample-project"
         proj_dir.mkdir()

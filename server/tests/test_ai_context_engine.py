@@ -13,7 +13,7 @@ from app.services.workspace_service import WorkspaceService
 
 def test_bounded_ai_context_retrieval_and_citations():
     with tempfile.TemporaryDirectory() as tmpdir:
-        root = Path(tmpdir)
+        root = Path(tmpdir).resolve()
         db_path = root / "test_ai.db"
         config._settings = config.Settings(database_path=db_path, data_dir=root, ai_provider="local")
 
@@ -42,7 +42,7 @@ Mutating actions require explicit user confirmation.
 
 def test_ai_tool_manager_safe_vs_mutating():
     with tempfile.TemporaryDirectory() as tmpdir:
-        root = Path(tmpdir)
+        root = Path(tmpdir).resolve()
         db_path = root / "test_tools.db"
         config._settings = config.Settings(database_path=db_path, data_dir=root)
 

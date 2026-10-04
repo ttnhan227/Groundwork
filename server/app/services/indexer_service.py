@@ -258,6 +258,7 @@ class IndexerService:
         if self._is_ignored(fpath, ws.ignore_patterns, [], root) or not self.parser.is_supported(fpath):
             self.remove_file(str(fpath))
             return False
+        fpath = fpath.resolve()
         if not fpath.exists() or not fpath.is_file():
             return False
 
@@ -444,14 +445,16 @@ class IndexerService:
 
     def _is_ignored(self, path: Path, ignore_patterns: list[str], gitignores: list[str], root: Path) -> bool:
         try:
-            path.resolve().relative_to(root.resolve())
-            rel = path.relative_to(root).as_posix()
+            resolved = path.resolve()
+            root = root.resolve()
+            rel = resolved.relative_to(root).as_posix()
         except ValueError:
             return True
         # Never index credentials or links (including links within a workspace).
         sensitive = {".env", "id_rsa", "id_ed25519", "credentials", "credentials.json"}
         if path.is_symlink() or path.is_junction() or path.name.lower() in sensitive or path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"} or path.name.lower().startswith(".env.") and path.name.lower() != ".env.example":
             return True
+        path = resolved
         suffix = "/" if path.is_dir() else ""
         spec = pathspec.GitIgnoreSpec.from_lines(self.settings.default_ignore_patterns + ignore_patterns)
         if spec.match_file(rel + suffix):
