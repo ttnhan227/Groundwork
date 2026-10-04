@@ -17,7 +17,7 @@ Verified on Windows x64 on October 4, 2026. The read-only audit was completed an
 
 | Check | Result |
 | --- | --- |
-| Local tests: `python -m pytest server/tests -q` using the packaging environment | 28 passed; one upstream Starlette/AnyIO deprecation warning |
+| Local tests: `python -m pytest server/tests -q` using the packaging environment | 29 passed; one upstream Starlette/AnyIO deprecation warning |
 | Cloud tests: `python -m pytest cloud/tests -q` using the cloud-capable environment | 4 passed |
 | Ruff: `ruff check server/app cloud/app` | Passed |
 | Desktop TypeScript and Vite production build | Passed |
@@ -34,7 +34,7 @@ The installed-app test isolates application state, removes developer executables
 
 The final installed screenshots were visually inspected: Quick Find shows actual paths, source lines, snippets, relevance details, and the split inspector; the relaunched notes view retains the edited note and its project association. The desktop preserves the paper palette, navy controls, hairline borders, and editorial typography.
 
-The installer tests exposed and repaired two actual workflow failures: development CORS configuration leaking into installed startup, and new notes disappearing from the selected project's filtered view because the project association was missing.
+The installer tests exposed and repaired development CORS configuration leaking into installed startup and new notes disappearing from the selected project's filtered view because the project association was missing. Hosted Windows testing additionally exposed short-path aliases being compared with canonical workspace paths. Indexing now normalizes those paths, with both a regression test and an actual Windows 8.3 alias check passing. The hosted installed-app test scopes a temporary WebView2 machine-policy override to its executable, restoring the previous value afterward; this handles current elevated-runner debugging restrictions without changing application defaults.
 
 ## Retrieval measurements and limits
 
@@ -42,11 +42,13 @@ The current fifteen-query source-code evaluation measured lexical Recall@1 100%,
 
 ## Release scope
 
-Artifact: `desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe`, 165,664,261 bytes (157.99 MiB).
+Local validation artifact: `desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe`, 165,664,261 bytes (157.99 MiB).
 
 SHA-256: `84495982f8a93330db07da21fc890854767d53b43bd8ac5f10e60ba146398922`.
 
-The Windows NSIS build is local and unsigned. It has not been uploaded to a public download host, so the website does not pretend a public installer exists. MSI, macOS, Linux, clean-VM/SmartScreen behavior, and external GitHub CI execution are unverified. Native compilation includes the global shortcut and folder chooser; off-focus OS shortcut registration and interactive folder-dialog selection are not covered by the automated WebView2 workflow.
+Published Windows NSIS release: [v1.0.4](https://github.com/ttnhan227/Groundwork/releases/tag/v1.0.4), built from commit `f18d161` by [the successful release workflow](https://github.com/ttnhan227/Groundwork/actions/runs/37168838788). Its installer contains 165,408,455 bytes and SHA-256 `63d74919b978926268ad1fcc19669d5a23ea0ddacd5c87d22854e70182e226d9`. The complete public download was independently downloaded and checksum-verified. The live Render page automatically displayed this version and download URL without a per-release website edit.
+
+[Main CI](https://github.com/ttnhan227/Groundwork/actions/runs/37168836149) passed all five jobs, including native Windows installer creation and actual installed WebView2 lifecycle checks. MSI creation passed in that build, but MSI installation was not tested. The installer remains unsigned. macOS, Linux, and SmartScreen behavior are unverified. Native compilation includes the global shortcut and folder chooser; off-focus OS shortcut registration and interactive folder-dialog selection are not covered by the automated WebView2 workflow.
 
 Real paid-provider generation and Ollama model inference are unverified without configured credentials/models. Their missing-key/failure paths and bounded provider context are tested. Local excerpt mode and bundled semantic retrieval work without accounts or network access. Cloud operation was verified against an isolated local HTTP service, not a deployed public endpoint.
 

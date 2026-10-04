@@ -1,12 +1,12 @@
 # Automatic Windows releases and website downloads
 
-The release workflow is `.github/workflows/release.yml`. A stable tag push such as `v1.0.1` builds and tests the Windows app, then publishes its installer and checksum to GitHub Releases. You can also rerun an existing tag through **Actions → Publish Windows desktop release → Run workflow**.
+The release workflow is `.github/workflows/release.yml`. A stable tag push such as `v1.0.5` builds and tests the Windows app, then publishes its installer and checksum to GitHub Releases. You can also rerun an existing tag through **Actions → Publish Windows desktop release → Run workflow**.
 
 ## One-time activation
 
-Push the repaired application and the new workflow to `ttnhan227/Groundwork`, and deploy the updated `client/` website once to the existing Render site at https://groundwork-client.onrender.com/. The release/download changes are currently in the local working tree; no remote release or deployment has been executed. The Render dashboard opened its sign-in page; authenticated deployment access is pending.
+The repaired application and release workflow are pushed to `ttnhan227/Groundwork`. The updated website is deployed at https://groundwork-client.onrender.com/download. Render deployment `dep-db0qb1hsrm7s738o3bk0` successfully deployed commit `2c2ebbb` on 2026-10-04. The existing service is configured for automatic deployment after CI checks pass and a `/*` to `/index.html` rewrite; the direct download route returns HTTP 200.
 
-`render.yaml` specifies the existing `groundwork-client` static site, the `main` branch, and automatic deployment after CI checks pass. Sync the Blueprint or apply that setting to the existing service; this does not create a new hosting provider. Once this download-page change is deployed, future app releases update the download without another Render deployment.
+`render.yaml` specifies the existing `groundwork-client` static site, the `main` branch, and automatic deployment after CI checks pass. These settings have been applied to the existing service. Once this download-page change is deployed, future app releases update the download without another Render deployment.
 
 The repository is public, so the browser can read public release metadata without a token. GitHub Actions publishes with its built-in `GITHUB_TOKEN`; do not put that token in the website. No publishing credentials are required in website code. Repository policies must allow the workflow's `contents: write` permission.
 
@@ -15,11 +15,11 @@ The repository is public, so the browser can read public release metadata withou
 Commit and push the app changes, then create and push the desired version tag:
 
 ```powershell
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.5
+git push origin v1.0.5
 ```
 
-Use a new version for each release; `v1.0.1` is an example, not a tag created by this change. The tag must point to the complete repaired application, including packaging scripts and model preparation.
+Use a new version for each release; `v1.0.5` is an example, not a tag created by this change. The tag must point to the complete repaired application, including packaging scripts and model preparation.
 
 The workflow sets Tauri, Cargo, npm, and backend versions from that tag in the disposable build checkout. It builds the NSIS installer with bundled Python, Git, and local model files, runs local/cloud tests and frozen-core/scale/sync checks, then silently installs and exercises the app in its actual WebView2. A failed check prevents publication.
 
@@ -39,6 +39,10 @@ GitHub may briefly cache its latest-release response. Unauthenticated API rate l
 - Four release metadata/API tests passed, covering uploaded assets, version/size/checksum, missing releases, service failure, and untrusted URLs.
 - Version preparation was tested in an isolated checkout fixture.
 - Browser workflow test covers a newer version appearing without a rebuild, unpublished releases, and API outages.
-- The actual GitHub-hosted release job and public website deployment have not been run from this session. The Windows application build/installed workflow was verified separately during the repair.
+- Hosted release workflow passed: https://github.com/ttnhan227/Groundwork/actions/runs/37168838788. It published the first verified public installer as `v1.0.4` on 2026-10-04.
+- Main CI passed all five jobs: https://github.com/ttnhan227/Groundwork/actions/runs/37168836149.
+- The live Render download page automatically displayed `v1.0.4`, its actual 165,408,455-byte installer, the correct GitHub download URL, and SHA-256 `63d74919b978926268ad1fcc19669d5a23ea0ddacd5c87d22854e70182e226d9`. No second website deployment or per-release link edit was needed.
+- Downloaded the complete public installer and independently verified that exact checksum.
+- Earlier unpublished tags were diagnostic builds; failed checks prevented publication. The current public release is https://github.com/ttnhan227/Groundwork/releases/tag/v1.0.4.
 
 The existing installer remains unsigned. Release automation does not provide a code-signing identity.
