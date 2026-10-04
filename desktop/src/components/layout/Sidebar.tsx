@@ -9,11 +9,13 @@ import {
   Settings,
   HardDrive,
   RefreshCw,
+  Home,
+  FolderOpen,
+  UserRound,
 } from "lucide-react";
 import { api } from "../../services/api";
 import type { IndexProgress } from "../../types/api";
 import { BrandMark } from "../common/BrandMark";
-import { Badge } from "../ui";
 
 interface SidebarProps {
   activeTab: string;
@@ -43,16 +45,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const navItems = [
+    { id: "home", label: "Home", icon: Home },
+    { id: "folders", label: "Folders", icon: FolderOpen },
     { id: "projects", label: "Projects", icon: FolderGit2 },
-    { id: "activity", label: "Timeline", icon: Clock },
-    { id: "sessions", label: "Resume Work", icon: BookmarkCheck },
-    { id: "ai", label: "AI Context", icon: BrainCircuit },
+    { id: "activity", label: "Recent activity", icon: Clock },
+    { id: "sessions", label: "Saved work", icon: BookmarkCheck },
+    { id: "ai", label: "Ask your files", icon: BrainCircuit },
     { id: "notes", label: "Notes", icon: FileText },
-    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
-    <aside className="w-64 bg-[var(--surface)] border-r border-[var(--hairline)] flex flex-col justify-between shrink-0 h-screen select-none">
+    <aside className="w-56 bg-[var(--surface)] border-r border-[var(--hairline)] flex flex-col justify-between shrink-0 h-screen select-none">
       {/* Brand Header */}
       <div>
         <div className="p-4 flex items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface)]">
@@ -64,9 +67,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-serif font-bold text-base tracking-tight text-[var(--ink)] block">
                 Groundwork
               </span>
-              <span className="text-[10px] text-[var(--ink-muted)] font-mono flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse inline-block" />
-                Local Workstation
+              <span className="text-xs text-[var(--ink-muted)] flex items-center gap-1">
+                Your work, within reach
               </span>
             </div>
           </div>
@@ -80,9 +82,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
-              <span>Search workspace...</span>
+              <span>Search files</span>
             </span>
-            <kbd className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--paper-subtle)] border border-[var(--hairline)] text-[var(--ink)] font-mono font-bold">
+            <kbd className="px-1.5 py-0.5 rounded text-xs bg-[var(--paper-subtle)] border border-[var(--hairline)] text-[var(--ink)] font-mono font-bold">
               Ctrl+Space
             </kbd>
           </button>
@@ -97,13 +99,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                aria-current={isActive ? "page" : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-[var(--radius-sm)] text-sm font-medium transition-all cursor-pointer ${
                   isActive
                     ? "bg-[var(--control-room)] text-white shadow-[var(--shadow-subtle)]"
                     : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-[var(--ink-muted)]"}`} />
+                <Icon
+                  className={`w-4 h-4 ${isActive ? "text-white" : "text-[var(--ink-muted)]"}`}
+                />
                 <span>{item.label}</span>
               </button>
             );
@@ -113,14 +118,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer / Indexing Status Widget */}
       <div className="p-3 border-t border-[var(--hairline)] bg-[var(--paper-subtle)]">
+        <div className="space-y-1 mb-4">
+          {[
+            { id: "account", label: "Account", icon: UserRound },
+            { id: "settings", label: "Settings", icon: Settings },
+          ].map((item) => (
+            <button
+              key={item.id}
+              aria-current={activeTab === item.id ? "page" : undefined}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium ${activeTab === item.id ? "bg-[var(--surface)] text-[var(--ink-blue)]" : "text-[var(--ink-secondary)] hover:bg-[var(--surface)]"}`}
+            >
+              <item.icon size={18} />
+              {item.label}
+            </button>
+          ))}
+        </div>
         {progress && progress.status === "indexing" ? (
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-[var(--ink)]">
+            <div className="flex items-center justify-between text-sm text-[var(--ink)]">
               <span className="flex items-center gap-1.5 font-mono font-bold text-[var(--ink-blue)]">
                 <RefreshCw className="w-3 h-3 animate-spin" />
-                Indexing...
+                Preparing your files…
               </span>
-              <span className="font-mono text-[var(--ink-secondary)] font-bold">{progress.percent}%</span>
+              <span className="font-mono text-[var(--ink-secondary)] font-bold">
+                {progress.percent}%
+              </span>
             </div>
             <div className="w-full bg-[var(--hairline)] h-1.5 rounded-full overflow-hidden">
               <div
@@ -128,18 +151,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
-            <p className="text-[10px] text-[var(--ink-secondary)] truncate font-mono">
+            <p className="text-xs text-[var(--ink-secondary)] truncate font-mono">
               {progress.current_file || `${progress.files_indexed} files`}
             </p>
           </div>
         ) : (
-          <div className="flex items-center justify-between text-[11px] text-[var(--ink-secondary)]">
+          <div className="flex items-center justify-between text-sm text-[var(--ink-secondary)]">
             <span className="flex items-center gap-1.5">
               <HardDrive className="w-3.5 h-3.5 text-[var(--ink-muted)]" />
-              <span>Workspace Index</span>
+              <span>Your files</span>
             </span>
-            <span className="font-mono text-[10px] text-[var(--ink-muted)] font-semibold">
-              {progress ? `${progress.status} · ${progress.files_indexed} updated` : "Unavailable"}
+            <span className="text-xs text-[var(--ink-muted)] font-medium">
+              {progress
+                ? ["scanning", "indexing"].includes(progress.status)
+                  ? "Preparing…"
+                  : progress.status === "failed"
+                    ? "Needs attention"
+                    : "Ready to search"
+                : "Starting…"}
             </span>
           </div>
         )}

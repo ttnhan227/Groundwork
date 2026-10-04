@@ -425,14 +425,14 @@ def update_preferences(req: PreferencesUpdate):
 
 
 class CloudLoginRequest(BaseModel):
-    url: str
+    url: str | None = None
     email: str
     password: str
     create_account: bool = Field(default=False, alias="register")
 
 
 class GoogleStartRequest(BaseModel):
-    url: str
+    url: str | None = None
     link: bool = False
 
 
@@ -444,7 +444,7 @@ class GoogleSessionRequest(BaseModel):
 def google_start(req: GoogleStartRequest):
     from app.services.google_signin_service import start_google
     try:
-        return start_google(req.url, req.link)
+        return start_google(req.url or get_settings().cloud_sync_url, req.link)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -467,7 +467,7 @@ def cloud_login(req: CloudLoginRequest):
 
     from app.services.preferences_service import PreferencesService, validate_url
     try:
-        url = validate_url(req.url)
+        url = validate_url(req.url or get_settings().cloud_sync_url)
         with httpx.Client(timeout=15) as client:
             response = client.post(f"{url}/auth/{'register' if req.create_account else 'login'}", json={"email": req.email, "password": req.password})
             if response.status_code != 200:

@@ -10,11 +10,46 @@ import { ContextSessionsView } from "./components/sessions/ContextSessionsView";
 import { AIInvestigationView } from "./components/ai/AIInvestigationView";
 import { NotesView } from "./components/notes/NotesView";
 import { SettingsView } from "./components/settings/SettingsView";
+import { HomeView } from "./components/home/HomeView";
+import { FoldersView } from "./components/folders/FoldersView";
+import { AccountDialog } from "./components/account/AccountDialog";
+import { AccountView } from "./components/account/AccountView";
+import { AISettingsView } from "./components/settings/AISettingsView";
+import { api } from "./services/api";
 import type { Project, SearchResultItem } from "./types/api";
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("projects");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("home");
+  const [accountDialog, setAccountDialog] = useState<
+    "welcome" | "signin" | "link" | null
+  >(null);
+  const [accountRevision, setAccountRevision] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const shouldWelcome = !localStorage.getItem("groundwork-welcome-complete");
+    if (shouldWelcome)
+      api
+        .getSyncStatus()
+        .then((status) => {
+          if (!cancelled && !status.is_authenticated)
+            setAccountDialog("welcome");
+          if (status.is_authenticated)
+            localStorage.setItem("groundwork-welcome-complete", "1");
+        })
+        .catch(() => {
+          if (!cancelled) setAccountDialog("welcome");
+        });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const closeAccount = React.useCallback(() => {
+    localStorage.setItem("groundwork-welcome-complete", "1");
+    setAccountDialog(null);
+  }, []);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
   const [contextQuestion, setContextQuestion] = useState("");
@@ -26,17 +61,26 @@ export const App: React.FC = () => {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
     listen("groundwork-search", () => setIsSearchOpen(true)).then((cleanup) => {
-      if (cancelled) cleanup(); else unlisten = cleanup;
+      if (cancelled) cleanup();
+      else unlisten = cleanup;
     });
-    return () => { cancelled = true; unlisten?.(); };
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   // Keyboard shortcut listener for Ctrl+Space or Ctrl+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.code === "Space" || e.key.toLowerCase() === "k")) {
+      if (accountDialog) return;
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.code === "Space" || e.key.toLowerCase() === "k")
+      ) {
         e.preventDefault();
-        if (e.code === "Space") setIsSearchOpen(true); else setIsSearchOpen((prev) => !prev);
+        if (e.code === "Space") setIsSearchOpen(true);
+        else setIsSearchOpen((prev) => !prev);
       } else if (e.key === "Escape" && isSearchOpen) {
         setIsSearchOpen(false);
       }
@@ -44,12 +88,14 @@ export const App: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSearchOpen]);
+  }, [isSearchOpen, accountDialog]);
 
   const handleInvestigateProject = (project: Project) => {
     setFocusedFile(null);
     setSessionId(undefined);
-    setContextQuestion(`Explain ${project.name}: its purpose, entry points, recent work, and current changes.`);
+    setContextQuestion(
+      `Explain ${project.name}: its purpose, entry points, recent work, and current changes.`,
+    );
     setSelectedProjectId(project.id);
     setActiveTab("ai");
   };
@@ -57,7 +103,9 @@ export const App: React.FC = () => {
   const handleAskAIWithContext = (query: string, file: SearchResultItem) => {
     setFocusedFile(file);
     setSessionId(undefined);
-    setContextQuestion(`${query}  -  explain ${file.relative_path} at line ${file.line_number ?? 1}`);
+    setContextQuestion(
+      `${query}  -  explain ${file.relative_path} at line ${file.line_number ?? 1}`,
+    );
     setIsSearchOpen(false);
     setSelectedProjectId(file.project_id || null);
     setActiveTab("ai");
@@ -65,18 +113,62 @@ export const App: React.FC = () => {
 
   const renderActiveView = () => {
     switch (activeTab) {
+      case "home":
+        return (
+          <HomeView
+            onNavigate={setActiveTab}
+            onSearch={() => setIsSearchOpen(true)}
+          />
+        );
+      case "folders":
+        return <FoldersView />;
+      case "account":
+        return (
+          <AccountView
+            key={accountRevision}
+            onSignIn={() => setAccountDialog("signin")}
+            onLinkGoogle={() => setAccountDialog("link")}
+            onChanged={() => setAccountRevision((previous) => previous + 1)}
+          />
+        );
+      case "ai-settings":
+        return <AISettingsView onBack={() => setActiveTab("ai")} />;
       case "projects":
         return <ProjectsView onInvestigateProject={handleInvestigateProject} />;
       case "activity":
         return <ActivityTimelineView selectedProjectId={selectedProjectId} />;
       case "sessions":
-        return <ContextSessionsView selectedProjectId={selectedProjectId} onResume={(session) => { setFocusedFile(null); setSessionId(session.id); setSelectedProjectId(session.project_id); setContextQuestion(`Continue ${session.title}. Review the saved findings and remaining tasks against current files.`); setActiveTab("ai"); }} />;
+        return (
+          <ContextSessionsView
+            selectedProjectId={selectedProjectId}
+            onResume={(session) => {
+              setFocusedFile(null);
+              setSessionId(session.id);
+              setSelectedProjectId(session.project_id);
+              setContextQuestion(
+                `Continue ${session.title}. Review the saved findings and remaining tasks against current files.`,
+              );
+              setActiveTab("ai");
+            }}
+          />
+        );
       case "ai":
-        return <AIInvestigationView selectedProjectId={selectedProjectId} initialQuestion={contextQuestion} focusedPath={focusedFile?.path} focusedLine={focusedFile?.line_number || 1} sessionId={sessionId} />;
+        return (
+          <AIInvestigationView
+            onConfigure={() => setActiveTab("ai-settings")}
+            selectedProjectId={selectedProjectId}
+            initialQuestion={contextQuestion}
+            focusedPath={focusedFile?.path}
+            focusedLine={focusedFile?.line_number || 1}
+            sessionId={sessionId}
+          />
+        );
       case "notes":
         return <NotesView selectedProjectId={selectedProjectId} />;
       case "settings":
-        return <SettingsView />;
+        return (
+          <SettingsView onConfigureAI={() => setActiveTab("ai-settings")} />
+        );
       default:
         return <ProjectsView onInvestigateProject={handleInvestigateProject} />;
     }
@@ -110,6 +202,18 @@ export const App: React.FC = () => {
         selectedProjectId={selectedProjectId}
         onAskAIWithContext={handleAskAIWithContext}
       />
+      {accountDialog && (
+        <AccountDialog
+          welcome={accountDialog === "welcome"}
+          link={accountDialog === "link"}
+          onClose={closeAccount}
+          onConnected={() => {
+            closeAccount();
+            setAccountRevision((previous) => previous + 1);
+            setActiveTab("account");
+          }}
+        />
+      )}
     </div>
   );
 };

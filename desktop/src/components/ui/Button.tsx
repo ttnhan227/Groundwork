@@ -10,7 +10,8 @@ export type ButtonVariant =
   | "outline";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   isLoading?: boolean;
@@ -41,10 +42,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center gap-1.5 font-medium transition-all select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none rounded-[var(--radius-sm)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1";
 
     const sizeClasses: Record<ButtonSize, string> = {
-      xs: "h-6 px-2 text-[11px] leading-tight font-mono",
-      sm: "h-7 px-2.5 text-xs leading-none font-sans",
-      md: "h-[34px] px-3.5 text-[13px] leading-none font-sans",
-      lg: "h-10 px-4 text-sm leading-none font-sans",
+      xs: "h-8 px-2.5 text-xs leading-tight font-sans",
+      sm: "h-9 px-3 text-sm leading-none font-sans",
+      md: "h-10 px-4 text-sm leading-none font-sans",
+      lg: "h-12 px-5 text-base leading-none font-sans",
     };
 
     const variantClasses: Record<ButtonVariant, string> = {

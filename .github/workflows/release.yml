@@ -60,6 +60,7 @@ jobs:
       - run: python -m pytest server/tests/hosted -q
       - run: npm run tauri -- build --bundles nsis
         working-directory: desktop
+      - run: node --test desktop/tests/onboarding-ui.test.cjs
       - run: server/.packaging-venv/Scripts/python.exe -m pytest server/tests -q
       - run: python desktop/scripts/smoke-core.py
       - run: python desktop/scripts/smoke-scale.py

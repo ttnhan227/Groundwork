@@ -14,9 +14,17 @@ import {
 } from "lucide-react";
 import { api } from "../../services/api";
 import type { AIQueryResponse, CitationItem } from "../../types/api";
-import { Button, Card, Badge, Modal, EmptyState, InlineCitationChip } from "../ui";
+import {
+  Button,
+  Card,
+  Badge,
+  Modal,
+  EmptyState,
+  InlineCitationChip,
+} from "../ui";
 
 interface AIInvestigationViewProps {
+  onConfigure?: () => void;
   selectedProjectId: string | null;
   initialQuestion?: string;
   focusedPath?: string;
@@ -25,6 +33,7 @@ interface AIInvestigationViewProps {
 }
 
 export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
+  onConfigure,
   selectedProjectId,
   initialQuestion = "",
   focusedPath,
@@ -33,12 +42,17 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
 }) => {
   const [question, setQuestion] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState("");
   const [response, setResponse] = useState<AIQueryResponse | null>(null);
-  const [providers, setProviders] = useState<Array<{ id: string; name: string; is_local: boolean; active: boolean }>>([]);
+  const [providers, setProviders] = useState<
+    Array<{ id: string; name: string; is_local: boolean; active: boolean }>
+  >([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [investigationMode, setInvestigationMode] = useState<boolean>(false);
 
-  useEffect(() => { if (initialQuestion) setQuestion(initialQuestion); }, [initialQuestion]);
+  useEffect(() => {
+    if (initialQuestion) setQuestion(initialQuestion);
+  }, [initialQuestion]);
 
   // Tool Confirmation Modal state
   const [pendingTool, setPendingTool] = useState<{
@@ -51,11 +65,14 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
   const [toolResult, setToolResult] = useState<any | null>(null);
 
   useEffect(() => {
-    api.listProviders().then((data) => {
-      setProviders(data);
-      const active = data.find((p) => p.active);
-      if (active) setSelectedProvider(active.id);
-    }).catch(() => {});
+    api
+      .listProviders()
+      .then((data) => {
+        setProviders(data);
+        const active = data.find((p) => p.active);
+        if (active) setSelectedProvider(active.id);
+      })
+      .catch(() => {});
   }, []);
 
   const handleRunInvestigation = async (e?: React.FormEvent) => {
@@ -63,19 +80,25 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
     if (!question.trim()) return;
 
     setLoading(true);
+    setError("");
     setToolResult(null);
 
     try {
       if (investigationMode) {
-        const inv = await api.investigateProblem(question, selectedProjectId || undefined, selectedProvider || undefined, focusedPath, focusedLine, sessionId);
+        const inv = await api.investigateProblem(
+          question,
+          selectedProjectId || undefined,
+          selectedProvider || undefined,
+          focusedPath,
+          focusedLine,
+          sessionId,
+        );
         setResponse({
           answer: inv.analysis,
           citations: inv.citations,
           evidence_count: inv.evidence_count,
           provider_used: inv.provider_used,
-          suggested_actions: [
-
-          ],
+          suggested_actions: [],
           session_id: inv.session_id,
         });
       } else {
@@ -91,36 +114,50 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
       }
     } catch (err: any) {
       console.error("AI query failed:", err);
-      setResponse({
-        answer: `Error executing AI investigation: ${err.message || err}`,
-        citations: [],
-        evidence_count: 0,
-        provider_used: selectedProvider,
-        suggested_actions: [],
-        session_id: null,
-      });
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't answer that question. Please try again.",
+      );
+      setResponse(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExecuteAction = async (action: { label: string; action: string; path?: string; title?: string; content?: string }) => {
+  const handleExecuteAction = async (action: {
+    label: string;
+    action: string;
+    path?: string;
+    title?: string;
+    content?: string;
+  }) => {
     if (action.path) {
       api.openFile(action.path);
     } else if (action.action === "create_note" && action.title) {
       try {
-        await api.createNote(action.title, action.content || response?.answer || "", selectedProjectId || undefined);
+        await api.createNote(
+          action.title,
+          action.content || response?.answer || "",
+          selectedProjectId || undefined,
+        );
         setToolResult({ status: "saved", message: "Note saved" });
-      } catch (error) { setToolResult({ error: String(error) }); }
+      } catch (error) {
+        setToolResult({ error: String(error) });
+      }
     } else if (action.action === "run_command") {
       try {
         // Probe execution to obtain a genuine single-use confirmation token
-        const probe = await api.executeTool("run_command", { command: "git status" });
+        const probe = await api.executeTool("run_command", {
+          command: "git status",
+        });
         if (probe.status === "confirmation_required") {
           setPendingTool({
             toolName: "run_command",
             args: { command: "git status" },
-            promptMessage: probe.prompt || "Execute allowlisted shell command 'git status' in workspace?",
+            promptMessage:
+              probe.prompt ||
+              "Execute allowlisted shell command 'git status' in workspace?",
             confirmationToken: probe.confirmation_token,
           });
         }
@@ -128,8 +165,12 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
         console.error("Tool probe failed", err);
       }
     } else if (action.action === "create_session" && action.title) {
-      await api.createSession(action.title, selectedProjectId || undefined, response?.answer?.slice(0, 300));
-      alert("Context Session created and saved!");
+      await api.createSession(
+        action.title,
+        selectedProjectId || undefined,
+        response?.answer?.slice(0, 300),
+      );
+      alert("Your work is saved.");
     }
   };
 
@@ -140,7 +181,7 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
       const res = await api.executeTool(
         pendingTool.toolName,
         pendingTool.args,
-        pendingTool.confirmationToken
+        pendingTool.confirmationToken,
       );
       setToolResult(res);
     } catch (err: any) {
@@ -152,59 +193,91 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
   };
 
   const presetQueries = [
-    "Explain project structure and primary entry points",
-    "Where is configuration and environment handling implemented?",
-    "Show recent Git commits and active modified files",
-    "Find all security and path sanitization checks",
+    "Help me understand this project",
+    "Where are the settings for this project?",
+    "What changed recently?",
+    "Where should I start reading?",
   ];
 
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--hairline)]">
+      <div className="flex flex-wrap gap-4 items-center justify-between mb-6 pb-4 border-b border-[var(--hairline)]">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
-            Grounded AI Assistant
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
+            Understand your work
           </p>
           <h1 className="text-xl font-serif font-bold tracking-tight text-[var(--ink)] flex items-center gap-2">
             <BrainCircuit className="w-5 h-5 text-[var(--ink-blue)]" />
-            AI Context &amp; Investigation
+            Ask your files
           </h1>
           <p className="text-xs text-[var(--ink-secondary)] mt-1">
-            Answers use bounded local evidence. Check the cited sources when reviewing an explanation.
+            Ask a question and follow the sources back to your files.
           </p>
         </div>
 
         {/* Provider Selector */}
         <div className="flex items-center gap-2 bg-[var(--surface)] p-1.5 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
+          {onConfigure && (
+            <Button onClick={onConfigure} variant="ghost">
+              Set up answers
+            </Button>
+          )}
           <Cpu className="w-3.5 h-3.5 text-[var(--ink-muted)] ml-1" />
           <select
+            aria-label="Answer service"
             value={selectedProvider}
             onChange={(e) => setSelectedProvider(e.target.value)}
             className="bg-transparent text-xs text-[var(--ink)] focus:outline-none cursor-pointer font-sans"
           >
             {providers.map((p) => (
-              <option key={p.id} value={p.id} className="bg-[var(--surface)] text-[var(--ink)]">
-                {p.name} {p.is_local ? "(Offline Local)" : "(Cloud API)"}
+              <option
+                key={p.id}
+                value={p.id}
+                className="bg-[var(--surface)] text-[var(--ink)]"
+              >
+                {{
+                  local: "Matching passages",
+                  ollama: "Ollama",
+                  openai: "OpenAI",
+                  gemini: "Google Gemini",
+                }[p.id] || p.name}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-        {/* Query Bar Card */}
-        {providers.find((provider) => provider.id === selectedProvider)?.is_local === false && <p className="mb-3 text-xs text-[var(--ink-sepia)]">Sending a question with this provider shares the question and bounded local evidence excerpts with its API. Choose Local to keep processing on this computer.</p>}
+      {/* Query Bar Card */}
+      {providers.find((provider) => provider.id === selectedProvider)
+        ?.is_local === false && (
+        <p className="mb-3 text-xs text-[var(--ink-sepia)]">
+          This service receives your question and relevant file excerpts when
+          you ask. Choose matching passages to stay offline.
+        </p>
+      )}
       <Card className="mb-6 border-[var(--hairline-strong)]">
+        {selectedProvider === "local" && (
+          <p className="text-sm text-[var(--ink-secondary)] mb-4">
+            Find relevant passages without AI or internet. For written answers,
+            choose Set up answers.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="gw-notice mb-4">
+            {error}
+          </p>
+        )}
         <form onSubmit={handleRunInvestigation} className="space-y-3">
-          <div className="relative">
+          <div className="flex gap-3 items-center">
             <input
               type="text"
-              placeholder="Ask an investigation question about your workspace or codebase..."
+              placeholder="What would you like to know about your files?"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              className="w-full bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] pl-3 pr-32 py-2 text-xs text-[var(--ink)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--ink-blue)] transition-colors font-sans hover:border-[var(--hairline-strong)]"
+              className="gw-input flex-1 min-w-0"
             />
-            <div className="absolute right-1.5 top-1 flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <Button
                 type="submit"
                 variant="primary"
@@ -213,12 +286,12 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
                 isLoading={loading}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                Investigate
+                Ask
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs pt-1">
+          <div className="flex flex-wrap gap-4 items-center justify-between text-sm pt-2">
             {/* Mode switch */}
             <label className="flex items-center gap-2 cursor-pointer text-[var(--ink-secondary)] hover:text-[var(--ink)] select-none">
               <input
@@ -227,18 +300,22 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
                 onChange={(e) => setInvestigationMode(e.target.checked)}
                 className="rounded-[var(--radius-xs)] border-[var(--hairline-strong)] text-[var(--ink-blue)] focus:ring-0 cursor-pointer"
               />
-              <span className="font-semibold text-[var(--ink)]">Deep Multi-Step Investigation Mode</span>
+              <span className="font-semibold text-[var(--ink)]">
+                Explore related files and save this work
+              </span>
             </label>
 
             {/* Presets */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] text-[var(--ink-muted)] font-mono">Try:</span>
+              <span className="text-xs text-[var(--ink-muted)] font-mono">
+                Try:
+              </span>
               {presetQueries.slice(0, 2).map((q, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => setQuestion(q)}
-                  className="px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--paper-subtle)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] text-[var(--ink-secondary)] hover:text-[var(--ink)] text-[10px] transition-colors truncate max-w-xs cursor-pointer font-sans"
+                  className="px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--paper-subtle)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xs transition-colors truncate max-w-xs cursor-pointer font-sans"
                 >
                   {q}
                 </button>
@@ -256,39 +333,46 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--hairline)]">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[var(--ink-blue)]" />
-                <span className="text-sm font-serif font-bold text-[var(--ink)]">Investigation Synthesis</span>
+                <span className="text-sm font-serif font-bold text-[var(--ink)]">
+                  Your answer
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-[var(--ink-muted)] font-mono">
-                <Badge variant="neutral">Provider: {response.provider_used}</Badge>
-                <Badge variant="human">{response.evidence_count} evidence items</Badge>
+              <div className="flex items-center gap-2 text-sm text-[var(--ink-muted)] font-mono">
+                <Badge variant="neutral">
+                  Provider: {response.provider_used}
+                </Badge>
+                <Badge variant="human">
+                  {response.evidence_count} matching passages
+                </Badge>
               </div>
             </div>
 
-            <div className="text-xs leading-relaxed text-[var(--ink)] whitespace-pre-wrap font-sans">
+            <div className="text-base leading-relaxed text-[var(--ink)] whitespace-pre-wrap font-sans">
               {response.answer}
             </div>
 
             {/* Suggested Next Actions */}
-            {response.suggested_actions && response.suggested_actions.length > 0 && (
-              <div className="mt-5 pt-4 border-t border-[var(--hairline)]">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-2">
-                  Suggested Context Actions
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {response.suggested_actions.map((act, idx) => (
-                    <Button
-                      key={idx}
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleExecuteAction(act)}
-                    >
-                      <ArrowRight className="w-3 h-3 text-[var(--ink-blue)]" />
-                      {act.label}
-                    </Button>
-                  ))}
+            {response.suggested_actions &&
+              response.suggested_actions.length > 0 && (
+                <div className="mt-5 pt-4 border-t border-[var(--hairline)]">
+                  <span className="text-sm font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-2">
+                    Next steps
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {response.suggested_actions.map((act, idx) => (
+                      <Button
+                        key={idx}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleExecuteAction(act)}
+                      >
+                        <ArrowRight className="w-3 h-3 text-[var(--ink-blue)]" />
+                        {act.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </Card>
 
           {/* Citations & Evidence Drawer */}
@@ -297,7 +381,7 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
               <div className="flex items-center gap-2 pb-3 mb-4 border-b border-[var(--hairline)]">
                 <FileCode className="w-4 h-4 text-[var(--ink-blue)]" />
                 <span className="text-sm font-serif font-bold text-[var(--ink)]">
-                  Grounded Citations &amp; Code References ({response.citations.length})
+                  Sources ({response.citations.length})
                 </span>
               </div>
 
@@ -338,12 +422,12 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
                       </div>
                     </div>
 
-                    <p className="text-[10px] text-[var(--ink-muted)] font-mono truncate mb-2">
+                    <p className="text-xs text-[var(--ink-muted)] font-mono truncate mb-2">
                       {c.path}
                       {c.line_start ? ` : L${c.line_start}` : ""}
                     </p>
 
-                    <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--paper-subtle)] border border-[var(--hairline-subtle)] text-[11px] font-mono text-[var(--ink-secondary)] whitespace-pre-wrap max-h-24 overflow-y-auto leading-relaxed">
+                    <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--paper-subtle)] border border-[var(--hairline-subtle)] text-sm font-mono text-[var(--ink-secondary)] whitespace-pre-wrap max-h-24 overflow-y-auto leading-relaxed">
                       {c.snippet}
                     </div>
                   </div>
@@ -387,11 +471,14 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
             </p>
 
             <div className="bg-[var(--paper)] border border-[var(--hairline)] p-2.5 rounded-[var(--radius-sm)] font-mono text-xs text-[var(--ink)]">
-              <code>{pendingTool.toolName} ({JSON.stringify(pendingTool.args)})</code>
+              <code>
+                {pendingTool.toolName} ({JSON.stringify(pendingTool.args)})
+              </code>
             </div>
 
-            <p className="text-[11px] text-[var(--ink-muted)]">
-              In accordance with Groundwork security guidelines, local execution tools require single-use cryptographic authorization.
+            <p className="text-sm text-[var(--ink-muted)]">
+              In accordance with Groundwork security guidelines, local execution
+              tools require single-use cryptographic authorization.
             </p>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--hairline)]">

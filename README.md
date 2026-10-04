@@ -4,7 +4,9 @@ Groundwork is a desktop app for searching project folders, exploring Git history
 
 ## Use the app
 
-Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases/latest), run the `.exe`, then open Groundwork and add a workspace folder.
+Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases/latest) and run the `.exe`. Open Groundwork, sign in or choose **Continue locally**, then select **Add your first folder** on Home. Choose a folder and start searching as its files become ready.
+
+**Folders** manages where the app searches. **Notes** keeps your ideas and reminders. **Account** handles sign-in and **Sync now**. **Ask your files → Set up answers** lets you choose matching passages, a local model, or an online AI service. Settings contains preferences and collapsed troubleshooting tools; regular users never need to configure a server URL.
 
 The installer includes the local engine, Python runtime, Git, and a search embedding model. You do not need Docker, Python, Node.js, or PostgreSQL installed separately. Local indexing and search work without an account or internet connection. Remote AI generation needs your own provider key and internet access; Ollama needs a separately installed local model.
 
@@ -83,7 +85,7 @@ Configure AI providers and your keys in the app's settings. The `local` provider
 
 ## Optional Google sign-in
 
-In the installed desktop app, open Settings and select **Sign in with Google**. Complete sign-in in your normal browser, then return to Groundwork. To connect Google to an existing password account, sign in with your password first and select **Link Google account**.
+Use **Sign in with Google** in the welcome window, or open **Account → Sign in** later. Complete sign-in in your normal browser, then return to Groundwork. To connect Google to an existing password account, sign in with your password first and open **Account → Sign-in options → Connect Google**.
 
 For a self-hosted backend, set `GOOGLE_CLIENT_ID` and add that backend's origin to the client's authorized JavaScript origins in Google Console. The desktop handoff expires after five minutes. It uses only basic Google identity information; no Google client secret is stored in the app. Google sign-in is optional and does not affect offline features.
 
@@ -149,8 +151,8 @@ The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It 
 For example, using a version number that has not been published:
 
 ```sh
-git tag v1.0.7
-git push origin v1.0.7
+git tag v1.0.8
+git push origin v1.0.8
 ```
 
 A normal branch push runs CI. A version tag triggers the installer build, tests, and GitHub release publication. Failed checks prevent publication.

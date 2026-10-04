@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
+.site-primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 20px; background: var(--ink-blue); color: white; border-radius: 10px; font-weight: 600; transition: background 150ms; }
+.site-primary:hover { background: var(--ink-blue-hover); }
+.site-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 20px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; font-weight: 500; }
+.site-secondary:hover { border-color: var(--ink-blue); }
+
 /* ==========================================================================
    GROUNDWORK GLOBAL STYLES & SIGNATURE MOTION
    - Calm, flat, typography-led manuscript canvas
@@ -27,10 +32,6 @@ body,
 
 body {
   background-color: var(--paper);
-  background-image:
-    linear-gradient(rgba(17, 32, 56, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 32, 56, 0.025) 1px, transparent 1px);
-  background-size: 32px 32px;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-base);

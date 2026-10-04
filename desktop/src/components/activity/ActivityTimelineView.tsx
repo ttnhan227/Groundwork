@@ -28,23 +28,40 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
   const [days, setDays] = useState<number>(2);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState("");
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
   const [summaryData, setSummaryData] = useState<{
     period_days: number;
     concise_summary: string;
     active_projects: string[];
-    modified_files: Array<{ filename: string; path: string; project: string; mtime: string }>;
-    recent_commits: Array<{ hash: string; author: string; date: string; message: string; project: string }>;
+    modified_files: Array<{
+      filename: string;
+      path: string;
+      project: string;
+      mtime: string;
+    }>;
+    recent_commits: Array<{
+      hash: string;
+      author: string;
+      date: string;
+      message: string;
+      project: string;
+    }>;
     active_sessions: Array<{ title: string; status: string; project: string }>;
   } | null>(null);
 
   const fetchActivities = async () => {
     setLoading(true);
     try {
-      const data = await api.listActivities(days, selectedProjectId || undefined);
+      const data = await api.listActivities(
+        days,
+        selectedProjectId || undefined,
+      );
       setActivities(data);
+      setError("");
     } catch (err) {
       console.error("Failed to load activity items:", err);
+      setError("Couldn't load recent activity. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -57,6 +74,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
       setSummaryData(data);
     } catch (err) {
       console.error("Failed to load activity summary:", err);
+      setError("Couldn't load your work summary. Please try again.");
     } finally {
       setSummaryLoading(false);
     }
@@ -105,17 +123,22 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
       {/* Top Header & Filters */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--hairline)]">
+      {error && (
+        <p role="alert" className="gw-notice mb-4">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-4 items-center justify-between mb-6 pb-4 border-b border-[var(--hairline)]">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
-            Work Memory
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
+            Catch up on your work
           </p>
           <h1 className="text-xl font-serif font-bold tracking-tight text-[var(--ink)] flex items-center gap-2">
             <Clock className="w-5 h-5 text-[var(--ink-blue)]" />
-            Activity Timeline
+            Recent activity
           </h1>
           <p className="text-xs text-[var(--ink-secondary)] mt-1">
-            Chronological log of workspace edits, Git commits, investigations, and search interactions.
+            See what changed in your folders and projects.
           </p>
         </div>
 
@@ -146,7 +169,9 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
             }}
             title="Refresh Timeline"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
       </div>
@@ -159,15 +184,19 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
               <Sparkles className="w-4 h-4 text-[var(--ink-blue)]" />
             </div>
             <div>
-              <h2 className="text-sm font-serif font-bold text-[var(--ink)]">What was I working on?</h2>
-              <span className="text-[11px] text-[var(--ink-muted)]">
-                Local synthesis of active files, commits, and sessions over {days} {days === 1 ? "day" : "days"}
+              <h2 className="text-sm font-serif font-bold text-[var(--ink)]">
+                What was I working on?
+              </h2>
+              <span className="text-sm text-[var(--ink-muted)]">
+                A summary of your changes over {days}{" "}
+                {days === 1 ? "day" : "days"}
               </span>
             </div>
           </div>
           {summaryLoading && (
             <Badge variant="human" className="font-mono">
-              <RefreshCw className="w-3 h-3 animate-spin mr-1" /> Synthesizing...
+              <RefreshCw className="w-3 h-3 animate-spin mr-1" /> Preparing
+              summary…
             </Badge>
           )}
         </div>
@@ -181,16 +210,22 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               {/* Active Projects */}
               <div className="bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
                   <Folder className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
                   Active Projects ({summaryData.active_projects.length})
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {summaryData.active_projects.length === 0 ? (
-                    <span className="text-[11px] text-[var(--ink-muted)]">None detected</span>
+                    <span className="text-sm text-[var(--ink-muted)]">
+                      None detected
+                    </span>
                   ) : (
                     summaryData.active_projects.map((proj) => (
-                      <Badge key={proj} variant="human" className="font-mono font-bold">
+                      <Badge
+                        key={proj}
+                        variant="human"
+                        className="font-mono font-bold"
+                      >
                         {proj}
                       </Badge>
                     ))
@@ -200,19 +235,21 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
 
               {/* Modified Files */}
               <div className="bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
                   <FileCode className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
                   Modified Files ({summaryData.modified_files.length})
                 </span>
                 <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                   {summaryData.modified_files.length === 0 ? (
-                    <span className="text-[11px] text-[var(--ink-muted)]">None</span>
+                    <span className="text-sm text-[var(--ink-muted)]">
+                      None
+                    </span>
                   ) : (
                     summaryData.modified_files.slice(0, 5).map((f) => (
                       <div
                         key={f.path}
                         onClick={() => api.openFile(f.path)}
-                        className="flex items-center justify-between text-[11px] text-[var(--ink-secondary)] hover:text-[var(--ink-blue)] cursor-pointer truncate py-0.5 group font-mono"
+                        className="flex items-center justify-between text-sm text-[var(--ink-secondary)] hover:text-[var(--ink-blue)] cursor-pointer truncate py-0.5 group font-mono"
                       >
                         <span className="truncate">{f.filename}</span>
                         <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-1 shrink-0" />
@@ -224,16 +261,21 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
 
               {/* Recent Commits */}
               <div className="bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
                   <GitCommit className="w-3.5 h-3.5 text-[var(--ink-sepia)]" />
                   Recent Commits ({summaryData.recent_commits.length})
                 </span>
                 <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                   {summaryData.recent_commits.length === 0 ? (
-                    <span className="text-[11px] text-[var(--ink-muted)]">None</span>
+                    <span className="text-sm text-[var(--ink-muted)]">
+                      None
+                    </span>
                   ) : (
                     summaryData.recent_commits.slice(0, 4).map((c) => (
-                      <div key={c.hash} className="text-[10px] text-[var(--ink-secondary)] truncate py-0.5">
+                      <div
+                        key={c.hash}
+                        className="text-xs text-[var(--ink-secondary)] truncate py-0.5"
+                      >
                         <span className="font-mono text-[var(--ink-sepia)] font-bold mr-1">
                           {c.hash.substring(0, 7)}
                         </span>
@@ -246,7 +288,9 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
             </div>
           </div>
         ) : (
-          <p className="text-xs text-[var(--ink-muted)]">No activity recorded yet for this period.</p>
+          <p className="text-xs text-[var(--ink-muted)]">
+            No activity recorded yet for this period.
+          </p>
         )}
       </Card>
 
@@ -258,7 +302,9 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
 
         {loading ? (
           <EmptyState
-            icon={<RefreshCw className="w-6 h-6 animate-spin text-[var(--ink-blue)]" />}
+            icon={
+              <RefreshCw className="w-6 h-6 animate-spin text-[var(--ink-blue)]" />
+            }
             title="Loading activity events..."
             compact
           />
@@ -294,20 +340,18 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                             {item.summary}
                           </span>
                           {item.project_name && (
-                            <Badge variant="neutral">
-                              {item.project_name}
-                            </Badge>
+                            <Badge variant="neutral">{item.project_name}</Badge>
                           )}
                         </div>
 
                         {filePath && (
-                          <p className="text-[11px] text-[var(--ink-muted)] font-mono mt-0.5 truncate max-w-xl">
+                          <p className="text-sm text-[var(--ink-muted)] font-mono mt-0.5 truncate max-w-xl">
                             {filePath}
                           </p>
                         )}
 
                         {item.details?.message && (
-                          <p className="text-[11px] text-[var(--ink-secondary)] mt-1 italic font-serif">
+                          <p className="text-sm text-[var(--ink-secondary)] mt-1 italic font-serif">
                             "{item.details.message}"
                           </p>
                         )}
@@ -315,7 +359,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-[var(--ink-muted)] font-mono">
+                      <span className="text-xs text-[var(--ink-muted)] font-mono">
                         {formatTimestamp(item.timestamp)}
                       </span>
                       {filePath && (

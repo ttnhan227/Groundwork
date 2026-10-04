@@ -18,10 +18,17 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(
     container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
   ).filter((el) => {
-    if (el.hasAttribute("disabled") || el.getAttribute("aria-hidden") === "true") {
+    if (
+      el.hasAttribute("disabled") ||
+      el.getAttribute("aria-hidden") === "true"
+    ) {
       return false;
     }
-    return el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0;
+    return (
+      el.offsetWidth > 0 ||
+      el.offsetHeight > 0 ||
+      el.getClientRects().length > 0
+    );
   });
 }
 
@@ -36,6 +43,8 @@ export const Modal: React.FC<ModalProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -56,7 +65,7 @@ export const Modal: React.FC<ModalProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        closeRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -96,7 +105,7 @@ export const Modal: React.FC<ModalProps> = ({
         restore.focus();
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -109,8 +118,7 @@ export const Modal: React.FC<ModalProps> = ({
     full: "max-w-4xl",
   };
 
-  const labelledBy =
-    title && typeof title === "string" ? titleId : undefined;
+  const labelledBy = title && typeof title === "string" ? titleId : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -134,7 +142,7 @@ export const Modal: React.FC<ModalProps> = ({
           <header className="flex items-start justify-between px-6 py-4 border-b border-[var(--hairline)] bg-[var(--surface)]">
             <div>
               {eyebrow && (
-                <p className="text-[10px] font-semibold tracking-wider uppercase text-[var(--ink-muted)] mb-0.5 font-mono">
+                <p className="text-xs font-semibold tracking-wider uppercase text-[var(--ink-muted)] mb-0.5 font-mono">
                   {eyebrow}
                 </p>
               )}

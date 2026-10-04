@@ -29,9 +29,12 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
   const [sessions, setSessions] = useState<ContextSession[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(
+    null,
+  );
 
   // New session form
   const [newTitle, setNewTitle] = useState<string>("");
@@ -47,8 +50,10 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
       ]);
       setSessions(sessionData);
       setProjects(projectData);
+      setError("");
     } catch (err) {
       console.error("Failed to load sessions:", err);
+      setError("Couldn't open your saved work. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -66,7 +71,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
       await api.createSession(
         newTitle.trim(),
         newProjectId || undefined,
-        newSummary.trim() || undefined
+        newSummary.trim() || undefined,
       );
       setNewTitle("");
       setNewSummary("");
@@ -75,24 +80,26 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
       fetchSessions();
     } catch (err) {
       console.error("Failed to create session:", err);
+      setError("Couldn't save your work. Please try again.");
     }
   };
 
   const handleUpdateStatus = async (
     id: string,
-    newStatus: "active" | "paused" | "completed"
+    newStatus: "active" | "paused" | "completed",
   ) => {
     try {
       await api.updateSession(id, { status: newStatus });
       fetchSessions();
     } catch (err) {
       console.error("Failed to update status:", err);
+      setError("Couldn't save that change. Please try again.");
     }
   };
 
   const handleToggleTodo = async (
     session: ContextSession,
-    todoIndex: number
+    todoIndex: number,
   ) => {
     const todos = [...session.todos];
     const current = todos[todoIndex];
@@ -109,6 +116,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
       fetchSessions();
     } catch (err) {
       console.error("Failed to toggle todo:", err);
+      setError("Couldn't save that change. Please try again.");
     }
   };
 
@@ -120,17 +128,22 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
       {/* Top Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--hairline)]">
+      {error && (
+        <p role="alert" className="gw-notice mb-4">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-4 items-center justify-between mb-6 pb-4 border-b border-[var(--hairline)]">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
-            Working Memory
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
+            Pick up where you left off
           </p>
           <h1 className="text-xl font-serif font-bold tracking-tight text-[var(--ink)] flex items-center gap-2">
             <BookmarkCheck className="w-5 h-5 text-[var(--ink-blue)]" />
-            Resume Work &amp; Context Sessions
+            Saved work
           </h1>
           <p className="text-xs text-[var(--ink-secondary)] mt-1">
-            Re-hydrate state, inspected files, notes, and task checklists without losing your place.
+            Keep your summary, useful files, and next steps together.
           </p>
         </div>
 
@@ -158,7 +171,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
             onClick={() => setShowCreateModal(true)}
           >
             <Plus className="w-4 h-4" />
-            New Session
+            Save work
           </Button>
         </div>
       </div>
@@ -167,26 +180,25 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
       {loading ? (
         <EmptyState
           icon={<BookmarkCheck size={32} className="animate-pulse" />}
-          title="Loading context sessions..."
+          title="Opening your saved work…"
           compact
         />
       ) : filteredSessions.length === 0 ? (
         <EmptyState
           icon={<BookmarkCheck size={36} />}
-          title="No context sessions found"
-          description="Click 'New Session' to capture your active files, goals, and working memory."
+          title="Nothing saved here yet"
+          description="Choose Save work to keep a summary and your next steps for later."
         />
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredSessions.map((session) => {
             const isExpanded = expandedSessionId === session.id;
-            const completedTodos = session.todos.filter((t) => t.startsWith("[x] ")).length;
+            const completedTodos = session.todos.filter((t) =>
+              t.startsWith("[x] "),
+            ).length;
 
             return (
-              <Card
-                key={session.id}
-                className="hover:border-[var(--ink-blue)]"
-              >
+              <Card key={session.id} className="hover:border-[var(--ink-blue)]">
                 {/* Header Row */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
@@ -199,8 +211,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                           session.status === "active"
                             ? "success"
                             : session.status === "paused"
-                            ? "warning"
-                            : "neutral"
+                              ? "warning"
+                              : "neutral"
                         }
                         className="font-mono uppercase font-bold"
                       >
@@ -223,13 +235,25 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
 
                   {/* Actions & Status toggles */}
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {session.status === "active" && onResume && <Button variant="primary" size="xs" onClick={() => onResume(session)}><Play className="w-3 h-3" />Continue</Button>}
+                    {session.status === "active" && onResume && (
+                      <Button
+                        variant="primary"
+                        size="xs"
+                        onClick={() => onResume(session)}
+                      >
+                        <Play className="w-3 h-3" />
+                        Continue
+                      </Button>
+                    )}
                     {session.status !== "active" ? (
                       <Button
                         variant="primary"
                         size="xs"
-                        onClick={async () => { await handleUpdateStatus(session.id, "active"); onResume?.(session); }}
-                        title="Resume Session"
+                        onClick={async () => {
+                          await handleUpdateStatus(session.id, "active");
+                          onResume?.(session);
+                        }}
+                        title="Continue this work"
                       >
                         <Play className="w-3 h-3 fill-current" />
                         Resume
@@ -239,7 +263,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                         variant="secondary"
                         size="xs"
                         onClick={() => handleUpdateStatus(session.id, "paused")}
-                        title="Pause Session"
+                        title="Pause this work"
                       >
                         <Pause className="w-3 h-3" />
                         Pause
@@ -250,8 +274,10 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                       <Button
                         variant="ghost"
                         size="xs"
-                        onClick={() => handleUpdateStatus(session.id, "completed")}
-                        title="Complete Session"
+                        onClick={() =>
+                          handleUpdateStatus(session.id, "completed")
+                        }
+                        title="Mark as complete"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 text-[var(--success)]" />
                       </Button>
@@ -274,7 +300,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                 </div>
 
                 {/* Quick Info Bar */}
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--hairline)] text-[11px] text-[var(--ink-secondary)]">
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--hairline)] text-sm text-[var(--ink-secondary)]">
                   <span className="flex items-center gap-1 font-mono">
                     <FileCode className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
                     {session.files_inspected.length} inspected files
@@ -287,29 +313,68 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                   )}
                   <span className="flex items-center gap-1 font-mono text-[var(--ink-muted)] ml-auto">
                     <Clock className="w-3 h-3" />
-                    Last active: {new Date(session.last_active_at).toLocaleDateString()}
+                    Last active:{" "}
+                    {new Date(session.last_active_at).toLocaleDateString()}
                   </span>
                 </div>
 
                 {/* Expanded Details Drawer */}
                 {isExpanded && (
                   <div className="mt-4 pt-3 border-t border-[var(--hairline)] space-y-4">
-                    <form className="space-y-2" onSubmit={async (event) => {
-                      event.preventDefault();
-                      const data = new FormData(event.currentTarget);
-                      try { await api.updateSession(session.id, {summary: String(data.get("summary") || ""), notes: String(data.get("notes") || "").split("\n").filter(Boolean), todos: String(data.get("todos") || "").split("\n").filter(Boolean)}); await fetchSessions(); }
-                      catch (error) { alert(String(error)); }
-                    }}>
-                      <label className="block text-xs">Findings and decisions<textarea name="summary" defaultValue={session.summary || ""} className="block w-full min-h-20 border border-[var(--hairline)] bg-[var(--paper)] p-2 text-xs" /></label>
-                      <label className="block text-xs">Notes<textarea name="notes" defaultValue={session.notes.join("\n")} className="block w-full border border-[var(--hairline)] bg-[var(--paper)] p-2 text-xs" /></label>
-                      <label className="block text-xs">Remaining tasks · one per line<textarea name="todos" defaultValue={session.todos.join("\n")} className="block w-full border border-[var(--hairline)] bg-[var(--paper)] p-2 text-xs" /></label>
-                      <Button size="xs" type="submit">Save working context</Button>
+                    <form
+                      className="space-y-2"
+                      onSubmit={async (event) => {
+                        event.preventDefault();
+                        const data = new FormData(event.currentTarget);
+                        try {
+                          await api.updateSession(session.id, {
+                            summary: String(data.get("summary") || ""),
+                            notes: String(data.get("notes") || "")
+                              .split("\n")
+                              .filter(Boolean),
+                            todos: String(data.get("todos") || "")
+                              .split("\n")
+                              .filter(Boolean),
+                          });
+                          await fetchSessions();
+                        } catch (error) {
+                          alert(String(error));
+                        }
+                      }}
+                    >
+                      <label className="block text-xs">
+                        Findings and decisions
+                        <textarea
+                          name="summary"
+                          defaultValue={session.summary || ""}
+                          className="block w-full min-h-20 border border-[var(--hairline)] bg-[var(--paper)] p-2 text-xs"
+                        />
+                      </label>
+                      <label className="block text-xs">
+                        Notes
+                        <textarea
+                          name="notes"
+                          defaultValue={session.notes.join("\n")}
+                          className="block w-full border border-[var(--hairline)] bg-[var(--paper)] p-2 text-xs"
+                        />
+                      </label>
+                      <label className="block text-xs">
+                        Remaining tasks · one per line
+                        <textarea
+                          name="todos"
+                          defaultValue={session.todos.join("\n")}
+                          className="block w-full border border-[var(--hairline)] bg-[var(--paper)] p-2 text-xs"
+                        />
+                      </label>
+                      <Button size="xs" type="submit">
+                        Save working context
+                      </Button>
                     </form>
                     {/* Inspected Files List */}
                     {session.files_inspected.length > 0 && (
                       <div>
-                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-1.5">
-                          Files Under Investigation
+                        <span className="text-sm font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-1.5">
+                          Related files
                         </span>
                         <div className="space-y-1">
                           {session.files_inspected.map((file) => (
@@ -329,7 +394,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                     {/* Todos Checklist */}
                     {session.todos.length > 0 && (
                       <div>
-                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-1.5">
+                        <span className="text-sm font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-1.5">
                           Task Checklist
                         </span>
                         <div className="space-y-1.5">
@@ -348,7 +413,13 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                                   onChange={() => {}}
                                   className="rounded-[var(--radius-xs)] border-[var(--hairline-strong)] text-[var(--ink-blue)] focus:ring-0 cursor-pointer"
                                 />
-                                <span className={isDone ? "line-through text-[var(--ink-muted)] font-mono" : "font-mono"}>
+                                <span
+                                  className={
+                                    isDone
+                                      ? "line-through text-[var(--ink-muted)] font-mono"
+                                      : "font-mono"
+                                  }
+                                >
                                   {cleanText}
                                 </span>
                               </div>
@@ -361,8 +432,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                     {/* Notes preview */}
                     {session.notes.length > 0 && (
                       <div>
-                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-1.5">
-                          Session Notes
+                        <span className="text-sm font-mono font-bold uppercase tracking-wider text-[var(--ink)] block mb-1.5">
+                          Notes
                         </span>
                         <div className="p-2.5 rounded-[var(--radius-xs)] bg-[var(--paper)] border border-[var(--hairline)] text-xs text-[var(--ink)] font-mono whitespace-pre-wrap">
                           {session.notes.join("\n")}
@@ -377,24 +448,24 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
         </div>
       )}
 
-      {/* Create Session Modal */}
+      {/* Save work Modal */}
       {showCreateModal && (
         <Modal
           isOpen={true}
           onClose={() => setShowCreateModal(false)}
-          eyebrow="Context Session"
-          title="Create New Context Session"
+          eyebrow=""
+          title="Save your work"
           maxWidth="md"
         >
           <form onSubmit={handleCreateSession} className="space-y-3.5">
             <div>
               <label className="block text-xs font-mono font-bold text-[var(--ink)] mb-1">
-                Session Title *
+                Name this work
               </label>
               <input
                 type="text"
                 required
-                placeholder="e.g. Refactoring authentication middleware"
+                placeholder="What are you working on?"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 className="w-full bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] px-3 py-2 text-xs text-[var(--ink)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--ink-blue)]"
@@ -425,7 +496,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
               </label>
               <textarea
                 rows={3}
-                placeholder="What are you trying to accomplish in this session?"
+                placeholder="Where did you leave off? What comes next?"
                 value={newSummary}
                 onChange={(e) => setNewSummary(e.target.value)}
                 className="w-full bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] px-3 py-2 text-xs text-[var(--ink)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--ink-blue)]"
@@ -441,12 +512,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-              >
-                Create Session
+              <Button type="submit" variant="primary" size="sm">
+                Save work
               </Button>
             </div>
           </form>

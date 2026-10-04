@@ -1,108 +1,75 @@
-import React, { useEffect, useState } from "react";
-import { Cloud, CloudOff, Folder, AlertTriangle, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Cloud, HardDrive } from "lucide-react";
 import { api } from "../../services/api";
-import type { Project, SystemStatus } from "../../types/api";
-import { Badge, Button } from "../ui";
+import type { Project } from "../../types/api";
+import { Button } from "../ui";
 
-interface HeaderProps {
-  selectedProjectId: string | null;
-  onSelectProject: (id: string | null) => void;
-  onOpenSearch: () => void;
-}
-
-export const Header: React.FC<HeaderProps> = ({
+export function Header({
   selectedProjectId,
   onSelectProject,
   onOpenSearch,
-}) => {
+}: {
+  selectedProjectId: string | null;
+  onSelectProject: (id: string | null) => void;
+  onOpenSearch: () => void;
+}) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [coreStatus, setCoreStatus] = useState<SystemStatus | null>(null);
-  const [isCoreOnline, setIsCoreOnline] = useState<boolean>(false);
-  const [coreError, setCoreError] = useState<string>("Starting local service…");
-  const [syncStatus, setSyncStatus] = useState<{
-    enabled: boolean;
-    state: string;
-    pending_items: number;
-  }>({ enabled: false, state: "local_only", pending_items: 0 });
-
-  const checkHealth = async () => {
-    try {
-      const status = await api.getSystemStatus();
-      setCoreStatus(status);
-      setIsCoreOnline(true);
-      setCoreError("");
-    } catch (error) {
-      setIsCoreOnline(false);
-      setCoreError(String(error));
-      return;
-    }
-    api.listProjects().then(setProjects).catch(() => {});
-    api.getSyncStatus().then(setSyncStatus).catch(() => setSyncStatus((previous) => ({...previous, state: "unavailable"})));
-  };
-
+  const [ready, setReady] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
-    checkHealth();
-    const interval = setInterval(checkHealth, 5000);
-    return () => clearInterval(interval);
+    const refresh = () => {
+      api
+        .getSystemStatus()
+        .then(() => setReady(true))
+        .catch(() => setReady(false));
+      api
+        .listProjects()
+        .then(setProjects)
+        .catch(() => {});
+      api
+        .getSyncStatus()
+        .then((status) => setSignedIn(status.is_authenticated))
+        .catch(() => {});
+    };
+    refresh();
+    const timer = setInterval(refresh, 5000);
+    return () => clearInterval(timer);
   }, []);
-
   return (
-    <header className="h-12 border-b border-[var(--hairline)] bg-[var(--surface)] px-4 flex items-center justify-between shrink-0 select-none shadow-[var(--shadow-subtle)]">
-      {/* Project Context Selector */}
-      <div className="flex items-center gap-2">
-        <Folder className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
-        <select
-          value={selectedProjectId || ""}
-          onChange={(e) => onSelectProject(e.target.value ? e.target.value : null)}
-          className="bg-[var(--paper)] border border-[var(--hairline)] text-[var(--ink)] text-xs rounded-[var(--radius-sm)] px-2.5 py-1 focus:outline-none focus:border-[var(--ink-blue)] font-sans hover:border-[var(--hairline-strong)] transition-colors cursor-pointer"
-        >
-          <option value="">All Workspace Projects</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.detected_type})
-            </option>
-          ))}
-        </select>
-
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={onOpenSearch}
-          className="hidden sm:inline-flex text-[var(--ink-secondary)] text-[11px] font-mono gap-1 ml-2"
-        >
-          <Search size={12} className="text-[var(--ink-blue)]" />
-          <span>Quick Find</span>
-          <kbd className="text-[9px] px-1 py-0.2 rounded bg-[var(--paper-subtle)] border border-[var(--hairline)]">
-            Ctrl+Space
-          </kbd>
+    <header className="h-16 border-b border-[var(--hairline)] bg-[var(--surface)] px-6 flex items-center justify-between gap-4 shrink-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <Button variant="ghost" onClick={onOpenSearch}>
+          <Search size={18} />
+          Search files
         </Button>
-      </div>
-
-      {/* Status Badges */}
-      <div className="flex items-center gap-2.5">
-        {/* Core Connectivity Status */}
-        {isCoreOnline ? (
-          <Badge variant="success" icon={<span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />}>
-            Core Active (v{coreStatus?.app_version || "1.0.0"})
-          </Badge>
-        ) : (
-          <Badge variant="danger" title={coreError} icon={<AlertTriangle className="w-3 h-3 text-[var(--danger)]" />}>
-            Local core unavailable
-          </Badge>
-        )}
-
-        {/* Sync Status Badge */}
-        {syncStatus.enabled ? (
-          <Badge variant="human" icon={<Cloud className="w-3 h-3 text-[var(--ink-blue)]" />}>
-            Sync: {syncStatus.state}
-          </Badge>
-        ) : (
-          <Badge variant="neutral" icon={<CloudOff className="w-3 h-3 text-[var(--ink-muted)]" />}>
-            100% Local
-          </Badge>
+        {!!projects.length && (
+          <select
+            aria-label="Search in project"
+            value={selectedProjectId || ""}
+            onChange={(event) => onSelectProject(event.target.value || null)}
+            className="max-w-48 border border-[var(--hairline)] rounded-lg bg-[var(--surface)] px-3 py-2 text-sm"
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
+      <span
+        role="status"
+        className="flex items-center gap-2 text-sm text-[var(--ink-muted)] whitespace-nowrap"
+      >
+        {signedIn ? <Cloud size={16} /> : <HardDrive size={16} />}{" "}
+        {!ready
+          ? "Opening Groundwork…"
+          : signedIn
+            ? "Account connected"
+            : "Saved on this computer"}
+      </span>
     </header>
   );
-};
+}
 export default Header;

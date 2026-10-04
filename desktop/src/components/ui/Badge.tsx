@@ -23,7 +23,7 @@ export const Badge: React.FC<BadgeProps> = ({
   ...rest
 }) => {
   const baseClasses =
-    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-xs)] text-[11px] font-medium tracking-tight select-none whitespace-nowrap flex-shrink-0";
+    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-xs)] text-sm font-medium tracking-tight select-none whitespace-nowrap flex-shrink-0";
 
   const variantClasses: Record<BadgeVariant, string> = {
     human:

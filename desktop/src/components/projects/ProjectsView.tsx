@@ -18,16 +18,31 @@ interface ProjectsViewProps {
   onInvestigateProject?: (project: Project) => void;
 }
 
-export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject }) => {
+export const ProjectsView: React.FC<ProjectsViewProps> = ({
+  onInvestigateProject,
+}) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOverview, setSelectedOverview] = useState<ProjectOverview | null>(null);
-  const [fileHistory, setFileHistory] = useState<{path: string; diff: string; commits: Array<{hash: string; message: string}>} | null>(null);
+  const [selectedOverview, setSelectedOverview] =
+    useState<ProjectOverview | null>(null);
+  const [fileHistory, setFileHistory] = useState<{
+    path: string;
+    diff: string;
+    commits: Array<{ hash: string; message: string }>;
+  } | null>(null);
 
   useEffect(() => {
     loadProjects();
-    const timer = setInterval(() => { api.listProjects().then((data) => {setProjects(data); setError(null);}).catch((failure) => setError(String(failure))); }, 5000);
+    const timer = setInterval(() => {
+      api
+        .listProjects()
+        .then((data) => {
+          setProjects(data);
+          setError(null);
+        })
+        .catch((failure) => setError(String(failure)));
+    }, 5000);
     return () => clearInterval(timer);
   }, []);
 
@@ -58,23 +73,31 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6 w-full font-sans">
-      {error && <p role="alert" className="text-sm text-[var(--danger)]">Projects unavailable: {error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-[var(--danger)]">
+          Projects unavailable: {error}
+        </p>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--hairline)] pb-4">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
-            Workspace Discovery
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-blue)] mb-1">
+            Explore your work
           </p>
           <h1 className="text-xl font-serif font-bold text-[var(--ink)] tracking-tight flex items-center gap-2">
             <FolderGit2 className="w-5 h-5 text-[var(--ink-blue)]" />
-            Detected Projects
+            Your projects
           </h1>
           <p className="text-xs text-[var(--ink-secondary)] mt-1">
-            Groundwork automatically discovers and analyzes repositories, frameworks, and entry points.
+            Projects found in the folders you have added. Open an overview or
+            ask about their files.
           </p>
         </div>
-        <Badge variant="neutral" className="font-mono text-xs px-3 py-1 font-bold">
-          {projects.length} Projects Tracked
+        <Badge
+          variant="neutral"
+          className="font-mono text-xs px-3 py-1 font-bold"
+        >
+          {projects.length} projects
         </Badge>
       </div>
 
@@ -82,14 +105,14 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
       {loading ? (
         <EmptyState
           icon={<FolderGit2 size={32} className="animate-pulse" />}
-          title="Scanning workspace..."
-          description="Locating git repositories, configuration manifests, and code trees."
+          title="Looking for projects…"
+          description="Finding projects in your chosen folders."
         />
       ) : projects.length === 0 ? (
         <EmptyState
           icon={<FolderOpen size={36} />}
-          title="No projects discovered yet"
-          description="Add a workspace directory in Settings to index local repositories and code."
+          title="No projects here yet"
+          description="Add a folder from Home or Folders. Your documents are searchable even if they are not part of a code project."
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -104,7 +127,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                     <h3 className="font-serif font-bold text-base text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
                       {proj.name}
                     </h3>
-                    <p className="text-[11px] font-mono text-[var(--ink-muted)] truncate max-w-[210px]">
+                    <p className="text-sm font-mono text-[var(--ink-muted)] truncate max-w-[210px]">
                       {proj.path}
                     </p>
                   </div>
@@ -116,8 +139,8 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                 {/* Git branch status */}
                 <div className="flex items-center gap-2 text-xs text-[var(--ink-secondary)] my-2">
                   <GitBranch className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
-                  <span className="font-mono text-[11px] text-[var(--ink-secondary)]">
-                    {proj.git_branch || "No Git branch detected"}
+                  <span className="font-mono text-sm text-[var(--ink-secondary)]">
+                    {proj.git_branch || "No version history"}
                   </span>
                 </div>
 
@@ -159,7 +182,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                       onClick={() => onInvestigateProject(proj)}
                     >
                       <Sparkles className="w-3 h-3" />
-                      Investigate
+                      Ask about project
                     </Button>
                   )}
                 </div>
@@ -174,7 +197,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
         <Modal
           isOpen={true}
           onClose={() => setSelectedOverview(null)}
-          eyebrow="Repository Manifest"
+          eyebrow="Project overview"
           title={
             <div className="flex items-center gap-2">
               <FolderGit2 className="w-5 h-5 text-[var(--ink-blue)]" />
@@ -191,9 +214,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
             {/* Entry points & Frameworks */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-1.5 flex items-center gap-1.5">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] block mb-1.5 flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
-                  Detected Entry Points
+                  Starting files
                 </span>
                 {selectedOverview.entry_points.length > 0 ? (
                   <ul className="space-y-1 text-xs font-mono text-[var(--ink-secondary)]">
@@ -204,12 +227,14 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-xs text-[var(--ink-muted)]">None detected automatically</p>
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    None detected automatically
+                  </p>
                 )}
               </div>
 
               <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-1.5 flex items-center gap-1.5">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] block mb-1.5 flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-[var(--ink-sepia)]" />
                   Key Dependencies ({selectedOverview.dependencies.length})
                 </span>
@@ -226,7 +251,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
             {/* README Preview */}
             {selectedOverview.readme_preview && (
               <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3.5">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-2 flex items-center gap-1.5">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] block mb-2 flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
                   README Preview
                 </span>
@@ -237,24 +262,116 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
             )}
 
             {/* Recent Git Commits */}
-            {selectedOverview.key_files.length > 0 && <section className="border-t border-[var(--hairline)] pt-3"><h3 className="font-serif font-bold text-sm mb-2">Project files</h3><div className="space-y-1">{selectedOverview.key_files.map((file) => <div key={file.name} className="flex justify-between text-xs font-mono"><span>{file.name}{file.is_dir ? "/" : ""}</span>{!file.is_dir && <div className="flex gap-2"><button onClick={() => api.openFile(`${selectedOverview.path}/${file.name}`).catch((error) => alert(String(error)))}>Open</button>{selectedOverview.working_tree?.branch && <button onClick={() => api.getFileHistory(selectedOverview.id, file.name).then(setFileHistory).catch((error) => alert(String(error)))}>History</button>}</div>}</div>)}</div></section>}
-            {selectedOverview.working_tree?.branch && <section className="border-t border-[var(--hairline)] pt-3 space-y-2">
-              <h3 className="font-serif font-bold text-sm">Working tree · {selectedOverview.working_tree.branch}</h3>
-              {!selectedOverview.working_tree.changed_files?.length && <p className="text-xs text-[var(--ink-muted)]">No uncommitted changes.</p>}
-              {selectedOverview.working_tree.changed_files?.map((file) => <button key={file.file} className="flex gap-3 text-xs font-mono w-full text-left hover:text-[var(--ink-blue)]" onClick={() => api.getFileHistory(selectedOverview.id, file.file).then(setFileHistory).catch((error) => alert(String(error)))}><span>{file.status}</span><span>{file.file}</span></button>)}
-              {fileHistory && <div className="space-y-2"><p className="text-xs font-mono font-bold">{fileHistory.path}</p>{fileHistory.commits.map((commit) => <p key={commit.hash} className="text-xs">{commit.hash.slice(0,7)} · {commit.message}</p>)}<pre className="text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto">{fileHistory.diff || "No tracked changes against HEAD."}</pre></div>}
-            </section>}
+            {selectedOverview.key_files.length > 0 && (
+              <section className="border-t border-[var(--hairline)] pt-3">
+                <h3 className="font-serif font-bold text-sm mb-2">
+                  Project files
+                </h3>
+                <div className="space-y-1">
+                  {selectedOverview.key_files.map((file) => (
+                    <div
+                      key={file.name}
+                      className="flex justify-between text-xs font-mono"
+                    >
+                      <span>
+                        {file.name}
+                        {file.is_dir ? "/" : ""}
+                      </span>
+                      {!file.is_dir && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              api
+                                .openFile(
+                                  `${selectedOverview.path}/${file.name}`,
+                                )
+                                .catch((error) => alert(String(error)))
+                            }
+                          >
+                            Open
+                          </button>
+                          {selectedOverview.working_tree?.branch && (
+                            <button
+                              onClick={() =>
+                                api
+                                  .getFileHistory(
+                                    selectedOverview.id,
+                                    file.name,
+                                  )
+                                  .then(setFileHistory)
+                                  .catch((error) => alert(String(error)))
+                              }
+                            >
+                              History
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            {selectedOverview.working_tree?.branch && (
+              <section className="border-t border-[var(--hairline)] pt-3 space-y-2">
+                <h3 className="font-serif font-bold text-sm">
+                  Working tree · {selectedOverview.working_tree.branch}
+                </h3>
+                {!selectedOverview.working_tree.changed_files?.length && (
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    No uncommitted changes.
+                  </p>
+                )}
+                {selectedOverview.working_tree.changed_files?.map((file) => (
+                  <button
+                    key={file.file}
+                    className="flex gap-3 text-xs font-mono w-full text-left hover:text-[var(--ink-blue)]"
+                    onClick={() =>
+                      api
+                        .getFileHistory(selectedOverview.id, file.file)
+                        .then(setFileHistory)
+                        .catch((error) => alert(String(error)))
+                    }
+                  >
+                    <span>{file.status}</span>
+                    <span>{file.file}</span>
+                  </button>
+                ))}
+                {fileHistory && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-mono font-bold">
+                      {fileHistory.path}
+                    </p>
+                    {fileHistory.commits.map((commit) => (
+                      <p key={commit.hash} className="text-xs">
+                        {commit.hash.slice(0, 7)} · {commit.message}
+                      </p>
+                    ))}
+                    <pre className="text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto">
+                      {fileHistory.diff || "No tracked changes against HEAD."}
+                    </pre>
+                  </div>
+                )}
+              </section>
+            )}
             {selectedOverview.recent_commits.length > 0 && (
               <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3.5">
-                <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-2 flex items-center gap-1.5">
+                <span className="text-sm font-mono font-bold text-[var(--ink)] block mb-2 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[var(--signal)]" />
                   Recent Git Activity
                 </span>
                 <div className="divide-y divide-[var(--hairline-subtle)] max-h-40 overflow-y-auto">
                   {selectedOverview.recent_commits.map((c) => (
-                    <div key={c.hash} className="py-1.5 flex items-center justify-between text-xs">
-                      <span className="text-[var(--ink)] truncate max-w-[450px] font-sans">{c.message}</span>
-                      <span className="font-mono text-[10px] text-[var(--ink-muted)] shrink-0 ml-2">{c.hash}</span>
+                    <div
+                      key={c.hash}
+                      className="py-1.5 flex items-center justify-between text-xs"
+                    >
+                      <span className="text-[var(--ink)] truncate max-w-[450px] font-sans">
+                        {c.message}
+                      </span>
+                      <span className="font-mono text-xs text-[var(--ink-muted)] shrink-0 ml-2">
+                        {c.hash}
+                      </span>
                     </div>
                   ))}
                 </div>

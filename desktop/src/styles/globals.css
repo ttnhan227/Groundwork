@@ -26,10 +26,6 @@ body,
 
 body {
   background-color: var(--paper);
-  background-image:
-    linear-gradient(rgba(17, 32, 56, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 32, 56, 0.025) 1px, transparent 1px);
-  background-size: 32px 32px;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -38,6 +34,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+.gw-page { width: 100%; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 28px; }
+.gw-title { font-size: 28px; line-height: 1.25; font-weight: 650; letter-spacing: -0.025em; margin: 0; }
+.gw-description { margin-top: 10px; color: var(--ink-secondary); font-size: 15px; line-height: 1.6; }
+.gw-input { display: block; width: 100%; border: 1px solid var(--hairline); border-radius: 9px; padding: 11px 13px; background: var(--surface); color: var(--ink); font-size: 15px; }
+.gw-notice { padding: 14px 16px; border-radius: 10px; background: var(--ink-blue-subtle); color: var(--ink); font-size: 14px; line-height: 1.6; }
+@media (max-width: 800px) { .gw-page { padding: 22px; gap: 22px; } }
 
 ::selection {
   background: var(--ink-sepia-subtle);

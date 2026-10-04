@@ -50,6 +50,8 @@ class PreferencesService:
         if not self.path.exists():
             return
         data = json.loads(_protect(base64.b64decode(self.path.read_bytes()), decrypt=True))
+        if data.get("gemini_model") == "gemini-1.5-flash":
+            data["gemini_model"] = "gemini-3.8-flash"
         for key, value in data.items():
             if key in ALLOWED:
                 setattr(self.settings, key, value)

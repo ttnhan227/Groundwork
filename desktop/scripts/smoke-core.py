@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory() as directory:
                     time.sleep(.25)
             else:
                 raise RuntimeError("Packaged core readiness deadline exceeded")
+            assert request("/api/system/preferences")["gemini_model"] == "gemini-3.8-flash", "Packaged AI setup retained a retired default model"
             try:
                 request("/api/workspaces", authenticated=False)
                 raise AssertionError("Unauthenticated access succeeded")
