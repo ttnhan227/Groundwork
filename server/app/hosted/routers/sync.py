@@ -68,6 +68,9 @@ def push_sync_items(
     now_iso = datetime.now(timezone.utc).isoformat()
 
     for item in req.items:
+        # Sessions disable autoflush. Later edits in this batch must see the
+        # note, revision and receipts written by the preceding queued item.
+        db.flush()
         fingerprint = hashlib.sha256(json.dumps(item.model_dump(exclude={"queue_id"}), sort_keys=True).encode()).hexdigest()
         receipt = db.get(SyncReceipt, (user.id, item.queue_id))
         if receipt:

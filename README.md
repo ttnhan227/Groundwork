@@ -149,11 +149,13 @@ The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It 
 For example, using a version number that has not been published:
 
 ```sh
-git tag v1.0.5
-git push origin v1.0.5
+git tag v1.0.7
+git push origin v1.0.7
 ```
 
 A normal branch push runs CI. A version tag triggers the installer build, tests, and GitHub release publication. Failed checks prevent publication.
+
+The release workflow also exercises registration, password login, logout, and metadata sync from the installed app against the live backend, using a new test account. A hosted-service failure blocks publication.
 
 The website automatically reads the latest published stable release. No manual installer upload or download-link edit is needed. Installed users must download the newer installer; there is no in-app automatic updater yet. Backend deployment is a separate workflow.
 

@@ -175,7 +175,7 @@ async function close() {
       assert.equal(cloudState.status,200);
       const syncedState=await cloudState.json();
       assert.ok(syncedState.notes.some(note=>note.content==='Edited and persisted'),'Installed note not found on live backend');
-      assert.ok(!JSON.stringify(syncedState).includes(workspace),'Private workspace path reached cloud sync');
+      assert.ok(!JSON.stringify(syncedState).includes(JSON.stringify(workspace).slice(1,-1)),'Private workspace path reached cloud sync');
       await page.screenshot({path:path.join(resultsDir,'installed-live-sync.png')});
       fs.writeFileSync(path.join(resultsDir,'live-sync-verification.json'),JSON.stringify({user_id:cloudAccount.user_id,email:accountEmail,registration:true,login:true,sync:true},null,2));
       await page.getByRole('button',{name:'Sign out',exact:true}).click();

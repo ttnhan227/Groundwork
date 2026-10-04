@@ -65,6 +65,8 @@ jobs:
       - run: python desktop/scripts/smoke-scale.py
       - run: python desktop/scripts/smoke-sync.py
       - name: Test the installed desktop before publication
+        env:
+          GROUNDWORK_VERIFY_LIVE_SYNC: '1'
         shell: pwsh
         run: |
           $installer = Get-ChildItem -LiteralPath desktop/src-tauri/target/release/bundle/nsis -Filter '*-setup.exe'
