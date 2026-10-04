@@ -96,7 +96,7 @@ def page(session_id: str, secret: str, db: Session = Depends(get_db)):
         try {
           const response = await fetch('./complete', {method:'POST', headers:{'Content-Type':'application/json'},
             body:JSON.stringify({session_id:config.session_id, secret:config.secret, id_token:result.credential})});
-          const data = await response.json();
+          const data = await response.json().catch(() => ({detail:'The account service is temporarily unavailable. Please try again.'}));
           if (!response.ok) throw new Error(data.detail || 'Sign-in failed');
           status.textContent = 'Connected. Return to Groundwork. You can close this tab.';
           document.getElementById('google-button').replaceChildren();

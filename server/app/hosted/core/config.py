@@ -27,6 +27,7 @@ class CloudSettings(BaseSettings):
     jwt_secret: str = Field(default="dev-cloud-jwt-secret-groundwork-2026", alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    database_schema: str = Field(default="groundwork", alias="GROUNDWORK_DATABASE_SCHEMA", pattern=r"^[a-z][a-z0-9_]{0,62}$")
     access_token_expire_minutes: int = Field(
         default=60 * 24 * 30,
         gt=0,

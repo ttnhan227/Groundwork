@@ -114,9 +114,9 @@ def test_existing_uuid_user_ids_match_new_identity_foreign_key(monkeypatch):
     from sqlalchemy import Uuid
     main = importlib.import_module('app.hosted.main')
     class ExistingDatabase:
-        def has_table(self, name):
+        def has_table(self, name, schema=None):
             return name == 'users'
-        def get_columns(self, name):
+        def get_columns(self, name, schema=None):
             return [{'name': 'id', 'type': Uuid()}]
     monkeypatch.setattr(main, 'inspect', lambda bind: ExistingDatabase())
     monkeypatch.setattr(main.Base.metadata, 'create_all', lambda **kwargs: None)

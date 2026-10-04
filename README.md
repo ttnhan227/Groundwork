@@ -32,6 +32,8 @@ Wait for startup, then open the **[app interface](http://localhost:5174)** or **
 
 SQLite stores local workspace data. PostgreSQL stores backend account and sync data. Both persist across ordinary container restarts.
 
+The backend creates its PostgreSQL tables in the `groundwork` schema. Existing tables in `public` are kept separate. `GROUNDWORK_DATABASE_SCHEMA` can override this namespace when self-hosting.
+
 Docker serves the app's browser interface, not a native desktop window. Native folder dialogs and service restart controls require the installed app or native development. The local engine sees the repository at `/workspace`. Mount other host folders into that container before indexing them, and use paths inside the container when adding workspaces.
 
 ### Everyday commands

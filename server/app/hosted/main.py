@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Uuid, inspect
+from sqlalchemy.schema import CreateSchema
 
 from app.hosted.core.config import get_cloud_settings
 from app.hosted.core.database import Base, engine
@@ -25,9 +26,13 @@ settings = get_cloud_settings()
 def initialize_schema(bind):
     # Older hosted databases use native UUID user IDs. Match that existing
     # key when adding tables, while retaining string IDs in fresh databases.
+    schema = Base.metadata.schema
+    if schema:
+        with bind.begin() as connection:
+            connection.execute(CreateSchema(schema, if_not_exists=True))
     inspector = inspect(bind)
-    if inspector.has_table("users"):
-        user_id_type = next(column["type"] for column in inspector.get_columns("users") if column["name"] == "id")
+    if inspector.has_table("users", schema=schema):
+        user_id_type = next(column["type"] for column in inspector.get_columns("users", schema=schema) if column["name"] == "id")
         if isinstance(user_id_type, Uuid):
             for table in Base.metadata.tables.values():
                 for column in table.columns:
