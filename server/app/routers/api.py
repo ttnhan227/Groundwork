@@ -431,6 +431,36 @@ class CloudLoginRequest(BaseModel):
     create_account: bool = Field(default=False, alias="register")
 
 
+class GoogleStartRequest(BaseModel):
+    url: str
+    link: bool = False
+
+
+class GoogleSessionRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=64)
+
+
+@sync_router.post("/google/start")
+def google_start(req: GoogleStartRequest):
+    from app.services.google_signin_service import start_google
+    try:
+        return start_google(req.url, req.link)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@sync_router.post("/google/poll")
+def google_poll(req: GoogleSessionRequest):
+    from app.services.google_signin_service import poll_google
+    return poll_google(req.session_id)
+
+
+@sync_router.post("/google/cancel")
+def google_cancel(req: GoogleSessionRequest):
+    from app.services.google_signin_service import cancel_google
+    return cancel_google(req.session_id)
+
+
 @sync_router.post("/login")
 def cloud_login(req: CloudLoginRequest):
     import httpx

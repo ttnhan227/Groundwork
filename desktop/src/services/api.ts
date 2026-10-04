@@ -57,6 +57,9 @@ export const api = {
   updatePreferences: (values: Record<string, string | null>) => request<Record<string, string | boolean | null>>("/api/system/preferences", { method: "PUT", body: JSON.stringify(values) }),
   loginCloud: (url: string, email: string, password: string, register = false) => request<{status: string}>("/api/sync/login", { method: "POST", body: JSON.stringify({url, email, password, register}) }),
   logoutCloud: () => request<{status: string}>("/api/sync/logout", {method: "POST"}),
+  startGoogleSignIn: (url: string, link = false) => request<{session_id: string}>("/api/sync/google/start", {method: "POST", body: JSON.stringify({url, link})}),
+  pollGoogleSignIn: (session_id: string) => request<{status: string}>("/api/sync/google/poll", {method: "POST", body: JSON.stringify({session_id})}),
+  cancelGoogleSignIn: (session_id: string) => request<{status: string}>("/api/sync/google/cancel", {method: "POST", body: JSON.stringify({session_id})}),
 
   // System
   getSystemStatus: () => request<SystemStatus>("/api/system/status"),

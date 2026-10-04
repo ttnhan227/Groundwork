@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import {
   Settings,
   FolderPlus,
@@ -43,6 +44,48 @@ export const SettingsView: React.FC = () => {
   const [cloudPassword, setCloudPassword] = useState("");
   const [registerAccount, setRegisterAccount] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const googleSession = useRef<string | null>(null);
+  const [googlePending, setGooglePending] = useState(false);
+  useEffect(() => () => {
+    const session = googleSession.current;
+    googleSession.current = null;
+    if (session) void api.cancelGoogleSignIn(session).catch(() => {});
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    setSyncing(true); setGooglePending(true);
+    googleSession.current = "starting";
+    try {
+      const {session_id} = await api.startGoogleSignIn(cloudUrl, Boolean(syncStatus?.is_authenticated));
+      if (googleSession.current !== "starting") {
+        await api.cancelGoogleSignIn(session_id); return;
+      }
+      googleSession.current = session_id;
+      setActionMessage("Complete Google sign-in in your browser, then return here.");
+      const deadline = Date.now() + 300000;
+      while (googleSession.current === session_id && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (googleSession.current !== session_id) return;
+        const result = await api.pollGoogleSignIn(session_id);
+        if (googleSession.current !== session_id) return;
+        if (result.status === "authenticated") {
+          googleSession.current = null;
+          setActionMessage("Google account connected. Use Sync Now to synchronize metadata.");
+          await loadData(); return;
+        }
+      }
+      if (googleSession.current === session_id) {
+        googleSession.current = null;
+        await api.cancelGoogleSignIn(session_id);
+        setActionMessage("Google sign-in expired. Please try again.");
+      }
+    } catch (error) {
+      const session = googleSession.current;
+      googleSession.current = null;
+      if (session) void api.cancelGoogleSignIn(session).catch(() => {});
+      setActionMessage(`Google sign-in failed: ${String(error)}`);
+    } finally { setSyncing(false); setGooglePending(false); }
+  };
   useEffect(() => { api.getPreferences().then((prefs) => {
     setProviderChoice(String(prefs.ai_provider || "local")); setCloudUrl(String(prefs.cloud_sync_url || ""));
   }).catch((error) => setActionMessage(`Preferences unavailable: ${String(error)}`)); }, []);
@@ -251,6 +294,17 @@ export const SettingsView: React.FC = () => {
               </Button>
             </div>
           </form>
+          <div className="flex gap-2 mt-3">
+            <Button type="button" variant="secondary" disabled={syncing || !cloudUrl || !isTauri()} onClick={handleGoogleSignIn}>
+              {syncStatus?.is_authenticated ? "Link Google account" : "Sign in with Google"}
+            </Button>
+            {googlePending && <Button type="button" variant="secondary" onClick={async () => {
+              const session = googleSession.current; googleSession.current = null;
+              if (session) await api.cancelGoogleSignIn(session).catch(() => {});
+              setActionMessage("Google sign-in cancelled.");
+            }}>Cancel Google sign-in</Button>}
+          </div>
+          {!isTauri() && <p className="text-xs text-[var(--ink-secondary)] mt-2">Google sign-in opens your browser from the installed desktop app.</p>}
         </Card>
 
         <Card>
@@ -288,7 +342,7 @@ export const SettingsView: React.FC = () => {
             <input required type="password" autoComplete={registerAccount ? "new-password" : "current-password"} minLength={registerAccount ? 12 : 1} aria-label="Account password" placeholder="Password" value={cloudPassword} onChange={(event) => setCloudPassword(event.target.value)} className="block w-full border border-[var(--hairline)] rounded px-3 py-2 bg-[var(--paper)] text-sm" />
             <label className="flex gap-2 text-sm"><input type="checkbox" checked={registerAccount} onChange={(event) => setRegisterAccount(event.target.checked)} />Create a new account</label>
             <Button type="submit" variant="primary" disabled={syncing}>{registerAccount ? "Create account" : "Sign in"}</Button>
-            <Button type="button" variant="secondary" onClick={async () => { try { await api.logoutCloud(); setActionMessage("Cloud disconnected. Local work remains available."); await loadData(); } catch (error) { setActionMessage(`Sign-out failed: ${String(error)}`); } }}>Sign out</Button>
+            <Button type="button" variant="secondary" disabled={syncing} onClick={async () => { try { await api.logoutCloud(); setActionMessage("Cloud disconnected. Local work remains available."); await loadData(); } catch (error) { setActionMessage(`Sign-out failed: ${String(error)}`); } }}>Sign out</Button>
           </form>
         </Card>
 

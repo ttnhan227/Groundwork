@@ -16,3 +16,10 @@ htmlcov
 .env
 .env.*
 tests/
+.packaging-venv/
+.packaging-build/
+.model-cache/
+models/
+git/
+*.db
+*.sqlite*

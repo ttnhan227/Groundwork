@@ -1,0 +1,8 @@
+node_modules/
+dist/
+test-results/
+src-tauri/target/
+src-tauri/resources/
+src-tauri/gen/
+.env
+.env.*

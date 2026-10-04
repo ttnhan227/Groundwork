@@ -79,6 +79,12 @@ postgresql+psycopg2://groundwork:groundwork_dev@localhost:5433/groundwork
 
 Configure AI providers and your keys in the app's settings. The `local` provider displays retrieved excerpts; it does not generate language-model responses. OpenAI and Gemini receive your question, selected excerpts, and cited paths when used. Local indexing does not call those providers.
 
+## Optional Google sign-in
+
+In the installed desktop app, open Settings and select **Sign in with Google**. Complete sign-in in your normal browser, then return to Groundwork. To connect Google to an existing password account, sign in with your password first and select **Link Google account**.
+
+For a self-hosted backend, set `GOOGLE_CLIENT_ID` and add that backend's origin to the client's authorized JavaScript origins in Google Console. The desktop handoff expires after five minutes. It uses only basic Google identity information; no Google client secret is stored in the app. Google sign-in is optional and does not affect offline features.
+
 ## Develop without Docker
 
 Install Python 3.12, Node.js 22 or newer, and Git. Local app development uses SQLite and does not need PostgreSQL.

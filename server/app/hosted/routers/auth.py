@@ -45,6 +45,7 @@ class GoogleLoginRequest(BaseModel):
 class GoogleClaims(BaseModel):
     sub: str = Field(min_length=1, max_length=255)
     email: EmailStr
+    nonce: str | None = None
 
 
 class GoogleRequest(Request):

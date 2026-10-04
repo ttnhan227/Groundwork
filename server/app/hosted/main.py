@@ -14,6 +14,7 @@ from app.hosted.core.config import get_cloud_settings
 from app.hosted.core.database import Base, engine
 from app.hosted.routers.auth import auth_router
 from app.hosted.routers.devices import devices_router
+from app.hosted.routers.google_desktop import router as google_desktop_router
 from app.hosted.routers.sync import sync_router
 
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +61,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(google_desktop_router)
 app.include_router(devices_router)
 app.include_router(sync_router)
 

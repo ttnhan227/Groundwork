@@ -37,6 +37,19 @@ class GoogleIdentity(Base):
     user = relationship("User")
 
 
+class GoogleDesktopSession(Base):
+    __tablename__ = "google_desktop_sessions"
+
+    id = Column(String(64), primary_key=True)
+    poll_hash = Column(String(64), nullable=False)
+    browser_hash = Column(String(64), nullable=False)
+    nonce = Column(String(64), nullable=False)
+    expires_at = Column(Integer, nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    link_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    consumed = Column(Integer, nullable=False, default=0)
+
+
 class Device(Base):
     __tablename__ = "devices"
 
