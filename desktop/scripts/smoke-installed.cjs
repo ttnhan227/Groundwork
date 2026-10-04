@@ -101,7 +101,8 @@ async function close() {
     await expect(page.getByRole('dialog',{name:'Welcome to Groundwork'})).toHaveCount(0);
     const preferences=await fetch(connection.url+'/api/system/preferences',{headers:{Authorization:'Bearer '+connection.token}});
     const cloudUrl=(await preferences.json()).cloud_sync_url;
-    assert.equal(cloudUrl,'https://groundwork-api-597984371188.asia-southeast1.run.app');
+    assert.ok(process.env.DESKTOP_API_BASE_URL,'Set DESKTOP_API_BASE_URL to verify the installed build configuration');
+    assert.equal(cloudUrl,process.env.DESKTOP_API_BASE_URL.trim().replace(/\/$/,'').replace(/\/api\/v1$/,''));
     if (process.env.GROUNDWORK_VERIFY_GOOGLE_SIGNIN === '1') {
       await page.getByRole('button',{name:'Account',exact:true}).click();
       await page.getByRole('button',{name:'Sign in',exact:true}).click();

@@ -124,6 +124,8 @@ jobs:
   windows-installer:
     name: Windows desktop installer
     runs-on: windows-latest
+    env:
+      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

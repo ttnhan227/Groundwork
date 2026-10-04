@@ -4,6 +4,8 @@ The release workflow is `.github/workflows/release.yml`. A version tag push such
 
 ## One-time activation
 
+Create the GitHub Repository Variable `DESKTOP_API_BASE_URL` with the HTTPS backend address. CI and release jobs pass it to the packaging script, which validates it and bundles a generated `desktop-config.json` in the installer. The production URL is not hardcoded in the local engine. `/api/v1` and trailing slashes are normalized to the backend root. Missing configuration fails packaging. Google OAuth remains configured on the hosted backend.
+
 The repaired application and release workflow are pushed to `ttnhan227/Groundwork`. The updated website is deployed at https://groundwork-client.onrender.com/download. Render deployment `dep-db0qb1hsrm7s738o3bk0` successfully deployed commit `2c2ebbb` on 2026-10-04. The existing service is configured for automatic deployment after CI checks pass and a `/*` to `/index.html` rewrite; the direct download route returns HTTP 200.
 
 `render.yaml` specifies the existing `groundwork-client` static site, the `main` branch, and automatic deployment after CI checks pass. These settings have been applied to the existing service. Once this download-page change is deployed, future app releases update the download without another Render deployment.

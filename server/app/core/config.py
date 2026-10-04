@@ -8,10 +8,18 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
+
+def desktop_api_url() -> str:
+    if not getattr(sys, "frozen", False):
+        return "http://localhost:8080"
+    config = Path(sys._MEIPASS) / "desktop-config.json"
+    return json.loads(config.read_text(encoding="utf-8"))["api_base_url"]
 
 
 class Settings(BaseSettings):
@@ -123,10 +131,7 @@ class Settings(BaseSettings):
     # Cloud Sync Configuration (Optional)
     cloud_sync_enabled: bool = Field(default=False, alias="CLOUD_SYNC_ENABLED")
     cloud_sync_url: str = Field(
-        default_factory=lambda: (
-            "https://groundwork-api-597984371188.asia-southeast1.run.app"
-            if getattr(sys, "frozen", False) else "http://localhost:8080"
-        ),
+        default_factory=desktop_api_url,
         alias="CLOUD_SYNC_URL",
     )
     cloud_sync_token: str | None = Field(default=None, alias="CLOUD_SYNC_TOKEN")

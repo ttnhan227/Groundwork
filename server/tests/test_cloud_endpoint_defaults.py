@@ -1,14 +1,17 @@
 """Installed builds use hosted accounts; developer builds stay local."""
 import sys
+import json
 
 from app.core.config import Settings
 
 
-def test_installed_default_uses_verified_hosted_root(monkeypatch):
+def test_installed_default_uses_bundled_build_configuration(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    (tmp_path / "desktop-config.json").write_text(json.dumps({"api_base_url": "https://build.example.com"}))
     monkeypatch.delenv("CLOUD_SYNC_URL", raising=False)
     settings = Settings(_env_file=None)
-    assert settings.cloud_sync_url == "https://groundwork-api-597984371188.asia-southeast1.run.app"
+    assert settings.cloud_sync_url == "https://build.example.com"
     assert settings.cloud_sync_enabled is False
     assert settings.cloud_sync_token is None
 

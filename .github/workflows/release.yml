@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 60
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
