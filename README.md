@@ -230,3 +230,7 @@ The sync check uses hosted API dependencies in `server/.venv`, or the Python sel
 | `docs/` | Architecture, privacy, search, AI, and releases |
 
 Read more about [architecture](docs/ARCHITECTURE.md), [privacy](docs/PRIVACY_MODEL.md), [search behavior](docs/SEARCH_AND_RANKING.md), and [AI boundaries](docs/AI_CONTEXT_ENGINE.md).
+
+## License
+
+Groundwork is open source under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.
