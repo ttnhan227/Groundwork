@@ -146,7 +146,7 @@ The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It 
 
 Set the GitHub Repository Variable **DESKTOP_API_BASE_URL** to your hosted backend's HTTPS address before building Windows installers in Actions. Both CI and release builds bundle this value into the local engine. A missing or invalid value fails the build. Google sign-in's client ID stays in the hosted backend's `GOOGLE_CLIENT_ID`; it is not a desktop build variable.
 
-For a local installer build, set `$env:DESKTOP_API_BASE_URL` in the build terminal first. Normal development still defaults to `http://localhost:8080`. Changing the repository variable affects future builds; it does not change an already installed app.
+For a local installer build, set `DESKTOP_API_BASE_URL` in the project-root `.env`. A terminal environment variable takes precedence if you need a temporary override. Normal development still defaults to `http://localhost:8080`. Changing the repository variable affects future builds; it does not change an already installed app. Only the public backend address is bundled; database passwords, OAuth secrets, and other root `.env` values are not copied into the installer.
 
 1. Commit and push your changes.
 2. Create and push a new version tag (0.x while the product is unfinished).

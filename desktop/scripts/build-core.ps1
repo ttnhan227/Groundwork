@@ -3,10 +3,10 @@ $repoPath = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $buildEnv = Join-Path $repoPath "server/.packaging-venv"
 if (!(Test-Path "$buildEnv/Scripts/python.exe")) { python -m venv $buildEnv; if ($LASTEXITCODE) { throw "Cannot create packaging environment" } }
 $pythonPath = "$buildEnv/Scripts/python.exe"
-& $pythonPath "$PSScriptRoot/prepare-desktop-config.py"
-if ($LASTEXITCODE) { throw "Desktop API configuration failed" }
 & $pythonPath -m pip install -r "$repoPath/server/requirements.txt" "pyinstaller>=6,<7"
 if ($LASTEXITCODE) { throw "Core dependency installation failed" }
+& $pythonPath "$PSScriptRoot/prepare-desktop-config.py"
+if ($LASTEXITCODE) { throw "Desktop API configuration failed" }
 & $pythonPath "$PSScriptRoot/prepare-model.py"
 if ($LASTEXITCODE) { throw "Local model preparation failed" }
 & "$PSScriptRoot/prepare-git.ps1"
