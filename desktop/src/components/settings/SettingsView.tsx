@@ -38,13 +38,13 @@ export const SettingsView: React.FC = () => {
   const [providerChoice, setProviderChoice] = useState("local");
   const [providerKey, setProviderKey] = useState("");
   const [providerModel, setProviderModel] = useState("");
-  const [cloudUrl, setCloudUrl] = useState("http://localhost:8080");
+  const [cloudUrl, setCloudUrl] = useState("");
   const [cloudEmail, setCloudEmail] = useState("");
   const [cloudPassword, setCloudPassword] = useState("");
   const [registerAccount, setRegisterAccount] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
   useEffect(() => { api.getPreferences().then((prefs) => {
-    setProviderChoice(String(prefs.ai_provider || "local")); setCloudUrl(String(prefs.cloud_sync_url || "http://localhost:8080"));
+    setProviderChoice(String(prefs.ai_provider || "local")); setCloudUrl(String(prefs.cloud_sync_url || ""));
   }).catch((error) => setActionMessage(`Preferences unavailable: ${String(error)}`)); }, []);
 
   const loadData = async () => {
@@ -360,7 +360,7 @@ export const SettingsView: React.FC = () => {
             <div className="text-xs text-[var(--ink-secondary)] font-sans">
               Cloud Service Endpoint:{" "}
               <span className="font-mono text-[var(--ink)] bg-[var(--paper)] px-1.5 py-0.5 rounded border border-[var(--hairline)]">
-                {syncStatus?.cloud_url || "http://127.0.0.1:8080"}
+                {syncStatus?.cloud_url || cloudUrl || "Loading service endpoint…"}
               </span>
             </div>
             <Button

@@ -1,31 +1,100 @@
 # Groundwork
 
-Groundwork is a local-first workspace search and context desktop application. It indexes registered workspace folders, inspects real projects and Git history, and preserves notes and investigation sessions in a local SQLite database.
+Groundwork is a desktop app for searching project folders, exploring Git history, and collecting notes and AI context. SQLite stores your local workspace data. An optional backend handles accounts and sync.
 
-## Repository
+## Use the app
 
-- `desktop/`: React, Tailwind, and Tauri desktop shell, using Groundwork's paper palette and editorial typography.
-- `server/`: local FastAPI core and hosted account/sync API. The local runtime owns SQLite/FTS5, file indexing, watcher, project and Git inspection, notes, sessions, and bounded AI context.
-- `client/`: static marketing, documentation, and download website.
+Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases/latest), run the `.exe`, then open Groundwork and add a workspace folder.
 
-Local indexing and search need no cloud service, PostgreSQL, Redis, Docker, or account. Windows installers bundle the Python runtime, Git, and a trained local MiniLM embedding model. Developer checkouts use installed Git and fall back to hashing when model files are absent. The `local` AI provider shows retrieved excerpts; it is not a language model. Ollama requires a separately installed model. OpenAI and Gemini queries send the question, retrieved excerpts, and cited paths to the selected provider. Indexing never uses those remote providers.
+The installer includes the local engine, Python runtime, Git, and a search embedding model. You do not need Docker, Python, Node.js, or PostgreSQL installed separately. Local indexing and search work without an account or internet connection. Remote AI generation needs your own provider key and internet access; Ollama needs a separately installed local model.
 
-## Development
+## Quick developer setup: Docker
 
-Run the complete developer stack with `docker compose up -d --build`. No `.env` file is required. The five services are `desktop` (port 5174), `website` (3000), `local-engine` (8000), `backend` (8080), and `database` (PostgreSQL on localhost:5433). The backend uses this PostgreSQL database by default; the local engine keeps its embedded SQLite database. Database data persists in Docker volumes.
+Install Git and Docker with Compose. On Windows, start Docker Desktop, then run:
 
-For a backend started directly with Python, the developer database URL is `postgresql+psycopg2://groundwork:groundwork_dev@localhost:5433/groundwork`. Set `BACKEND_DATABASE_URL` to override the Docker backend's database connection. Use `docker compose ps` to check services and `docker compose logs backend` to inspect backend logs.
+```sh
+git clone https://github.com/ttnhan227/Groundwork.git
+cd Groundwork
+docker compose up -d --build
+```
 
-Use Python 3.12 and Node 22 or newer. Native development also requires Rust and the Windows Tauri prerequisites.
+Wait for startup, then open the **[app interface](http://localhost:5174)** or **[website](http://localhost:3000)**. No `.env` file or external database account is required. The first build downloads dependencies and can take several minutes.
+
+### The five services
+
+| Service | What it does | Local address |
+| --- | --- | --- |
+| `desktop` | App interface in your browser | `http://localhost:5174` |
+| `website` | Landing page, downloads, and documentation | `http://localhost:3000` |
+| `local-engine` | SQLite, indexing, search, Git inspection, and AI context | `http://localhost:8000/docs` |
+| `backend` | Accounts, authentication, and metadata sync | `http://localhost:8080/docs` |
+| `database` | PostgreSQL for backend account and sync data | `localhost:5433` |
+
+SQLite stores local workspace data. PostgreSQL stores backend account and sync data. Both persist across ordinary container restarts.
+
+Docker serves the app's browser interface, not a native desktop window. Native folder dialogs and service restart controls require the installed app or native development. The local engine sees the repository at `/workspace`. Mount other host folders into that container before indexing them, and use paths inside the container when adding workspaces.
+
+### Everyday commands
+
+Run these from the repository root:
+
+```sh
+# Check service health
+docker compose ps
+
+# Follow logs; replace backend with any service name
+docker compose logs -f backend
+
+# Rebuild after changing code
+docker compose up -d --build
+
+# Stop the stack while keeping database data
+docker compose down
+```
+
+Adding `-v` to the shutdown command deletes the stack's database volumes. Use that option only when you want to reset development data.
+
+If a port is occupied, stop the other process or change `APP_PORT` for the browser app and `DATABASE_PORT` for PostgreSQL. Their defaults are 5174 and 5433.
+
+## Optional configuration
+
+For a fresh checkout, copy `.env.example` to `.env` in the repository root only if you need custom settings. Keep an existing `.env` rather than overwriting it. The file is ignored by Git.
+
+| Setting | Purpose |
+| --- | --- |
+| `BACKEND_DATABASE_URL` | Override the Docker backend's database connection |
+| `BACKEND_JWT_SECRET` | Override its development token-signing secret |
+| `BACKEND_CORS_ORIGINS` | Allow custom browser origins on the Docker backend |
+| `DATABASE_URL` | Database connection for a backend started directly with Python |
+| `GOOGLE_CLIENT_ID` | Enable optional backend Google sign-in |
+| `APP_PORT` / `DATABASE_PORT` | Change the Docker app / PostgreSQL port |
+
+Docker uses its included PostgreSQL database even if `.env` contains a different `DATABASE_URL`. Set `BACKEND_DATABASE_URL` to explicitly override Docker. The included credentials and signing secret are development defaults; use production credentials when hosting the backend.
+
+From your computer, the default developer database URL is:
+
+```text
+postgresql+psycopg2://groundwork:groundwork_dev@localhost:5433/groundwork
+```
+
+Configure AI providers and your keys in the app's settings. The `local` provider displays retrieved excerpts; it does not generate language-model responses. OpenAI and Gemini receive your question, selected excerpts, and cited paths when used. Local indexing does not call those providers.
+
+## Develop without Docker
+
+Install Python 3.12, Node.js 22 or newer, and Git. Local app development uses SQLite and does not need PostgreSQL.
+
+These commands use Windows PowerShell. Start each terminal in the repository root. Stop Docker services using the same ports first.
+
+**Terminal 1: local engine**
 
 ```powershell
 cd server
 python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m uvicorn app.local_main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn app.local_main:app --host 127.0.0.1 --port 8000
 ```
 
-In another terminal:
+**Terminal 2: app interface**
 
 ```powershell
 cd desktop
@@ -33,9 +102,26 @@ npm ci
 npm run dev
 ```
 
-For native development, activate the server virtual environment in the same shell and run `npm run tauri -- dev` from `desktop/`. The shell starts a managed development core. Its release path launches the bundled executable, discovers readiness using an authenticated health request, and passes a private token and dynamic localhost port to the UI.
+Open [http://localhost:1420](http://localhost:1420). This starts the browser app and local engine, not the hosted backend or website.
 
-## Windows packaging
+To develop the website separately, run `npm ci` and `npm run dev` from `client/`, then open the URL printed by Vite.
+
+### Native desktop development
+
+Install Rust and the Windows Tauri prerequisites: Microsoft C++ Build Tools and WebView2. Create the Python environment above, then run from the repository root:
+
+```powershell
+.\server\.venv\Scripts\Activate.ps1
+cd desktop
+npm ci
+npm run tauri -- dev
+```
+
+Tauri starts the local engine for you. Stop any separately running local engine first.
+
+## Build a Windows installer
+
+With the native development prerequisites installed, run from the repository root:
 
 ```powershell
 cd desktop
@@ -44,30 +130,52 @@ npm run tauri -- build --bundles nsis
 python scripts/smoke-core.py
 ```
 
-The build command creates an isolated Python packaging environment, prepares the local model and Git with their licenses, freezes the core with PyInstaller, builds the UI, and bundles the runtime as Tauri resources. The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. Installed users need no Python, Node, npm, or developer terminal. The native shell starts its backend from the application data directory; frozen builds ignore development `.env` files. A local `local-core.log` records startup diagnostics. See `docs/REPAIR_VERIFICATION.md` for measured verification results and release limits.
+The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It bundles the local engine, Python, Git, and search model. Installed builds ignore development `.env` files. Startup diagnostics are written to `local-core.log` in the app's data directory.
 
-The website checks GitHub's latest stable release when the download page opens and displays the published installer, version, size, and available SHA-256 digest. No per-release website rebuild or URL update is required. Push a stable `vMAJOR.MINOR.PATCH` tag to run the tested Windows release workflow; see [release automation](docs/RELEASE_AUTOMATION.md). A missing release or GitHub outage is shown explicitly.
+## Publish a desktop release
 
-## Verification
+1. Commit and push your changes.
+2. Create and push a new stable version tag.
+3. Check **Publish Windows desktop release** in GitHub Actions.
 
-```powershell
-cd server
-python -m pytest tests
-cd ../desktop
-npm run build
-cd ../client
-npm run build
+For example, using a version number that has not been published:
+
+```sh
+git tag v1.0.5
+git push origin v1.0.5
 ```
 
-The curated search evaluation is a development check, not a guarantee of recall or latency on arbitrary workspaces. See [search behavior](docs/SEARCH_AND_RANKING.md), [privacy](docs/PRIVACY_MODEL.md), [AI boundaries](docs/AI_CONTEXT_ENGINE.md), and [architecture](docs/ARCHITECTURE.md).
+A normal branch push runs CI. A version tag triggers the installer build, tests, and GitHub release publication. Failed checks prevent publication.
 
-Packaged integration checks run from the repository root:
+The website automatically reads the latest published stable release. No manual installer upload or download-link edit is needed. Installed users must download the newer installer; there is no in-app automatic updater yet. Backend deployment is a separate workflow.
+
+See [release automation](docs/RELEASE_AUTOMATION.md) for details.
+
+## Checks and project layout
+
+After installing Python and npm dependencies, run from the repository root:
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests
+npm --prefix desktop run build
+npm --prefix client run build
+```
+
+After building the installer, run packaged integration checks:
 
 ```powershell
 python desktop/scripts/smoke-core.py
 python desktop/scripts/smoke-scale.py
 python desktop/scripts/smoke-sync.py
-node desktop/scripts/smoke-installed.cjs desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe
 ```
 
-The sync check requires the hosted API dependencies in `server/.venv` or the Python selected through `GROUNDWORK_CLOUD_PYTHON`. The installed UI check uses Playwright from `client/node_modules` and attaches to the real WebView2 runtime. Both application tests isolate state and run the application with an empty PATH.
+The sync check uses hosted API dependencies in `server/.venv`, or the Python selected through `GROUNDWORK_CLOUD_PYTHON`. See [repair verification](docs/REPAIR_VERIFICATION.md) for installed-app checks and measured limits.
+
+| Directory | Contents |
+| --- | --- |
+| `desktop/` | React interface and Tauri native shell |
+| `server/` | Local engine and hosted account/sync backend |
+| `client/` | Landing page and download website |
+| `docs/` | Architecture, privacy, search, AI, and releases |
+
+Read more about [architecture](docs/ARCHITECTURE.md), [privacy](docs/PRIVACY_MODEL.md), [search behavior](docs/SEARCH_AND_RANKING.md), and [AI boundaries](docs/AI_CONTEXT_ENGINE.md).

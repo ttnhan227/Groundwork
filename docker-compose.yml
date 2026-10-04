@@ -20,6 +20,7 @@ services:
       PORT: 8000
       GROUNDWORK_ENV: development
       GROUNDWORK_RUNTIME: local
+      CORS_ORIGINS: http://localhost:${APP_PORT:-5174},http://127.0.0.1:${APP_PORT:-5174},http://localhost:1420,http://127.0.0.1:1420,tauri://localhost,http://tauri.localhost
     ports:
       - "127.0.0.1:8000:8000"
     volumes:

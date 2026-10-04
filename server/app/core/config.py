@@ -122,7 +122,13 @@ class Settings(BaseSettings):
 
     # Cloud Sync Configuration (Optional)
     cloud_sync_enabled: bool = Field(default=False, alias="CLOUD_SYNC_ENABLED")
-    cloud_sync_url: str = Field(default="http://localhost:8080", alias="CLOUD_SYNC_URL")
+    cloud_sync_url: str = Field(
+        default_factory=lambda: (
+            "https://groundwork-api-597984371188.asia-southeast1.run.app"
+            if getattr(sys, "frozen", False) else "http://localhost:8080"
+        ),
+        alias="CLOUD_SYNC_URL",
+    )
     cloud_sync_token: str | None = Field(default=None, alias="CLOUD_SYNC_TOKEN")
     device_id: str | None = Field(default=None, alias="GROUNDWORK_DEVICE_ID")
 
