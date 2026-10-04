@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 if (!process.argv[2]) throw new Error('Pass the NSIS installer path');
 const installer = path.resolve(process.argv[2]);
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'groundwork-installed-'));
+const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'groundwork-installed-')));
 const installDir = path.join(root, 'application');
 const resultsDir = path.resolve(__dirname, '../test-results');
 fs.mkdirSync(resultsDir, {recursive:true});
