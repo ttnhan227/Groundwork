@@ -15,7 +15,7 @@ class CloudSettings(BaseSettings):
     """Cloud backend settings."""
 
     app_name: str = "Groundwork Cloud Sync"
-    app_version: str = "1.0.0"
+    app_version: str = "0.1.0"
     environment: str = Field(default="development", alias="ENVIRONMENT")
 
     # PostgreSQL / SQLite connection URL

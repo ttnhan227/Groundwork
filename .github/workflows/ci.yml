@@ -143,7 +143,7 @@ jobs:
       - run: python desktop/scripts/smoke-core.py
       - run: python desktop/scripts/smoke-scale.py
       - run: python desktop/scripts/smoke-sync.py
-      - run: ./desktop/scripts/smoke-installed-ci.ps1 -Installer desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe
+      - run: ./desktop/scripts/smoke-installed-ci.ps1 -Installer desktop/src-tauri/target/release/bundle/nsis/Groundwork_0.1.0_x64-setup.exe
       - uses: actions/upload-artifact@v4
         if: always()
         with:

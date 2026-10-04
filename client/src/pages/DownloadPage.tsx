@@ -57,13 +57,14 @@ export const DownloadPage: React.FC = () => {
           </h2>
           <p className="text-sm text-[var(--ink-secondary)]">
             {status === "loading"
-              ? "Checking the latest stable release…"
+              ? "Checking the latest version…"
               : release
-                ? `Latest stable release: ${release.version} · ${(release.bytes / 1048576).toFixed(1)} MB`
+                ? `${release.preview ? 'Preview' : 'Latest release'}: ${release.version} · ${(release.bytes / 1048576).toFixed(1)} MB`
                 : status === "error"
                   ? "Unable to check the latest version right now. You can check the releases page directly."
                   : "A Windows installer has not been published yet. It will appear here automatically after a release passes its checks."}
           </p>
+          {release?.preview && <p className="text-sm text-[var(--ink-secondary)]">Groundwork is still in development. This preview is available to try; the finished 1.0 release is not ready yet.</p>}
           {release ? (
             <a
               href={release.url}

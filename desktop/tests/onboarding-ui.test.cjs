@@ -69,7 +69,7 @@ test("first launch, local choice, account recovery, folders and nontechnical set
         };
       else if (url.pathname === "/api/system/status")
         body = {
-          app_version: "1.0.7",
+          app_version: "0.1.0",
           counts: {
             workspaces: folders.length,
             projects: 0,

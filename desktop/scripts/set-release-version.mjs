@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export function setReleaseVersion(root, tag) {
-  if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('Use a stable version tag such as v1.0.1');
+  if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('Use a numeric version tag such as v0.1.0');
   const version = tag.slice(1);
   for (const relative of ['desktop/package.json', 'desktop/package-lock.json', 'desktop/src-tauri/tauri.conf.json']) {
     const filename = path.join(root, relative);

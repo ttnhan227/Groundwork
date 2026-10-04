@@ -274,7 +274,7 @@ class ToolExecutionRequest(BaseModel):
 class SystemStatusResponse(BaseModel):
     status: str = "ok"
     app_name: str = "Groundwork Local"
-    app_version: str = "1.0.0"
+    app_version: str = "0.1.0"
     database_path: str
     counts: dict[str, int] = Field(default_factory=dict)
 

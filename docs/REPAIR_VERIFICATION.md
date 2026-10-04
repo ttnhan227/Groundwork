@@ -42,11 +42,7 @@ The current fifteen-query source-code evaluation measured lexical Recall@1 100%,
 
 ## Release scope
 
-Local validation artifact: `desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe`, 165,664,261 bytes (157.99 MiB).
-
-SHA-256: `84495982f8a93330db07da21fc890854767d53b43bd8ac5f10e60ba146398922`.
-
-Published Windows NSIS release: [v1.0.4](https://github.com/ttnhan227/Groundwork/releases/tag/v1.0.4), built from commit `f18d161` by [the successful release workflow](https://github.com/ttnhan227/Groundwork/actions/runs/37168838788). Its installer contains 165,408,455 bytes and SHA-256 `63d74919b978926268ad1fcc19669d5a23ea0ddacd5c87d22854e70182e226d9`. The complete public download was independently downloaded and checksum-verified. The live Render page automatically displayed this version and download URL without a per-release website edit.
+Groundwork remains in development. Windows installer and download checks validate specific behavior; they do not mean that the product is finished or ready for a 1.0 release. Public 0.x builds are previews.
 
 [Main CI](https://github.com/ttnhan227/Groundwork/actions/runs/37168836149) passed all five jobs, including native Windows installer creation and actual installed WebView2 lifecycle checks. MSI creation passed in that build, but MSI installation was not tested. The installer remains unsigned. macOS, Linux, and SmartScreen behavior are unverified. Native compilation includes the global shortcut and folder chooser; off-focus OS shortcut registration and interactive folder-dialog selection are not covered by the automated WebView2 workflow.
 

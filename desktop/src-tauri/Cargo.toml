@@ -1,6 +1,6 @@
 [package]
 name = "groundwork-desktop"
-version = "1.0.0"
+version = "0.1.0"
 description = "Groundwork Local - Workspace Search and AI Context Tool"
 edition = "2021"
 

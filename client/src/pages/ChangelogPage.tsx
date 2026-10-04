@@ -35,7 +35,7 @@ export function ChangelogPage() {
       <div className="p-8 rounded-xl border border-[var(--hairline)] bg-[var(--surface)] space-y-5">
         <h2 className="text-2xl font-semibold">
           {release
-            ? `Groundwork ${release.version}`
+            ? `Groundwork ${release.version}${release.preview ? ' — Preview' : ''}`
             : loaded
               ? "Groundwork releases"
               : "Checking the latest version…"}

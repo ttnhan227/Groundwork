@@ -17,6 +17,6 @@ test('installer, native package, npm lock and backend all receive the release ta
     assert.equal(JSON.parse(fs.readFileSync(path.join(root,files[1]),'utf8')).packages[''].version,'1.2.3');
     assert.match(fs.readFileSync(path.join(root,files[3]),'utf8'),/version = "1.2.3"/);
     assert.match(fs.readFileSync(path.join(root,files[4]),'utf8'),/app_version: str = "1.2.3"/);
-    assert.throws(()=>setReleaseVersion(root,'v1.2.3-beta'),/stable/);
+    assert.throws(()=>setReleaseVersion(root,'v1.2.3-beta'),/numeric/);
   } finally {fs.rmSync(root,{recursive:true,force:true});}
 });

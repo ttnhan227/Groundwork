@@ -4,7 +4,7 @@ Groundwork is a desktop app for searching project folders, exploring Git history
 
 ## Use the app
 
-Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases/latest) and run the `.exe`. Open Groundwork, sign in or choose **Continue locally**, then select **Add your first folder** on Home. Choose a folder and start searching as its files become ready.
+Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases) and run the `.exe`. Open Groundwork, sign in or choose **Continue locally**, then select **Add your first folder** on Home. Choose a folder and start searching as its files become ready.
 
 **Folders** manages where the app searches. **Notes** keeps your ideas and reminders. **Account** handles sign-in and **Sync now**. **Ask your files → Set up answers** lets you choose matching passages, a local model, or an online AI service. Settings contains preferences and collapsed troubleshooting tools; regular users never need to configure a server URL.
 
@@ -145,21 +145,21 @@ The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It 
 ## Publish a desktop release
 
 1. Commit and push your changes.
-2. Create and push a new stable version tag.
+2. Create and push a new version tag (0.x while the product is unfinished).
 3. Check **Publish Windows desktop release** in GitHub Actions.
 
 For example, using a version number that has not been published:
 
 ```sh
-git tag v1.0.8
-git push origin v1.0.8
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 A normal branch push runs CI. A version tag triggers the installer build, tests, and GitHub release publication. Failed checks prevent publication.
 
 The release workflow also exercises registration, password login, logout, and metadata sync from the installed app against the live backend, using a new test account. A hosted-service failure blocks publication.
 
-The website automatically reads the latest published stable release. No manual installer upload or download-link edit is needed. Installed users must download the newer installer; there is no in-app automatic updater yet. Backend deployment is a separate workflow.
+The website automatically reads the newest published version, including previews. No manual installer upload or download-link edit is needed. Installed users must download the newer installer; there is no in-app automatic updater yet. Backend deployment is a separate workflow.
 
 See [release automation](docs/RELEASE_AUTOMATION.md) for details.
 
