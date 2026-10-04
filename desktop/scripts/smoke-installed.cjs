@@ -52,7 +52,14 @@ async function launch() {
     console.error(execFileSync('powershell.exe',['-NoProfile','-Command',`Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('groundwork-desktop.exe','msedgewebview2.exe') } | Select-Object Name,ProcessId,ParentProcessId,CommandLine | Format-List | Out-String`],{encoding:'utf8'}));
     throw new Error('WebView2 debugging endpoint unavailable');
   }
-  page=browser.contexts()[0].pages()[0];
+  // WebView2 can expose its CDP endpoint before creating the application page.
+  for(let attempt=0;attempt<150;attempt++) {
+    page=browser.contexts().flatMap(context=>context.pages())[0];
+    if(page)break;
+    if(app.exitCode!==null)throw new Error('Installed application exited before creating its window');
+    await new Promise(resolve=>setTimeout(resolve,200));
+  }
+  if(!page)throw new Error('WebView2 application page did not become ready');
   page.on('console', message=>{if(message.type()==='error') console.error('WebView:',message.text());});
   page.on('requestfailed', request=>console.error('Request failed:',request.url(),request.failure()));
   await expect(page.getByRole('heading',{name:'Detected Projects'})).toBeVisible({timeout:30000});
