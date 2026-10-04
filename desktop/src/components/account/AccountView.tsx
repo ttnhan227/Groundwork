@@ -18,15 +18,20 @@ export function AccountView({
   > | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   const load = () =>
     api
       .getSyncStatus()
-      .then(setStatus)
-      .catch(() =>
+      .then((result) => {
+        setStatus(result);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        setLoadFailed(true);
         setMessage(
           "Account details are unavailable right now. Your local work is still available.",
-        ),
-      );
+        );
+      });
   useEffect(() => {
     void load();
   }, []);
@@ -47,7 +52,7 @@ export function AccountView({
         <UserRound size={28} className="text-[var(--ink-blue)]" />
         <h2 className="text-xl font-semibold">
           {!status
-            ? "Checking your account…"
+            ? loadFailed ? "Couldn't check your account" : "Checking your account…"
             : status.is_authenticated
               ? "You're signed in"
               : "You're using Groundwork locally"}
@@ -116,7 +121,7 @@ export function AccountView({
             </div>
           </>
         ) : (
-          <Button
+          loadFailed ? <Button onClick={async () => { setMessage(""); setLoadFailed(false); await load(); }}>Try again</Button> : <Button
             variant="primary"
             size="lg"
             disabled={!status}

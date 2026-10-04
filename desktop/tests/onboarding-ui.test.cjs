@@ -231,6 +231,11 @@ test("first launch, local choice, account recovery, folders and nontechnical set
       .getByRole("button", { name: "Continue locally", exact: true })
       .click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "Account", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Couldn't check your account" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Try again", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Couldn't check your account" })).toBeVisible();
   } finally {
     if (browser) await browser.close();
     server.kill();

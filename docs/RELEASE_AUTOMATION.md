@@ -41,4 +41,4 @@ GitHub may briefly cache its release-list response. Unauthenticated API rate lim
 
 Release checks cover metadata parsing, automatic version selection, installer version consistency, packaged startup, and installed-app workflows. Passing these checks does not mean the product is finished. Groundwork remains a 0.x preview until a deliberate 1.0 launch.
 
-The installer remains unsigned. Release automation does not provide a code-signing identity.
+Preview installers can be built without a signing identity. Stable (1.x and later) publication requires `WINDOWS_CERTIFICATE_BASE64` (a PFX certificate with its private key, encoded as base64) and `WINDOWS_CERTIFICATE_PASSWORD` in GitHub Actions secrets. Obtain a trusted code-signing identity before configuring them. The workflow imports it into its disposable runner, signs through Tauri, verifies the installer's Authenticode signature and expected certificate, then removes the imported key. An absent certificate or invalid signature prevents stable publication. Certificates held by a hardware token or managed signing service require that provider's signing integration instead of the PFX path.

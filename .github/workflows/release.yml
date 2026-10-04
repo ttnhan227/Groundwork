@@ -59,7 +59,12 @@ jobs:
         working-directory: client
       - run: python -m pip install -r server/requirements.txt pytest
       - run: python -m pytest server/tests/hosted -q
-      - run: npm run tauri -- build --bundles nsis
+      - name: Build and verify the release signature
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: ./scripts/build-signed-release.ps1
         working-directory: desktop
       - run: node --test desktop/tests/onboarding-ui.test.cjs
       - run: server/.packaging-venv/Scripts/python.exe -m pytest server/tests -q

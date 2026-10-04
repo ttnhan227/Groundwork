@@ -51,6 +51,8 @@ export const App: React.FC = () => {
     null,
   );
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const accountDialogRef = React.useRef(accountDialog);
+  accountDialogRef.current = accountDialog;
 
   const [contextQuestion, setContextQuestion] = useState("");
   const [focusedFile, setFocusedFile] = useState<SearchResultItem | null>(null);
@@ -60,7 +62,9 @@ export const App: React.FC = () => {
     if (!isTauri()) return;
     let cancelled = false;
     let unlisten: (() => void) | undefined;
-    listen("groundwork-search", () => setIsSearchOpen(true)).then((cleanup) => {
+    listen("groundwork-search", () => {
+      if (!accountDialogRef.current) setIsSearchOpen(true);
+    }).then((cleanup) => {
       if (cancelled) cleanup();
       else unlisten = cleanup;
     });
@@ -197,7 +201,7 @@ export const App: React.FC = () => {
 
       {/* Global Spotlight Search Modal */}
       <GlobalSearchModal
-        isOpen={isSearchOpen}
+        isOpen={isSearchOpen && !accountDialog}
         onClose={() => setIsSearchOpen(false)}
         selectedProjectId={selectedProjectId}
         onAskAIWithContext={handleAskAIWithContext}
