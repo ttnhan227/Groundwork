@@ -35,7 +35,7 @@ def test_cloud_sync_full_flow():
 
             # 2. Register User 1
             reg_res = client.post("/auth/register", json={
-                "email": "developer1@groundwork.test",
+                "email": "developer1@example.com",
                 "password": "Password123!",
             })
             assert reg_res.status_code == 200
@@ -48,7 +48,7 @@ def test_cloud_sync_full_flow():
             assert dev_res.json()["device_name"] == "Work Laptop"
 
             # 4. Push sync items (Note + Saved Search)
-            push_res = client.post("/sync/push", json={
+            push_payload = {
                 "items": [
                     {
                         "queue_id": "q1",
@@ -72,22 +72,27 @@ def test_cloud_sync_full_flow():
                         },
                     },
                 ]
-            }, headers=headers1)
+            }
+            push_res = client.post("/sync/push", json=push_payload, headers=headers1)
             assert push_res.status_code == 200
             assert push_res.json()["processed_count"] == 2
 
+            replay = client.post("/sync/push", headers=headers1, json=push_payload)
+            assert replay.status_code == 200
+            assert replay.json()["acknowledged_queue_ids"] == ["q1", "q2"]
             # 5. Pull sync state (Simulating a second device)
             pull_res = client.get("/sync/pull", headers=headers1)
             assert pull_res.status_code == 200
             data = pull_res.json()
             assert len(data["notes"]) == 1
+            assert data["notes"][0]["version"] == 1
             assert data["notes"][0]["title"] == "Windows watcher debounce"
             assert len(data["saved_searches"]) == 1
             assert data["saved_searches"][0]["query"] == "PostgreSQL migration"
 
             # 6. Tenant isolation: Register User 2 and verify empty pull
             reg_res2 = client.post("/auth/register", json={
-                "email": "developer2@groundwork.test",
+                "email": "developer2@example.com",
                 "password": "Password456!",
             })
             assert reg_res2.status_code == 200
@@ -96,6 +101,12 @@ def test_cloud_sync_full_flow():
             assert pull_res2.status_code == 200
             assert len(pull_res2.json()["notes"]) == 0
             assert len(pull_res2.json()["saved_searches"]) == 0
+            deletion = client.post("/sync/push", headers=headers1, json={"items": [{"queue_id": "q3", "entity_type": "note", "entity_id": "note-123", "action": "delete"}]})
+            assert deletion.status_code == 200
+            state = client.get("/sync/pull", headers=headers1).json()
+            assert state["notes"] == []
+            assert state["tombstones"][0]["entity_id"] == "note-123"
+            assert client.get("/sync/pull", headers=headers2).json()["tombstones"] == []
         finally:
             app.dependency_overrides.clear()
             test_engine.dispose()

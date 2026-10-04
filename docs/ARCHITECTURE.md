@@ -1,95 +1,11 @@
-# Groundwork Architecture Specification
+# Architecture
 
-This document details the architectural foundation of Groundwork, a local-first workspace search, project intelligence, and AI context system for developers.
+Tauri hosts a React desktop UI. Native startup launches a bundled one-folder PyInstaller runtime, using a per-launch token and dynamic loopback port. Authenticated health verification must succeed before the connection is returned. Release startup has no Python/PATH fallback. Development startup can use Python from the source checkout. Shutdown first requests graceful server exit and kills only the owned child if it exceeds the deadline.
 
----
+The local core owns SQLite/FTS, workspace roots, project discovery, file parsing/chunks, content hashing, background indexing, filesystem watching, Git inspection, notes, activity, sessions, and provider preferences. Indexing requests made during an active scan schedule another scan instead of being discarded. Startup reconciles registered workspaces with disk. Watcher roots are refreshed, and ignore/manifest changes trigger reconciliation.
 
-## 1. System Philosophy
+The optional cloud service owns accounts, devices, notes, saved searches, sync receipts, and deletion tombstones. It never receives the search index. Sync pushes acknowledged queue entries and pulls metadata while preserving pending local edits and local file associations. Current note updates include revision preconditions. SQLite is sufficient for development; synchronous PostgreSQL is optional for a deployed cloud service. The deployment workflow targets `cloud/` only and is manually dispatched.
 
-Groundwork is built around three inviolable principles:
+The static website owns marketing and documentation. It does not host a workspace backend and does not invent download artifacts.
 
-1. **The user's workspace belongs to the user's machine.** File indexing, AST extraction, embedding generation, vector search, and Git analysis must run locally and operate completely offline.
-2. **Deterministic, low-latency search beats generic generation.** When searching for a function, file, or commit, developers require sub-10 millisecond exact and conceptual retrieval with structured line snippets, not hallucinated conversational prose.
-3. **Bounded and grounded AI context.** AI assistance must be strictly constrained by real file citations with line ranges and user-authorized execution tokens.
-
----
-
-## 2. Monorepo Surface Topography
-
-```text
-Groundwork Monorepo
-│
-├── desktop/               # Tauri 2 Desktop Frontend Application
-│   ├── src-tauri/         # Rust native layer (window management, shortcuts)
-│   └── src/               # React 19 + TypeScript + Vite UI
-│
-├── server/                # Local FastAPI Core Service (Runs on 127.0.0.1:8000)
-│   ├── app/core/          # Security (path traversal prevention, single-use tokens)
-│   ├── app/database/      # SQLite in WAL mode with FTS5 virtual tables
-│   ├── app/services/      # Parser (AST), Indexer, Watcher, Git, Search, AI
-│   └── eval/              # Quantitative search benchmark suite
-│
-├── cloud/                 # Optional Groundwork Sync Service (Google Cloud Run)
-│   ├── app/core/          # PostgreSQL engine, JWT authentication
-│   ├── app/routers/       # Devices, Auth, Settings/Notes synchronization
-│   └── tests/             # Isolation and synchronization test suite
-│
-├── client/                # Marketing, Download & Documentation Website
-│   └── src/               # Static site: Landing, Download, Docs, Changelog, Privacy
-│
-└── docs/                  # Architecture & System Design Specifications
-```
-
----
-
-## 3. Local Process & Communication Topology
-
-```text
-+-------------------------------------------------------+
-|                   Tauri 2 Desktop                     |
-|  +-------------------------------------------------+  |
-|  |           React 19 / TypeScript UI              |  |
-|  |   - Spotlight Search Modal (Ctrl+Space)         |  |
-|  |   - Project Explorer & AST Key Files            |  |
-|  |   - Activity Timeline ("What was I doing?")     |  |
-|  |   - Context Sessions ("Resume work")            |  |
-|  |   - Grounded AI Investigation & Citations       |  |
-|  |   - Local Notes & Settings                      |  |
-|  +------------------------+------------------------+  |
-|                           | HTTP / JSON               |
-+---------------------------|---------------------------+
-                            v
-+-------------------------------------------------------+
-|             Local FastAPI Service (127.0.0.1)         |
-|  +-------------------------------------------------+  |
-|  | REST Endpoints (/api/search, /api/activity, etc)|  |
-|  +------------------------+------------------------+  |
-|                           |                           |
-|       +-------------------+-------------------+       |
-|       v                                       v       |
-|  +-----------------------+       +------------------+ |
-|  |    Search Engine      |       | Indexer & Watcher| |
-|  |  - FTS5 BM25          |       | - SHA-256 Hashing| |
-|  |  - 384-d Cosine Sim   |       | - AST Extraction | |
-|  |  - Recency Decay      |       | - watchfiles     | |
-|  +-----------+-----------+       +--------+---------+ |
-|              |                            |           |
-|              +-------------+--------------+           |
-|                            v                          |
-|  +-------------------------------------------------+  |
-|  |          SQLite WAL Database File               |  |
-|  |   - workspaces, projects, files, chunks         |  |
-|  |   - fts_files, fts_chunks (FTS5)                |  |
-|  |   - activities, context_sessions, notes         |  |
-|  +-------------------------------------------------+  |
-+-------------------------------------------------------+
-```
-
----
-
-## 4. Concurrency and SQLite Database Design
-
-To ensure fast concurrent reads while background indexing is actively writing:
-* **WAL Mode (Write-Ahead Logging):** Configured via `PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;`. Readers never block writers, and writers never block readers.
-* **Connection Registry & Thread-Safe RLock:** Connection handles are allocated per-thread with `threading.RLock()` guarding schema migration to avoid SQLite file lock contention on Windows.
-* **Cancellation & Graceful Shutdown:** The background `IndexerService` supports cooperative task cancellation and state checkpointing so an interrupted scan resumes without re-parsing unmodified files.
+Verification covers Python API/service behavior, desktop and website builds, Windows credential protection, native Rust release compilation, NSIS installation, and the real installed WebView2 lifecycle with an empty PATH. Actual UI checks include workspace setup, Git overview, keyboard search, grounded AI, saved-investigation resume, note editing, service restart, normal shutdown, and relaunch persistence. Frozen-core checks also cover watcher mutations, a 1,101-file directory, interrupted indexing recovery, and real HTTP cloud outage/retry. Interactive native folder selection and off-focus global shortcut behavior remain unverified. See [REPAIR_VERIFICATION.md](REPAIR_VERIFICATION.md) for exact results and release limits. The Windows CI job builds installers and runs core, sync, and installed UI smoke checks; that external job has not been run here.

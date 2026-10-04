@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.database.local_db import get_db
@@ -15,6 +15,7 @@ from app.models.types import (
     AIQueryResponse,
     ContextSessionCreate,
     ContextSessionResponse,
+    ContextSessionUpdate,
     IndexProgress,
     InvestigationRequest,
     NoteCreate,
@@ -197,6 +198,8 @@ def search_workspace(
     project_id: str | None = None,
     mode: str = Query(default="hybrid", enum=["hybrid", "lexical", "semantic", "filename"]),
     limit: int = Query(default=25, ge=1, le=100),
+    file_type: str | None = None,
+    modified_after: float | None = None,
 ) -> SearchResponse:
     return SearchEngine().search(
         query=q,
@@ -204,6 +207,8 @@ def search_workspace(
         project_id=project_id,
         search_mode=mode,
         limit=limit,
+        file_type=file_type,
+        modified_after=modified_after,
     )
 
 
@@ -215,19 +220,22 @@ git_router = APIRouter(prefix="/api/git", tags=["Git"])
 def get_git_commits(query: str | None = None, project_id: str | None = None, limit: int = 25) -> list[dict[str, Any]]:
     if query:
         return GitService().search_commits(query, project_id, limit)
-    conn = get_db().get_connection()
-    sql = "SELECT c.*, p.name as project_name FROM git_commits c JOIN projects p ON c.project_id = p.id"
-    params: list[Any] = []
-    if project_id:
-        sql += " WHERE c.project_id = ?"
-        params.append(project_id)
-    sql += " ORDER BY c.date DESC LIMIT ?;"
-    params.append(limit)
-    rows = conn.execute(sql, params).fetchall()
-    return [dict(r) for r in rows]
+    return GitService().search_commits("", project_id, limit)
 
 
 # --- Activity Router ---
+@git_router.get("/projects/{project_id}/file-history")
+def get_file_history(project_id: str, path: str, limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
+    project = ProjectService().get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    from pathlib import Path
+    try:
+        return GitService().get_file_history(Path(project.path), path, limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 activity_router = APIRouter(prefix="/api/activity", tags=["Activity"])
 
 
@@ -264,8 +272,8 @@ def get_session(session_id: str) -> ContextSessionResponse:
 
 
 @context_router.put("/{session_id}", response_model=ContextSessionResponse)
-def update_session(session_id: str, updates: dict[str, Any]) -> ContextSessionResponse:
-    sess = ContextService().update_session(session_id, updates)
+def update_session(session_id: str, updates: ContextSessionUpdate) -> ContextSessionResponse:
+    sess = ContextService().update_session(session_id, updates.model_dump(exclude_unset=True, exclude_none=True))
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found")
     return sess
@@ -337,12 +345,18 @@ ai_router = APIRouter(prefix="/api/ai", tags=["AI"])
 
 @ai_router.post("/query", response_model=AIQueryResponse)
 def query_ai(req: AIQueryRequest) -> AIQueryResponse:
-    return AIContextEngine().query(req)
+    try:
+        return AIContextEngine().query(req)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @ai_router.post("/investigate")
 def run_investigation(req: InvestigationRequest) -> dict[str, Any]:
-    return InvestigationService().run_investigation(req)
+    try:
+        return InvestigationService().run_investigation(req)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @ai_router.get("/tools")
@@ -359,7 +373,7 @@ def execute_ai_tool(req: ToolExecutionRequest) -> dict[str, Any]:
 def list_providers() -> list[dict[str, Any]]:
     settings = get_settings()
     return [
-        {"id": "local", "name": "Local Deterministic Synthesizer", "is_local": True, "active": settings.ai_provider == "local"},
+        {"id": "local", "name": "Local workspace excerpts", "is_local": True, "active": settings.ai_provider == "local"},
         {"id": "ollama", "name": "Ollama (On-Device Local LLM)", "is_local": True, "active": settings.ai_provider == "ollama"},
         {"id": "openai", "name": "OpenAI (Cloud)", "is_local": False, "active": settings.ai_provider == "openai"},
         {"id": "gemini", "name": "Google Gemini (Cloud)", "is_local": False, "active": settings.ai_provider == "gemini"},
@@ -378,3 +392,76 @@ def get_sync_status() -> dict[str, Any]:
 @sync_router.post("/trigger")
 def trigger_sync() -> dict[str, Any]:
     return SyncService().trigger_sync()
+
+
+class PreferencesUpdate(BaseModel):
+    ai_provider: str | None = None
+    ollama_base_url: str | None = None
+    ollama_model: str | None = None
+    openai_model: str | None = None
+    gemini_model: str | None = None
+    openai_api_key: str | None = None
+    gemini_api_key: str | None = None
+
+
+@system_router.get("/preferences")
+def get_preferences():
+    from app.services.preferences_service import PreferencesService
+    return PreferencesService().public()
+
+
+@system_router.put("/preferences")
+def update_preferences(req: PreferencesUpdate):
+    from app.services.preferences_service import PreferencesService
+    values = req.model_dump(exclude_unset=True)
+    if values.get("ai_provider") not in {None, "local", "ollama", "openai", "gemini"}:
+        raise HTTPException(status_code=422, detail="Unknown provider")
+    if any((value is None and key not in {"openai_api_key", "gemini_api_key"}) or (value is not None and (not isinstance(value, str) or not value or len(value) > 4096)) for key, value in values.items()):
+        raise HTTPException(status_code=422, detail="Invalid preferences")
+    try:
+        return PreferencesService().update(values)
+    except (ValueError, RuntimeError, OSError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class CloudLoginRequest(BaseModel):
+    url: str
+    email: str
+    password: str
+    create_account: bool = Field(default=False, alias="register")
+
+
+@sync_router.post("/login")
+def cloud_login(req: CloudLoginRequest):
+    import httpx
+
+    from app.services.preferences_service import PreferencesService, validate_url
+    try:
+        url = validate_url(req.url)
+        with httpx.Client(timeout=15) as client:
+            response = client.post(f"{url}/auth/{'register' if req.create_account else 'login'}", json={"email": req.email, "password": req.password})
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Cloud sign-in failed; check your credentials")
+            token = response.json()["access_token"]
+        PreferencesService().update({"cloud_sync_url": url, "cloud_sync_token": token, "cloud_sync_enabled": True})
+        return {"status": "authenticated"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to sign in to cloud sync") from exc
+
+
+@sync_router.post("/logout")
+def cloud_logout():
+    from app.services.preferences_service import PreferencesService
+    PreferencesService().update({"cloud_sync_token": None, "cloud_sync_enabled": False})
+    return {"status": "local_only"}
+
+
+@system_router.post("/shutdown")
+def shutdown_core(request: Request):
+    callback = getattr(request.app.state, "request_shutdown", None)
+    if callback is None:
+        raise HTTPException(status_code=503, detail="This development server is not managed by Groundwork")
+    callback()
+    return {"status": "stopping"}

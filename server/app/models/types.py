@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -61,6 +61,7 @@ class ProjectResponse(BaseModel):
 
 
 class ProjectOverview(ProjectResponse):
+    working_tree: dict[str, Any] = Field(default_factory=dict)
     readme_preview: str | None = None
     entry_points: list[str] = Field(default_factory=list)
     dependencies: list[str] = Field(default_factory=list)
@@ -175,7 +176,7 @@ class ContextSessionResponse(BaseModel):
 
 class ContextSessionUpdate(BaseModel):
     title: str | None = None
-    status: str | None = None
+    status: Literal["active", "paused", "completed"] | None = None
     summary: str | None = None
     files_inspected: list[str] | None = None
     git_commits: list[str] | None = None
@@ -224,7 +225,11 @@ class SavedSearchResponse(BaseModel):
 # --- AI DTOs ---
 
 class AIQueryRequest(BaseModel):
-    question: str
+    session_id: str | None = None
+    question: str = Field(min_length=1, max_length=12000)
+    focused_path: str | None = None
+    file_paths: list[str] = Field(default_factory=list, max_length=6)
+    focused_line: int = Field(default=1, ge=1, le=10000000)
     project_id: str | None = None
     workspace_id: str | None = None
     include_git: bool = True
@@ -249,10 +254,13 @@ class AIQueryResponse(BaseModel):
 
 
 class InvestigationRequest(BaseModel):
-    problem_statement: str
+    provider: str | None = None
+    problem_statement: str = Field(min_length=1, max_length=12000)
     project_id: str | None = None
-    files: list[str] = Field(default_factory=list)
-    recent_errors: list[str] = Field(default_factory=list)
+    files: list[str] = Field(default_factory=list, max_length=6)
+    focused_line: int = Field(default=1, ge=1, le=10000000)
+    session_id: str | None = None
+    recent_errors: list[str] = Field(default_factory=list, max_length=20)
 
 
 class ToolExecutionRequest(BaseModel):

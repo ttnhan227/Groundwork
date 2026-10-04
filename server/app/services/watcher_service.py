@@ -86,8 +86,15 @@ class WatcherService:
                     stop_event=self._stop_event,
                     debounce=600,
                     step=200,
+                    yield_on_timeout=True,
+                    watch_filter=None,
+                    rust_timeout=1000,
                 ):
-                    self._handle_changes(changes)
+                    if set(existing_roots) != set(self.workspace_service.get_allowed_roots()):
+                        self.indexer_service.start_indexing()
+                        break
+                    if changes:
+                        self._handle_changes(changes)
             except Exception as exc:
                 if not self._stop_event.is_set():
                     logger.debug("Watcher reconnecting after event: %s", exc)
@@ -101,6 +108,14 @@ class WatcherService:
         for change_type, path_str in changes:
             fpath = Path(path_str)
 
+            ws = self._find_workspace_for_path(fpath)
+            if ws and fpath.name in {".gitignore", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"}:
+                self.indexer_service.start_indexing(ws.id)
+            if ".git" in fpath.parts:
+                for project in projects:
+                    if Path(project.path) / ".git" in fpath.parents:
+                        self.indexer_service.git_service.sync_project_commits(project.id, Path(project.path))
+                continue
             # Ignore noise and temp files
             if self._should_ignore(fpath):
                 continue

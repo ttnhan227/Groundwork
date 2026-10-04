@@ -34,6 +34,8 @@ class SystemService:
         if not valid_path.exists():
             raise FileNotFoundError(f"File not found: {valid_path}")
 
+        if not valid_path.is_file() or valid_path.suffix.lower() in {".exe", ".com", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".msi", ".lnk", ".url", ".hta"}:
+            raise PermissionError("Use Reveal in folder for executable files")
         try:
             if sys.platform == "win32":
                 os.startfile(str(valid_path))  # type: ignore[attr-defined]

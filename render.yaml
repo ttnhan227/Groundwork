@@ -2,6 +2,8 @@ services:
   - type: web
     name: groundwork-client
     runtime: static
+    branch: main
+    autoDeployTrigger: checksPass
     rootDir: client
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist

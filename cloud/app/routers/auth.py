@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from typing import Any
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -15,13 +16,13 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=256)
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=256)
 
 
 class TokenResponse(BaseModel):
@@ -74,6 +75,9 @@ def login_user(req: LoginRequest, db: Session = Depends(get_db)) -> TokenRespons
     if not user or not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
+    if not user.hashed_password.startswith("pbkdf2_sha256$"):
+        user.hashed_password = hash_password(req.password)
+        db.commit()
     token = create_access_token({"sub": user.id, "email": user.email})
     return TokenResponse(access_token=token, user_id=user.id, email=user.email)
 

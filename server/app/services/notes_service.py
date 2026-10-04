@@ -54,7 +54,7 @@ class NotesService:
             """, (
                 str(uuid.uuid4()),
                 note_id,
-                json.dumps(data.model_dump()),
+                json.dumps({"title": data.title, "content": data.content, "tags": data.tags, "base_version": 0}),
                 now_iso,
             ))
 
@@ -143,8 +143,8 @@ class NotesService:
             UPDATE notes SET
                 title = COALESCE(?, title),
                 content = COALESCE(?, content),
-                project_id = COALESCE(?, project_id),
-                file_path = COALESCE(?, file_path),
+                project_id = ?,
+                file_path = ?,
                 tags_json = COALESCE(?, tags_json),
                 updated_at = ?,
                 sync_version = sync_version + 1,
@@ -153,8 +153,8 @@ class NotesService:
             """, (
                 data.get("title"),
                 data.get("content"),
-                data.get("project_id"),
-                data.get("file_path"),
+                data.get("project_id", current.project_id),
+                data.get("file_path", current.file_path),
                 json.dumps(data["tags"]) if "tags" in data else None,
                 now_iso,
                 note_id,
@@ -166,7 +166,7 @@ class NotesService:
             """, (
                 str(uuid.uuid4()),
                 note_id,
-                json.dumps(data),
+                json.dumps({"title": self.get_note(note_id).title, "content": self.get_note(note_id).content, "tags": self.get_note(note_id).tags, "base_version": conn.execute("SELECT sync_version FROM notes WHERE id = ?", (note_id,)).fetchone()["sync_version"] - 1}),
                 now_iso,
             ))
 

@@ -20,9 +20,9 @@ services:
       PORT: 8000
       GROUNDWORK_ENV: development
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
-      - .:/workspace:rw
+      - .:/workspace:ro
       - local_data:/root/.groundwork
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

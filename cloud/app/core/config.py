@@ -5,8 +5,7 @@ Lightweight synchronization backend deployed to Google Cloud Run with PostgreSQL
 
 from __future__ import annotations
 
-import os
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -27,7 +26,30 @@ class CloudSettings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 30  # 30 days session
 
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] | str = ["*"]
+
+    @model_validator(mode="after")
+    def production_configuration(self):
+        if self.environment == "production" and (self.jwt_secret.startswith("dev-") or len(self.jwt_secret) < 32):
+            raise ValueError("Production JWT_SECRET must contain at least 32 random characters")
+        if "+asyncpg" in self.database_url:
+            raise ValueError("Cloud requires a synchronous PostgreSQL driver (postgresql+psycopg2)")
+        return self
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        if isinstance(self.cors_origins, list):
+            return self.cors_origins
+        if isinstance(self.cors_origins, str):
+            v = self.cors_origins.strip()
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return ["*"]
 
     model_config = {
         "env_file": ".env",

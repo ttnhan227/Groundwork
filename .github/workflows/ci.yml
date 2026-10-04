@@ -90,7 +90,7 @@ jobs:
 
       - name: Install desktop dependencies
         working-directory: desktop
-        run: npm install
+        run: npm ci
 
       - name: Build desktop application bundle
         working-directory: desktop
@@ -115,8 +115,36 @@ jobs:
 
       - name: Install web dependencies
         working-directory: client
-        run: npm install
+        run: npm ci
 
       - name: Build web application bundle
         working-directory: client
         run: npm run build
+
+  windows-installer:
+    name: Windows desktop installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+        working-directory: desktop
+      - run: npm ci
+        working-directory: client
+      - run: python -m pip install -r cloud/requirements.txt
+      - run: npm run tauri -- build
+        working-directory: desktop
+      - run: python desktop/scripts/smoke-core.py
+      - run: python desktop/scripts/smoke-scale.py
+      - run: python desktop/scripts/smoke-sync.py
+      - run: node desktop/scripts/smoke-installed.cjs desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: groundwork-windows-installer
+          path: desktop/src-tauri/target/release/bundle/

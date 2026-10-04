@@ -13,6 +13,7 @@ import {
 import { api } from "../../services/api";
 import type { IndexProgress } from "../../types/api";
 import { BrandMark } from "../common/BrandMark";
+import { Badge } from "../ui";
 
 interface SidebarProps {
   activeTab: string;
@@ -33,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const data = await api.getIndexProgress();
         setProgress(data);
       } catch {
-        // Local service might be booting
+        setProgress(null);
       }
     };
     fetchProgress();
@@ -54,18 +55,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-64 bg-[var(--surface)] border-r border-[var(--hairline)] flex flex-col justify-between shrink-0 h-screen select-none">
       {/* Brand Header */}
       <div>
-        <div className="p-4 flex items-center justify-between border-b border-[var(--hairline)]">
+        <div className="p-4 flex items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface)]">
           <div className="flex items-center space-x-2.5">
-            <span className="flex h-7 w-7 items-center justify-center border border-[var(--hairline-strong)] bg-[var(--paper-subtle)] text-[var(--ink-blue)] shadow-xs rounded">
+            <span className="flex h-7 w-7 items-center justify-center border border-[var(--hairline-strong)] bg-[var(--paper-subtle)] text-[var(--ink-blue)] shadow-[var(--shadow-subtle)] rounded-[var(--radius-sm)]">
               <BrandMark size={16} />
             </span>
             <div>
               <span className="font-serif font-bold text-base tracking-tight text-[var(--ink)] block">
                 Groundwork
               </span>
-              <span className="text-[10px] text-[var(--success)] font-mono flex items-center gap-1 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse"></span>
-                Local Core Active
+              <span className="text-[10px] text-[var(--ink-muted)] font-mono flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse inline-block" />
+                Local Workstation
               </span>
             </div>
           </div>
@@ -75,11 +76,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-3">
           <button
             onClick={onOpenSearch}
-            className="w-full flex items-center justify-between px-3 py-2 rounded bg-[var(--paper)] border border-[var(--hairline)] text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:border-[var(--ink-blue)] transition-all text-xs group shadow-xs"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--paper)] border border-[var(--hairline)] text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:border-[var(--ink-blue)] hover:bg-[var(--surface-hover)] transition-all text-xs group shadow-[var(--shadow-subtle)] cursor-pointer"
           >
             <span className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
-              <span>Search everything...</span>
+              <span>Search workspace...</span>
             </span>
             <kbd className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--paper-subtle)] border border-[var(--hairline)] text-[var(--ink)] font-mono font-bold">
               Ctrl+Space
@@ -96,9 +97,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded text-xs font-semibold transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? "bg-[var(--control-room)] text-white shadow-xs"
+                    ? "bg-[var(--control-room)] text-white shadow-[var(--shadow-subtle)]"
                     : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
@@ -135,10 +136,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between text-[11px] text-[var(--ink-secondary)]">
             <span className="flex items-center gap-1.5">
               <HardDrive className="w-3.5 h-3.5 text-[var(--ink-muted)]" />
-              <span>Workspace Indexed</span>
+              <span>Workspace Index</span>
             </span>
             <span className="font-mono text-[10px] text-[var(--ink-muted)] font-semibold">
-              {progress ? `${progress.files_indexed} files` : "Ready"}
+              {progress ? `${progress.status} · ${progress.files_indexed} updated` : "Unavailable"}
             </span>
           </div>
         )}
@@ -146,3 +147,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+export default Sidebar;

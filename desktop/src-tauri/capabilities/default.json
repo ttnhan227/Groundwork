@@ -1,0 +1,1 @@
+{"identifier":"main-window","description":"Allow the desktop window to listen for its native search shortcut","windows":["main"],"permissions":["core:event:allow-listen","core:event:allow-unlisten"]}

@@ -11,7 +11,6 @@ Performs:
 
 from __future__ import annotations
 
-import fnmatch
 import hashlib
 import json
 import logging
@@ -21,6 +20,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import pathspec
 
 from app.core.config import get_settings
 from app.database.local_db import LocalDatabase, get_db
@@ -56,6 +57,7 @@ class IndexerService:
         self._lock = threading.Lock()
         self._cancel_requested = threading.Event()
         self._worker_thread: threading.Thread | None = None
+        self._pending_reindex = False
 
         self._progress = IndexProgress(status=IndexStatus.IDLE)
 
@@ -73,6 +75,7 @@ class IndexerService:
         """Starts indexing in a background worker thread."""
         with self._lock:
             if self._worker_thread and self._worker_thread.is_alive():
+                self._pending_reindex = True
                 return self._progress.model_copy()
 
             self._cancel_requested.clear()
@@ -86,7 +89,7 @@ class IndexerService:
             )
 
             self._worker_thread = threading.Thread(
-                target=self._run_indexing_worker,
+                target=self._background_index_loop,
                 args=(run_id, workspace_id),
                 name="GroundworkIndexerWorker",
                 daemon=True,
@@ -95,9 +98,21 @@ class IndexerService:
 
             return self._progress.model_copy()
 
+    def _background_index_loop(self, run_id: str, workspace_id: str | None) -> None:
+        while True:
+            self._run_indexing_worker(run_id, workspace_id)
+            with self._lock:
+                if not self._pending_reindex or self._cancel_requested.is_set():
+                    return
+                self._pending_reindex = False
+                run_id = str(uuid.uuid4())
+                workspace_id = None
+                self._progress = IndexProgress(run_id=run_id, status=IndexStatus.INDEXING, started_at=datetime.now(timezone.utc).isoformat())
+
     def cancel_indexing(self) -> IndexProgress:
         """Requests cancellation of ongoing indexing run."""
         with self._lock:
+            self._pending_reindex = False
             if self._progress.status == IndexStatus.INDEXING:
                 self._cancel_requested.set()
                 self._progress.status = IndexStatus.CANCELLED
@@ -111,7 +126,9 @@ class IndexerService:
 
     def index_workspace_sync(self, workspace_id: str | None = None) -> IndexProgress:
         """Executes workspace indexing synchronously for immediate processing and tests."""
+        self._cancel_requested.clear()
         run_id = str(uuid.uuid4())
+        self._progress = IndexProgress(run_id=run_id, status=IndexStatus.INDEXING)
         self._run_indexing_worker(run_id, workspace_id)
         return self.get_progress()
 
@@ -123,7 +140,7 @@ class IndexerService:
         start_time = datetime.now(timezone.utc)
 
         try:
-            workspaces = self.workspace_service.list_workspaces()
+            workspaces = [w for w in self.workspace_service.list_workspaces() if w.is_active]
             if target_workspace_id:
                 workspaces = [w for w in workspaces if w.id == target_workspace_id]
 
@@ -234,6 +251,13 @@ class IndexerService:
 
     def index_single_file(self, fpath: Path, workspace_id: str, projects: list[dict[str, Any]] | None = None) -> bool:
         """Parses and indexes a single file. Returns True if indexed, False if skipped."""
+        ws = self.workspace_service.get_workspace(workspace_id)
+        if not ws or not ws.is_active:
+            return False
+        root = Path(ws.path).resolve()
+        if self._is_ignored(fpath, ws.ignore_patterns, [], root) or not self.parser.is_supported(fpath):
+            self.remove_file(str(fpath))
+            return False
         if not fpath.exists() or not fpath.is_file():
             return False
 
@@ -243,22 +267,20 @@ class IndexerService:
             return False
 
         if stat.st_size > self.settings.max_file_size_bytes or stat.st_size == 0:
+            self.remove_file(str(fpath))
             return False
 
         # Compute fast hash
-        file_hash = hashlib.sha256(f"{stat.st_mtime}:{stat.st_size}:{fpath.name}".encode()).hexdigest()
+        file_hash = self.embeddings.model_id + ":" + hashlib.sha256(fpath.read_bytes()).hexdigest()
 
         # Check existing hash in database
         conn = self.db.get_connection()
         row = conn.execute("SELECT id, hash FROM files WHERE path = ?;", (str(fpath),)).fetchone()
-        if row and row["hash"] == file_hash:
-            return False  # Unchanged! Skip re-indexing!
-
         # Associate with nearest project
         proj_id = None
         proj_name = ""
         if projects:
-            for p in projects:
+            for p in sorted(projects, key=lambda item: len(Path(item["path"]).parts), reverse=True):
                 p_path = Path(p["path"])
                 try:
                     fpath.relative_to(p_path)
@@ -268,16 +290,22 @@ class IndexerService:
                 except ValueError:
                     pass
 
+        if row and row["hash"] == file_hash:
+            with conn:
+                conn.execute("UPDATE files SET project_id = ?, workspace_id = ?, relative_path = ? WHERE id = ?", (proj_id, workspace_id, str(fpath.relative_to(root)), row["id"]))
+            return False
+
         # Parse text, AST symbols, and chunks
         parse_result = self.parser.parse_file(fpath, max_size_bytes=self.settings.max_file_size_bytes)
         if parse_result.is_binary or not parse_result.content.strip():
+            self.remove_file(str(fpath))
             return False
 
         file_id = row["id"] if row else str(uuid.uuid4())
         now_iso = datetime.now(timezone.utc).isoformat()
         rel_path = str(fpath.name)
         try:
-            rel_path = str(fpath.relative_to(Path(fpath.anchor)))
+            rel_path = str(fpath.relative_to(root))
         except Exception:
             pass
 
@@ -295,6 +323,10 @@ class IndexerService:
                 extension, file_type, size_bytes, hash, mtime, indexed_at, symbols_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(path) DO UPDATE SET
+                workspace_id = excluded.workspace_id,
+                project_id = excluded.project_id,
+                relative_path = excluded.relative_path,
+                file_type = excluded.file_type,
                 hash = excluded.hash,
                 mtime = excluded.mtime,
                 size_bytes = excluded.size_bytes,
@@ -334,38 +366,43 @@ class IndexerService:
                 proj_name,
             ))
 
-            # 4. Insert chunks and chunk FTS records
-            for chunk in parse_result.chunks:
-                chunk_id = str(uuid.uuid4())
-                embedding = self.embeddings.embed_text(chunk.content)
+            # 4. Insert chunks and chunk FTS records in batches
+            if parse_result.chunks:
+                chunk_rows = []
+                fts_chunk_rows = []
+                for chunk in parse_result.chunks:
+                    chunk_id = str(uuid.uuid4())
+                    embedding = self.embeddings.embed_text(chunk.content)
+                    chunk_rows.append((
+                        chunk_id,
+                        file_id,
+                        chunk.chunk_index,
+                        chunk.content,
+                        chunk.char_start,
+                        chunk.char_end,
+                        chunk.line_start,
+                        chunk.line_end,
+                        json.dumps(embedding),
+                    ))
+                    fts_chunk_rows.append((
+                        chunk_id,
+                        file_id,
+                        chunk.content,
+                        fpath.name,
+                        rel_path,
+                    ))
 
-                conn.execute("""
+                conn.executemany("""
                 INSERT INTO chunks (
                     id, file_id, chunk_index, content, char_start, char_end,
                     line_start, line_end, embedding_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """, (
-                    chunk_id,
-                    file_id,
-                    chunk.chunk_index,
-                    chunk.content,
-                    chunk.char_start,
-                    chunk.char_end,
-                    chunk.line_start,
-                    chunk.line_end,
-                    json.dumps(embedding),
-                ))
+                """, chunk_rows)
 
-                conn.execute("""
+                conn.executemany("""
                 INSERT INTO fts_chunks (chunk_id, file_id, content, filename, relative_path)
                 VALUES (?, ?, ?, ?, ?);
-                """, (
-                    chunk_id,
-                    file_id,
-                    chunk.content,
-                    fpath.name,
-                    rel_path,
-                ))
+                """, fts_chunk_rows)
 
         return True
 
@@ -406,22 +443,33 @@ class IndexerService:
         return discovered
 
     def _is_ignored(self, path: Path, ignore_patterns: list[str], gitignores: list[str], root: Path) -> bool:
-        name = path.name
-        # Default patterns
-        for pattern in self.settings.default_ignore_patterns + ignore_patterns:
-            if fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(str(path), f"*{pattern}*"):
-                return True
-
-        # Gitignore rules
         try:
-            rel = str(path.relative_to(root)).replace("\\", "/")
-            for rule in gitignores:
-                if fnmatch.fnmatch(rel, rule) or fnmatch.fnmatch(name, rule):
-                    return True
+            path.resolve().relative_to(root.resolve())
+            rel = path.relative_to(root).as_posix()
         except ValueError:
-            pass
-
-        return False
+            return True
+        # Never index credentials or links (including links within a workspace).
+        sensitive = {".env", "id_rsa", "id_ed25519", "credentials", "credentials.json"}
+        if path.is_symlink() or path.is_junction() or path.name.lower() in sensitive or path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"} or path.name.lower().startswith(".env.") and path.name.lower() != ".env.example":
+            return True
+        suffix = "/" if path.is_dir() else ""
+        spec = pathspec.GitIgnoreSpec.from_lines(self.settings.default_ignore_patterns + ignore_patterns)
+        if spec.match_file(rel + suffix):
+            return True
+        # Apply each ancestor's Git rules in order, respecting negations and anchors.
+        ignored = False
+        parents = [root]
+        current = root
+        for part in path.relative_to(root).parts[:-1]:
+            current = current / part
+            parents.append(current)
+        for parent in parents:
+            rules = self._load_gitignore(parent)
+            if rules:
+                result = pathspec.GitIgnoreSpec.from_lines(rules).check_file(path.relative_to(parent).as_posix() + suffix)
+                if result.include is not None:
+                    ignored = result.include
+        return ignored
 
     def _load_gitignore(self, root: Path) -> list[str]:
         rules: list[str] = []
@@ -431,7 +479,7 @@ class IndexerService:
                 for line in gi.read_text(encoding="utf-8").splitlines():
                     s = line.strip()
                     if s and not s.startswith("#"):
-                        rules.append(s.rstrip("/"))
+                        rules.append(s)
             except Exception:
                 pass
         return rules
@@ -442,5 +490,5 @@ class IndexerService:
         conn = self.db.get_connection()
         rows = conn.execute("SELECT id, path FROM files WHERE workspace_id = ?;", (workspace_id,)).fetchall()
         for r in rows:
-            if r["path"] not in current_paths and not Path(r["path"]).exists():
+            if r["path"] not in current_paths:
                 self.remove_file(r["path"])

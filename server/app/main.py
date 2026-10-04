@@ -6,11 +6,14 @@ Local-first workspace search, project intelligence, and AI context engine.
 from __future__ import annotations
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
 from app.database.local_db import get_db
@@ -42,6 +45,11 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manages application lifecycle: DB init, watcher startup, and graceful shutdown."""
+    from app.services.preferences_service import PreferencesService
+    try:
+        PreferencesService().load()
+    except Exception:
+        logger.warning("Private preferences could not be loaded; using environment defaults")
     logger.info("Initializing Groundwork Local database...")
     db = get_db()
     db.init_schema()
@@ -49,12 +57,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting workspace filesystem watcher...")
     watcher = WatcherService.get_instance()
     watcher.start()
+    IndexerService.get_instance().start_indexing()
 
     yield
 
     logger.info("Shutting down Groundwork Local...")
     watcher.stop()
     IndexerService.get_instance().cancel_indexing()
+    IndexerService.get_instance().wait_for_completion()
 
 
 app = FastAPI(
@@ -64,14 +74,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver", "tauri.localhost"])
+
 # CORS configuration for Tauri desktop application and local dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[origin for origin in settings.cors_origin_list if origin != "*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def protect_local_api(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin and origin not in settings.cors_origin_list:
+        return JSONResponse({"detail": "Untrusted origin"}, status_code=403)
+    if settings.core_token and request.method != "OPTIONS":
+        supplied = request.headers.get("authorization", "")
+        if not secrets.compare_digest(supplied, f"Bearer {settings.core_token}"):
+            return JSONResponse({"detail": "Local core authentication required"}, status_code=401)
+    return await call_next(request)
+
 
 # Register Routers
 app.include_router(system_router)

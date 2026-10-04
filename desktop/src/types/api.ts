@@ -23,6 +23,7 @@ export interface Project {
 }
 
 export interface ProjectOverview extends Project {
+  working_tree: { branch?: string; changed_files?: Array<{status: string; file: string}>; diff_stat?: string };
   readme_preview: string | null;
   entry_points: string[];
   dependencies: string[];

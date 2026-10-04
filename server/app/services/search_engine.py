@@ -2,12 +2,12 @@
 
 Combines:
 1. Lexical retrieval via SQLite FTS5 (BM25 token & phrase matching).
-2. Semantic vector retrieval via local / Ollama embeddings.
+2. Local MiniLM vectors, with a development hashing fallback.
 3. Filename & path exact/fuzzy matches.
 4. Recency boost (recently modified files prioritized).
 5. Project relevance weighting.
 
-Provides a transparent scoring pipeline with latency < 50ms.
+Provides inspectable scores. Latency depends on corpus size and hardware.
 """
 
 from __future__ import annotations
@@ -45,25 +45,25 @@ class SearchEngine:
         search_mode: str = "hybrid",  # hybrid, lexical, semantic, filename
         limit: int = 25,
         mode: str | None = None,
+        file_type: str | None = None,
+        modified_after: float | None = None,
     ) -> SearchResponse:
         search_mode = mode or search_mode
         start_time = time.perf_counter()
         query_clean = query.strip()
-        if not query_clean:
-            return SearchResponse(query="", total_matches=0, results=[], duration_ms=0.0)
-
         # 1. Filename & Path Matches
-        filename_candidates = self._search_filenames(query_clean, workspace_id, project_id, limit=limit * 2)
+        filters = {"file_type": file_type, "modified_after": modified_after}
+        filename_candidates = self._search_filenames(query_clean, workspace_id, project_id, limit=limit * 2, **filters)
 
         # 2. Lexical FTS5 Matches
         lexical_candidates = {}
-        if search_mode in ("hybrid", "lexical"):
-            lexical_candidates = self._search_fts(query_clean, workspace_id, project_id, limit=limit * 2)
+        if query_clean and search_mode in ("hybrid", "lexical"):
+            lexical_candidates = self._search_fts(query_clean, workspace_id, project_id, limit=limit * 2, **filters)
 
         # 3. Semantic Vector Matches
         semantic_candidates = {}
-        if search_mode in ("hybrid", "semantic"):
-            semantic_candidates = self._search_semantic(query_clean, workspace_id, project_id, limit=limit * 2)
+        if query_clean and search_mode in ("hybrid", "semantic"):
+            semantic_candidates = self._search_semantic(query_clean, workspace_id, project_id, limit=limit * 2, **filters)
 
         # 4. Merge candidates by file_id
         all_file_ids = set(filename_candidates.keys()) | set(lexical_candidates.keys()) | set(semantic_candidates.keys())
@@ -143,7 +143,7 @@ class SearchEngine:
             ))
 
         # Sort descending by final_score
-        scored_results.sort(key=lambda x: x.score, reverse=True)
+        scored_results.sort(key=lambda x: (x.score, x.path) if query_clean else (x.last_modified or "", x.path), reverse=True)
         top_results = scored_results[:limit]
 
         duration = (time.perf_counter() - start_time) * 1000
@@ -161,11 +161,13 @@ class SearchEngine:
         workspace_id: str | None,
         project_id: str | None,
         limit: int = 50,
+        file_type: str | None = None,
+        modified_after: float | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Finds candidate files by filename and path token matching."""
         conn = self.db.get_connection()
         q_lower = query.lower()
-        terms = [t for t in re.findall(r"[A-Za-z0-9_.-]+", q_lower) if len(t) >= 2]
+        terms = [t for t in re.findall(r"[\w.-]+", q_lower) if len(t) >= 2]
 
         where_clauses = []
         params: list[Any] = []
@@ -184,7 +186,14 @@ class SearchEngine:
             where_clauses.append("project_id = ?")
             params.append(project_id)
 
-        sql = f"SELECT id, filename, relative_path FROM files WHERE {' AND '.join(where_clauses)} LIMIT {limit};"
+        if file_type:
+            where_clauses.append("file_type = ?")
+            params.append(file_type)
+        if modified_after is not None:
+            where_clauses.append("mtime >= ?")
+            params.append(modified_after)
+        sql = f"SELECT id, filename, relative_path FROM files WHERE {' AND '.join(where_clauses)} ORDER BY CASE WHEN lower(filename) = ? THEN 0 ELSE 1 END, mtime DESC LIMIT ?;"
+        params.extend([q_lower, limit])
         rows = conn.execute(sql, params).fetchall()
         results: dict[str, dict[str, Any]] = {}
 
@@ -223,11 +232,13 @@ class SearchEngine:
         workspace_id: str | None,
         project_id: str | None,
         limit: int = 50,
+        file_type: str | None = None,
+        modified_after: float | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Queries SQLite FTS5 for content and chunk keyword matches."""
         conn = self.db.get_connection()
         # Clean query for FTS5 (escape quotes, split words)
-        words = re.findall(r"[A-Za-z0-9_]+", query)
+        words = re.findall(r"\w+", query)
         if not words:
             return {}
 
@@ -250,22 +261,33 @@ class SearchEngine:
             if project_id:
                 sql += " AND f.project_id = ?"
                 params.append(project_id)
+            if file_type:
+                sql += " AND f.file_type = ?"
+                params.append(file_type)
+            if modified_after is not None:
+                sql += " AND f.mtime >= ?"
+                params.append(modified_after)
             sql += f" ORDER BY rank ASC LIMIT {limit};"
 
             rows = conn.execute(sql, params).fetchall()
+            if not rows and len(words) > 1:
+                params[0] = " OR ".join(f'"{word}"*' for word in words)
+                rows = conn.execute(sql, params).fetchall()
             for r in rows:
                 fid = r["file_id"]
                 # BM25 rank in SQLite: lower is better (more negative). Normalize to 0..1
                 raw_rank = abs(float(r["rank"]))
-                norm_score = max(0.1, min(1.0, 1.0 / (1.0 + (raw_rank * 0.1))))
+                norm_score = raw_rank / (1.0 + raw_rank)
 
                 if fid not in results or norm_score > results[fid]["score"]:
                     # Create excerpt
-                    snippet = self._highlight_snippet(r["content"], words)
+                    lines = r["content"].splitlines()
+                    offset = next((i for i, line in enumerate(lines) if any(word.lower() in line.lower() for word in words)), 0)
+                    snippet = "\n".join(lines[offset:offset + 6])[:400]
                     results[fid] = {
                         "score": norm_score,
                         "snippet": snippet,
-                        "line": r["line_start"],
+                        "line": r["line_start"] + offset,
                         "matched_terms": words,
                     }
         except Exception as exc:
@@ -279,6 +301,8 @@ class SearchEngine:
         workspace_id: str | None,
         project_id: str | None,
         limit: int = 50,
+        file_type: str | None = None,
+        modified_after: float | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Vector semantic similarity search over indexed chunks."""
         query_vec = self.embeddings.embed_text(query)
@@ -288,18 +312,23 @@ class SearchEngine:
         SELECT c.file_id, c.line_start, c.content, c.embedding_json
         FROM chunks c
         JOIN files f ON c.file_id = f.id
-        WHERE c.embedding_json IS NOT NULL
+        WHERE c.embedding_json IS NOT NULL AND f.hash LIKE ?
         """
-        params: list[Any] = []
+        params: list[Any] = [self.embeddings.model_id + ":%"]
         if workspace_id:
             sql += " AND f.workspace_id = ?"
             params.append(workspace_id)
         if project_id:
             sql += " AND f.project_id = ?"
             params.append(project_id)
-        sql += " LIMIT 500;"  # Evaluate up to top 500 candidate chunks
+        if file_type:
+            sql += " AND f.file_type = ?"
+            params.append(file_type)
+        if modified_after is not None:
+            sql += " AND f.mtime >= ?"
+            params.append(modified_after)
 
-        rows = conn.execute(sql, params).fetchall()
+        rows = conn.execute(sql, params)
         results: dict[str, dict[str, Any]] = {}
 
         for r in rows:
@@ -318,7 +347,7 @@ class SearchEngine:
             except Exception:
                 continue
 
-        return results
+        return dict(sorted(results.items(), key=lambda item: item[1]["score"], reverse=True)[:limit])
 
     def _fetch_file_records(self, file_ids: list[str]) -> dict[str, dict[str, Any]]:
         conn = self.db.get_connection()

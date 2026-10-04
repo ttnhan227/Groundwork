@@ -8,14 +8,16 @@ from pathlib import Path
 from typing import Any
 
 from app.core.security import (
+    command_argv,
     consume_confirmation_token,
     generate_confirmation_token,
+    git_environment,
     is_safe_command,
     validate_workspace_path,
 )
-from app.database.local_db import get_db
 from app.models.types import NoteCreate
 from app.services.activity_service import ActivityService
+from app.services.context_service import ContextService
 from app.services.git_service import GitService
 from app.services.notes_service import NotesService
 from app.services.project_service import ProjectService
@@ -42,11 +44,12 @@ class AIToolManager:
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Returns schemas for the exposed tools."""
-        return [
+        definitions = [
+            {"name": "get_context_session", "description": "Read a saved local investigation and unfinished work.", "parameters": {"session_id": "string"}, "is_mutating": False},
             {
                 "name": "search_files",
                 "description": "Hybrid search across all workspace files, code symbols, and content.",
-                "parameters": {"query": "string", "project_id": "string (optional)", "limit": "integer"},
+                "parameters": {"query": "string", "project_id": "string (optional)", "workspace_id": "string (optional)", "limit": "integer"},
                 "is_mutating": False,
             },
             {
@@ -97,23 +100,50 @@ class AIToolManager:
                 "parameters": {"command": "string", "cwd": "string (optional)"},
                 "is_mutating": True,
                 "requires_confirmation": True,
+                    "status": "confirmation_required",
             },
         ]
 
+        for tool in definitions:
+            properties = {}
+            required = []
+            for name, description in tool["parameters"].items():
+                kind = "integer" if description.startswith("integer") else "string"
+                properties[name] = {"type": kind}
+                if "optional" not in description and name not in {"limit", "days"}:
+                    required.append(name)
+            tool["parameters"] = {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
+            if tool["name"] in MUTATING_TOOLS:
+                tool["requires_confirmation"] = True
+        return definitions
+
     def execute_tool(self, tool_name: str, args: dict[str, Any], confirmation_token: str | None = None) -> dict[str, Any]:
         """Dispatches tool execution with permission checks."""
+        definition = next((d for d in self.get_tool_definitions() if d["name"] == tool_name), None)
+        if definition is None or not isinstance(args, dict):
+            return {"status": "blocked", "error": "Unknown tool or invalid arguments"}
+        schema = definition["parameters"]
+        if set(args) - set(schema["properties"]) or set(schema["required"]) - set(args):
+            return {"status": "blocked", "error": "Unexpected or missing tool arguments"}
+        for name, value in args.items():
+            expected = schema["properties"][name]["type"]
+            if value is None and name not in schema["required"]:
+                continue
+            if (expected == "integer" and (type(value) is not int or not 1 <= value <= (200 if name in {"limit", "days"} else 10000000))) or (expected == "string" and (not isinstance(value, str) or len(value) > 20000)):
+                return {"status": "blocked", "error": f"Invalid argument: {name}"}
         # 1. Mutating command execution check
-        if tool_name == "run_command":
+        if tool_name in MUTATING_TOOLS:
             command = args.get("command", "")
-            is_safe, reason = is_safe_command(command)
+            is_safe, reason = is_safe_command(command) if tool_name == "run_command" else (True, "Allowed")
             if not is_safe:
                 return {"error": f"Command rejected: {reason}", "status": "blocked"}
 
             # If token is not provided, generate confirmation request
             if not confirmation_token:
-                token = generate_confirmation_token("run_command", {"command": command, "cwd": args.get("cwd")})
+                token = generate_confirmation_token(tool_name, args)
                 return {
                     "requires_confirmation": True,
+                    "status": "confirmation_required",
                     "confirmation_token": token,
                     "action": f"Groundwork wants to run: `{command}`",
                     "details": args,
@@ -121,16 +151,21 @@ class AIToolManager:
 
             # Validate token
             token_data = consume_confirmation_token(confirmation_token)
-            if not token_data or token_data.get("action_type") != "run_command":
+            if not token_data or token_data.get("action_type") != tool_name or token_data.get("details") != args:
                 return {"error": "Invalid or expired confirmation token.", "status": "denied"}
 
-            return self._run_command(command, args.get("cwd"))
+            if tool_name == "run_command":
+                return self._run_command(command, args.get("cwd"))
 
         # 2. Read-only and safe tools
+        if tool_name == "get_context_session":
+            session = ContextService().get_session(args["session_id"])
+            return session.model_dump() if session else {"error": "Session not found"}
         if tool_name == "search_files":
             res = self.search_engine.search(
                 query=args["query"],
                 project_id=args.get("project_id"),
+                workspace_id=args.get("workspace_id"),
                 limit=args.get("limit", 10),
             )
             return {"results": [r.model_dump() for r in res.results], "total": res.total_matches}
@@ -142,9 +177,7 @@ class AIToolManager:
             return {"commits": self.git_service.search_commits(args["query"], args.get("project_id"))}
 
         elif tool_name == "get_recent_commits":
-            conn = get_db().get_connection()
-            rows = conn.execute("SELECT * FROM git_commits ORDER BY date DESC LIMIT ?;", (args.get("limit", 10),)).fetchall()
-            return {"commits": [dict(r) for r in rows]}
+            return {"commits": self.git_service.search_commits("", args.get("project_id"), args.get("limit", 10))}
 
         elif tool_name == "get_project_structure":
             overview = self.project_service.get_project_overview(args["project_id"])
@@ -176,9 +209,19 @@ class AIToolManager:
             if not valid_path.is_file():
                 return {"error": f"Not a file: {path_str}"}
 
-            lines = valid_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            from app.services.indexer_service import IndexerService
+            workspace = next((ws for ws in self.workspace_service.list_workspaces() if ws.is_active and valid_path.is_relative_to(Path(ws.path).resolve())), None)
+            if not workspace or IndexerService.get_instance()._is_ignored(valid_path, workspace.ignore_patterns, [], Path(workspace.path).resolve()):
+                return {"error": "File is excluded by workspace privacy rules"}
+            if valid_path.stat().st_size > 5 * 1024 * 1024:
+                return {"error": "File exceeds reading limit"}
+            from app.services.file_parser import FileParser
+            parsed = FileParser.parse_file(valid_path)
+            if parsed.is_binary or not parsed.content:
+                return {"error": "File has no readable text"}
+            lines = parsed.content.splitlines()
             s = max(1, start_line or 1)
-            e = min(len(lines), end_line or len(lines))
+            e = min(len(lines), end_line or s + 199, s + 199)
 
             slice_lines = lines[s - 1:e]
             numbered = [f"{i}: {line}" for i, line in enumerate(slice_lines, start=s)]
@@ -199,9 +242,10 @@ class AIToolManager:
         try:
             validate_workspace_path(str(cwd), allowed_roots)
             res = subprocess.run(
-                command,
+                command_argv(command),
                 cwd=str(cwd),
-                shell=True,
+                shell=False,
+                env=git_environment(),
                 capture_output=True,
                 text=True,
                 timeout=30,

@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.core.security import git_environment, git_executable
 from app.database.local_db import LocalDatabase, get_db
 
 logger = logging.getLogger("groundwork.git")
@@ -27,7 +28,21 @@ class GitService:
     @staticmethod
     def is_git_repo(path: Path) -> bool:
         """Checks if a path is inside a Git repository."""
-        return (path / ".git").exists() or (path.parent / ".git").exists()
+        return any((parent / ".git").exists() for parent in (path, *path.parents))
+
+    def get_file_history(self, repo_path: Path, relative_path: str, limit: int = 20) -> dict[str, Any]:
+        target = (repo_path / relative_path).resolve()
+        if not target.is_relative_to(repo_path.resolve()):
+            raise ValueError("File must be inside the project")
+        path = str(target.relative_to(repo_path.resolve())).replace("\\", "/")
+        history = self._run_git(repo_path, ["log", "--follow", f"-n{limit}", "--date=iso-strict", "--format=%H|%an|%ad|%s", "--", path]) or ""
+        commits = []
+        for line in history.splitlines():
+            parts = line.split("|", 3)
+            if len(parts) == 4:
+                commits.append(dict(zip(("hash", "author", "date", "message"), parts, strict=True)))
+        diff = self._run_git(repo_path, ["diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", path]) or ""
+        return {"path": path, "commits": commits, "diff": diff[:20000]}
 
     def get_recent_commits(self, repo_path: str | Path, limit: int = 50) -> list[dict[str, Any]]:
         """Public method returning parsed commit history from a local git repository."""
@@ -93,16 +108,18 @@ class GitService:
 
     def get_working_tree_status(self, repo_path: Path) -> dict[str, Any]:
         """Returns the current branch and uncommitted changed files."""
-        branch = self._run_git(repo_path, ["branch", "--show-current"]) or "main"
-        status_raw = self._run_git(repo_path, ["status", "--porcelain"]) or ""
-
+        branch = (self._run_git(repo_path, ["branch", "--show-current"]) or "").strip() or "Detached HEAD"
+        status_raw = self._run_git(repo_path, ["status", "--porcelain=v1", "-z"]) or ""
         changed_files = []
-        for line in status_raw.splitlines():
-            line_str = line.strip()
-            if len(line_str) >= 3:
-                status_code = line_str[:2].strip()
-                file_rel = line_str[2:].strip()
-                changed_files.append({"status": status_code, "file": file_rel})
+        records = iter(status_raw.split("\0"))
+        for record in records:
+            if len(record) < 4:
+                continue
+            code = record[:2]
+            item = {"status": code.strip(), "file": record[3:]}
+            if "R" in code or "C" in code:
+                item["original_file"] = next(records, "")
+            changed_files.append(item)
 
         diff_stat = self._run_git(repo_path, ["diff", "--stat"]) or ""
 
@@ -117,7 +134,7 @@ class GitService:
         # Format: %H|%an|%ad|%s
         raw = self._run_git(
             repo_path,
-            ["log", f"-n{limit}", "--pretty=format:%H|%an|%ad|%s", "--date=iso"],
+            ["log", f"-n{limit}", "--pretty=format:%H|%an|%ad|%s", "--date=iso-strict"],
         )
         if not raw:
             return []
@@ -132,7 +149,7 @@ class GitService:
                     "author": author,
                     "date": date,
                     "message": message,
-                    "changed_files": [],
+                    "changed_files": (self._run_git(repo_path, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", commit_hash]) or "").split("\0")[:-1],
                 })
         return commits
 
@@ -140,15 +157,16 @@ class GitService:
     def _run_git(cwd: Path, args: list[str]) -> str | None:
         try:
             res = subprocess.run(
-                ["git", *args],
+                [git_executable(), "-c", "core.pager=cat", "-c", "diff.external=", *args],
                 cwd=str(cwd),
+                env=git_environment(),
                 capture_output=True,
                 text=True,
                 check=False,
                 timeout=10,
             )
             if res.returncode == 0:
-                return res.stdout.strip()
+                return res.stdout
         except Exception as exc:
             logger.debug("Git command failed in %s: %s", cwd, exc)
         return None

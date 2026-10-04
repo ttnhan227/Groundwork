@@ -23,6 +23,8 @@ client/test-results/
 client/playwright-report/
 desktop/node_modules/
 desktop/dist/
+desktop/test-results/
+desktop/src-tauri/gen/
 desktop/src-tauri/target/
 
 # Local databases & state
@@ -39,3 +41,10 @@ postgres_data/
 minio_data/
 redis_data/
 Groundwork AI SaaS Application Specification.docx
+
+server/.packaging-venv/
+server/.packaging-build/
+desktop/src-tauri/resources/
+server/models/
+server/.model-cache/
+server/git/

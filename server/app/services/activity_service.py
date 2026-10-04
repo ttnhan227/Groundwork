@@ -103,7 +103,22 @@ class ActivityService:
                 details=json.loads(r["details_json"]) if r["details_json"] else {},
                 timestamp=r["timestamp"],
             ))
-        return result
+        commit_query = "SELECT c.*, p.name AS project_name, p.workspace_id FROM git_commits c JOIN projects p ON p.id = c.project_id WHERE c.date >= ?"
+        commit_params: list[Any] = [cutoff]
+        if project_id:
+            commit_query += " AND c.project_id = ?"
+            commit_params.append(project_id)
+        commit_query += " ORDER BY c.date DESC LIMIT ?"
+        commit_params.append(limit)
+        for commit in conn.execute(commit_query, commit_params):
+            result.append(ActivityItem(
+                id="commit:" + commit["id"], workspace_id=commit["workspace_id"],
+                project_id=commit["project_id"], project_name=commit["project_name"],
+                activity_type=ActivityType.GIT_COMMIT, summary=commit["message"],
+                details={"hash": commit["commit_hash"], "author": commit["author"], "changed_files": json.loads(commit["changed_files_json"] or "[]")},
+                timestamp=commit["date"],
+            ))
+        return sorted(result, key=lambda item: datetime.fromisoformat(item.timestamp), reverse=True)[:limit]
 
     def get_what_was_i_doing_summary(self, days: int = 2) -> dict[str, Any]:
         """Collects evidence across files, git, notes, and sessions to summarize recent work."""
@@ -114,7 +129,7 @@ class ActivityService:
 
         # 1. Recently modified files
         file_rows = conn.execute("""
-            SELECT f.filename, f.relative_path, f.mtime, p.name as project_name
+            SELECT f.filename, f.path, f.relative_path, f.mtime, p.name as project_name
             FROM files f
             LEFT JOIN projects p ON f.project_id = p.id
             WHERE f.mtime >= ?
@@ -124,7 +139,7 @@ class ActivityService:
         modified_files = [
             {
                 "filename": r["filename"],
-                "path": r["relative_path"],
+                "path": r["path"],
                 "project": r["project_name"] or "Workspace",
                 "mtime": datetime.fromtimestamp(r["mtime"], tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
             }
@@ -187,11 +202,11 @@ class ActivityService:
 
         summary_lines = []
         if projects_active:
-            summary_lines.append(f"You were primarily active in: {', '.join(projects_active)}.")
+            summary_lines.append(f"Recent activity was observed in: {', '.join(projects_active)}.")
         if recent_commits:
-            summary_lines.append(f"You made {len(recent_commits)} Git commits, including '{recent_commits[0]['message']}'.")
+            summary_lines.append(f"Found {len(recent_commits)} Git commits, including '{recent_commits[0]['message']}'.")
         if modified_files:
-            summary_lines.append(f"You modified {len(modified_files)} files recently (most recent: {modified_files[0]['filename']}).")
+            summary_lines.append(f"Found {len(modified_files)} recently modified files (most recent: {modified_files[0]['filename']}).")
         if active_sessions:
             summary_lines.append(f"Active context session: '{active_sessions[0]['title']}'.")
 

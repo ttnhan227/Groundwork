@@ -1,45 +1,15 @@
-# Privacy Model & Security Architecture
+# Privacy model
 
-> **"The user's workspace belongs to the user's machine."**
+Workspace discovery, parsing, indexing, FTS, local feature vectors, notes, sessions, and Git inspection run on the user's machine. Local indexing does not upload files when a remote generation provider is selected. Desktop fonts are bundled.
 
-Groundwork is intentionally engineered to avoid the privacy compromises common in cloud AI developer tools. This document outlines the security controls, filesystem isolation, and data boundaries implemented across Groundwork.
+Groundwork Sync is optional. It transfers user-written note titles/content/tags, saved queries/filters, and permitted preferences. Notes may contain sensitive information that the user writes into them. Workspace paths attached to notes, source trees, indexed chunks, embeddings, and provider credentials are excluded from sync payloads.
 
----
+Cloud AI is a separate opt-in operation. Choosing OpenAI or Gemini and running a query sends the question, retrieved snippets, and cited file paths to that provider. Ollama endpoints are restricted to loopback. Local mode displays retrieved excerpts without a network request or language-model inference.
 
-## 1. Local vs. Cloud Responsibility Boundary
+The packaged local API uses a random per-launch bearer token on a dynamically selected loopback port. It rejects unknown browser origins and hosts. Native release startup does not attach to an arbitrary existing listener. Browser development uses an explicitly local development server.
 
-Groundwork enforces a strict boundary between what stays local and what may optionally synchronize:
+Provider keys and cloud tokens are protected with Windows DPAPI in a separate private preferences file. They are not placed in the sync database or returned by the public preferences API. Development on other platforms uses environment configuration.
 
-| Domain | Local Machine (100% Offline) | Groundwork Sync (Optional Cloud) |
-| :--- | :--- | :--- |
-| **Filesystem Indexing** | Fully local on disk | ❌ **NEVER uploaded** |
-| **Source Repositories & Diffs** | Read only via local Git CLI | ❌ **NEVER uploaded** |
-| **Extracted AST Chunks & Text** | SQLite WAL on disk | ❌ **NEVER uploaded** |
-| **Vector Embeddings** | Stored in local SQLite | ❌ **NEVER uploaded** |
-| **PDFs, Documents & Spreadsheets**| Local memory cache only | ❌ **NEVER uploaded** |
-| **Account & Device Pairing** | Optional | ✅ Managed via Cloud Run |
-| **Application UI Preferences** | Stored locally | ✅ Synchronized if opt-in |
-| **Saved Searches & Queries** | Stored in local DB | ✅ Synchronized if opt-in |
-| **Markdown Notes & Tags** | Stored in local DB | ✅ Synchronized if opt-in |
+Cloud accounts use uniquely salted PBKDF2 password hashes. Existing legacy hashes are upgraded after successful login. Production rejects the development JWT secret. Sync receipts make acknowledged retries idempotent. Deletion tombstones propagate removals, and note revisions reject conflicting updates from current clients. Pending local changes survive offline failures and missing acknowledgements.
 
----
-
-## 2. Path Traversal & Filesystem Hardening
-
-Groundwork implements path sanitization in `server/app/core/security.py`:
-
-* **Canonical Path Resolution:** All requested file paths are resolved to their absolute canonical form using `Path.resolve()`.
-* **Workspace Boundary Enforcement:** File operations (`/api/system/open-file`, `/api/system/open-folder`, `/api/system/reveal-file`) verify that the target path is strictly contained within an authorized workspace root.
-* **Denial of Relative Sequences:** Relative traversal strings (`../`, `..\\`), null bytes, and unauthorized drives are rejected with a 403 `SecurityError`.
-
----
-
-## 3. Tool Execution Authorization & Single-Use Tokens
-
-Groundwork's AI Context Engine does not have arbitrary code execution privileges:
-
-* **Strict Command Allowlist:** Only benign developer inspection commands are permitted:
-  * `git status`, `git log`, `git diff`, `git branch`
-  * `pytest`, `cargo test`, `npm test`
-* **Single-Use Confirmation Tokens:** Any mutating tool execution requires the desktop UI to request authorization. The user is prompted with an explicit confirmation dialog. The generated token is valid for one execution only and expires after 60 seconds.
-* **No Outbound Network Sockets in Tools:** Tools cannot spawn arbitrary network requests or open listening ports.
+Registered roots define file access boundaries. AI tools cannot use a shell; approved commands are parsed into arguments and constrained to the allowlist. Test commands execute project code and still require explicit confirmation. Confirmations expire after five minutes, are single-use, and are bound to the exact proposed arguments.

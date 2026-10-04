@@ -1,20 +1,15 @@
-"""Embedding generator supporting offline local hashing vectors and external providers.
-
-Provides:
-1. Fast, deterministic local subword hashing vectorizer (384 dimensions, L2 normalized).
-   Requires no GPU, no model download, runs in 0.1ms per chunk, 100% offline.
-2. Ollama local model embeddings (e.g., nomic-embed-text) when running.
-3. OpenAI / Gemini embeddings when API keys are configured.
-"""
+"""Local-only embeddings. Packaged builds include MiniLM; development can use hashing."""
 
 from __future__ import annotations
 
 import hashlib
 import logging
 import re
+import sys
+import threading
+from pathlib import Path
 from typing import Sequence
 
-import httpx
 import numpy as np
 
 from app.core.config import get_settings
@@ -29,33 +24,21 @@ class EmbeddingEngine:
 
     def __init__(self) -> None:
         self.settings = get_settings()
+        self._lock = threading.Lock()
+        self.model = None
+        model_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "models" / "minilm"
+        if model_path.is_dir():
+            from fastembed import TextEmbedding
+            self.model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2", specific_model_path=str(model_path), local_files_only=True, threads=2)
+        self.model_id = "minilm-l6-v2" if self.model else "hash-v1"
 
     def embed_text(self, text: str) -> list[float]:
         """Generates a normalized embedding vector for the given text."""
-        provider = self.settings.ai_provider
-
-        if provider == "ollama":
-            try:
-                return self._embed_ollama(text)
-            except Exception as exc:
-                logger.debug("Ollama embedding failed (%s), falling back to local vectorizer", exc)
-                return self._embed_local(text)
-
-        elif provider == "openai" and self.settings.openai_api_key:
-            try:
-                return self._embed_openai(text)
-            except Exception as exc:
-                logger.debug("OpenAI embedding failed (%s), falling back to local vectorizer", exc)
-                return self._embed_local(text)
-
-        elif provider == "gemini" and self.settings.gemini_api_key:
-            try:
-                return self._embed_gemini(text)
-            except Exception as exc:
-                logger.debug("Gemini embedding failed (%s), falling back to local vectorizer", exc)
-                return self._embed_local(text)
-
-        # Default local offline deterministic vectorizer
+        # A generation provider must never change corpus vectors or upload files.
+        # All stored/query vectors use the same deterministic local representation.
+        if self.model:
+            with self._lock:
+                return next(self.model.embed([text])).tolist()
         return self._embed_local(text)
 
     def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
@@ -88,60 +71,6 @@ class EmbeddingEngine:
         if norm > 0:
             vec = vec / norm
         return vec.tolist()
-
-    def _embed_ollama(self, text: str) -> list[float]:
-        url = f"{self.settings.ollama_base_url}/api/embeddings"
-        payload = {
-            "model": self.settings.ollama_embedding_model,
-            "prompt": text[:2000],
-        }
-        with httpx.Client(timeout=10.0) as client:
-            resp = client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            embedding = data.get("embedding", [])
-            # Normalize vector
-            arr = np.array(embedding, dtype=np.float32)
-            norm = np.linalg.norm(arr)
-            if norm > 0:
-                arr = arr / norm
-            return arr.tolist()
-
-    def _embed_openai(self, text: str) -> list[float]:
-        url = "https://api.openai.com/v1/embeddings"
-        headers = {"Authorization": f"Bearer {self.settings.openai_api_key}"}
-        payload = {
-            "model": "text-embedding-3-small",
-            "input": text[:4000],
-        }
-        with httpx.Client(timeout=15.0) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            embedding = data["data"][0]["embedding"]
-            arr = np.array(embedding, dtype=np.float32)
-            norm = np.linalg.norm(arr)
-            if norm > 0:
-                arr = arr / norm
-            return arr.tolist()
-
-    def _embed_gemini(self, text: str) -> list[float]:
-        key = self.settings.gemini_api_key
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={key}"
-        payload = {
-            "model": "models/text-embedding-004",
-            "content": {"parts": [{"text": text[:4000]}]},
-        }
-        with httpx.Client(timeout=15.0) as client:
-            resp = client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            embedding = data["embedding"]["values"]
-            arr = np.array(embedding, dtype=np.float32)
-            norm = np.linalg.norm(arr)
-            if norm > 0:
-                arr = arr / norm
-            return arr.tolist()
 
 
 def cosine_similarity(v1: Sequence[float], v2: Sequence[float]) -> float:

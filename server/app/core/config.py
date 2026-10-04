@@ -7,6 +7,7 @@ and AI provider parameters.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from pydantic import Field
@@ -28,6 +29,8 @@ class Settings(BaseSettings):
     )
     database_path: Path | None = None
 
+    core_token: str | None = Field(default=None, alias="GROUNDWORK_CORE_TOKEN")
+
     # CORS settings for Tauri and local dev
     cors_origins: list[str] | str = [
         "http://localhost:3000",
@@ -37,7 +40,6 @@ class Settings(BaseSettings):
         "http://tauri.localhost",
         "http://127.0.0.1:1420",
         "http://127.0.0.1:5173",
-        "*",
     ]
 
     @property
@@ -52,7 +54,7 @@ class Settings(BaseSettings):
                 except Exception:
                     pass
             return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
-        return ["*"]
+        return []
 
     # Default ignored directories and file patterns
     default_ignore_patterns: list[str] = [
@@ -120,12 +122,12 @@ class Settings(BaseSettings):
 
     # Cloud Sync Configuration (Optional)
     cloud_sync_enabled: bool = Field(default=False, alias="CLOUD_SYNC_ENABLED")
-    cloud_sync_url: str = Field(default="http://localhost:8080/api/v1", alias="CLOUD_SYNC_URL")
+    cloud_sync_url: str = Field(default="http://localhost:8080", alias="CLOUD_SYNC_URL")
     cloud_sync_token: str | None = Field(default=None, alias="CLOUD_SYNC_TOKEN")
     device_id: str | None = Field(default=None, alias="GROUNDWORK_DEVICE_ID")
 
     model_config = {
-        "env_file": ".env",
+        "env_file": None if getattr(sys, "frozen", False) else ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
@@ -133,7 +135,8 @@ class Settings(BaseSettings):
     def get_database_path(self) -> Path:
         """Returns the absolute path to the local SQLite database."""
         if self.database_path:
-            return self.database_path
+            return Path(self.database_path).expanduser().resolve()
+        self.data_dir = self.data_dir.expanduser().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         return self.data_dir / "groundwork.db"
 

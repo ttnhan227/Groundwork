@@ -100,7 +100,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({ initialSection = "getting-st
 
                 <h3 className="text-sm font-serif font-bold text-[var(--ink)] pt-2">Step 3: Global Shortcut (Spotlight)</h3>
                 <p>
-                  Press <kbd className="px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline-strong)] text-[var(--ink)] font-mono font-bold">Ctrl+Space</kbd> (or <kbd className="px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline-strong)] text-[var(--ink)] font-mono font-bold">Ctrl+K</kbd>) anywhere in the app to open the global Spotlight modal. Type queries to search across code snippets, documentation, commits, and notes in under 10 milliseconds.
+                  Press <kbd className="px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline-strong)] text-[var(--ink)] font-mono font-bold">Ctrl+Space</kbd> (or <kbd className="px-2 py-0.5 rounded bg-[var(--paper-subtle)] border border-[var(--hairline-strong)] text-[var(--ink)] font-mono font-bold">Ctrl+K</kbd>) anywhere in the app to open Quick Find. Search indexed files and code snippets, or switch to projects and Git commits. Notes have their own searchable view. Response time depends on workspace size and hardware.
                 </p>
               </div>
             </article>
@@ -126,21 +126,21 @@ export const DocsPage: React.FC<DocsPageProps> = ({ initialSection = "getting-st
                 </p>
 
                 <div className="bg-[var(--control-room)] p-4 rounded border border-black/20 font-mono text-[11px] text-[var(--control-room-muted)] space-y-1">
-                  <div>score = 0.40 × S_lexical (SQLite FTS5 BM25)</div>
-                  <div>      + 0.35 × S_semantic (Dense Vector Cosine Similarity)</div>
-                  <div>      + 0.15 × S_filename (Filename exact/partial match)</div>
+                  <div>score = 0.35 × S_lexical (SQLite FTS5 BM25)</div>
+                  <div>      + 0.30 × S_semantic (Local Vector Cosine Similarity)</div>
+                  <div>      + 0.20 × S_filename (Filename exact/partial match)</div>
                   <div>      + 0.05 × S_recency (Exponential decay on file mtime)</div>
-                  <div>      + 0.05 × S_project (Active project boost)</div>
+                  <div>      + 0.10 × S_project (Active project boost)</div>
                 </div>
 
                 <h3 className="text-sm font-serif font-bold text-[var(--ink)] pt-2">FTS5 Full-Text Search</h3>
                 <p>
-                  The local SQLite database leverages virtual tables with the BM25 ranking algorithm, tokenizing alphanumeric words and identifiers. This provides sub-millisecond retrieval for exact symbol references and variable names.
+                  The local SQLite database uses FTS5 virtual tables with BM25 ranking for words and identifiers. Search time depends on corpus size, hardware, and retrieval mode.
                 </p>
 
                 <h3 className="text-sm font-serif font-bold text-[var(--ink)] pt-2">Dense Semantic Embeddings</h3>
                 <p>
-                  Groundwork generates 384-dimensional normalized vectors locally. When searching conceptually, cosine similarity matches chunks that describe the query even when exact keywords differ.
+                  Packaged builds include a local MiniLM model that produces 384-dimensional vectors without network access. Development builds without the model use word hashing; run the model preparation script for trained semantic retrieval.
                 </p>
               </div>
             </article>

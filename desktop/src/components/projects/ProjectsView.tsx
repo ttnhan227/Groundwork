@@ -8,10 +8,11 @@ import {
   Sparkles,
   Layers,
   Clock,
-  X,
+  FolderOpen,
 } from "lucide-react";
 import { api } from "../../services/api";
 import type { Project, ProjectOverview } from "../../types/api";
+import { Button, Card, Badge, Modal, EmptyState } from "../ui";
 
 interface ProjectsViewProps {
   onInvestigateProject?: (project: Project) => void;
@@ -20,10 +21,14 @@ interface ProjectsViewProps {
 export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedOverview, setSelectedOverview] = useState<ProjectOverview | null>(null);
+  const [fileHistory, setFileHistory] = useState<{path: string; diff: string; commits: Array<{hash: string; message: string}>} | null>(null);
 
   useEffect(() => {
     loadProjects();
+    const timer = setInterval(() => { api.listProjects().then((data) => {setProjects(data); setError(null);}).catch((failure) => setError(String(failure))); }, 5000);
+    return () => clearInterval(timer);
   }, []);
 
   const loadProjects = async () => {
@@ -31,8 +36,10 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
     try {
       const data = await api.listProjects();
       setProjects(data);
+      setError(null);
     } catch (err) {
       console.error("Failed to load projects:", err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -42,13 +49,16 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
     try {
       const overview = await api.getProjectOverview(project.id);
       setSelectedOverview(overview);
+      setFileHistory(null);
     } catch (err) {
       console.error("Failed to get overview:", err);
+      setError(String(err));
     }
   };
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6 w-full font-sans">
+      {error && <p role="alert" className="text-sm text-[var(--danger)]">Projects unavailable: {error}</p>}
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--hairline)] pb-4">
         <div>
@@ -63,24 +73,30 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
             Groundwork automatically discovers and analyzes repositories, frameworks, and entry points.
           </p>
         </div>
-        <span className="text-xs font-mono text-[var(--ink-secondary)] bg-[var(--surface)] px-3 py-1.5 rounded border border-[var(--hairline)] font-bold">
+        <Badge variant="neutral" className="font-mono text-xs px-3 py-1 font-bold">
           {projects.length} Projects Tracked
-        </span>
+        </Badge>
       </div>
 
       {/* Projects Grid */}
       {loading ? (
-        <div className="py-20 text-center text-[var(--ink-muted)] text-sm">Scanning workspace for projects...</div>
+        <EmptyState
+          icon={<FolderGit2 size={32} className="animate-pulse" />}
+          title="Scanning workspace..."
+          description="Locating git repositories, configuration manifests, and code trees."
+        />
       ) : projects.length === 0 ? (
-        <div className="py-20 text-center text-[var(--ink-muted)] text-sm">
-          No projects discovered yet. Add a workspace directory in Settings to get started.
-        </div>
+        <EmptyState
+          icon={<FolderOpen size={36} />}
+          title="No projects discovered yet"
+          description="Add a workspace directory in Settings to index local repositories and code."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((proj) => (
-            <div
+            <Card
               key={proj.id}
-              className="bg-[var(--surface)] border border-[var(--hairline)] rounded p-4 hover:border-[var(--ink-blue)] transition-all flex flex-col justify-between group shadow-xs"
+              className="flex flex-col justify-between group hover:border-[var(--ink-blue)]"
             >
               <div>
                 <div className="flex items-start justify-between mb-2">
@@ -88,20 +104,20 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                     <h3 className="font-serif font-bold text-base text-[var(--ink)] group-hover:text-[var(--ink-blue)] transition-colors">
                       {proj.name}
                     </h3>
-                    <p className="text-[11px] font-mono text-[var(--ink-muted)] truncate max-w-[220px]">
+                    <p className="text-[11px] font-mono text-[var(--ink-muted)] truncate max-w-[210px]">
                       {proj.path}
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)] text-[var(--ink-blue)]">
+                  <Badge variant="human" className="font-mono">
                     {proj.detected_type}
-                  </span>
+                  </Badge>
                 </div>
 
-                {/* Git status */}
+                {/* Git branch status */}
                 <div className="flex items-center gap-2 text-xs text-[var(--ink-secondary)] my-2">
                   <GitBranch className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
                   <span className="font-mono text-[11px] text-[var(--ink-secondary)]">
-                    {proj.git_branch || "local repo"}
+                    {proj.git_branch || "No Git branch detected"}
                   </span>
                 </div>
 
@@ -109,12 +125,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                 {proj.frameworks.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 my-2">
                     {proj.frameworks.map((fw) => (
-                      <span
-                        key={fw}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink-secondary)] border border-[var(--hairline)] font-mono"
-                      >
+                      <Badge key={fw} variant="neutral">
                         {fw}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 )}
@@ -122,69 +135,65 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
 
               {/* Actions Footer */}
               <div className="pt-3 border-t border-[var(--hairline)] flex items-center justify-between gap-2 text-xs mt-3">
-                <button
+                <Button
+                  variant="primary"
+                  size="xs"
                   onClick={() => openOverview(proj)}
-                  className="flex items-center gap-1 text-[11px] text-white px-2.5 py-1 rounded bg-[var(--control-room)] hover:bg-[var(--control-room-hover)] transition-colors font-semibold"
                 >
                   <BookOpen className="w-3 h-3" />
                   Overview
-                </button>
+                </Button>
                 <div className="flex items-center gap-1.5">
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="xs"
                     onClick={() => api.openFolder(proj.path)}
                     title="Open folder in Explorer"
-                    className="p-1 text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] rounded transition-colors"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
                   {onInvestigateProject && (
-                    <button
+                    <Button
+                      variant="agent"
+                      size="xs"
                       onClick={() => onInvestigateProject(proj)}
-                      className="flex items-center gap-1 text-[11px] text-[var(--ink-blue)] px-2.5 py-1 rounded bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)] hover:bg-[var(--ink-blue-border)] transition-colors font-semibold"
                     >
-                      <Sparkles className="w-3 h-3 text-[var(--ink-blue)]" />
+                      <Sparkles className="w-3 h-3" />
                       Investigate
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
 
       {/* Project Overview Modal */}
       {selectedOverview && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-6"
-          onClick={() => setSelectedOverview(null)}
-        >
-          <div
-            className="w-full max-w-3xl bg-[var(--surface)] border border-[var(--hairline-strong)] rounded-lg shadow-[var(--shadow-modal)] p-6 max-h-[85vh] overflow-y-auto space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between border-b border-[var(--hairline)] pb-3">
-              <div>
-                <h2 className="text-lg font-serif font-bold text-[var(--ink)] flex items-center gap-2">
-                  <FolderGit2 className="w-5 h-5 text-[var(--ink-blue)]" />
-                  {selectedOverview.name}
-                </h2>
-                <p className="text-xs font-mono text-[var(--ink-muted)]">{selectedOverview.path}</p>
-              </div>
-              <button
-                onClick={() => setSelectedOverview(null)}
-                className="text-[var(--ink-muted)] hover:text-[var(--ink)]"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        <Modal
+          isOpen={true}
+          onClose={() => setSelectedOverview(null)}
+          eyebrow="Repository Manifest"
+          title={
+            <div className="flex items-center gap-2">
+              <FolderGit2 className="w-5 h-5 text-[var(--ink-blue)]" />
+              <span>{selectedOverview.name}</span>
             </div>
+          }
+          maxWidth="2xl"
+        >
+          <div className="space-y-4">
+            <p className="text-xs font-mono text-[var(--ink-muted)] -mt-2">
+              {selectedOverview.path}
+            </p>
 
             {/* Entry points & Frameworks */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded p-3">
+              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-1.5 flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
-                  Likely Entry Points
+                  Detected Entry Points
                 </span>
                 {selectedOverview.entry_points.length > 0 ? (
                   <ul className="space-y-1 text-xs font-mono text-[var(--ink-secondary)]">
@@ -199,19 +208,16 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                 )}
               </div>
 
-              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded p-3">
+              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-1.5 flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-[var(--ink-sepia)]" />
                   Key Dependencies ({selectedOverview.dependencies.length})
                 </span>
-                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {selectedOverview.dependencies.slice(0, 15).map((dep) => (
-                    <span
-                      key={dep}
-                      className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--paper-subtle)] text-[var(--ink-secondary)] border border-[var(--hairline)] font-mono"
-                    >
+                    <Badge key={dep} variant="neutral">
                       {dep}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               </div>
@@ -219,20 +225,27 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
 
             {/* README Preview */}
             {selectedOverview.readme_preview && (
-              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded p-4">
+              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3.5">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-2 flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
                   README Preview
                 </span>
-                <div className="bg-[var(--paper-subtle)] border border-[var(--hairline)] rounded p-3 text-xs font-mono text-[var(--ink)] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                <div className="bg-[var(--paper-subtle)] border border-[var(--hairline)] rounded-[var(--radius-xs)] p-3 text-xs font-mono text-[var(--ink)] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                   {selectedOverview.readme_preview}
                 </div>
               </div>
             )}
 
             {/* Recent Git Commits */}
+            {selectedOverview.key_files.length > 0 && <section className="border-t border-[var(--hairline)] pt-3"><h3 className="font-serif font-bold text-sm mb-2">Project files</h3><div className="space-y-1">{selectedOverview.key_files.map((file) => <div key={file.name} className="flex justify-between text-xs font-mono"><span>{file.name}{file.is_dir ? "/" : ""}</span>{!file.is_dir && <div className="flex gap-2"><button onClick={() => api.openFile(`${selectedOverview.path}/${file.name}`).catch((error) => alert(String(error)))}>Open</button>{selectedOverview.working_tree?.branch && <button onClick={() => api.getFileHistory(selectedOverview.id, file.name).then(setFileHistory).catch((error) => alert(String(error)))}>History</button>}</div>}</div>)}</div></section>}
+            {selectedOverview.working_tree?.branch && <section className="border-t border-[var(--hairline)] pt-3 space-y-2">
+              <h3 className="font-serif font-bold text-sm">Working tree · {selectedOverview.working_tree.branch}</h3>
+              {!selectedOverview.working_tree.changed_files?.length && <p className="text-xs text-[var(--ink-muted)]">No uncommitted changes.</p>}
+              {selectedOverview.working_tree.changed_files?.map((file) => <button key={file.file} className="flex gap-3 text-xs font-mono w-full text-left hover:text-[var(--ink-blue)]" onClick={() => api.getFileHistory(selectedOverview.id, file.file).then(setFileHistory).catch((error) => alert(String(error)))}><span>{file.status}</span><span>{file.file}</span></button>)}
+              {fileHistory && <div className="space-y-2"><p className="text-xs font-mono font-bold">{fileHistory.path}</p>{fileHistory.commits.map((commit) => <p key={commit.hash} className="text-xs">{commit.hash.slice(0,7)} · {commit.message}</p>)}<pre className="text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto">{fileHistory.diff || "No tracked changes against HEAD."}</pre></div>}
+            </section>}
             {selectedOverview.recent_commits.length > 0 && (
-              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded p-4">
+              <div className="bg-[var(--paper)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-3.5">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] block mb-2 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[var(--signal)]" />
                   Recent Git Activity
@@ -240,16 +253,17 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onInvestigateProject
                 <div className="divide-y divide-[var(--hairline-subtle)] max-h-40 overflow-y-auto">
                   {selectedOverview.recent_commits.map((c) => (
                     <div key={c.hash} className="py-1.5 flex items-center justify-between text-xs">
-                      <span className="text-[var(--ink)] truncate max-w-[450px]">{c.message}</span>
-                      <span className="font-mono text-[10px] text-[var(--ink-muted)]">{c.hash}</span>
+                      <span className="text-[var(--ink)] truncate max-w-[450px] font-sans">{c.message}</span>
+                      <span className="font-mono text-[10px] text-[var(--ink-muted)] shrink-0 ml-2">{c.hash}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
 };
+export default ProjectsView;

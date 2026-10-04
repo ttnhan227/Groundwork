@@ -1,14 +1,14 @@
 # Groundwork Local - Search Quality Benchmark Report
 
-Evaluated against 25 developer workspace query benchmarks.
+Evaluated against 15 curated developer queries on current Groundwork core source files. This small, repository-specific set is not representative of arbitrary workspaces.
 
 | Retrieval Mode | Recall @ 1 (%) | Recall @ 5 (%) | MRR (Mean Reciprocal Rank) | Avg Latency (ms) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Lexical** | 96.0% | 96.0% | 0.96 | 0.54 ms |
-| **Semantic** | 100.0% | 100.0% | 1.0 | 3.1 ms |
-| **Hybrid** | 100.0% | 100.0% | 1.0 | 3.21 ms |
+| **Lexical** | 100.0% | 100.0% | 1.0 | 4.25 ms |
+| **Semantic** | 80.0% | 100.0% | 0.9 | 62.07 ms |
+| **Hybrid** | 100.0% | 100.0% | 1.0 | 61.94 ms |
 
 ### Key Findings:
-- **Hybrid Retrieval** achieves the highest Recall@1 and MRR by combining FTS5 exact terms with semantic dense vectors.
-- **Latency** across all retrieval modes remains well under the 300 ms target (< 20 ms).
-- **Recency and filename boosts** successfully disambiguate relevant files when queries target specific modules.
+- **Hybrid Retrieval** achieves balanced retrieval by combining FTS5 lexical matching with vector and recency signals.
+- Latencies are measurements from this run, not guarantees. Exact vector scans scale with indexed chunks; no universal latency or recall target is claimed.
+- **Real-world Grounding**: Evaluated against live codebase files rather than synthetic text mocks.

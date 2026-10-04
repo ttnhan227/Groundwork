@@ -14,8 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.core.security import git_environment, git_executable
 from app.database.local_db import LocalDatabase, get_db
 from app.models.types import ProjectOverview, ProjectResponse
+from app.services.git_service import GitService
 
 logger = logging.getLogger("groundwork.projects")
 
@@ -55,10 +57,15 @@ class ProjectService:
             self._upsert_project(proj_info)
             discovered.append(proj_info)
 
-        # Walk subdirectories (depth 3 to avoid deep recursion)
+        from app.services.indexer_service import IndexerService
+        from app.services.workspace_service import WorkspaceService
+        workspace = WorkspaceService().get_workspace(workspace_id)
+        ignore_patterns = workspace.ignore_patterns if workspace else []
+        policy = IndexerService.get_instance()
+        # Discover nested projects while honoring the same boundaries as indexing.
         for root, dirs, _files in os.walk(str(workspace_path)):
             # Skip ignored directories
-            dirs[:] = [d for d in dirs if d not in (".git", "node_modules", ".venv", "target", "dist", "build")]
+            dirs[:] = [d for d in dirs if not policy._is_ignored(Path(root) / d, ignore_patterns, [], workspace_path)]
             cur_path = Path(root).resolve()
             if cur_path == workspace_path:
                 continue
@@ -69,9 +76,14 @@ class ProjectService:
                 proj_info = self._analyze_project_directory(cur_path, workspace_id)
                 self._upsert_project(proj_info)
                 discovered.append(proj_info)
-                # Don't recurse deeper into this project root
-                dirs.clear()
 
+
+        current_ids = {project["id"] for project in discovered}
+        conn = self.db.get_connection()
+        with conn:
+            for row in conn.execute("SELECT id FROM projects WHERE workspace_id = ?", (workspace_id,)).fetchall():
+                if row["id"] not in current_ids:
+                    conn.execute("DELETE FROM projects WHERE id = ?", (row["id"],))
         return discovered
 
     def _analyze_project_directory(self, path: Path, workspace_id: str) -> dict[str, Any]:
@@ -84,7 +96,7 @@ class ProjectService:
 
         # 1. Node / TypeScript / JavaScript
         pkg_json = path / "package.json"
-        if pkg_json.exists():
+        if pkg_json.is_file() and not pkg_json.is_symlink():
             try:
                 data = json.loads(pkg_json.read_text(encoding="utf-8"))
                 name = data.get("name", name)
@@ -116,12 +128,12 @@ class ProjectService:
         if pyproject.exists() or req_txt.exists() or (path / "setup.py").exists():
             language = "Python"
             py_text = ""
-            if pyproject.exists():
+            if pyproject.is_file() and not pyproject.is_symlink():
                 try:
                     py_text += pyproject.read_text(encoding="utf-8")
                 except Exception:
                     pass
-            if req_txt.exists():
+            if req_txt.is_file() and not req_txt.is_symlink():
                 try:
                     py_text += req_txt.read_text(encoding="utf-8")
                 except Exception:
@@ -143,7 +155,7 @@ class ProjectService:
 
         # 3. Rust
         cargo = path / "Cargo.toml"
-        if cargo.exists():
+        if cargo.is_file() and not cargo.is_symlink():
             language = "Rust"
             try:
                 cargo_text = cargo.read_text(encoding="utf-8")
@@ -287,7 +299,7 @@ class ProjectService:
         readme_preview = None
         for rname in ("README.md", "README", "readme.markdown"):
             rfile = p_path / rname
-            if rfile.exists():
+            if rfile.is_file() and not rfile.is_symlink():
                 try:
                     readme_preview = rfile.read_text(encoding="utf-8")[:2000]
                     break
@@ -320,9 +332,13 @@ class ProjectService:
 
         # Key files in project root
         key_files = []
+        from app.services.indexer_service import IndexerService
+        from app.services.workspace_service import WorkspaceService
+        workspace = WorkspaceService().get_workspace(proj.workspace_id)
+        policy = IndexerService.get_instance()
         try:
             for item in sorted(p_path.iterdir()):
-                if item.name.startswith(".") or item.name in ("node_modules", "target", "__pycache__"):
+                if item.name.startswith(".") or not workspace or policy._is_ignored(item, workspace.ignore_patterns, [], Path(workspace.path)):
                     continue
                 key_files.append({
                     "name": item.name,
@@ -334,6 +350,7 @@ class ProjectService:
 
         return ProjectOverview(
             **proj.model_dump(),
+            working_tree=GitService().get_working_tree_status(p_path) if GitService.is_git_repo(p_path) else {},
             readme_preview=readme_preview,
             entry_points=entry_points,
             dependencies=proj.metadata.get("dependencies", []),
@@ -345,8 +362,9 @@ class ProjectService:
     def _run_git(cwd: Path, args: list[str]) -> str | None:
         try:
             res = subprocess.run(
-                ["git", *args],
+                [git_executable(), *args],
                 cwd=str(cwd),
+                env=git_environment(),
                 capture_output=True,
                 text=True,
                 check=False,

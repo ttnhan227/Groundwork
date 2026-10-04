@@ -9,13 +9,13 @@ Implements the bounded context architecture:
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 
 from app.models.types import AIQueryRequest, AIQueryResponse, CitationItem
 from app.services.ai.providers import get_llm_provider
-from app.services.git_service import GitService
-from app.services.project_service import ProjectService
-from app.services.search_engine import SearchEngine
+from app.services.ai.tools import AIToolManager
 
 logger = logging.getLogger("groundwork.ai.context")
 
@@ -35,9 +35,7 @@ class AIContextEngine:
     """Retrieves bounded workspace context and coordinates with LLM providers."""
 
     def __init__(self) -> None:
-        self.search_engine = SearchEngine()
-        self.project_service = ProjectService()
-        self.git_service = GitService()
+        self.tools = AIToolManager()
 
     def answer_with_context(
         self,
@@ -57,35 +55,55 @@ class AIContextEngine:
     def query(self, req: AIQueryRequest) -> AIQueryResponse:
         """Executes a bounded context AI query."""
         # 1. Retrieve top relevant chunks via Hybrid Search
-        search_res = self.search_engine.search(
-            query=req.question,
-            project_id=req.project_id,
-            workspace_id=req.workspace_id,
-            search_mode="hybrid",
-            limit=6,
-        )
+        search_res = self.tools.execute_tool("search_files", {
+            "query": req.question, "project_id": req.project_id,
+            "workspace_id": req.workspace_id, "limit": 6,
+        })
 
         citations: list[CitationItem] = []
         evidence_blocks = []
 
-        for item in search_res.results:
+        results = search_res.get("results", [])
+        selected_paths = list(dict.fromkeys(([req.focused_path] if req.focused_path else []) + req.file_paths))[:6]
+        if selected_paths:
+            results = [*[{"path": path, "filename": Path(path).name, "line_number": req.focused_line if index == 0 else 1} for index, path in enumerate(selected_paths)], *[item for item in results if item["path"] not in selected_paths]][:6]
+        for result in results:
+            # Read current contents through the privacy-checked tool. Search
+            # results alone may be stale while the watcher catches up.
+            source = self.tools.execute_tool("read_file", {
+                "path": result["path"], "start_line": result.get("line_number") or 1,
+                "end_line": (result.get("line_number") or 1) + 39,
+            })
+            if "error" in source or source["end_line"] < source["start_line"]:
+                continue
+            excerpt = source["content"][:8000]
+            excerpt_end = min(source["end_line"], source["start_line"] + max(0, len(excerpt.splitlines()) - 1))
             citations.append(CitationItem(
-                path=item.path,
-                filename=item.filename,
-                line_start=item.line_number,
-                line_end=(item.line_number or 1) + 20,
-                snippet=item.snippet,
+                path=source["path"], filename=result["filename"],
+                line_start=source["start_line"], line_end=excerpt_end,
+                snippet=excerpt,
             ))
             evidence_blocks.append(
-                f"File [{item.filename}:{item.line_number or 1}] (Project: {item.project_name or 'Root'}):\n"
-                f"Path: {item.path}\n"
-                f"```\n{item.snippet}\n```"
+                f"File [{result['filename']}:{source['start_line']}] (Project: {result.get('project_name') or 'Root'}):\n"
+                f"Path: {source['path']}\n```\n{excerpt}\n```"
             )
+
+        if req.project_id:
+            overview = self.tools.execute_tool("get_project_structure", {"project_id": req.project_id})
+            if "error" not in overview:
+                facts = {key: overview.get(key) for key in ("name", "path", "detected_type", "language", "frameworks", "entry_points", "dependencies", "working_tree")}
+                evidence_blocks.append("Project metadata from local tools:\n```\n" + json.dumps(facts, ensure_ascii=False)[:6000] + "\n```")
+        if req.session_id:
+            session = self.tools.execute_tool("get_context_session", {"session_id": req.session_id})
+            if "error" not in session:
+                evidence_blocks.append("Saved investigation context (previous findings may be outdated):\n```\n" + json.dumps(session, ensure_ascii=False)[:12000] + "\n```")
 
         # 2. Add recent Git commits if requested
         git_context = ""
         if req.include_git and req.project_id:
-            commits = self.git_service.search_commits(req.question, project_id=req.project_id, limit=3)
+            commits = self.tools.execute_tool("search_git", {"query": req.question, "project_id": req.project_id}).get("commits", [])[:3]
+            if not commits:
+                commits = self.tools.execute_tool("get_recent_commits", {"project_id": req.project_id, "limit": 3}).get("commits", [])
             if commits:
                 commit_lines = [f"- {c['short_hash']}: {c['message']} (by {c['author']} on {c['date']})" for c in commits]
                 git_context = "\nRecent Related Git Commits:\n" + "\n".join(commit_lines)
@@ -119,6 +137,8 @@ class AIContextEngine:
                 "label": "Save as Note",
                 "action": "create_note",
                 "title": f"Note: {req.question[:50]}",
+                "content": answer,
+                "project_id": req.project_id,
             })
 
         return AIQueryResponse(

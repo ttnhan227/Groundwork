@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+
+from sqlalchemy import Column, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -93,3 +94,20 @@ class CloudSetting(Base):
     )
 
     user = relationship("User", back_populates="settings")
+
+
+class SyncReceipt(Base):
+    """Acknowledgements survive retries and process restarts."""
+    __tablename__ = "sync_receipts"
+    user_id = Column(String(36), ForeignKey("users.id"), primary_key=True)
+    queue_id = Column(String(64), primary_key=True)
+    payload_hash = Column(String(64), nullable=False)
+    created_at = Column(String(50), default=utcnow_str)
+
+
+class CloudTombstone(Base):
+    __tablename__ = "cloud_tombstones"
+    user_id = Column(String(36), ForeignKey("users.id"), primary_key=True)
+    entity_type = Column(String(30), primary_key=True)
+    entity_id = Column(String(100), primary_key=True)
+    deleted_at = Column(String(50), default=utcnow_str)

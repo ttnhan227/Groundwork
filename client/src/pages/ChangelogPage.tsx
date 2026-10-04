@@ -4,19 +4,19 @@ import { History, Tag, Sparkles, CheckCircle2 } from "lucide-react";
 export const ChangelogPage: React.FC = () => {
   const releases = [
     {
-      version: "v1.0.0",
-      date: "September 2026",
+      version: "Development build",
+      date: "October 2026",
       title: "The Local-First Transformation",
-      badge: "Major Release",
+      badge: "In development",
       summary:
         "Groundwork transformed from a browser document app into a high-performance local-first workspace search and AI context tool for developers.",
       highlights: [
         "Native Tauri 2 desktop client for Windows with global shortcut Ctrl+Space / Ctrl+K.",
         "Local FastAPI core running on SQLite in WAL mode with FTS5 BM25 virtual tables.",
-        "Hybrid Search Engine combining BM25 lexical matching, 384-d dense vector cosine similarity, filename exact/partial matches, recency decay, and active project boosting (avg 9.4ms latency).",
+        "Hybrid search combines SQLite FTS5, local vectors, filename matching, recency, and project context. Latency depends on the indexed workspace.",
         "AST Symbol and Function Extractor for Python, TypeScript, JavaScript, Rust, and Go.",
         "Project Explorer detecting package.json, pyproject.toml, Cargo.toml, READMEs, and Git remotes.",
-        "Activity Timeline & 'What was I doing?' AI workspace activity synthesizer.",
+        "Activity timeline and resume summaries use observed file changes, Git commits, notes, and sessions.",
         "Context Sessions ('Continue where I left off') preserving working memory, inspected files, and task checklists.",
         "Grounded AI Context Engine with verifiable citations drawer and single-use execution tokens.",
         "Groundwork Sync: Optional lightweight cloud service on Cloud Run for settings and notes.",

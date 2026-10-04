@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { api } from "../../services/api";
 import type { ActivityItem } from "../../types/api";
+import { Button, Card, Badge, EmptyState } from "../ui";
 
 interface ActivityTimelineViewProps {
   selectedProjectId: string | null;
@@ -114,21 +115,21 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
             Activity Timeline
           </h1>
           <p className="text-xs text-[var(--ink-secondary)] mt-1">
-            "What was I doing?" — Chronological view of workspace changes, commits, notes, and investigations.
+            Chronological log of workspace edits, Git commits, investigations, and search interactions.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded border border-[var(--hairline)] text-xs">
+          <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded-[var(--radius-sm)] border border-[var(--hairline)] text-xs">
             <Calendar className="w-3.5 h-3.5 text-[var(--ink-muted)] ml-1" />
             {[1, 2, 7, 14, 30].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`px-2.5 py-1 rounded text-xs transition-colors font-mono font-bold ${
+                className={`px-2.5 py-1 rounded-[var(--radius-xs)] text-xs transition-all font-mono font-semibold cursor-pointer ${
                   days === d
-                    ? "bg-[var(--control-room)] text-white"
-                    : "text-[var(--ink-secondary)] hover:text-[var(--ink)]"
+                    ? "bg-[var(--control-room)] text-white shadow-[var(--shadow-subtle)]"
+                    : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
                 {d === 1 ? "Today" : `${d}d`}
@@ -136,49 +137,50 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
             ))}
           </div>
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               fetchActivities();
               fetchSummary();
             }}
             title="Refresh Timeline"
-            className="p-2 rounded bg-[var(--surface)] border border-[var(--hairline)] text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:border-[var(--ink-blue)] transition-colors shadow-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* AI Context "What Was I Doing?" Card */}
-      <div className="mb-6 bg-[var(--surface)] rounded-lg border border-[var(--hairline-strong)] p-5 shadow-[var(--shadow-card)] relative overflow-hidden">
+      {/* AI Context Synthesis Card */}
+      <Card className="mb-6 border-[var(--hairline-strong)]">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded border border-[var(--ink-blue-border)] bg-[var(--ink-blue-subtle)] flex items-center justify-center">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-[var(--radius-xs)] border border-[var(--ink-blue-border)] bg-[var(--ink-blue-subtle)] flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-[var(--ink-blue)]" />
             </div>
             <div>
               <h2 className="text-sm font-serif font-bold text-[var(--ink)]">What was I working on?</h2>
-              <span className="text-[11px] text-[var(--ink-secondary)]">
-                Workspace synthesized activity over the last {days} days
+              <span className="text-[11px] text-[var(--ink-muted)]">
+                Local synthesis of active files, commits, and sessions over {days} {days === 1 ? "day" : "days"}
               </span>
             </div>
           </div>
           {summaryLoading && (
-            <span className="text-[11px] font-mono text-[var(--ink-blue)] flex items-center gap-1 font-bold">
-              <RefreshCw className="w-3 h-3 animate-spin" /> Synthesizing...
-            </span>
+            <Badge variant="human" className="font-mono">
+              <RefreshCw className="w-3 h-3 animate-spin mr-1" /> Synthesizing...
+            </Badge>
           )}
         </div>
 
         {summaryData ? (
           <div className="space-y-4">
-            <p className="text-xs text-[var(--ink)] leading-relaxed font-sans bg-[var(--paper)] p-3.5 rounded border border-[var(--hairline)]">
+            <p className="text-xs text-[var(--ink)] leading-relaxed font-sans bg-[var(--paper)] p-3.5 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
               {summaryData.concise_summary}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               {/* Active Projects */}
-              <div className="bg-[var(--paper-subtle)] p-3 rounded border border-[var(--hairline)]">
+              <div className="bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
                   <Folder className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
                   Active Projects ({summaryData.active_projects.length})
@@ -188,22 +190,19 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                     <span className="text-[11px] text-[var(--ink-muted)]">None detected</span>
                   ) : (
                     summaryData.active_projects.map((proj) => (
-                      <span
-                        key={proj}
-                        className="px-2 py-0.5 rounded text-[10px] bg-[var(--ink-blue-subtle)] border border-[var(--ink-blue-border)] text-[var(--ink-blue)] font-mono font-bold"
-                      >
+                      <Badge key={proj} variant="human" className="font-mono font-bold">
                         {proj}
-                      </span>
+                      </Badge>
                     ))
                   )}
                 </div>
               </div>
 
               {/* Modified Files */}
-              <div className="bg-[var(--paper-subtle)] p-3 rounded border border-[var(--hairline)]">
+              <div className="bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
                   <FileCode className="w-3.5 h-3.5 text-[var(--ink-blue)]" />
-                  Recent Modified Files ({summaryData.modified_files.length})
+                  Modified Files ({summaryData.modified_files.length})
                 </span>
                 <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                   {summaryData.modified_files.length === 0 ? (
@@ -224,7 +223,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
               </div>
 
               {/* Recent Commits */}
-              <div className="bg-[var(--paper-subtle)] p-3 rounded border border-[var(--hairline)]">
+              <div className="bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--hairline)]">
                 <span className="text-[11px] font-mono font-bold text-[var(--ink)] flex items-center gap-1.5 mb-2">
                   <GitCommit className="w-3.5 h-3.5 text-[var(--ink-sepia)]" />
                   Recent Commits ({summaryData.recent_commits.length})
@@ -249,35 +248,39 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
         ) : (
           <p className="text-xs text-[var(--ink-muted)]">No activity recorded yet for this period.</p>
         )}
-      </div>
+      </Card>
 
       {/* Chronological Timeline List */}
       <div className="space-y-3">
         <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--ink-muted)] mb-2">
-          Chronological Events ({activities.length})
+          Events Log ({activities.length})
         </h2>
 
         {loading ? (
-          <div className="text-center py-12 text-[var(--ink-muted)] text-xs flex flex-col items-center gap-2">
-            <RefreshCw className="w-5 h-5 animate-spin text-[var(--ink-blue)]" />
-            Loading timeline events...
-          </div>
+          <EmptyState
+            icon={<RefreshCw className="w-6 h-6 animate-spin text-[var(--ink-blue)]" />}
+            title="Loading activity events..."
+            compact
+          />
         ) : activities.length === 0 ? (
-          <div className="text-center py-12 text-[var(--ink-muted)] text-xs bg-[var(--surface)] rounded border border-[var(--hairline)]">
-            No workspace events logged for this timeframe.
-          </div>
+          <EmptyState
+            icon={<Clock size={28} />}
+            title="No events recorded for this timeframe"
+            description="As you edit files, run git commands, and search projects, events appear here."
+            compact
+          />
         ) : (
-          <div className="relative pl-6 space-y-4 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--hairline-strong)]">
+          <div className="relative pl-6 space-y-3 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--hairline-strong)]">
             {activities.map((item) => {
               const filePath = item.details?.path || item.details?.file_path;
               return (
                 <div
                   key={item.id}
-                  className="relative group bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] hover:border-[var(--ink-blue)] rounded p-3 transition-colors text-xs shadow-xs"
+                  className="relative group bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--hairline)] hover:border-[var(--ink-blue)] rounded-[var(--radius-sm)] p-3 transition-all text-xs shadow-[var(--shadow-subtle)]"
                 >
                   {/* Timeline Node Point */}
                   <div className="absolute -left-[27px] top-3.5 w-4 h-4 rounded-full bg-[var(--paper)] border-2 border-[var(--ink-blue)] flex items-center justify-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-blue)]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-blue)]" />
                   </div>
 
                   <div className="flex items-start justify-between gap-3">
@@ -291,9 +294,9 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                             {item.summary}
                           </span>
                           {item.project_name && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--paper-subtle)] text-[var(--ink-secondary)] border border-[var(--hairline)] font-mono">
+                            <Badge variant="neutral">
                               {item.project_name}
-                            </span>
+                            </Badge>
                           )}
                         </div>
 
@@ -317,20 +320,22 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                       </span>
                       {filePath && (
                         <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="xs"
                             onClick={() => api.openFile(filePath)}
                             title="Open File"
-                            className="p-1 hover:bg-[var(--surface-active)] rounded text-[var(--ink-secondary)] hover:text-[var(--ink)] border border-[var(--hairline)]"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="xs"
                             onClick={() => api.revealFile(filePath)}
                             title="Reveal in Explorer"
-                            className="p-1 hover:bg-[var(--surface-active)] rounded text-[var(--ink-secondary)] hover:text-[var(--ink)] border border-[var(--hairline)]"
                           >
                             <FolderOpen className="w-3.5 h-3.5" />
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -344,3 +349,4 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
     </div>
   );
 };
+export default ActivityTimelineView;

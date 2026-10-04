@@ -183,7 +183,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
                 <div className="flex items-center gap-3 px-4 py-3 rounded bg-[var(--surface)] border border-[var(--ink-blue)] shadow-xs">
                   <Search className="w-4 h-4 text-[var(--ink-blue)]" />
                   <span className="text-sm text-[var(--ink)] font-mono font-medium">auth middleware token</span>
-                  <span className="ml-auto text-xs font-mono text-[var(--ink-muted)]">Hybrid Search (9.4ms)</span>
+                  <span className="ml-auto text-xs font-mono text-[var(--ink-muted)]">Illustrative search preview</span>
                 </div>
 
                 {/* Results Mockup */}
@@ -191,7 +191,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
                   <div className="p-3.5 rounded bg-[var(--surface)] border border-[var(--hairline)] hover:border-[var(--ink-blue)] transition-colors">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono text-xs font-bold text-[var(--ink-blue)]">server/app/core/security.py</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] font-mono font-bold">Score: 0.984</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] font-mono font-bold">Example result</span>
                     </div>
                     <p className="text-xs font-mono text-[var(--ink-secondary)] line-clamp-1 bg-[var(--paper-subtle)] p-1.5 rounded border border-[var(--hairline-subtle)]">
                       def verify_confirmation_token(token: str) -&gt; bool: ...
@@ -247,7 +247,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
                     <span className="font-bold text-xs text-[var(--ink)] font-serif">Synthesized Activity (Last 2 Days)</span>
                   </div>
                   <p className="text-xs text-[var(--ink-secondary)] leading-relaxed">
-                    You worked on SQLite WAL FTS5 schemas, implemented the hybrid ranking formula, and verified 100% search recall across benchmark queries.
+                    Example session: review SQLite search schemas, inspect relevant files, and leave notes for the next investigation.
                   </p>
                 </div>
 
@@ -331,7 +331,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
               <ShieldCheck className="w-6 h-6 text-[var(--signal)] mb-3" />
               <h3 className="font-serif font-bold text-sm text-[var(--ink)] mb-1.5">Zero Silent Uploads</h3>
               <p className="text-xs text-[var(--ink-secondary)] leading-relaxed">
-                Groundwork never uploads your source code, PDFs, or private files. Cloud sync is strictly opt-in and restricted to preferences and notes.
+                Workspace files and indexes stay local. Optional sync carries notes, saved searches, and preferences. Selecting a remote AI provider sends bounded evidence excerpts to that provider.
               </p>
             </div>
 
