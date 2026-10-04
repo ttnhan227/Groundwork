@@ -19,18 +19,38 @@ fs.writeFileSync(path.join(workspace, 'sample.ts'), 'export function installed_w
 for (const args of [['init'],['config','user.name','Installer Test'],['config','user.email','installer@example.com'],['add','.'],['commit','-m','Initialize installed workflow']]) execFileSync('git',args,{cwd:workspace,stdio:'ignore'});
 const env = {...process.env, PATH:'', GROUNDWORK_DATA_DIR:path.join(root,'state'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port=18540 --remote-debugging-address=127.0.0.1'};
 let app, browser, page, connection;
+// Microsoft WebView2 150+ drops environment overrides in elevated hosts.
+// Only the ephemeral hosted-CI wrapper opts into a per-executable HKLM policy.
+const useCiPolicy = process.env.GROUNDWORK_CI_WEBVIEW_POLICY === '1';
+const policyKey = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments';
+let previousPolicy;
+function setCiPolicy(argumentsValue) {
+  if (!useCiPolicy) return;
+  const policyScript = `$ErrorActionPreference='Stop'; $key='${policyKey}'; $name='groundwork-desktop.exe'; New-Item -Path $key -Force | Out-Null; $existing=Get-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue; if($existing){$existing.$name}; Set-ItemProperty -LiteralPath $key -Name $name -Value '${argumentsValue}'`;
+  const value=execFileSync('powershell.exe',['-NoProfile','-Command',policyScript],{encoding:'utf8'}).trim();
+  if(previousPolicy===undefined) previousPolicy=value;
+}
+function restoreCiPolicy() {
+  if(!useCiPolicy || previousPolicy===undefined) return;
+  const script=previousPolicy ? `Set-ItemProperty -LiteralPath '${policyKey}' -Name 'groundwork-desktop.exe' -Value '${previousPolicy.replace(/'/g,"''")}'` : `Remove-ItemProperty -LiteralPath '${policyKey}' -Name 'groundwork-desktop.exe' -ErrorAction SilentlyContinue`;
+  execFileSync('powershell.exe',['-NoProfile','-Command',script]);
+}
 async function launch() {
   const listener=net.createServer();
   await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));
   const debugPort=listener.address().port;
   await new Promise(resolve=>listener.close(resolve));
   env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=`--remote-debugging-port=${debugPort} --remote-debugging-address=127.0.0.1`;
+  setCiPolicy(env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS);
   app = spawn(path.join(installDir,'groundwork-desktop.exe'),[],{env,stdio:'ignore'});
   for(let attempt=0;attempt<100;attempt++) {
     try { browser=await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`); break; }
     catch {if(app.exitCode!==null)throw new Error('Installed application exited'); await new Promise(r=>setTimeout(r,200));}
   }
-  if(!browser)throw new Error('WebView2 debugging endpoint unavailable');
+  if(!browser) {
+    console.error(execFileSync('powershell.exe',['-NoProfile','-Command',`Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('groundwork-desktop.exe','msedgewebview2.exe') } | Select-Object Name,ProcessId,ParentProcessId,CommandLine | Format-List | Out-String`],{encoding:'utf8'}));
+    throw new Error('WebView2 debugging endpoint unavailable');
+  }
   page=browser.contexts()[0].pages()[0];
   page.on('console', message=>{if(message.type()==='error') console.error('WebView:',message.text());});
   page.on('requestfailed', request=>console.error('Request failed:',request.url(),request.failure()));
@@ -118,6 +138,7 @@ async function close() {
     try {await close();}catch(error){console.error('Cleanup:',error.message);}
     const uninstall=path.join(installDir,'uninstall.exe');
     if(fs.existsSync(uninstall))spawnSync(uninstall,['/S'],{windowsHide:true,timeout:30000});
+    restoreCiPolicy();
     // Keep failed runs and screenshots available for diagnosis.
   }
 })().catch(error=>{console.error(error);process.exitCode=1;console.error('Integration directory:',root)});
