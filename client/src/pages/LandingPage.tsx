@@ -200,7 +200,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
 
                   <div className="p-3.5 rounded bg-[var(--surface)] border border-[var(--hairline)]">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-xs font-bold text-[var(--ink)]">cloud/app/core/security.py</span>
+                      <span className="font-mono text-xs font-bold text-[var(--ink)]">server/app/hosted/core/security.py</span>
                       <span className="px-2 py-0.5 rounded text-[10px] bg-[var(--paper-subtle)] text-[var(--ink-secondary)] font-mono">Score: 0.892</span>
                     </div>
                     <p className="text-xs font-mono text-[var(--ink-secondary)] line-clamp-1 bg-[var(--paper-subtle)] p-1.5 rounded border border-[var(--hairline-subtle)]">

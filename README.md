@@ -5,13 +5,16 @@ Groundwork is a local-first workspace search and context desktop application. It
 ## Repository
 
 - `desktop/`: React, Tailwind, and Tauri desktop shell, using Groundwork's paper palette and editorial typography.
-- `server/`: local FastAPI core, SQLite/FTS5, file indexing, watcher, project and Git inspection, notes, sessions, and bounded AI context.
-- `cloud/`: optional account and metadata synchronization service. SQLite works for development; synchronous PostgreSQL is optional for deployment.
+- `server/`: local FastAPI core and hosted account/sync API. The local runtime owns SQLite/FTS5, file indexing, watcher, project and Git inspection, notes, sessions, and bounded AI context.
 - `client/`: static marketing, documentation, and download website.
 
 Local indexing and search need no cloud service, PostgreSQL, Redis, Docker, or account. Windows installers bundle the Python runtime, Git, and a trained local MiniLM embedding model. Developer checkouts use installed Git and fall back to hashing when model files are absent. The `local` AI provider shows retrieved excerpts; it is not a language model. Ollama requires a separately installed model. OpenAI and Gemini queries send the question, retrieved excerpts, and cited paths to the selected provider. Indexing never uses those remote providers.
 
 ## Development
+
+Run the complete developer stack with `docker compose up -d --build`. No `.env` file is required. The five services are `desktop` (port 5174), `website` (3000), `local-engine` (8000), `backend` (8080), and `database` (PostgreSQL on localhost:5433). The backend uses this PostgreSQL database by default; the local engine keeps its embedded SQLite database. Database data persists in Docker volumes.
+
+For a backend started directly with Python, the developer database URL is `postgresql+psycopg2://groundwork:groundwork_dev@localhost:5433/groundwork`. Set `BACKEND_DATABASE_URL` to override the Docker backend's database connection. Use `docker compose ps` to check services and `docker compose logs backend` to inspect backend logs.
 
 Use Python 3.12 and Node 22 or newer. Native development also requires Rust and the Windows Tauri prerequisites.
 
@@ -19,7 +22,7 @@ Use Python 3.12 and Node 22 or newer. Native development also requires Rust and 
 cd server
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv\Scripts\python -m uvicorn app.local_main:app --host 127.0.0.1 --port 8000
 ```
 
 In another terminal:
@@ -50,8 +53,6 @@ The website checks GitHub's latest stable release when the download page opens a
 ```powershell
 cd server
 python -m pytest tests
-cd ../cloud
-python -m pytest tests
 cd ../desktop
 npm run build
 cd ../client
@@ -69,4 +70,4 @@ python desktop/scripts/smoke-sync.py
 node desktop/scripts/smoke-installed.cjs desktop/src-tauri/target/release/bundle/nsis/Groundwork_1.0.0_x64-setup.exe
 ```
 
-The sync check requires the cloud dependencies in `server/.venv` or the Python selected through `GROUNDWORK_CLOUD_PYTHON`. The installed UI check uses Playwright from `client/node_modules` and attaches to the real WebView2 runtime. Both application tests isolate state and run the application with an empty PATH.
+The sync check requires the hosted API dependencies in `server/.venv` or the Python selected through `GROUNDWORK_CLOUD_PYTHON`. The installed UI check uses Playwright from `client/node_modules` and attaches to the real WebView2 runtime. Both application tests isolate state and run the application with an empty PATH.

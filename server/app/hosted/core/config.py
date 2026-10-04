@@ -5,7 +5,9 @@ Lightweight synchronization backend deployed to Google Cloud Run with PostgreSQL
 
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pathlib import Path
+
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -24,7 +26,12 @@ class CloudSettings(BaseSettings):
 
     jwt_secret: str = Field(default="dev-cloud-jwt-secret-groundwork-2026", alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 30  # 30 days session
+    google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    access_token_expire_minutes: int = Field(
+        default=60 * 24 * 30,
+        gt=0,
+        validation_alias=AliasChoices("ACCESS_TOKEN_MINUTES", "ACCESS_TOKEN_EXPIRE_MINUTES"),
+    )
 
     cors_origins: list[str] | str = ["*"]
 
@@ -52,7 +59,7 @@ class CloudSettings(BaseSettings):
         return ["*"]
 
     model_config = {
-        "env_file": ".env",
+        "env_file": Path(__file__).resolve().parents[4] / ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

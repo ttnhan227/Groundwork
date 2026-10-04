@@ -1,10 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-import pytest
 
-from app.main import app
-from app.core.security import hash_password, verify_password
-from app.routers.sync import SyncPushRequest
+from app.hosted.core.security import hash_password, verify_password
+from app.hosted.main import app
+from app.hosted.routers.sync import SyncPushRequest
 
 
 def test_passwords_have_unique_salts_and_verify():

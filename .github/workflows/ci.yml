@@ -60,16 +60,16 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: cloud/requirements.txt
+          cache-dependency-path: server/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r cloud/requirements.txt pytest
+          pip install -r server/requirements.txt pytest
 
       - name: Run Cloud Sync Tests
-        working-directory: cloud
-        run: pytest tests/ -v
+        working-directory: server
+        run: pytest tests/hosted -v
 
   # ──────────────────────────────────────────────
   # 3. Desktop Application: Tauri & React Build
@@ -137,7 +137,7 @@ jobs:
         working-directory: desktop
       - run: npm ci
         working-directory: client
-      - run: python -m pip install -r cloud/requirements.txt
+      - run: python -m pip install -r server/requirements.txt
       - run: npm run tauri -- build
         working-directory: desktop
       - run: python desktop/scripts/smoke-core.py

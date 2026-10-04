@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from app.hosted.core.database import Base
 
 
 def utcnow_str() -> str:
@@ -27,6 +27,14 @@ class User(Base):
     notes = relationship("CloudNote", back_populates="user", cascade="all, delete-orphan")
     saved_searches = relationship("CloudSavedSearch", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("CloudSetting", back_populates="user", cascade="all, delete-orphan")
+
+
+class GoogleIdentity(Base):
+    __tablename__ = "google_identities"
+
+    subject = Column(String(255), primary_key=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, unique=True)
+    user = relationship("User")
 
 
 class Device(Base):

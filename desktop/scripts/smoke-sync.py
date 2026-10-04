@@ -49,7 +49,7 @@ with tempfile.TemporaryDirectory() as directory:
     cloud_port, local_port = free_port(), free_port()
     cloud_url, local_url = f"http://127.0.0.1:{cloud_port}", f"http://127.0.0.1:{local_port}"
     cloud_env = os.environ.copy()
-    cloud_env.update(PYTHONPATH=str(repo / "cloud"), DATABASE_URL="sqlite:///" + str(root / "cloud.db").replace("\\", "/"), ENVIRONMENT="development", JWT_SECRET="integration-test-secret-not-used-in-production")
+    cloud_env.update(GROUNDWORK_RUNTIME="hosted", PYTHONPATH=str(repo / "server"), DATABASE_URL="sqlite:///" + str(root / "cloud.db").replace("\\", "/"), ENVIRONMENT="development", JWT_SECRET="integration-test-secret-not-used-in-production")
     local_env = os.environ.copy()
     local_env.update(PATH="", GROUNDWORK_DATA_DIR=str(root / "state"), GROUNDWORK_CORE_PORT=str(local_port), GROUNDWORK_CORE_TOKEN="sync-integration")
     with (root / "services.log").open("w", encoding="utf-8") as log:

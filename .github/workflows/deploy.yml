@@ -1,4 +1,4 @@
-name: Deploy optional cloud sync
+name: Deploy server
 
 on:
   workflow_dispatch:
@@ -19,15 +19,19 @@ jobs:
         run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
       - uses: docker/build-push-action@v6
         with:
-          context: ./cloud
+          context: ./server
           push: true
-          tags: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/cloud:${{ github.sha }}
+          tags: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/api:${{ github.sha }}
       - uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: groundwork-cloud-sync
+          service: groundwork-api
           region: asia-southeast1
-          image: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/cloud:${{ github.sha }}
-          env_vars: ENVIRONMENT=production
+          image: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/api:${{ github.sha }}
+          env_vars: |
+            ENVIRONMENT=production
+            GROUNDWORK_RUNTIME=hosted
+            CORS_ORIGINS=https://groundwork-client.onrender.com
+            ACCESS_TOKEN_MINUTES=15
           secrets: |
             DATABASE_URL=groundwork-cloud-database-url:latest
             JWT_SECRET=groundwork-cloud-jwt-secret:latest

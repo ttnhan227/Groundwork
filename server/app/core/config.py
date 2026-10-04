@@ -127,7 +127,7 @@ class Settings(BaseSettings):
     device_id: str | None = Field(default=None, alias="GROUNDWORK_DEVICE_ID")
 
     model_config = {
-        "env_file": None if getattr(sys, "frozen", False) else ".env",
+        "env_file": None if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[3] / ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

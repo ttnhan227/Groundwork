@@ -8,22 +8,39 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import Uuid, inspect
 
-from app.core.config import get_cloud_settings
-from app.core.database import Base, engine
-from app.routers.auth import auth_router
-from app.routers.devices import devices_router
-from app.routers.sync import sync_router
+from app.hosted.core.config import get_cloud_settings
+from app.hosted.core.database import Base, engine
+from app.hosted.routers.auth import auth_router
+from app.hosted.routers.devices import devices_router
+from app.hosted.routers.sync import sync_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("groundwork.cloud")
 settings = get_cloud_settings()
 
 
+def initialize_schema(bind):
+    # Older hosted databases use native UUID user IDs. Match that existing
+    # key when adding tables, while retaining string IDs in fresh databases.
+    inspector = inspect(bind)
+    if inspector.has_table("users"):
+        user_id_type = next(column["type"] for column in inspector.get_columns("users") if column["name"] == "id")
+        if isinstance(user_id_type, Uuid):
+            for table in Base.metadata.tables.values():
+                for column in table.columns:
+                    if (table.name == "users" and column.name == "id") or any(
+                        key.target_fullname == "users.id" for key in column.foreign_keys
+                    ):
+                        column.type = Uuid(as_uuid=False)
+    Base.metadata.create_all(bind=bind)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Initializing Groundwork Cloud schema...")
-    Base.metadata.create_all(bind=engine)
+    initialize_schema(engine)
     yield
 
 

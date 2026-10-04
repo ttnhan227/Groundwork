@@ -10,7 +10,7 @@ from typing import Any
 
 import jwt
 
-from app.core.config import get_cloud_settings
+from app.hosted.core.config import get_cloud_settings
 
 
 def hash_password(password: str) -> str:

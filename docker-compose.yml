@@ -2,23 +2,24 @@
 # Groundwork — Full Docker Compose Stack
 # =====================================================================
 # Runs the complete Groundwork environment in Docker:
-# 1. local-core: Local FastAPI search, indexing & AI context engine (port 8000)
-# 2. app-ui: Groundwork App Web Interface (port 5173)
+# 1. local-engine: Embedded SQLite database, indexing, search and AI (port 8000)
+# 2. desktop: Groundwork Desktop interface for browser development (port 5174)
 # 3. website: Marketing, download & documentation website (port 3000)
-# 4. cloud-api: Cloud Sync Backend API (port 8080)
-# 5. cloud-db: PostgreSQL database for cloud sync (port 5432)
+# 4. backend: Cloud Sync Backend API (port 8080)
+# 5. database: PostgreSQL for backend accounts and sync (port 5433)
 # =====================================================================
 
 services:
-  # 1. Groundwork Local Core (FastAPI + SQLite FTS5)
-  local-core:
+  # 1. Local engine: embedded SQLite database, indexing, search and AI (port 8000)
+  local-engine:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: groundwork-local-core
+    container_name: groundwork-local-engine
     environment:
       PORT: 8000
       GROUNDWORK_ENV: development
+      GROUNDWORK_RUNTIME: local
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -34,14 +35,14 @@ services:
       - groundwork-net
     restart: unless-stopped
 
-  # 2. Groundwork App Interface (React Web Interface on port 5173)
-  app-ui:
+  # 2. Desktop interface for browser development (port 5174)
+  desktop:
     build:
       context: ./desktop
       dockerfile: Dockerfile
-    container_name: groundwork-app-ui
+    container_name: groundwork-desktop
     depends_on:
-      local-core:
+      local-engine:
         condition: service_healthy
     ports:
       - "${APP_PORT:-5174}:80"
@@ -71,40 +72,24 @@ services:
       - groundwork-net
     restart: unless-stopped
 
-  # 4. Cloud Database (PostgreSQL for optional Cloud Sync)
-  cloud-db:
-    image: postgres:16-alpine
-    container_name: groundwork-cloud-db
-    environment:
-      POSTGRES_DB: ${CLOUD_DB_NAME:-groundwork_cloud}
-      POSTGRES_USER: ${CLOUD_DB_USER:-groundwork}
-      POSTGRES_PASSWORD: ${CLOUD_DB_PASSWORD:-groundwork_secret}
-    volumes:
-      - cloud_pgdata:/var/lib/postgresql/data
-    ports:
-      - "${CLOUD_DB_PORT:-5433}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CLOUD_DB_USER:-groundwork}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - groundwork-net
-    restart: unless-stopped
-
-  # 5. Cloud Sync Backend API (port 8080)
-  cloud-api:
+  # 4. Backend: accounts, authentication and metadata sync (port 8080)
+  backend:
     build:
-      context: ./cloud
+      context: ./server
       dockerfile: Dockerfile
-    container_name: groundwork-cloud-api
+    container_name: groundwork-backend
     depends_on:
-      cloud-db:
+      database:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${CLOUD_DB_USER:-groundwork}:${CLOUD_DB_PASSWORD:-groundwork_secret}@cloud-db:5432/${CLOUD_DB_NAME:-groundwork_cloud}
       PORT: 8080
-      JWT_SECRET: ${JWT_SECRET:-groundwork-cloud-secret-key-min-32-chars-long}
+      GROUNDWORK_RUNTIME: hosted
+      ENVIRONMENT: development
+      DATABASE_URL: ${BACKEND_DATABASE_URL:-postgresql+psycopg2://groundwork:groundwork_dev@database:5432/groundwork}
+      JWT_SECRET: ${BACKEND_JWT_SECRET:-dev-docker-jwt-secret-groundwork-2026}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5174,http://localhost:3000,http://localhost:1420,tauri://localhost,http://tauri.localhost}
     ports:
       - "8080:8080"
     healthcheck:
@@ -116,8 +101,31 @@ services:
       - groundwork-net
     restart: unless-stopped
 
+  # 5. Developer PostgreSQL database; SQLite remains inside local-engine.
+  database:
+    image: postgres:16-alpine
+    container_name: groundwork-database
+    environment:
+      POSTGRES_USER: groundwork
+      POSTGRES_PASSWORD: groundwork_dev
+      POSTGRES_DB: groundwork
+    ports:
+      - "127.0.0.1:${DATABASE_PORT:-5433}:5432"
+    volumes:
+      - backend_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U groundwork -d groundwork"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - groundwork-net
+    restart: unless-stopped
+
 volumes:
   local_data:
+  backend_pgdata:
+  # Preserve the previous database volume without reusing its old configuration.
   cloud_pgdata:
 
 networks:

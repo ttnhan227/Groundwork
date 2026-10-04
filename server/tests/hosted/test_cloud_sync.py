@@ -2,13 +2,13 @@
 
 import tempfile
 from pathlib import Path
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core import config
-from app.core.database import Base, get_db
-from app.main import app
+from app.hosted.core.database import Base, get_db
+from app.hosted.main import app
 
 
 def test_cloud_sync_full_flow():

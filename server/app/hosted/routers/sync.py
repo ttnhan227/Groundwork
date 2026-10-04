@@ -15,9 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.models.entities import CloudNote, CloudSavedSearch, CloudSetting, CloudTombstone, SyncReceipt, User
-from app.routers.auth import get_current_user
+from app.hosted.core.database import get_db
+from app.hosted.models.entities import CloudNote, CloudSavedSearch, CloudSetting, CloudTombstone, SyncReceipt, User
+from app.hosted.routers.auth import get_current_user
 
 sync_router = APIRouter(prefix="/sync", tags=["Sync"])
 
