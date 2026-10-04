@@ -9,6 +9,7 @@ Groundwork remains a working preview. No release was published during this repai
 - Packaging now uses clean, isolated build state after stale cached Python code was found during installer verification.
 - Stable release publication requires a trusted Windows signature; preview builds remain available without a certificate.
 - Backend suite: 74 passed. Onboarding/account recovery browser checks passed. Frozen-core checks passed for search, file changes, Git history, persistence, and provider errors. Scale checks covered 1,101 files and interrupted indexing.
+- The rebuilt Windows installer passed silent installation, native startup, search, investigations, notes, restart/persistence, and live Cloud Run email login/metadata sync. This installer was used for verification and was not published.
 
 ## Requires your account, device, or decision
 
