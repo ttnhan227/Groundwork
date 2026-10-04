@@ -102,7 +102,11 @@ async function close() {
     await page.getByRole('button',{name:'Investigate',exact:true}).click();
     const savedInvestigation=await (await investigationResponse).json();
     assert.ok(savedInvestigation.session_id);
-    assert.ok(savedInvestigation.inspected_files.includes(path.join(workspace,'sample.ts')));
+    const expectedFile=fs.statSync(path.join(workspace,'sample.ts'),{bigint:true});
+    assert.ok(savedInvestigation.inspected_files.some(file=>{
+      const actualFile=fs.statSync(file,{bigint:true});
+      return actualFile.dev===expectedFile.dev && actualFile.ino===expectedFile.ino;
+    }),'Investigation did not inspect the actual source file');
     await page.getByRole('button',{name:'Resume Work',exact:true}).click();
     await page.getByRole('button',{name:'Continue',exact:true}).click();
     await expect(page.getByPlaceholder('Ask an investigation question about your workspace or codebase...')).toHaveValue(/Continue Investigation/);
