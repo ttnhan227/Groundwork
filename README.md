@@ -1,8 +1,29 @@
 # Groundwork
 
+<p align="center">
+  <img src="client/public/logo-mark.png" alt="Groundwork logo" width="88" height="88" />
+</p>
+
+<p align="center">
+  <strong>Local workspace search, Git history, notes &amp; AI context</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ttnhan227/Groundwork/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ttnhan227/Groundwork/ci.yml?branch=main&amp;label=CI&amp;style=flat-square" alt="CI status" /></a>
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.12" />
+  <img src="https://img.shields.io/badge/Node.js-22%2B-339933?style=flat-square&amp;logo=nodedotjs&amp;logoColor=white" alt="Node.js 22 or newer" />
+  <img src="https://img.shields.io/badge/Local_database-SQLite-003B57?style=flat-square&amp;logo=sqlite&amp;logoColor=white" alt="SQLite local database" />
+</p>
+
+---
+
+## 📌 Overview
+
 Groundwork is a desktop app for searching project folders, exploring Git history, and collecting notes and AI context. SQLite stores your local workspace data. An optional backend handles accounts and sync.
 
-## Use the app
+---
+
+## 📥 Use the app
 
 Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases) and run the `.exe`. Open Groundwork, sign in or choose **Continue locally**, then select **Add your first folder** on Home. Choose a folder and start searching as its files become ready.
 
@@ -10,7 +31,9 @@ Download the Windows installer from [GitHub Releases](https://github.com/ttnhan2
 
 The installer includes the local engine, Python runtime, Git, and a search embedding model. You do not need Docker, Python, Node.js, or PostgreSQL installed separately. Local indexing and search work without an account or internet connection. Remote AI generation needs your own provider key and internet access; Ollama needs a separately installed local model.
 
-## Quick developer setup: Docker
+---
+
+## 🚀 Quick developer setup: Docker
 
 Install Git and Docker with Compose. On Windows, start Docker Desktop, then run:
 
@@ -60,7 +83,9 @@ Adding `-v` to the shutdown command deletes the stack's database volumes. Use th
 
 If a port is occupied, stop the other process or change `APP_PORT` for the browser app and `DATABASE_PORT` for PostgreSQL. Their defaults are 5174 and 5433.
 
-## Optional configuration
+---
+
+## ⚙️ Optional configuration
 
 For a fresh checkout, copy `.env.example` to `.env` in the repository root only if you need custom settings. Keep an existing `.env` rather than overwriting it. The file is ignored by Git.
 
@@ -83,13 +108,17 @@ postgresql+psycopg2://groundwork:groundwork_dev@localhost:5433/groundwork
 
 Configure AI providers and your keys in the app's settings. The `local` provider displays retrieved excerpts; it does not generate language-model responses. OpenAI and Gemini receive your question, selected excerpts, and cited paths when used. Local indexing does not call those providers.
 
-## Optional Google sign-in
+---
+
+## 🔐 Optional Google sign-in
 
 Use **Sign in with Google** in the welcome window, or open **Account → Sign in** later. Complete sign-in in your normal browser, then return to Groundwork. To connect Google to an existing password account, sign in with your password first and open **Account → Sign-in options → Connect Google**.
 
 For a self-hosted backend, set `GOOGLE_CLIENT_ID` and add that backend's origin to the client's authorized JavaScript origins in Google Console. The desktop handoff expires after five minutes. It uses only basic Google identity information; no Google client secret is stored in the app. Google sign-in is optional and does not affect offline features.
 
-## Develop without Docker
+---
+
+## 💻 Develop without Docker
 
 Install Python 3.12, Node.js 22 or newer, and Git. Local app development uses SQLite and does not need PostgreSQL.
 
@@ -129,7 +158,9 @@ npm run tauri -- dev
 
 Tauri starts the local engine for you. Stop any separately running local engine first.
 
-## Build a Windows installer
+---
+
+## 📦 Build a Windows installer
 
 With the native development prerequisites installed, run from the repository root:
 
@@ -142,7 +173,9 @@ python scripts/smoke-core.py
 
 The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It bundles the local engine, Python, Git, and search model. Installed builds ignore development `.env` files. Startup diagnostics are written to `local-core.log` in the app's data directory.
 
-## Publish a desktop release
+---
+
+## 🔄 Publish a desktop release
 
 Set the GitHub Repository Variable **DESKTOP_API_BASE_URL** to your hosted backend's HTTPS address before building Windows installers in Actions. Both CI and release builds bundle this value into the local engine. A missing or invalid value fails the build. Google sign-in's client ID stays in the hosted backend's `GOOGLE_CLIENT_ID`; it is not a desktop build variable.
 
@@ -167,7 +200,9 @@ The website automatically reads the newest published version, including previews
 
 See [release automation](docs/RELEASE_AUTOMATION.md) for details.
 
-## Checks and project layout
+---
+
+## 🧪 Checks and project layout
 
 After installing Python and npm dependencies, run from the repository root:
 
