@@ -422,6 +422,8 @@ class InventoryService:
         clauses = [scope]
         args: List[Any] = list(scope_args)
         if parent is not None:
+            # Workspace registration stores resolved paths, including Windows 8.3 aliases.
+            parent = str(Path(parent).resolve())
             if recursive:
                 prefix = parent.rstrip("\\/") + os.sep
                 clauses.append("substr(path,1,?) = ?")

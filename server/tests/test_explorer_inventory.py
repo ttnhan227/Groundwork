@@ -27,6 +27,9 @@ def test_recursive_scope_wildcards_folder_tree_and_global_pagination(tmp_path, m
         service.scan(second)
         branch = service.browse(first.id, str(root), kind="folder", limit=1)
         assert branch["total"] == 2 and len(branch["items"]) == 1
+        alias = service.browse(first.id, str(root / "Project" / ".."), kind="folder")
+        assert alias["total"] == 2 and len(alias["items"]) == 2
+        assert alias["parent_bytes"] == 170
         result = service.browse(first.id, str(root / "Project"), recursive=True, kind="file", query="*.ts")
         assert result["total"] == 1 and result["items"][0]["name"] == "main.TS"
         assert result["parent_bytes"] == 30
