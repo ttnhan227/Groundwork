@@ -117,7 +117,8 @@ def test_existing_uuid_user_ids_match_new_identity_foreign_key(monkeypatch):
         def has_table(self, name, schema=None):
             return name == 'users'
         def get_columns(self, name, schema=None):
-            return [{'name': 'id', 'type': Uuid()}]
+            table = next(table for table in main.Base.metadata.tables.values() if table.name == name)
+            return [{'name': column.name, 'type': Uuid() if column.name == 'id' else column.type} for column in table.columns]
     monkeypatch.setattr(main, 'inspect', lambda bind: ExistingDatabase())
     monkeypatch.setattr(main.Base.metadata, 'create_all', lambda **kwargs: None)
     original_types = [(column, column.type) for table in main.Base.metadata.tables.values() for column in table.columns]

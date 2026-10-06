@@ -104,8 +104,18 @@ jobs:
           name: windows-release-test-diagnostics
           path: desktop/test-results/
 
-  publish:
+  deploy-backend:
     needs: build-and-test
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      ref: ${{ inputs.tag || github.ref_name }}
+    secrets: inherit
+
+  publish:
+    needs: [build-and-test, deploy-backend]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -140,3 +150,22 @@ jobs:
             latest=$(python -c 'import json,os,re; old=json.load(open("latest-release.json"))["tag_name"]; new=os.environ["RELEASE_TAG"]; parse=lambda value:tuple(map(int,value[1:].split("."))); print("false" if re.fullmatch(r"v\d+\.\d+\.\d+",old) and parse(new)<parse(old) else "true")')
           fi
           gh release edit "$RELEASE_TAG" --draft=false --prerelease="$prerelease" --latest="$latest"
+
+  verify-website:
+    needs: publish
+    uses: ./.github/workflows/website.yml
+    secrets: inherit
+
+  verify-public-download:
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Verify publicly published installer and checksum
+        run: |
+          gh release download "$RELEASE_TAG" --pattern 'Groundwork-windows-x64-setup.exe*' --dir published
+          cd published
+          sha256sum --check Groundwork-windows-x64-setup.exe.sha256

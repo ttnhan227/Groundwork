@@ -163,3 +163,20 @@ jobs:
         with:
           name: groundwork-windows-installer
           path: desktop/src-tauri/target/release/bundle/
+
+  deploy-backend:
+    needs: [local-core, cloud-backend, desktop-client, web-portal, windows-installer]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_AUTOMATION_ENABLED == 'true'
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      ref: ${{ github.sha }}
+    secrets: inherit
+
+  deploy-website:
+    needs: [local-core, cloud-backend, desktop-client, web-portal, windows-installer]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_AUTOMATION_ENABLED == 'true'
+    uses: ./.github/workflows/website.yml
+    secrets: inherit

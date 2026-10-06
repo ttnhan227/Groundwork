@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Uuid, inspect
+from sqlalchemy import Uuid, inspect, text
+from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema
 
 from app.hosted.core.config import get_cloud_settings
-from app.hosted.core.database import Base, engine
+from app.hosted.core.database import Base, engine, get_db
 from app.hosted.routers.auth import auth_router
 from app.hosted.routers.devices import devices_router
 from app.hosted.routers.google_desktop import router as google_desktop_router
@@ -41,6 +43,14 @@ def initialize_schema(bind):
                     ):
                         column.type = Uuid(as_uuid=False)
     Base.metadata.create_all(bind=bind)
+    # create_all adds missing tables, but cannot migrate existing columns.
+    # Reject incompatible schemas before this revision can serve traffic.
+    inspector = inspect(bind)
+    for table in Base.metadata.tables.values():
+        actual = {column['name'] for column in inspector.get_columns(table.name, schema=schema)}
+        missing = set(table.columns.keys()) - actual
+        if missing:
+            raise RuntimeError(f"Hosted schema migration required for {table.name}: {sorted(missing)}")
 
 
 @asynccontextmanager
@@ -74,6 +84,15 @@ app.include_router(sync_router)
 @app.get("/health", tags=["System"])
 def health_check() -> dict[str, str]:
     return {"status": "healthy", "service": "groundwork-cloud-sync"}
+
+
+@app.get("/ready", tags=["System"])
+def readiness(db: Session = Depends(get_db)) -> dict[str, str]:
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable") from None
+    return {"status": "ready", "service": "groundwork-cloud-sync", "commit": os.getenv("GROUNDWORK_COMMIT", "local")}
 
 
 if __name__ == "__main__":

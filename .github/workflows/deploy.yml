@@ -1,37 +1,80 @@
 name: Deploy server
-
 on:
   workflow_dispatch:
-
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: production-cloud-backend
+  cancel-in-progress: false
 jobs:
   deploy-cloud:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Check deployment configuration
+        env:
+          WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          for name in WIF_PROVIDER WIF_SERVICE_ACCOUNT GCP_PROJECT_ID; do
+            test -n "${!name}" || { echo "Missing deployment configuration: $name"; exit 1; }
+          done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r server/requirements.txt pytest
+      - run: python -m pytest server/tests/hosted -q
+      - name: Identify source revision
+        id: source
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || { echo 'Deploy the current main commit; refusing a stale backend rollback.'; exit 1; }
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: google-github-actions/auth@v2
         with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Configure registry
         run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
       - uses: docker/build-push-action@v6
         with:
           context: ./server
           push: true
-          tags: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/api:${{ github.sha }}
-      - uses: google-github-actions/deploy-cloudrun@v2
+          tags: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/cloud-run-source-deploy/groundwork-api:${{ steps.source.outputs.sha }}
+      - name: Deploy candidate without production traffic
+        uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: groundwork-api
           region: asia-southeast1
-          image: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/groundwork/api:${{ github.sha }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          image: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/cloud-run-source-deploy/groundwork-api:${{ steps.source.outputs.sha }}
+          flags: --no-traffic --tag verify-${{ github.run_id }}
+          env_vars_update_strategy: merge
           env_vars: |
+            GROUNDWORK_COMMIT=${{ steps.source.outputs.sha }}
             ENVIRONMENT=production
             GROUNDWORK_RUNTIME=hosted
-            CORS_ORIGINS=https://groundwork-client.onrender.com
-            ACCESS_TOKEN_MINUTES=15
-          secrets: |
-            DATABASE_URL=groundwork-cloud-database-url:latest
-            JWT_SECRET=groundwork-cloud-jwt-secret:latest
+      - name: Verify candidate database and exact revision
+        env:
+          EXPECTED_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          gcloud run services describe groundwork-api --region asia-southeast1 --project '${{ vars.GCP_PROJECT_ID }}' --format=json > service.json
+          candidate=$(jq -r --arg tag "verify-$GITHUB_RUN_ID" '.status.traffic[] | select(.tag == $tag) | .url' service.json)
+          test -n "$candidate"
+          python scripts/verify-deployment.py "$candidate/ready" "$EXPECTED_SHA"
+      - name: Promote verified revision
+        run: gcloud run services update-traffic groundwork-api --region asia-southeast1 --project '${{ vars.GCP_PROJECT_ID }}' --to-tags verify-${{ github.run_id }}=100 --quiet
+      - name: Verify production backend
+        run: python scripts/verify-deployment.py '${{ vars.DESKTOP_API_BASE_URL || 'https://groundwork-api-597984371188.asia-southeast1.run.app' }}/ready' '${{ steps.source.outputs.sha }}'
