@@ -20,7 +20,7 @@ import pytest
 
 from app.core import config
 from app.database.local_db import LocalDatabase, reset_db
-from app.models.types import SearchMode, WorkspaceCreate
+from app.models.types import AIQueryRequest, SearchMode, WorkspaceCreate
 from app.services.ai.context_engine import AIContextEngine
 from app.services.ai.tools import AIToolManager
 from app.services.git_service import GitService
@@ -133,7 +133,7 @@ def test_ai_citations_point_to_real_lines(audit_db):
     indexer.index_workspace(ws.id)
 
     engine = AIContextEngine()
-    resp = engine.answer_with_context("How is path traversal defended?", workspace_id=ws.id)
+    resp = engine.query(AIQueryRequest(question="How is path traversal defended?", workspace_id=ws.id, file_paths=[str(target_dir / "security.py")]))
 
     assert len(resp.citations) > 0
     citation = resp.citations[0]

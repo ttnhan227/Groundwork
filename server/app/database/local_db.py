@@ -16,6 +16,7 @@ from typing import Generator
 from app.core.config import get_settings
 
 logger = logging.getLogger("groundwork.db")
+SCHEMA_VERSION = 1
 
 
 class LocalDatabase:
@@ -65,6 +66,21 @@ class LocalDatabase:
         """Initializes tables, indexes, and FTS5 virtual tables."""
         with self._lock:
             conn = self.get_connection()
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            if version > SCHEMA_VERSION:
+                raise RuntimeError("This data was created by a newer Groundwork version. Update Groundwork before opening it.")
+            if version < SCHEMA_VERSION and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' LIMIT 1").fetchone():
+                # SQLite's backup API includes committed WAL data. Preserve the
+                # pre-upgrade state before any schema changes, once per version.
+                backup_path = self.db_path.with_name(f"{self.db_path.name}.schema-v{version}.bak")
+                if not backup_path.exists():
+                    temporary = backup_path.with_suffix(backup_path.suffix + ".tmp")
+                    destination = sqlite3.connect(str(temporary))
+                    try:
+                        conn.backup(destination)
+                    finally:
+                        destination.close()
+                    temporary.replace(backup_path)
             with conn:
                 # 1. Workspaces
                 conn.execute("""
@@ -78,6 +94,51 @@ class LocalDatabase:
                     updated_at TEXT NOT NULL
                 );
                 """)
+
+                conn.execute("""CREATE TABLE IF NOT EXISTS inventory (
+                    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                    path TEXT NOT NULL, parent TEXT NOT NULL, name TEXT NOT NULL,
+                    kind TEXT NOT NULL, extension TEXT NOT NULL, size_bytes INTEGER NOT NULL,
+                    mtime REAL NOT NULL, scan_id TEXT NOT NULL, file_count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(workspace_id,path))""")
+                try:
+                    conn.execute("ALTER TABLE inventory ADD COLUMN file_count INTEGER NOT NULL DEFAULT 0")
+                except sqlite3.OperationalError:
+                    pass
+                conn.execute("CREATE INDEX IF NOT EXISTS inventory_parent ON inventory(workspace_id,parent)")
+                conn.execute("CREATE INDEX IF NOT EXISTS inventory_parent_kind ON inventory(workspace_id,parent,kind)")
+                conn.execute("CREATE INDEX IF NOT EXISTS inventory_path_membership ON inventory(path COLLATE NOCASE,workspace_id)")
+                from app.core.file_categories import backfill_categories
+                try:
+                    conn.execute("ALTER TABLE inventory ADD COLUMN category TEXT NOT NULL DEFAULT 'other'")
+                    backfill_categories(conn)
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column" not in str(exc).lower():
+                        raise
+                conn.execute("CREATE INDEX IF NOT EXISTS inventory_ws_category ON inventory(workspace_id,category,kind,name COLLATE NOCASE,path)")
+                conn.execute("""CREATE TABLE IF NOT EXISTS inventory_categories (
+                    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                    category TEXT NOT NULL, file_count INTEGER NOT NULL, size_bytes INTEGER NOT NULL,
+                    PRIMARY KEY(workspace_id,category))""")
+                # One-time cache backfill for existing inventories, not browse polling.
+                conn.execute("""INSERT OR IGNORE INTO inventory_categories
+                    SELECT workspace_id, category, count(*), coalesce(sum(size_bytes),0)
+                    FROM inventory WHERE kind='file' AND workspace_id NOT IN
+                    (SELECT workspace_id FROM inventory_categories) GROUP BY workspace_id,category""")
+                conn.execute("CREATE INDEX IF NOT EXISTS inventory_ws_kind ON inventory(workspace_id,kind)")
+                conn.execute("CREATE INDEX IF NOT EXISTS inventory_ws_name ON inventory(workspace_id,name COLLATE NOCASE)")
+                conn.execute("DROP TRIGGER IF EXISTS inventory_insert_total")
+                conn.execute("DROP TRIGGER IF EXISTS inventory_delete_total")
+                conn.execute("DROP TRIGGER IF EXISTS inventory_update_total")
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS inventory_scans (workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE, status TEXT NOT NULL, errors TEXT NOT NULL, updated_at REAL NOT NULL)"
+                )
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS inventory_totals (workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE, files INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0)"
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO inventory_totals SELECT workspace_id, sum(kind='file'), sum(CASE WHEN kind='file' THEN size_bytes ELSE 0 END) FROM inventory GROUP BY workspace_id"
+                )
 
                 # 2. Projects
                 conn.execute("""
@@ -279,6 +340,47 @@ class LocalDatabase:
                 );
                 """)
 
+                # 14. Organization Rules and History Tracking
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS organization_rules (
+                    id TEXT PRIMARY KEY,
+                    folder_path TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    rule_type TEXT NOT NULL,
+                    instruction TEXT DEFAULT '',
+                    categories_json TEXT DEFAULT '[]',
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_org_rules_folder ON organization_rules(folder_path);")
+
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS organization_processed_files (
+                    rule_id TEXT NOT NULL REFERENCES organization_rules(id) ON DELETE CASCADE,
+                    source_path TEXT NOT NULL,
+                    sha256 TEXT NOT NULL,
+                    mtime_ns INTEGER NOT NULL,
+                    size INTEGER NOT NULL,
+                    processed_at REAL NOT NULL,
+                    PRIMARY KEY(rule_id, source_path)
+                );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_org_processed_rule ON organization_processed_files(rule_id);")
+
+                # 15. Transparent Local Preferences for Organization
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS organization_preferences (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    categories_json TEXT NOT NULL DEFAULT '[]',
+                    instructions TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                """)
+                conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
     def close(self) -> None:
         """Closes all open database connections."""
         with self._lock:
@@ -293,22 +395,25 @@ class LocalDatabase:
 
 
 _db_instance: LocalDatabase | None = None
+_instance_lock = threading.RLock()
 
 
 def get_db(db_path: Path | None = None) -> LocalDatabase:
     """Singleton getter for the local database manager."""
     global _db_instance
     target = db_path or get_settings().get_database_path()
-    if _db_instance is None or _db_instance.db_path != target:
-        if _db_instance:
-            _db_instance.close()
-        _db_instance = LocalDatabase(target)
-    return _db_instance
+    with _instance_lock:
+        if _db_instance is None or _db_instance.db_path != target:
+            if _db_instance:
+                _db_instance.close()
+            _db_instance = LocalDatabase(target)
+        return _db_instance
 
 
 def reset_db() -> None:
     """Resets the singleton database instance and closes open connections."""
     global _db_instance
-    if _db_instance is not None:
-        _db_instance.close()
-        _db_instance = None
+    with _instance_lock:
+        if _db_instance is not None:
+            _db_instance.close()
+            _db_instance = None

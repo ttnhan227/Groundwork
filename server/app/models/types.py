@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class ActivityType(str, Enum):
+    INDEXING_RUN = "indexing_run"
     FILE_MODIFIED = "file_modified"
     FILE_CREATED = "file_created"
     FILE_DELETED = "file_deleted"
@@ -113,9 +114,11 @@ class SearchResponse(BaseModel):
 # --- Indexer DTOs ---
 
 class IndexProgress(BaseModel):
+    phase: str = "scanning"
     run_id: str | None = None
     status: IndexStatus = IndexStatus.IDLE
     current_workspace: str | None = None
+    files_inventoried: int = 0
     files_discovered: int = 0
     files_indexed: int = 0
     files_skipped: int = 0

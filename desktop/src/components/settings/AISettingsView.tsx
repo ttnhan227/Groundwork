@@ -2,8 +2,15 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Check, KeyRound } from "lucide-react";
 import { api } from "../../services/api";
 import { Button, Card } from "../ui";
+import { LocalAISetup } from "../assistant/LocalAISetup";
 
 const choices = [
+  {
+    id: "builtin",
+    title: "Built-in AI",
+    detail:
+      "Write answers on this computer after a one-time download. No separate app or account required.",
+  },
   {
     id: "local",
     title: "Find matching passages",
@@ -58,7 +65,7 @@ export function AISettingsView({ onBack }: { onBack: () => void }) {
   }, []);
   const cloud = ["openai", "gemini"].includes(choice);
   return (
-    <div className="gw-page max-w-3xl">
+    <div className="gw-page max-w-3xl" style={{ alignSelf: "flex-start" }}>
       <Button variant="ghost" onClick={onBack} className="self-start">
         <ArrowLeft size={17} />
         Back to Ask your files
@@ -74,6 +81,7 @@ export function AISettingsView({ onBack }: { onBack: () => void }) {
           {message}
         </p>
       )}
+      <LocalAISetup />
       <form
         className="space-y-5"
         onSubmit={async (event) => {
@@ -101,32 +109,72 @@ export function AISettingsView({ onBack }: { onBack: () => void }) {
       >
         <fieldset className="space-y-3" disabled={!ready || busy}>
           <legend className="sr-only">Answer service</legend>
-          {choices.map((item) => (
-            <label
-              key={item.id}
-              className={`flex gap-3 items-start p-5 rounded-xl border cursor-pointer ${choice === item.id ? "border-[var(--ink-blue)] bg-[var(--ink-blue-subtle)]" : "border-[var(--hairline)] bg-[var(--surface)]"}`}
-            >
-              <input
-                type="radio"
-                name="answer-service"
-                aria-label={item.title}
-                className="mt-1"
-                value={item.id}
-                checked={choice === item.id}
-                onChange={() => {
-                  setChoice(item.id);
-                  setKey("");
-                  setModel("");
-                }}
-              />
-              <span>
-                <span className="block font-semibold mb-1">{item.title}</span>
-                <span className="text-sm text-[var(--ink-secondary)]">
-                  {item.detail}
+          {choices
+            .filter((item) => ["local", "builtin"].includes(item.id))
+            .map((item) => (
+              <label
+                key={item.id}
+                className={`flex gap-3 items-start p-5 rounded-xl border cursor-pointer ${choice === item.id ? "border-[var(--ink-blue)] bg-[var(--ink-blue-subtle)]" : "border-[var(--hairline)] bg-[var(--surface)]"}`}
+              >
+                <input
+                  type="radio"
+                  name="answer-service"
+                  aria-label={item.title}
+                  className="mt-1"
+                  value={item.id}
+                  checked={choice === item.id}
+                  onChange={() => {
+                    setChoice(item.id);
+                    setKey("");
+                    setModel("");
+                  }}
+                />
+                <span>
+                  <span className="block font-semibold mb-1">{item.title}</span>
+                  <span className="text-sm text-[var(--ink-secondary)]">
+                    {item.detail}
+                  </span>
                 </span>
-              </span>
-            </label>
-          ))}
+              </label>
+            ))}
+          <details>
+            <summary className="cursor-pointer text-sm">
+              Advanced: other AI services
+            </summary>
+            <div className="space-y-3 mt-3">
+              {" "}
+              {choices
+                .filter((item) => !["local", "builtin"].includes(item.id))
+                .map((item) => (
+                  <label
+                    key={item.id}
+                    className={`flex gap-3 items-start p-5 rounded-xl border cursor-pointer ${choice === item.id ? "border-[var(--ink-blue)] bg-[var(--ink-blue-subtle)]" : "border-[var(--hairline)] bg-[var(--surface)]"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="answer-service"
+                      aria-label={item.title}
+                      className="mt-1"
+                      value={item.id}
+                      checked={choice === item.id}
+                      onChange={() => {
+                        setChoice(item.id);
+                        setKey("");
+                        setModel("");
+                      }}
+                    />
+                    <span>
+                      <span className="block font-semibold mb-1">
+                        {item.title}
+                      </span>
+                      <span className="text-sm text-[var(--ink-secondary)]">
+                        {item.detail}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+            </div>
+          </details>
         </fieldset>
         {cloud && (
           <Card className="space-y-4">
@@ -162,7 +210,7 @@ export function AISettingsView({ onBack }: { onBack: () => void }) {
             </p>
           </Card>
         )}
-        {choice !== "local" && (
+        {!["local", "builtin"].includes(choice) && (
           <details className="p-4 border border-[var(--hairline)] rounded-lg">
             <summary className="cursor-pointer text-sm">
               Advanced: model choice

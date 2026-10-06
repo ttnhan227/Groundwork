@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, Plus, Trash2 } from "lucide-react";
+import { FolderOpen, Plus, Trash2, Copy } from "lucide-react";
+import { StorageInsightsModal } from "./StorageInsightsModal";
 import { isTauri } from "@tauri-apps/api/core";
 import { api } from "../../services/api";
 import type { Workspace } from "../../types/api";
+import { FileBrowser } from "./FileBrowser";
 import { Button, Card, Modal } from "../ui";
 
 export function AddFolderDialog({
@@ -119,12 +121,14 @@ export function AddFolderDialog({
 }
 
 export function FoldersView() {
+  const [browsing, setBrowsing] = useState<Workspace | null>(null);
   const [folders, setFolders] = useState<Workspace[]>([]);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Workspace | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [storageInsights, setStorageInsights] = useState<{ workspaceId?: string; workspaceName?: string } | null>(null);
   const load = () =>
     api
       .listWorkspaces()
@@ -143,10 +147,23 @@ export function FoldersView() {
             Choose where Groundwork looks for your files.
           </p>
         </div>
-        <Button variant="primary" size="lg" onClick={() => setAdding(true)}>
-          <Plus size={18} />
-          Add folder
-        </Button>
+        <div className="flex items-center gap-2">
+          {folders.length > 0 && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setStorageInsights({})}
+              title="Inspect duplicate files and reclaim storage"
+            >
+              <Copy size={18} />
+              Storage insights
+            </Button>
+          )}
+          <Button variant="primary" size="lg" onClick={() => setAdding(true)}>
+            <Plus size={18} />
+            Add folder
+          </Button>
+        </div>
       </div>
       {message && (
         <p role="status" className="gw-notice">
@@ -158,17 +175,39 @@ export function FoldersView() {
       ) : folders.length ? (
         <div className="space-y-3">
           {folders.map((folder) => (
-            <Card key={folder.id} className="flex items-center gap-4">
+            <Card key={folder.id} className="flex flex-wrap items-center gap-4">
               <FolderOpen
                 className="text-[var(--ink-blue)] shrink-0"
                 size={24}
               />
-              <div className="flex-1 min-w-0">
+              <div className="w-full sm:w-auto sm:flex-1 min-w-0">
                 <h2 className="font-semibold">{folder.name}</h2>
                 <p className="text-sm text-[var(--ink-secondary)] break-all mt-1">
                   {folder.path}
                 </p>
               </div>
+              <Button onClick={() => setBrowsing(folder)}>Browse files</Button>
+              <Button
+                variant="ghost"
+                onClick={() => setStorageInsights({ workspaceId: folder.id, workspaceName: folder.name })}
+                title={`Storage insights for ${folder.name}`}
+              >
+                <Copy size={16} />
+                <span className="hidden sm:inline">Duplicates</span>
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    const result = await api.openFolder(folder.path);
+                    if (!result.success)
+                      setMessage("Couldn't open this folder.");
+                  } catch {
+                    setMessage("Couldn't open this folder.");
+                  }
+                }}
+              >
+                Open folder
+              </Button>
               <Button
                 variant="ghost"
                 aria-label={`Remove ${folder.name}`}
@@ -197,6 +236,7 @@ export function FoldersView() {
         Files are prepared for search in the background. Changes are picked up
         automatically while Groundwork is open.
       </p>
+      {browsing && <FileBrowser key={browsing.id} folder={browsing} />}
       {adding && (
         <AddFolderDialog
           onClose={() => setAdding(false)}
@@ -207,6 +247,13 @@ export function FoldersView() {
             );
             void load();
           }}
+        />
+      )}
+      {storageInsights && (
+        <StorageInsightsModal
+          workspaceId={storageInsights.workspaceId}
+          workspaceName={storageInsights.workspaceName}
+          onClose={() => setStorageInsights(null)}
         />
       )}
       {removing && (

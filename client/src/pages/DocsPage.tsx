@@ -23,7 +23,7 @@ const guides: Record<
       ],
       [
         "Find something",
-        "Click Search files or press Ctrl + Space. Type a filename or a phrase you remember. Files become searchable as Groundwork prepares them.",
+        "Click Find files or press Ctrl + Space. Filename search becomes available as files are discovered. Content search is a separate option for supported readable formats after preparation finishes.",
       ],
       [
         "Make yourself at home",
@@ -38,7 +38,7 @@ const guides: Record<
     steps: [
       [
         "Search by name or content",
-        "Click Search files. Try part of a filename, a phrase from a document, or a function name from code. You can narrow results to a project or file type.",
+        "Start with part of a filename or path. Switch to content search for a phrase in a supported readable file. A format icon identifies the file type; it does not mean Groundwork can read its contents.",
       ],
       [
         "Open a result",
@@ -50,7 +50,7 @@ const guides: Record<
       ],
       [
         "If a file is missing",
-        "Wait for files to finish preparing. Check that its folder is included. If needed, open Settings → Troubleshooting → Refresh all files.",
+        "Check that its folder is included and review any scan errors. You can browse discovered files while preparation continues. If needed, open Settings → Troubleshooting → Refresh all files.",
       ],
     ],
   },
@@ -65,16 +65,26 @@ const guides: Record<
       ],
       [
         "Choose written answers",
-        "Open Ask your files → Set up answers. Choose Ollama for a model running on your computer, or OpenAI or Google Gemini with your own API key. Online providers require internet and may charge for usage.",
+        "In the development version, Assistant offers built-in local answers through llama.cpp. Download a model in the app or import a compatible GGUF file. External providers remain optional; online providers require internet and may charge for usage. Check the downloaded release's changelog for available features.",
       ],
       [
         "Know what gets shared",
-        "Online AI receives your question and relevant file excerpts when you ask. Your search index and API key stay on your computer. Ollama requires a local installation and downloaded model.",
+        "Online AI receives your question and selected supported file excerpts when you choose that provider. Local answers stay on this computer. Excerpts cover only part of a long document; review coverage notices and original files before relying on an answer.",
       ],
       [
         "Check the sources",
         "Use the source links to review the files behind an answer. Save useful findings as notes or saved work so you can return to them.",
       ],
+    ],
+  },
+  organize: {
+    title: "Preview file organization",
+    intro: "Available in the development version. Scanning never moves or renames your files. Check release notes for installer availability.",
+    steps: [
+      ["Choose files and a method", "Select files in Files, then open Organize. Group by file type or last modified date without AI. Content suggestions use supported excerpts and require a local model or your configured provider."],
+      ["Review the proposed changes", "Choose a destination inside an added folder. Preview changes shows current and proposed locations. Edit suggestions, exclude files, or leave them unchanged when evidence is insufficient. The preview creates no folders or links."],
+      ["Apply the reviewed plan", "Apply changes approves the exact displayed plan. Groundwork rechecks files and destinations and never silently overwrites a file. Cancel stops remaining work; already completed changes remain in history."],
+      ["Check results or undo", "Change history reports completed, skipped, and failed files. Review undo to restore original locations where possible. Changed files, occupied destinations, and interrupted copies require review."],
     ],
   },
   sync: {

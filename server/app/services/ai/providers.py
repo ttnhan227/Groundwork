@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
 
@@ -19,6 +20,19 @@ class LLMProvider(ABC):
     def generate(self, prompt: str, system_prompt: str = "") -> str:
         """Generates a text completion given prompt and system instructions."""
         pass
+
+    def generate_structured(self, prompt: str, system_prompt: str, schema: dict) -> str:
+        return self.generate(prompt, system_prompt)
+
+
+class BuiltinProvider(LLMProvider):
+    def generate(self, prompt: str, system_prompt: str = "") -> str:
+        from app.services.local_ai_service import LocalAIService
+        return LocalAIService.instance().generate(prompt, system_prompt)
+
+    def generate_structured(self, prompt: str, system_prompt: str, schema: dict) -> str:
+        from app.services.local_ai_service import LocalAIService
+        return LocalAIService.instance().generate(prompt, system_prompt, schema=schema)
 
 
 class OllamaProvider(LLMProvider):
@@ -145,6 +159,15 @@ class OfflineProvider(LLMProvider):
         in_code_block = False
 
         for line in lines:
+            if line.startswith('{"filename":'):
+                try:
+                    document = json.loads(line)
+                    text = document["untrusted_document_text"]
+                    source = f"File [{document['filename']}:{document['start_line']}]"
+                    evidence_snippets.extend((source, value.strip()) for value in text.splitlines() if value.strip())
+                    continue
+                except (ValueError, KeyError, TypeError, AttributeError):
+                    pass
             if line.startswith("Project metadata from local tools:") or line.startswith("Saved investigation context ("):
                 current_source = line.rstrip(":")
                 continue
@@ -161,9 +184,9 @@ class OfflineProvider(LLMProvider):
             return "No matching workspace evidence was found. Try a file name, symbol, or more specific search. Local mode shows retrieved excerpts; it does not run a language model."
 
         response_parts = [
-            "### Local workspace excerpts",
+            "### Selected file excerpts",
             "",
-            "These excerpts match your search. Local mode does not infer an answer or verify a diagnosis:",
+            "These passages come from the files you selected. Local mode shows excerpts and does not generate an answer:",
             "",
         ]
 
@@ -178,7 +201,7 @@ class OfflineProvider(LLMProvider):
 
         response_parts.append("")
         response_parts.append(
-            "*Note: This answer was assembled locally using Groundwork's hybrid retrieval engine without sending code to the cloud.*"
+            "*These passages were processed on this computer.*"
         )
         return "\n".join(response_parts)
 
@@ -187,6 +210,9 @@ def get_llm_provider(provider_name: str | None = None) -> LLMProvider:
     """Factory function returning the active LLMProvider instance."""
     settings = get_settings()
     p_name = (provider_name or settings.ai_provider).lower()
+
+    if p_name == "builtin":
+        return BuiltinProvider()
 
     if p_name == "ollama":
         return OllamaProvider()

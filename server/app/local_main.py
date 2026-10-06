@@ -63,6 +63,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     logger.info("Shutting down Groundwork Local...")
     watcher.stop()
+    from app.services.local_ai_service import LocalAIService
+    if LocalAIService._instance:
+        LocalAIService._instance.close()
     IndexerService.get_instance().cancel_indexing()
     IndexerService.get_instance().wait_for_completion()
 

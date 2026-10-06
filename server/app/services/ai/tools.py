@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -55,7 +56,7 @@ class AIToolManager:
             {
                 "name": "read_file",
                 "description": "Reads lines from a specific workspace file.",
-                "parameters": {"path": "string", "start_line": "integer (optional)", "end_line": "integer (optional)"},
+                "parameters": {"path": "string", "start_line": "integer (optional)", "end_line": "integer (optional)", "query": "string (optional)"},
                 "is_mutating": False,
             },
             {
@@ -171,7 +172,7 @@ class AIToolManager:
             return {"results": [r.model_dump() for r in res.results], "total": res.total_matches}
 
         elif tool_name == "read_file":
-            return self._read_file(args["path"], args.get("start_line"), args.get("end_line"))
+            return self._read_file(args["path"], args.get("start_line"), args.get("end_line"), args.get("query"))
 
         elif tool_name == "search_git":
             return {"commits": self.git_service.search_commits(args["query"], args.get("project_id"))}
@@ -202,7 +203,7 @@ class AIToolManager:
 
         return {"error": f"Unknown tool: '{tool_name}'"}
 
-    def _read_file(self, path_str: str, start_line: int | None = None, end_line: int | None = None) -> dict[str, Any]:
+    def _read_file(self, path_str: str, start_line: int | None = None, end_line: int | None = None, query: str | None = None) -> dict[str, Any]:
         allowed_roots = self.workspace_service.get_allowed_roots()
         try:
             valid_path = validate_workspace_path(path_str, allowed_roots)
@@ -216,12 +217,23 @@ class AIToolManager:
             if valid_path.stat().st_size > 5 * 1024 * 1024:
                 return {"error": "File exceeds reading limit"}
             from app.services.file_parser import FileParser
+            if not FileParser.is_supported(valid_path):
+                return {"error": "This format is listed in the inventory but cannot be read by AI"}
             parsed = FileParser.parse_file(valid_path)
             if parsed.is_binary or not parsed.content:
                 return {"error": "File has no readable text"}
             lines = parsed.content.splitlines()
             s = max(1, start_line or 1)
             e = min(len(lines), end_line or s + 199, s + 199)
+            if query and len(lines) > 40:
+                terms = set(re.findall(r"\w{3,}", query.lower()))
+                # Retrieve a bounded contiguous section, preserving real line
+                # numbers. Ties keep the earliest section; no semantic claim.
+                windows = [(offset, lines[offset:offset + 40]) for offset in range(0, len(lines), 40)]
+                offset, _ = max(windows, key=lambda window: sum(
+                    len(terms.intersection(re.findall(r"\w{3,}", line.lower()))) for line in window[1]
+                ))
+                s, e = offset + 1, min(len(lines), offset + 40)
 
             slice_lines = lines[s - 1:e]
             numbered = [f"{i}: {line}" for i, line in enumerate(slice_lines, start=s)]

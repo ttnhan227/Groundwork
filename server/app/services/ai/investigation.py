@@ -29,10 +29,8 @@ class InvestigationService:
             file_paths=req.files, focused_line=req.focused_line, session_id=req.session_id,
         ))
         inspected_files = list(dict.fromkeys(source.path for source in response.citations))
-        git_commits = self.context_engine.tools.execute_tool("search_git", {
-            "query": req.problem_statement, "project_id": req.project_id,
-        }).get("commits", [])[:5]
-        commit_hashes = [c["short_hash"] for c in git_commits]
+        git_commits = []
+        commit_hashes = []
         analysis = response.answer
 
         # 4. Create persistent context session so user can resume anytime!

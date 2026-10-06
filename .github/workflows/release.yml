@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 60
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL }}
+      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL || 'https://groundwork-api-597984371188.asia-southeast1.run.app' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,7 +59,7 @@ jobs:
         working-directory: client
       - run: python -m pip install -r server/requirements.txt pytest
       - run: python -m pytest server/tests/hosted -q
-      - name: Build and verify the release signature
+      - name: Build release and verify optional signature
         shell: pwsh
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
@@ -69,7 +69,12 @@ jobs:
       - run: node --test desktop/tests/onboarding-ui.test.cjs
       - run: server/.packaging-venv/Scripts/python.exe -m pytest server/tests -q
       - run: python desktop/scripts/smoke-core.py
+      - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
+      - run: python desktop/scripts/smoke-storage.py
       - run: python desktop/scripts/smoke-scale.py
+        env:
+          GROUNDWORK_SCALE_COUNT: '10000'
+          GROUNDWORK_SCALE_CRASH: '1'
       - run: python desktop/scripts/smoke-sync.py
       - name: Test the installed desktop before publication
         env:

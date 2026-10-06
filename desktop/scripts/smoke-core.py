@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory() as directory:
             for args in (["init"], ["config", "user.name", "Packaging Test"], ["config", "user.email", "packaging@example.com"], ["add", "."], ["commit", "-m", "Initialize packaging needle"]):
                 subprocess.run(["git", *args], cwd=workspace, check=True, capture_output=True)
             ws = request("/api/workspaces", {"name": "Packaging smoke", "path": str(workspace)})
-            request(f"/api/index/start?workspace_id={ws['id']}", {})
+            request(f"/api/index/start?workspace_id={ws['id']}", [])
             for attempt in range(80):
                 progress = request("/api/index/status")
                 if progress["status"] in {"completed", "failed"}:
@@ -100,12 +100,39 @@ with tempfile.TemporaryDirectory() as directory:
             assert answer["citations"] and "updated local evidence" in answer["citations"][0]["snippet"], answer
             assert answer["citations"][0]["line_end"] == 2, answer
             try:
-                request("/api/ai/query", {"question": "packaging_needle", "provider": "openai"})
+                request("/api/ai/query", {"question": "packaging_needle", "provider": "openai", "focused_path": str(sample)})
                 raise AssertionError("Provider without API key succeeded")
             except urllib.error.HTTPError as error:
                 assert error.code == 502
-            investigation = request("/api/ai/investigate", {"problem_statement": "packaging_needle", "provider": "local"})
+            investigation = request("/api/ai/investigate", {"problem_statement": "packaging_needle", "provider": "local", "files": [str(sample)]})
             assert investigation["session_id"] and investigation["citations"], investigation
+            def finished(job):
+                for _ in range(100):
+                    state = request('/api/ai/jobs/' + job['id'])
+                    if state['status'] != 'running':
+                        assert state['status'] == 'complete', state
+                        return state['result']
+                    time.sleep(.1)
+                raise AssertionError('Organization task did not finish')
+            stream = ':Zone.Identifier'
+            with open(str(sample) + stream, 'w') as metadata:
+                metadata.write('[ZoneTransfer]\nZoneId=3\n')
+            created = sample.stat().st_birthtime_ns
+            plan = finished(request('/api/ai/organization', {'action':'preview','destination':str(workspace),'items':[{'source':str(sample),'relative':'organized/sample.py'}]}))
+            try:
+                request('/api/ai/organization', {'action':'execute','plan_id':plan['id'],'approved':False})
+                raise AssertionError('Unapproved file move succeeded')
+            except urllib.error.HTTPError as error:
+                assert error.code == 400
+            assert finished(request('/api/ai/organization', {'action':'execute','plan_id':plan['id'],'approved':True}))['status'] == 'completed'
+            moved = workspace/'organized/sample.py'
+            assert not sample.exists() and moved.stat().st_birthtime_ns == created
+            with open(str(moved) + stream) as metadata:
+                assert 'ZoneId=3' in metadata.read()
+            assert finished(request('/api/ai/organization', {'action':'undo','plan_id':plan['id'],'approved':True}))['status'] == 'undone'
+            with open(str(sample) + stream) as metadata:
+                assert 'ZoneId=3' in metadata.read()
+            assert sample.stat().st_birthtime_ns == created
             action = {"tool_name": "create_note", "arguments": {"title": "Packaging review", "content": "Persisted evidence"}}
             proposal = request("/api/ai/tools/execute", action)
             assert proposal["requires_confirmation"] and not request("/api/notes"), proposal
@@ -126,7 +153,7 @@ with tempfile.TemporaryDirectory() as directory:
             assert request("/api/context-sessions")[0]["id"] == investigation["session_id"]
             request("/api/system/shutdown", {})
             assert process.wait(timeout=10) == 0
-            print("Frozen core with empty PATH: authenticated startup; index/search; watcher create/modify/rename/move/delete; bundled Git history/diff; AI citations/provider error; action confirmation; graceful shutdown/restart/persistence passed")
+            print("Frozen core with empty PATH: authenticated startup; index/search; watcher create/modify/rename/move/delete; bundled Git history/diff; AI citations/provider error; approved organization move/undo with NTFS streams and creation times; action confirmation; graceful shutdown/restart/persistence passed")
         finally:
             if process.poll() is None:
                 process.terminate()

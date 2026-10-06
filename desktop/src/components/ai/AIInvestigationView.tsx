@@ -24,6 +24,7 @@ import {
 } from "../ui";
 
 interface AIInvestigationViewProps {
+  onChooseFiles?: () => void;
   onConfigure?: () => void;
   selectedProjectId: string | null;
   initialQuestion?: string;
@@ -33,6 +34,7 @@ interface AIInvestigationViewProps {
 }
 
 export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
+  onChooseFiles,
   onConfigure,
   selectedProjectId,
   initialQuestion = "",
@@ -199,6 +201,21 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
     "Where should I start reading?",
   ];
 
+  if (!focusedPath)
+    return (
+      <div className="gw-page max-w-3xl">
+        <h1 className="gw-title">Ask about your files</h1>
+        <p className="gw-description">
+          Choose files first, then ask what you would like to know. Only
+          selected files are used for an answer.
+        </p>
+        <Button variant="primary" onClick={onChooseFiles}>
+          Choose files
+        </Button>
+        {onConfigure && <Button onClick={onConfigure}>AI settings</Button>}
+      </div>
+    );
+
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
       {/* Header */}
@@ -252,8 +269,8 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
       {providers.find((provider) => provider.id === selectedProvider)
         ?.is_local === false && (
         <p className="mb-3 text-xs text-[var(--ink-sepia)]">
-          This service receives your question and relevant file excerpts when
-          you ask. Choose matching passages to stay offline.
+          This service receives your question, selected file path, and readable
+          excerpts when you ask. Choose matching passages to stay offline.
         </p>
       )}
       <Card className="mb-6 border-[var(--hairline-strong)]">

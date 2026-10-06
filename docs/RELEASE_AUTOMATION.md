@@ -4,9 +4,9 @@ The release workflow is `.github/workflows/release.yml`. A version tag push such
 
 ## One-time activation
 
-Create the GitHub Repository Variable `DESKTOP_API_BASE_URL` with the HTTPS backend address. CI and release jobs pass it to the packaging script, which validates it and bundles a generated `desktop-config.json` in the installer. The production URL is not hardcoded in the local engine. `/api/v1` and trailing slashes are normalized to the backend root. Missing configuration fails packaging. Google OAuth remains configured on the hosted backend.
+CI and release jobs default to the owner-provided public backend, `https://groundwork-api-597984371188.asia-southeast1.run.app`. Set the GitHub Repository Variable `DESKTOP_API_BASE_URL` to override it. CI and release jobs pass it to the packaging script, which validates it and bundles a generated `desktop-config.json` in the installer. The production URL is not hardcoded in the local engine. `/api/v1` and trailing slashes are normalized to the backend root. Missing configuration fails packaging. Google OAuth remains configured on the hosted backend.
 
-Local installer builds can read `DESKTOP_API_BASE_URL` from the project-root `.env`; an explicit terminal value overrides it. GitHub Actions requires its configured variable and does not fall back to `.env`. The generated desktop configuration contains only the public backend address, never the rest of the environment file.
+Local installer builds can read `DESKTOP_API_BASE_URL` from the project-root `.env`; an explicit terminal value overrides it. GitHub Actions uses its repository variable or the public workflow default; it does not read the local `.env`. The generated desktop configuration contains only the public backend address, never the rest of the environment file.
 
 The repaired application and release workflow are pushed to `ttnhan227/Groundwork`. The updated website is deployed at https://groundwork-client.onrender.com/download. Render deployment `dep-db0qb1hsrm7s738o3bk0` successfully deployed commit `2c2ebbb` on 2026-10-04. The existing service is configured for automatic deployment after CI checks pass and a `/*` to `/index.html` rewrite; the direct download route returns HTTP 200.
 
@@ -39,6 +39,8 @@ GitHub may briefly cache its release-list response. Unauthenticated API rate lim
 
 ## Verification and status
 
-Release checks cover metadata parsing, automatic version selection, installer version consistency, packaged startup, and installed-app workflows. Passing these checks does not mean the product is finished. Groundwork remains a 0.x preview until a deliberate 1.0 launch.
+Release checks cover metadata parsing, automatic version selection, installer version consistency, packaged startup, and installed-app workflows. The local candidate is prepared as 1.0.0. Publication remains the owner's action; the latest measured checks and remaining scope limits are recorded in [release readiness](RELEASE_1_0_READINESS.md).
 
-Preview installers can be built without a signing identity. Stable (1.x and later) publication requires `WINDOWS_CERTIFICATE_BASE64` (a PFX certificate with its private key, encoded as base64) and `WINDOWS_CERTIFICATE_PASSWORD` in GitHub Actions secrets. Obtain a trusted code-signing identity before configuring them. The workflow imports it into its disposable runner, signs through Tauri, verifies the installer's Authenticode signature and expected certificate, then removes the imported key. An absent certificate or invalid signature prevents stable publication. Certificates held by a hardware token or managed signing service require that provider's signing integration instead of the PFX path.
+Signing is optional for all versions by the owner's release decision on 2026-10-06. With no certificate secrets, the workflow builds an unsigned installer and still runs every functional gate. If `WINDOWS_CERTIFICATE_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD` are configured, the existing signing path imports the certificate into the disposable runner, verifies the installer signature and timestamp, then removes the key. Invalid configured signing credentials still fail the build.
+
+The workflow defaults to the public Cloud Run address supplied by the owner when `DESKTOP_API_BASE_URL` is unset; a repository variable can override it. Release configuration rejects HTTP/localhost. CI discovers the generated installer rather than assuming version 0.1.0.

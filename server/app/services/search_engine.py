@@ -34,8 +34,14 @@ class SearchEngine:
     def db(self) -> LocalDatabase:
         return get_db()
 
+    @property
+    def embeddings(self):
+        if self._embeddings is None:
+            self._embeddings = get_embedding_engine()
+        return self._embeddings
+
     def __init__(self) -> None:
-        self.embeddings = get_embedding_engine()
+        self._embeddings = None
 
     def search(
         self,
@@ -344,6 +350,10 @@ class SearchEngine:
                             "snippet": r["content"][:250],
                             "line": r["line_start"],
                         }
+                        # Discard low-scoring candidates incrementally rather
+                        # than retaining snippets for the entire corpus.
+                        if len(results) > max(200, limit * 4):
+                            results = dict(sorted(results.items(), key=lambda item: item[1]["score"], reverse=True)[:limit])
             except Exception:
                 continue
 

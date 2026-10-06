@@ -28,11 +28,11 @@ def test_context_keeps_selected_sources_and_bounds_citation_lines(monkeypatch):
     monkeypatch.setattr(context_engine, "AIToolManager", Tools)
     monkeypatch.setattr(context_engine, "get_llm_provider", lambda name: Provider())
     result = context_engine.AIContextEngine().query(AIQueryRequest(question="Continue", file_paths=["selected.py"], focused_line=10, session_id="saved-session", include_git=False))
-    assert calls[1] == ("read_file", {"path": "selected.py", "start_line": 10, "end_line": 49})
+    assert calls == [("read_file", {"path": "selected.py", "start_line": 10, "end_line": 49})]
     assert len(result.citations[0].snippet) == 8000
     assert result.citations[0].line_end == 14
-    assert "Remember the previous decision" in prompts[0]
-    assert "Verify the fix" in prompts[0]
+    assert "Remember the previous decision" not in prompts[0]
+    assert "Verify the fix" not in prompts[0]
 
 
 def test_shell_operators_and_mutating_git_are_blocked():

@@ -1,8 +1,9 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import React, { useState, useEffect } from "react";
-import { Sidebar } from "./components/layout/Sidebar";
-import { Header } from "./components/layout/Header";
+import { DesktopCommandBar, ToolPanelHeader } from "./components/layout/DesktopCommandBar";
+import { ExplorerWorkspace } from "./components/folders/ExplorerWorkspace";
+
 import { GlobalSearchModal } from "./components/search/GlobalSearchModal";
 import { ProjectsView } from "./components/projects/ProjectsView";
 import { ActivityTimelineView } from "./components/activity/ActivityTimelineView";
@@ -11,15 +12,27 @@ import { AIInvestigationView } from "./components/ai/AIInvestigationView";
 import { NotesView } from "./components/notes/NotesView";
 import { SettingsView } from "./components/settings/SettingsView";
 import { HomeView } from "./components/home/HomeView";
+import { ComputerView } from "./components/computer/ComputerView";
 import { FoldersView } from "./components/folders/FoldersView";
 import { AccountDialog } from "./components/account/AccountDialog";
 import { AccountView } from "./components/account/AccountView";
 import { AISettingsView } from "./components/settings/AISettingsView";
 import { api } from "./services/api";
+import { SelectionProvider } from "./services/selection";
+import { AssistantView } from "./components/assistant/AssistantView";
+import { OrganizeView } from "./components/assistant/OrganizeView";
 import type { Project, SearchResultItem } from "./types/api";
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("home");
+  const [activeTab, setActiveTab] = useState<string>("folders");
+  const [expandedTool, setExpandedTool] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [resumedSummary, setResumedSummary] = useState("");
+  const mainScroll = React.useRef<HTMLElement>(null);
+  useEffect(() => {
+    mainScroll.current?.scrollTo({ top: 0 });
+    setExpandedTool(false);
+  }, [activeTab]);
   const [accountDialog, setAccountDialog] = useState<
     "welcome" | "signin" | "link" | null
   >(null);
@@ -51,6 +64,12 @@ export const App: React.FC = () => {
     null,
   );
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [contentQuery, setContentQuery] = useState("");
+  useEffect(() => {
+    const openContents = (event: Event) => { setContentQuery((event as CustomEvent<string>).detail ?? ""); setIsSearchOpen(true); };
+    window.addEventListener("groundwork-content-search", openContents);
+    return () => window.removeEventListener("groundwork-content-search", openContents);
+  }, []);
   const accountDialogRef = React.useRef(accountDialog);
   accountDialogRef.current = accountDialog;
 
@@ -63,7 +82,7 @@ export const App: React.FC = () => {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
     listen("groundwork-search", () => {
-      if (!accountDialogRef.current) setIsSearchOpen(true);
+      if (!accountDialogRef.current) window.dispatchEvent(new Event("groundwork-focus-search"));
     }).then((cleanup) => {
       if (cancelled) cleanup();
       else unlisten = cleanup;
@@ -83,10 +102,11 @@ export const App: React.FC = () => {
         (e.code === "Space" || e.key.toLowerCase() === "k")
       ) {
         e.preventDefault();
-        if (e.code === "Space") setIsSearchOpen(true);
-        else setIsSearchOpen((prev) => !prev);
+        window.dispatchEvent(new Event("groundwork-focus-search"));
       } else if (e.key === "Escape" && isSearchOpen) {
         setIsSearchOpen(false);
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault(); setContentQuery(""); setIsSearchOpen(true);
       }
     };
 
@@ -105,6 +125,8 @@ export const App: React.FC = () => {
   };
 
   const handleAskAIWithContext = (query: string, file: SearchResultItem) => {
+    setSelectedFiles([file.path]);
+    setResumedSummary("");
     setFocusedFile(file);
     setSessionId(undefined);
     setContextQuestion(
@@ -112,11 +134,20 @@ export const App: React.FC = () => {
     );
     setIsSearchOpen(false);
     setSelectedProjectId(file.project_id || null);
-    setActiveTab("ai");
+    setActiveTab("assistant");
   };
 
   const renderActiveView = () => {
     switch (activeTab) {
+      case "assistant":
+        return (
+          <AssistantView
+            initialQuestion={contextQuestion}
+            savedSummary={resumedSummary}
+          />
+        );
+      case "organize":
+        return <OrganizeView />;
       case "home":
         return (
           <HomeView
@@ -124,6 +155,8 @@ export const App: React.FC = () => {
             onSearch={() => setIsSearchOpen(true)}
           />
         );
+      case "computer":
+        return <ComputerView />;
       case "folders":
         return <FoldersView />;
       case "account":
@@ -144,21 +177,24 @@ export const App: React.FC = () => {
       case "sessions":
         return (
           <ContextSessionsView
-            selectedProjectId={selectedProjectId}
+            selectedProjectId={null}
             onResume={(session) => {
+              setSelectedFiles(session.files_inspected || []);
+              setResumedSummary(session.summary || "");
               setFocusedFile(null);
               setSessionId(session.id);
               setSelectedProjectId(session.project_id);
               setContextQuestion(
                 `Continue ${session.title}. Review the saved findings and remaining tasks against current files.`,
               );
-              setActiveTab("ai");
+              setActiveTab("assistant");
             }}
           />
         );
       case "ai":
         return (
           <AIInvestigationView
+            onChooseFiles={() => setActiveTab("folders")}
             onConfigure={() => setActiveTab("ai-settings")}
             selectedProjectId={selectedProjectId}
             initialQuestion={contextQuestion}
@@ -168,7 +204,7 @@ export const App: React.FC = () => {
           />
         );
       case "notes":
-        return <NotesView selectedProjectId={selectedProjectId} />;
+        return <NotesView selectedProjectId={null} />;
       case "settings":
         return (
           <SettingsView onConfigureAI={() => setActiveTab("ai-settings")} />
@@ -179,46 +215,44 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[var(--paper)] text-[var(--ink)]">
-      {/* Sidebar Navigation */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenSearch={() => setIsSearchOpen(true)}
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        <Header
-          selectedProjectId={selectedProjectId}
-          onSelectProject={setSelectedProjectId}
-          onOpenSearch={() => setIsSearchOpen(true)}
+    <SelectionProvider
+      navigate={setActiveTab}
+      selected={selectedFiles}
+      setSelected={setSelectedFiles}
+    >
+      <div className="desktop-shell">
+        <DesktopCommandBar active={activeTab} onTool={(tab) => setActiveTab(tab === "home" || tab === "projects" ? "folders" : tab)}
+          onSearch={() => window.dispatchEvent(new Event("groundwork-focus-search"))} />
+        <div className="desktop-work-area">
+          <ExplorerWorkspace />
+          {!["folders", "home", "projects"].includes(activeTab) && <aside className={`desktop-tool-panel ${expandedTool ? "is-expanded" : ""}`} aria-label="Tool panel">
+            <ToolPanelHeader active={activeTab} expanded={expandedTool} toggle={() => setExpandedTool(value => !value)} close={() => setActiveTab("folders")} />
+            <main ref={mainScroll} className="desktop-tool-content">{renderActiveView()}</main>
+          </aside>}
+        </div>
+        {/* Global Spotlight Search Modal */}
+        <GlobalSearchModal
+          isOpen={isSearchOpen && !accountDialog}
+          onClose={() => setIsSearchOpen(false)}
+          selectedProjectId={null}
+          initialMode="lexical"
+          initialQuery={contentQuery}
+          onAskAIWithContext={handleAskAIWithContext}
         />
-        <main className="flex-1 flex min-h-0 overflow-y-auto relative bg-[var(--paper)]">
-          {renderActiveView()}
-        </main>
+        {accountDialog && (
+          <AccountDialog
+            welcome={accountDialog === "welcome"}
+            link={accountDialog === "link"}
+            onClose={closeAccount}
+            onConnected={() => {
+              closeAccount();
+              setAccountRevision((previous) => previous + 1);
+              setActiveTab("account");
+            }}
+          />
+        )}
       </div>
-
-      {/* Global Spotlight Search Modal */}
-      <GlobalSearchModal
-        isOpen={isSearchOpen && !accountDialog}
-        onClose={() => setIsSearchOpen(false)}
-        selectedProjectId={selectedProjectId}
-        onAskAIWithContext={handleAskAIWithContext}
-      />
-      {accountDialog && (
-        <AccountDialog
-          welcome={accountDialog === "welcome"}
-          link={accountDialog === "link"}
-          onClose={closeAccount}
-          onConnected={() => {
-            closeAccount();
-            setAccountRevision((previous) => previous + 1);
-            setActiveTab("account");
-          }}
-        />
-      )}
-    </div>
+    </SelectionProvider>
   );
 };
 

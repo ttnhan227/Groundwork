@@ -23,7 +23,11 @@ export interface Project {
 }
 
 export interface ProjectOverview extends Project {
-  working_tree: { branch?: string; changed_files?: Array<{status: string; file: string}>; diff_stat?: string };
+  working_tree: {
+    branch?: string;
+    changed_files?: Array<{ status: string; file: string }>;
+    diff_stat?: string;
+  };
   readme_preview: string | null;
   entry_points: string[];
   dependencies: string[];
@@ -71,9 +75,12 @@ export interface SearchResponse {
 }
 
 export interface IndexProgress {
+  phase?:
+    "scanning" | "content_discovery" | "projects" | "history" | "indexing";
   run_id: string | null;
   status: "idle" | "indexing" | "paused" | "completed" | "cancelled" | "failed";
   current_workspace: string | null;
+  files_inventoried: number;
   files_discovered: number;
   files_indexed: number;
   files_skipped: number;
@@ -90,6 +97,7 @@ export interface ActivityItem {
   project_id: string | null;
   project_name: string | null;
   activity_type:
+    | "indexing_run"
     | "file_modified"
     | "file_created"
     | "file_deleted"
@@ -174,4 +182,37 @@ export interface SystemStatus {
     chunks: number;
     notes: number;
   };
+}
+
+export type StorageCategory = "media" | "archives" | "documents" | "code" | "other";
+export interface StorageCategorySummary {
+  category: StorageCategory;
+  label: string;
+  size_bytes: number;
+  file_count: number;
+  percentage: number;
+}
+export interface InventoryItem {
+  workspace_id?: string;
+  parent_size_bytes?: number;
+  path: string;
+  parent: string;
+  name: string;
+  kind: string;
+  extension: string;
+  category: StorageCategory | "";
+  size_bytes: number;
+  mtime: number;
+  file_count?: number;
+}
+export interface InventoryResult {
+  items: InventoryItem[];
+  total: number;
+  files: number;
+  bytes: number;
+  parent_bytes: number;
+  category_breakdown: StorageCategorySummary[];
+  scan_status: string;
+  errors: string[];
+  updated_at: number | null;
 }

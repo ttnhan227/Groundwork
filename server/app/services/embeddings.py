@@ -28,8 +28,12 @@ class EmbeddingEngine:
         self.model = None
         model_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "models" / "minilm"
         if model_path.is_dir():
-            from fastembed import TextEmbedding
-            self.model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2", specific_model_path=str(model_path), local_files_only=True, threads=2)
+            try:
+                from fastembed import TextEmbedding
+            except ImportError:
+                logger.info("Optional semantic model runtime unavailable; using local hashing")
+            else:
+                self.model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2", specific_model_path=str(model_path), local_files_only=True, threads=2)
         self.model_id = "minilm-l6-v2" if self.model else "hash-v1"
 
     def embed_text(self, text: str) -> list[float]:

@@ -1,6 +1,6 @@
 [package]
 name = "groundwork-desktop"
-version = "0.1.0"
+version = "1.0.0"
 description = "Groundwork Local - Workspace Search and AI Context Tool"
 edition = "2021"
 
@@ -17,3 +17,4 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 
 rfd = "0.15"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"

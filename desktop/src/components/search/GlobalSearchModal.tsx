@@ -18,6 +18,8 @@ import type {
 import { Button, Badge, EmptyState } from "../ui";
 
 interface GlobalSearchModalProps {
+  initialMode?: "filename" | "lexical";
+  initialQuery?: string;
   isOpen: boolean;
   onClose: () => void;
   selectedProjectId: string | null;
@@ -29,18 +31,40 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   onClose,
   selectedProjectId,
   onAskAIWithContext,
+  initialMode = "filename",
+  initialQuery = "",
 }) => {
   const [query, setQuery] = useState("");
+  useEffect(() => { if (isOpen) { setMode(initialMode); setQuery(initialQuery); } }, [isOpen, initialMode, initialQuery]);
   const [mode, setMode] = useState<
     "hybrid" | "lexical" | "semantic" | "filename"
-  >("hybrid");
+  >("filename");
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [indexRevision, setIndexRevision] = useState(0);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    let previous = "";
+    const refresh = async () => {
+      try {
+        const progress = await api.getIndexProgress();
+        const signature = JSON.stringify(progress);
+        if (active && (signature !== previous || mode === "lexical" || mode === "filename")) {
+          previous = signature;
+          setIndexRevision(value => value + 1);
+        }
+      } catch { /* Keep usable results if the engine is restarting. */ }
+    };
+    const timer = setInterval(refresh, 3000);
+    return () => { active = false; clearInterval(timer); };
+  }, [isOpen, mode]);
   const [duration, setDuration] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [category, setCategory] = useState<"files" | "projects" | "git">(
     "files",
   );
+  useEffect(() => { setSelectedIndex(0); }, [query, mode, category]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [commits, setCommits] = useState<
     Awaited<ReturnType<typeof api.getGitCommits>>
@@ -151,7 +175,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           ),
         );
         setDuration(resp.duration_ms);
-        setSelectedIndex(0);
+        setSelectedIndex(value => Math.min(value, Math.max(0, resp.results.length - 1)));
       } catch (err) {
         if (!cancelled) {
           setError(String(err));
@@ -166,7 +190,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, mode, selectedProjectId, isOpen, category, fileType, recentOnly]);
+  }, [query, mode, selectedProjectId, isOpen, category, fileType, recentOnly, indexRevision]);
 
   const rememberQuery = () => {
     if (!query.trim()) return;
@@ -361,12 +385,19 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             <div className="px-4 py-2 bg-[var(--paper-subtle)] border-b border-[var(--hairline)] flex items-center justify-between text-xs text-[var(--ink-secondary)]">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-[var(--ink-muted)] font-mono font-bold mr-1">
-                  RETRIEVAL:
+                  Search:
                 </span>
                 {(["hybrid", "lexical", "semantic", "filename"] as const).map(
                   (m) => (
                     <button
-                      key={m}
+                      key={
+                        {
+                          filename: "Names & paths",
+                          lexical: "File contents",
+                          hybrid: "Related contents",
+                          semantic: "Similar meanings",
+                        }[m]
+                      }
                       onClick={() => setMode(m)}
                       className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-sm capitalize transition-all font-mono font-semibold cursor-pointer ${
                         mode === m
@@ -374,7 +405,14 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                           : "hover:bg-[var(--surface-hover)] text-[var(--ink-secondary)]"
                       }`}
                     >
-                      {m}
+                      {
+                        {
+                          filename: "Names & paths",
+                          lexical: "File contents",
+                          hybrid: "Related contents",
+                          semantic: "Similar meanings",
+                        }[m]
+                      }
                     </button>
                   ),
                 )}

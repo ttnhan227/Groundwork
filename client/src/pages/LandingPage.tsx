@@ -56,7 +56,7 @@ export function LandingPage({
               {
                 icon: Search,
                 title: "Find the file you remember",
-                text: "Search by a name or a phrase inside a file. Open the result without hunting through folders.",
+                text: "Find files by name or path as they are discovered. Search inside supported readable formats once preparation finishes.",
               },
               {
                 icon: FileText,

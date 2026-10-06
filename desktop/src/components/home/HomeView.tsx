@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, FolderOpen, Search, FileText, Clock } from "lucide-react";
+import {
+  ArrowRight,
+  FolderOpen,
+  Search,
+  FileText,
+  HardDrive,
+} from "lucide-react";
 import { api } from "../../services/api";
 import type { Workspace } from "../../types/api";
 import { Button, Card } from "../ui";
@@ -37,7 +43,7 @@ export function HomeView({
         <p className="text-sm font-medium text-[var(--ink-blue)] mb-2">
           Your place to pick up where you left off
         </p>
-        <h1 className="gw-title text-3xl">Welcome home.</h1>
+        <h1 className="gw-title text-3xl">What would you like to do?</h1>
         <p className="gw-description">
           Find a file, capture a thought, or return to your work.
         </p>
@@ -98,10 +104,11 @@ export function HomeView({
             action: () => onNavigate("notes"),
           },
           {
-            title: "Pick up your work",
-            description: "Return to questions and work you've saved.",
-            icon: Clock,
-            action: () => onNavigate("sessions"),
+            title: "Your computer",
+            description:
+              "Open apps and websites, check storage, or take a screenshot.",
+            icon: HardDrive,
+            action: () => onNavigate("computer"),
           },
         ].map((item) => (
           <button

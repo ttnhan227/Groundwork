@@ -181,6 +181,8 @@ Set the GitHub Repository Variable **DESKTOP_API_BASE_URL** to your hosted backe
 
 For a local installer build, set `DESKTOP_API_BASE_URL` in the project-root `.env`. A terminal environment variable takes precedence if you need a temporary override. Normal development still defaults to `http://localhost:8080`. Changing the repository variable affects future builds; it does not change an already installed app. Only the public backend address is bundled; database passwords, OAuth secrets, and other root `.env` values are not copied into the installer.
 
+CI builds reject localhost backend addresses. For a local release candidate, set `GROUNDWORK_RELEASE_BUILD=1` to require an HTTPS hosted-backend address as well. The validation scripts support a fresh installed build and a portable executable with an isolated data directory and an empty developer PATH; neither check replaces testing on a clean Windows installation.
+
 1. Commit and push your changes.
 2. Create and push a new version tag (0.x while the product is unfinished).
 3. Check **Publish Windows desktop release** in GitHub Actions.
@@ -217,6 +219,7 @@ After building the installer, run packaged integration checks:
 ```powershell
 python desktop/scripts/smoke-core.py
 python desktop/scripts/smoke-scale.py
+.\server\.venv\Scripts\python.exe desktop/scripts/smoke-storage.py
 python desktop/scripts/smoke-sync.py
 ```
 
@@ -234,3 +237,5 @@ Read more about [architecture](docs/ARCHITECTURE.md), [privacy](docs/PRIVACY_MOD
 ## License
 
 Groundwork is open source under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.
+
+Release 1.0 validation and handoff: [readiness report](docs/RELEASE_1_0_READINESS.md). Signing is optional.

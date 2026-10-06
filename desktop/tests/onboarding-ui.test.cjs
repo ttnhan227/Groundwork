@@ -80,10 +80,11 @@ test("first launch, local choice, account recovery, folders and nontechnical set
         };
       else if (url.pathname === "/api/index/status")
         body = { status: "completed", percent: 100, files_indexed: 0 };
+      else if (url.pathname.includes("/inventory")) body = {items: [], total: 0, files: 0, bytes: 0, parent_bytes: 0, category_breakdown: [], scan_status: "completed", errors: [], updated_at: 1};
       else if (url.pathname === "/api/workspaces") {
         if (request.method() === "POST") {
           const data = request.postDataJSON();
-          folders.push({ id: "folder", ...data });
+          folders.push({ id: "folder", is_active: true, ...data });
           body = folders[0];
         } else body = folders;
       } else if (url.pathname === "/api/sync/login") {
@@ -111,6 +112,8 @@ test("first launch, local choice, account recovery, folders and nontechnical set
           openai_api_key_configured: false,
           gemini_api_key_configured: false,
         };
+      else if (url.pathname === "/api/system/local-ai")
+        body = { supported: true, engine_size: 0, selected: "", loaded: null, generating: false, hardware: { architecture: "x86_64", ram_total: 8589934592, ram_available: 4294967296, cpu_threads: 4, acceleration: "cpu" }, models: [], download: { phase: "idle", bytes: 0, total: 0, error: null } };
       else if (url.pathname === "/api/ai/providers")
         body = [
           { id: "local", name: "Local passages", is_local: true, active: true },
@@ -137,12 +140,12 @@ test("first launch, local choice, account recovery, folders and nontechnical set
     assert.equal(loginCalls, 0);
     await page.reload();
     await expect(
-      page.getByRole("heading", { name: "Welcome home." }),
+      page.getByRole("region", { name: "Files and storage workspace" }),
     ).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.screenshot({ path: path.join(results, "polished-home.png") });
     await page
-      .getByRole("button", { name: "Add your first folder", exact: true })
+      .getByRole("button", { name: "Choose folder", exact: true }).first()
       .click();
     await page.getByLabel("Folder location").pressSequentially("C:/Documents");
     await expect(page.getByLabel("Folder location")).toHaveValue(
@@ -150,7 +153,7 @@ test("first launch, local choice, account recovery, folders and nontechnical set
     );
     await page.getByRole("button", { name: "Add folder", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Your folders", exact: true }),
+      page.getByRole("combobox", { name: "Current location" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -200,6 +203,7 @@ test("first launch, local choice, account recovery, folders and nontechnical set
       path: path.join(results, "polished-settings.png"),
     });
     await page.getByRole("button", { name: "Choose how answers work" }).click();
+    await page.getByText("Advanced: other AI services", { exact: true }).click();
     await page.getByRole("radio", { name: "OpenAI", exact: true }).check();
     await expect(page.getByLabel("API key")).toBeVisible();
     await expect(page.getByLabel("Model name")).not.toBeVisible();

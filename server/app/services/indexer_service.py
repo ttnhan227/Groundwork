@@ -45,10 +45,16 @@ class IndexerService:
     def db(self) -> LocalDatabase:
         return get_db()
 
+    @property
+    def embeddings(self):
+        if self._embeddings is None:
+            self._embeddings = get_embedding_engine()
+        return self._embeddings
+
     def __init__(self) -> None:
         self.settings = get_settings()
         self.parser = FileParser()
-        self.embeddings = get_embedding_engine()
+        self._embeddings = None
         self.workspace_service = WorkspaceService()
         self.project_service = ProjectService()
         self.git_service = GitService()
@@ -58,6 +64,7 @@ class IndexerService:
         self._cancel_requested = threading.Event()
         self._worker_thread: threading.Thread | None = None
         self._pending_reindex = False
+        self._resume_requested = False
 
         self._progress = IndexProgress(status=IndexStatus.IDLE)
 
@@ -71,14 +78,18 @@ class IndexerService:
         with self._lock:
             return self._progress.model_copy()
 
-    def start_indexing(self, workspace_id: str | None = None) -> IndexProgress:
+    def start_indexing(self, workspace_id: str | None = None, target_paths: list[str] | None = None, resume: bool = False) -> IndexProgress:
         """Starts indexing in a background worker thread."""
         with self._lock:
             if self._worker_thread and self._worker_thread.is_alive():
                 self._pending_reindex = True
+                if resume and self._cancel_requested.is_set():
+                    self._resume_requested = True
                 return self._progress.model_copy()
 
             self._cancel_requested.clear()
+            self._pending_reindex = False
+            self._resume_requested = False
             run_id = str(uuid.uuid4())
             now_iso = datetime.now(timezone.utc).isoformat()
             self._progress = IndexProgress(
@@ -90,7 +101,7 @@ class IndexerService:
 
             self._worker_thread = threading.Thread(
                 target=self._background_index_loop,
-                args=(run_id, workspace_id),
+                args=(run_id, workspace_id, target_paths),
                 name="GroundworkIndexerWorker",
                 daemon=True,
             )
@@ -98,21 +109,29 @@ class IndexerService:
 
             return self._progress.model_copy()
 
-    def _background_index_loop(self, run_id: str, workspace_id: str | None) -> None:
+    def index_selected_paths(self, paths: list[str], workspace_id: str | None = None) -> IndexProgress:
+        """Indexes user-selected files explicitly with dedicated progress."""
+        return self.start_indexing(workspace_id=workspace_id, target_paths=paths, resume=True)
+
+    def _background_index_loop(self, run_id: str, workspace_id: str | None, target_paths: list[str] | None = None) -> None:
         while True:
-            self._run_indexing_worker(run_id, workspace_id)
+            self._run_indexing_worker(run_id, workspace_id, target_paths)
             with self._lock:
-                if not self._pending_reindex or self._cancel_requested.is_set():
+                if not self._pending_reindex or (self._cancel_requested.is_set() and not self._resume_requested):
                     return
                 self._pending_reindex = False
+                self._resume_requested = False
+                self._cancel_requested.clear()
                 run_id = str(uuid.uuid4())
                 workspace_id = None
+                target_paths = None
                 self._progress = IndexProgress(run_id=run_id, status=IndexStatus.INDEXING, started_at=datetime.now(timezone.utc).isoformat())
 
     def cancel_indexing(self) -> IndexProgress:
         """Requests cancellation of ongoing indexing run."""
         with self._lock:
             self._pending_reindex = False
+            self._resume_requested = False
             if self._progress.status == IndexStatus.INDEXING:
                 self._cancel_requested.set()
                 self._progress.status = IndexStatus.CANCELLED
@@ -134,12 +153,14 @@ class IndexerService:
 
     index_workspace = index_workspace_sync
 
-    def _run_indexing_worker(self, run_id: str, target_workspace_id: str | None) -> None:
+    def _run_indexing_worker(self, run_id: str, target_workspace_id: str | None, target_paths: list[str] | None = None) -> None:
         """Worker loop executed in a background daemon thread."""
         logger.info("Indexing worker started (run %s)", run_id)
         start_time = datetime.now(timezone.utc)
 
         try:
+            from app.services.inventory_service import InventoryService
+            inventory = InventoryService()
             workspaces = [w for w in self.workspace_service.list_workspaces() if w.is_active]
             if target_workspace_id:
                 workspaces = [w for w in workspaces if w.id == target_workspace_id]
@@ -160,20 +181,69 @@ class IndexerService:
                     break
 
                 ws_path = Path(ws.path)
+
+                with self._lock:
+                    self._progress.current_workspace = ws.name
+                    self._progress.phase = "scanning"
+                    self._progress.current_file = None
+                inventory_count = self._progress.files_inventoried
+                previous_errors = self._progress.errors.copy()
+                def report_inventory(count, directory, errors, inventory_count=inventory_count, previous_errors=previous_errors):
+                    with self._lock:
+                        self._progress.current_file = directory
+                        self._progress.files_inventoried = inventory_count + count
+                        self._progress.errors = (previous_errors + errors)[-50:]
+                inventory.scan(ws, self._cancel_requested.is_set, report_inventory)
+                if self._cancel_requested.is_set():
+                    break
+            # Discover eligible content across roots before reporting a percentage.
+            content_files = []
+            for ws in workspaces:
+                if self._cancel_requested.is_set():
+                    break
+                ws_path = Path(ws.path)
                 if not ws_path.exists():
                     continue
+                with self._lock:
+                    self._progress.current_workspace = ws.name
+                    self._progress.phase = "content_discovery"
 
-                # 1. Discover and synchronize projects first
-                projects = self.project_service.discover_projects_in_workspace(ws.id, ws_path)
-                for proj in projects:
-                    if (Path(proj["path"]) / ".git").exists():
-                        self.git_service.sync_project_commits(proj["id"], Path(proj["path"]))
+                if target_paths:
+                    selected_files = []
+                    for p in target_paths:
+                        try:
+                            rp = Path(p).resolve()
+                            if rp.is_relative_to(ws_path) and rp.is_file() and self.parser.is_supported(rp):
+                                selected_files.append(rp)
+                        except (ValueError, OSError):
+                            pass
+                    file_paths = selected_files
+                else:
+                    file_paths = self._discover_files(ws_path, ws.ignore_patterns)
 
-                # 2. Discover files
-                file_paths = self._discover_files(ws_path, ws.ignore_patterns)
                 total_discovered += len(file_paths)
                 with self._lock:
                     self._progress.files_discovered = total_discovered
+                content_files.append((ws, file_paths))
+            for ws, file_paths in content_files:
+                ws_path = Path(ws.path)
+                with self._lock:
+                    self._progress.current_workspace = ws.name
+                    self._progress.phase = "projects"
+                if self._cancel_requested.is_set():
+                    break
+                projects = self.project_service.discover_projects_in_workspace(ws.id, ws_path)
+                with self._lock:
+                    self._progress.phase = "history"
+                for proj in projects:
+                    if self._cancel_requested.is_set():
+                        break
+                    if (Path(proj["path"]) / ".git").exists():
+                        with self._lock:
+                            self._progress.current_file = Path(proj["path"]).name
+                        self.git_service.sync_project_commits(proj["id"], Path(proj["path"]))
+                with self._lock:
+                    self._progress.phase = "indexing"
 
                 # 3. Clean up deleted files from database
                 self._cleanup_deleted_files(ws.id, file_paths)
@@ -202,6 +272,7 @@ class IndexerService:
                     with self._lock:
                         self._progress.files_indexed = total_indexed
                         self._progress.files_skipped = total_skipped
+                        self._progress.percent = round((total_indexed + total_skipped) / max(1, total_discovered) * 100, 1)
 
             finished_iso = datetime.now(timezone.utc).isoformat()
             final_status = IndexStatus.CANCELLED if self._cancel_requested.is_set() else IndexStatus.COMPLETED
@@ -209,7 +280,7 @@ class IndexerService:
             with self._lock:
                 self._progress.status = final_status
                 self._progress.finished_at = finished_iso
-                self._progress.percent = 100.0
+                self._progress.percent = 100.0 if final_status == IndexStatus.COMPLETED else self._progress.percent
 
             # Record run in database
             first_ws = workspaces[0].id if workspaces else "unknown"
@@ -235,8 +306,8 @@ class IndexerService:
             # Record activity
             self.activity_service.record_activity(
                 workspace_id=first_ws,
-                activity_type=ActivityType.FILE_CREATED,
-                summary=f"Workspace indexing completed: {total_indexed} files updated, {total_skipped} skipped.",
+                activity_type=ActivityType.INDEXING_RUN,
+                summary=f"Workspace indexing {final_status.value}: {total_indexed} files updated, {total_skipped} skipped.",
                 details={"discovered": total_discovered, "indexed": total_indexed, "skipped": total_skipped},
             )
 
@@ -318,7 +389,20 @@ class IndexerService:
 
         with conn:
             # 1. Upsert files table
-            conn.execute("""
+            if not conn.in_transaction:
+                conn.execute("BEGIN IMMEDIATE")
+            # A slow parser must not overwrite a newer watcher update. Check
+            # the source after obtaining the write lock, before changing rows.
+            try:
+                latest = fpath.stat()
+                if latest.st_mtime_ns != stat.st_mtime_ns or latest.st_size != stat.st_size:
+                    return False
+                latest_hash = self.embeddings.model_id + ":" + hashlib.sha256(fpath.read_bytes()).hexdigest()
+            except OSError:
+                return False
+            if latest_hash != file_hash:
+                return False
+            stored = conn.execute("""
             INSERT INTO files (
                 id, workspace_id, project_id, path, relative_path, filename,
                 extension, file_type, size_bytes, hash, mtime, indexed_at, symbols_json
@@ -332,7 +416,8 @@ class IndexerService:
                 mtime = excluded.mtime,
                 size_bytes = excluded.size_bytes,
                 indexed_at = excluded.indexed_at,
-                symbols_json = excluded.symbols_json;
+                symbols_json = excluded.symbols_json
+            RETURNING id;
             """, (
                 file_id,
                 workspace_id,
@@ -347,7 +432,10 @@ class IndexerService:
                 stat.st_mtime,
                 now_iso,
                 json.dumps(symbols_data),
-            ))
+            )).fetchone()
+            # Another indexer may have inserted this path since our initial
+            # lookup. All dependent records must use the retained row identity.
+            file_id = stored["id"]
 
             # 2. Clean previous chunks & FTS records for this file
             conn.execute("DELETE FROM chunks WHERE file_id = ?;", (file_id,))
@@ -408,11 +496,12 @@ class IndexerService:
         return True
 
     def remove_file(self, file_path_str: str) -> None:
-        """Removes a deleted file from SQLite and FTS tables."""
+        """Remove a deleted path and its descendants from content search."""
         conn = self.db.get_connection()
+        prefix = file_path_str.rstrip("\\/") + os.sep
         with conn:
-            row = conn.execute("SELECT id FROM files WHERE path = ?;", (file_path_str,)).fetchone()
-            if row:
+            rows = conn.execute("SELECT id FROM files WHERE path = ? COLLATE NOCASE OR substr(path,1,?) = ? COLLATE NOCASE;", (file_path_str, len(prefix), prefix)).fetchall()
+            for row in rows:
                 file_id = row["id"]
                 conn.execute("DELETE FROM fts_files WHERE file_id = ?;", (file_id,))
                 conn.execute("DELETE FROM fts_chunks WHERE file_id = ?;", (file_id,))
@@ -420,14 +509,23 @@ class IndexerService:
                 conn.execute("DELETE FROM files WHERE id = ?;", (file_id,))
 
     def _discover_files(self, root: Path, ignore_patterns: list[str]) -> list[Path]:
-        """Walks directory, honoring ignore patterns and .gitignore."""
+        """Walks directory, honoring ignore patterns and .gitignore with rule caching."""
+        from app.services.exclusion_cache import ExclusionRuleCache
+        rule_cache = ExclusionRuleCache(self.settings.default_ignore_patterns, ignore_patterns, root)
         discovered: list[Path] = []
         gitignores = self._load_gitignore(root)
 
+        initial_count = self.get_progress().files_discovered
         for dirpath, dirnames, filenames in os.walk(str(root)):
+            if self._cancel_requested.is_set():
+                break
+            with self._lock:
+                self._progress.current_file = str(Path(dirpath).relative_to(root))
             # Filter directories
             filtered_dirs = []
             for d in dirnames:
+                if rule_cache.is_fast_ignorable_dir(d):
+                    continue
                 full_dir = Path(dirpath) / d
                 if self._is_ignored(full_dir, ignore_patterns, gitignores, root):
                     continue
@@ -435,11 +533,15 @@ class IndexerService:
             dirnames[:] = filtered_dirs
 
             for fname in filenames:
+                if self._cancel_requested.is_set():
+                    break
                 fpath = Path(dirpath) / fname
                 if self._is_ignored(fpath, ignore_patterns, gitignores, root):
                     continue
                 if self.parser.is_supported(fpath):
                     discovered.append(fpath)
+                    with self._lock:
+                        self._progress.files_discovered = initial_count + len(discovered)
 
         return discovered
 
@@ -451,14 +553,28 @@ class IndexerService:
         except ValueError:
             return True
         # Never index credentials or links (including links within a workspace).
-        sensitive = {".env", "id_rsa", "id_ed25519", "credentials", "credentials.json"}
+        sensitive = {".env", "id_rsa", "id_ed25519", "credentials", "credentials.json", ".npmrc", ".pypirc", ".netrc", "preferences.dat", "service-account.json", "secrets.json", "secrets.yaml", "secrets.yml"}
         if path.is_symlink() or path.is_junction() or path.name.lower() in sensitive or path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"} or path.name.lower().startswith(".env.") and path.name.lower() != ".env.example":
+            return True
+        private_folders = {".ssh", ".aws", ".azure", ".gnupg", ".kube"}
+        name = path.name.lower()
+        if private_folders.intersection(part.lower() for part in path.relative_to(root).parts) or name == "application_default_credentials.json" or name == "kubeconfig.yaml" or name.startswith(("client_secret", "service_account", "service-account")) and path.suffix.lower() == ".json":
             return True
         path = resolved
         suffix = "/" if path.is_dir() else ""
-        spec = pathspec.GitIgnoreSpec.from_lines(self.settings.default_ignore_patterns + ignore_patterns)
+
+        spec_key = tuple(sorted(self.settings.default_ignore_patterns + ignore_patterns))
+        if not hasattr(self, "_spec_cache"):
+            self._spec_cache = {}
+        if spec_key not in self._spec_cache:
+            self._spec_cache[spec_key] = pathspec.GitIgnoreSpec.from_lines(list(spec_key))
+        spec = self._spec_cache[spec_key]
         if spec.match_file(rel + suffix):
             return True
+
+        if not hasattr(self, "_gi_spec_cache"):
+            self._gi_spec_cache = {}
+
         # Apply each ancestor's Git rules in order, respecting negations and anchors.
         ignored = False
         parents = [root]
@@ -467,9 +583,21 @@ class IndexerService:
             current = current / part
             parents.append(current)
         for parent in parents:
-            rules = self._load_gitignore(parent)
-            if rules:
-                result = pathspec.GitIgnoreSpec.from_lines(rules).check_file(path.relative_to(parent).as_posix() + suffix)
+            gi_file = parent / ".gitignore"
+            gi_mtime = None
+            if gi_file.is_file():
+                try:
+                    gi_mtime = gi_file.stat().st_mtime
+                except OSError:
+                    pass
+            cached = self._gi_spec_cache.get(parent)
+            if cached is None or cached[0] != gi_mtime:
+                rules = self._load_gitignore(parent)
+                p_spec = pathspec.GitIgnoreSpec.from_lines(rules) if rules else None
+                self._gi_spec_cache[parent] = (gi_mtime, p_spec)
+            p_spec = self._gi_spec_cache[parent][1]
+            if p_spec:
+                result = p_spec.check_file(path.relative_to(parent).as_posix() + suffix)
                 if result.include is not None:
                     ignored = result.include
         return ignored

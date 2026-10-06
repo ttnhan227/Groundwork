@@ -15,6 +15,9 @@ def normalize_api_url(value: str) -> str:
     if parts.scheme != "https" and not (parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"}):
         raise ValueError("DESKTOP_API_BASE_URL must use HTTPS; HTTP is allowed only for local development.")
     path = parts.path.rstrip("/").removesuffix("/api/v1")
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("GROUNDWORK_RELEASE_BUILD") == "1":
+        if parts.scheme != "https" or parts.hostname in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or parts.hostname.endswith(".localhost"):
+            raise ValueError("Release builds require an HTTPS backend address that is reachable by users, not localhost.")
     return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 

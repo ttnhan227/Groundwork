@@ -12,6 +12,23 @@ struct CoreConnection { url: String, token: String }
 struct CoreProcessState { child: Option<Child>, connection: Option<CoreConnection> }
 static CORE_STATE: Mutex<CoreProcessState> = Mutex::new(CoreProcessState { child: None, connection: None });
 
+fn terminate_core(child: &mut Child) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // PyInstaller's launcher owns a second process. Terminate only this
+        // owned process tree when graceful shutdown exceeds its deadline.
+        if let Some(system_root) = std::env::var_os("SystemRoot") {
+            let _ = Command::new(std::path::PathBuf::from(system_root).join("System32/taskkill.exe"))
+                .args(["/PID", &child.id().to_string(), "/T", "/F"])
+                .creation_flags(0x08000000)
+                .stdout(Stdio::null()).stderr(Stdio::null()).status();
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 fn start_core_inner(app: tauri::AppHandle) -> Result<CoreConnection, String> {
     let mut state = CORE_STATE.lock().map_err(|e| e.to_string())?;
     if let Some(child) = state.child.as_mut() {
@@ -28,13 +45,14 @@ fn start_core_inner(app: tauri::AppHandle) -> Result<CoreConnection, String> {
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let resources = app.path().resource_dir().map_err(|e| e.to_string())?;
     let binary = resources.join("resources/groundwork-core/groundwork-core.exe");
-    let mut command = if binary.is_file() {
-        Command::new(binary)
-    } else if cfg!(debug_assertions) {
+    let mut command = if cfg!(debug_assertions) {
         let server = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server");
-        let mut cmd = Command::new("python");
+        let venv_python = server.join(".venv/Scripts/python.exe");
+        let mut cmd = if venv_python.is_file() { Command::new(venv_python) } else { Command::new("python") };
         cmd.arg(server.join("core_entry.py")).current_dir(server);
         cmd
+    } else if binary.is_file() {
+        Command::new(binary)
     } else {
         return Err("The bundled local core is missing. Reinstall Groundwork.".into());
     };
@@ -64,7 +82,7 @@ fn start_core_inner(app: tauri::AppHandle) -> Result<CoreConnection, String> {
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    let _ = child.kill(); let _ = child.wait();
+    terminate_core(&mut child);
     Err("Local core did not become ready within the startup deadline.".into())
 }
 
@@ -86,7 +104,7 @@ fn stop_local_core() -> Result<(), String> {
             if child.try_wait().ok().flatten().is_some() { break; }
             std::thread::sleep(Duration::from_millis(100));
         }
-        if child.try_wait().ok().flatten().is_none() { let _ = child.kill(); }
+        if child.try_wait().ok().flatten().is_none() { terminate_core(&mut child); }
         let _ = child.wait();
     }
     state.connection = None;
@@ -101,8 +119,27 @@ fn pick_workspace_folder() -> Option<String> {
     rfd::FileDialog::new().set_title("Choose a Groundwork workspace").pick_folder().map(|p| p.to_string_lossy().to_string())
 }
 
+mod scanner;
+
+#[tauri::command]
+fn pick_ai_model() -> Option<String> {
+    rfd::FileDialog::new().set_title("Choose an existing AI model").add_filter("GGUF model", &["gguf"]).pick_file().map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn scan_workspace_fast(path: String) -> Result<scanner::ScanResult, String> {
+    Ok(scanner::scan_directory_native(&path))
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| {
             if event.state() == ShortcutState::Pressed {
                 if let Some(window) = app.get_webview_window("main") {
@@ -117,7 +154,15 @@ fn main() {
             if let Err(error) = app.global_shortcut().register("Ctrl+Space") { eprintln!("Search shortcut unavailable: {}", error); }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_local_core, stop_local_core, get_platform_info, pick_workspace_folder])
+        .invoke_handler(tauri::generate_handler![start_local_core, stop_local_core, get_platform_info, pick_workspace_folder, pick_ai_model, scan_workspace_fast])
+        .on_window_event(|window, event| {
+            // Native plugins own hidden windows. Closing the workspace must
+            // terminate the application even when those windows remain alive.
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                let _ = stop_local_core();
+                window.app_handle().exit(0);
+            }
+        })
         .build(tauri::generate_context!())
         .expect("Cannot initialize Groundwork desktop")
         .run(|_, event| { if let tauri::RunEvent::Exit = event { let _ = stop_local_core(); } });

@@ -48,3 +48,7 @@ desktop/src-tauri/resources/
 server/models/
 server/.model-cache/
 server/git/
+
+# Disposable local validation fixtures and database migration backups
+/work/
+*.schema-v*.bak

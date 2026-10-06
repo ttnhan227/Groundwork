@@ -6,9 +6,9 @@ and AI provider parameters.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
-import json
 from pathlib import Path
 
 from pydantic import Field
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     """Local Groundwork configuration settings."""
 
     app_name: str = "Groundwork Local"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
     environment: str = Field(default="development", alias="ENVIRONMENT")
 
     # Local filesystem storage

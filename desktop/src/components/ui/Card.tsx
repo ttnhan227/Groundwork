@@ -14,7 +14,7 @@ export const Card: React.FC<CardProps> = ({
   ...rest
 }) => {
   const baseClasses =
-    "bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] transition-all";
+    "gw-card bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] transition-all";
   const interactiveClasses = interactive
     ? "cursor-pointer hover:border-[var(--hairline-strong)] hover:shadow-[var(--shadow-popover)] active:bg-[var(--surface-hover)]"
     : "";

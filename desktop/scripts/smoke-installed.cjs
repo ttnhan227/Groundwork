@@ -8,9 +8,11 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 const crypto = require('node:crypto');
 if (!process.argv[2]) throw new Error('Pass the NSIS installer path');
-const installer = path.resolve(process.argv[2]);
+const upgradeFrom = process.env.GROUNDWORK_UPGRADE_FROM ? path.resolve(process.env.GROUNDWORK_UPGRADE_FROM) : null;
+const portable = process.argv[2] === '--portable';
+const installer = portable ? null : path.resolve(process.argv[2]);
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'groundwork-installed-')));
-const installDir = path.join(root, 'application');
+const installDir = portable ? path.resolve(__dirname,'../src-tauri/target/release') : path.join(root, 'application');
 const resultsDir = path.resolve(__dirname, '../test-results');
 fs.mkdirSync(resultsDir, {recursive:true});
 const workspace = path.join(root, 'workspace');
@@ -18,7 +20,7 @@ fs.mkdirSync(workspace);
 fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({name:'installed-workflow', dependencies:{react:'19'}}));
 fs.writeFileSync(path.join(workspace, 'sample.ts'), 'export function installed_workflow_needle() { return "real evidence"; }\n');
 for (const args of [['init'],['config','user.name','Installer Test'],['config','user.email','installer@example.com'],['add','.'],['commit','-m','Initialize installed workflow']]) execFileSync('git',args,{cwd:workspace,stdio:'ignore'});
-const env = {...process.env, PATH:'', GROUNDWORK_DATA_DIR:path.join(root,'state'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port=18540 --remote-debugging-address=127.0.0.1'};
+const env = {...process.env, PATH:'', GROUNDWORK_DATA_DIR:path.join(root,'state'), WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port=18540 --remote-debugging-address=127.0.0.1'};
 let app, browser, page, connection;
 // Microsoft WebView2 150+ drops environment overrides in elevated hosts.
 // Only the ephemeral hosted-CI wrapper opts into a per-executable HKLM policy.
@@ -62,29 +64,64 @@ async function launch() {
   if(!page)throw new Error('WebView2 application page did not become ready');
   page.on('console', message=>{if(message.type()==='error') console.error('WebView:',message.text());});
   page.on('requestfailed', request=>console.error('Request failed:',request.url(),request.failure()));
-  await expect(page.getByRole('heading',{name:'Welcome home.'})).toBeVisible({timeout:30000});
+  await expect(page.getByRole('region',{name:'Files and storage workspace'})).toBeVisible({timeout:30000});
   connection=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('start_local_core'));
   console.log('Core endpoint', connection.url, 'WebView', await page.evaluate(()=>({origin:location.origin,isTauri:window.isTauri})));
   const preflight=await fetch(connection.url+'/api/system/status',{method:'OPTIONS',headers:{Origin:'http://tauri.localhost','Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'authorization,content-type'}});
   assert.equal(preflight.headers.get('access-control-allow-origin'),'http://tauri.localhost','Installed runtime rejected its desktop origin');
-  await expect(page.getByText('Saved on this computer',{exact:true})).toBeVisible({timeout:30000});
+  await expect.poll(async () => (await fetch(connection.url+'/health',{headers:{Authorization:'Bearer '+connection.token}})).status,{timeout:30000}).toBe(200);
   assert.match(connection.url,/^http:\/\/127\.0\.0\.1:\d+$/);
 }
 async function close() {
   if(app && app.exitCode===null) {
-    execFileSync('powershell.exe',['-NoProfile','-Command',`$nativeProcess = Get-Process -Id ${app.pid}; $nativeProcess.CloseMainWindow() | Out-Null`]);
-    for(let i=0;i<100 && app.exitCode===null;i++)await new Promise(r=>setTimeout(r,100));
+    // Single-instance handling also owns a hidden message window. Locate the
+    // visible application window explicitly rather than relying on the cached
+    // Process.MainWindowHandle heuristic after engine restarts.
+    const closeScript=`Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class GroundworkSmokeWindow { public delegate bool EnumCallback(IntPtr window,IntPtr parameter); [DllImport("user32.dll")] public static extern bool EnumWindows(EnumCallback callback,IntPtr parameter); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window,out uint process); [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window); [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window,uint message,IntPtr wParam,IntPtr lParam); public static int Close(uint owner) { int count=0; EnumWindows((w,p)=> { uint pid; GetWindowThreadProcessId(w,out pid); if(pid==owner && IsWindowVisible(w)) { if(PostMessage(w,16,IntPtr.Zero,IntPtr.Zero)) count++; } return true; },IntPtr.Zero); return count; } }'; $count=[GroundworkSmokeWindow]::Close(${app.pid}); if($count -eq 0) { Get-Process -Id ${app.pid} | Select-Object Id,MainWindowTitle,MainWindowHandle | Out-String | Write-Output; throw 'No visible test window found' }`;
+    execFileSync('powershell.exe',['-NoProfile','-Command',closeScript]);
+    for(let i=0;i<250 && app.exitCode===null;i++)await new Promise(r=>setTimeout(r,100));
     assert.notEqual(app.exitCode,null,'Native window did not shut down');
     if(connection) await assert.rejects(()=>fetch(connection.url+'/health',{headers:{Authorization:'Bearer '+connection.token}}));
   }
   browser=undefined;
 }
 (async()=>{
-  const installed=spawnSync(installer,['/S',`/D=${installDir}`],{windowsHide:true,timeout:120000});
-  assert.equal(installed.status,0,`Installer failed: ${installed.error || installed.status}`);
+  if (!portable) {
+    const registryCheck=String.raw`@('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Groundwork','HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Groundwork') | ForEach-Object { $item=Get-ItemProperty -LiteralPath $_ -ErrorAction SilentlyContinue; if($item.InstallLocation) { $item.InstallLocation } }`;
+    const registered=execFileSync('powershell.exe',['-NoProfile','-Command',registryCheck],{encoding:'utf8'}).trim().split(/\r?\n/).filter(Boolean);
+    for(const entry of registered) {
+      const previous=entry.replace(/^"|"$/g,'');
+      if(fs.existsSync(path.join(previous,'groundwork-desktop.exe'))) {
+        const parent=path.relative(os.tmpdir(),previous);
+        assert.ok(!parent.startsWith('..') && !path.isAbsolute(parent) && parent.startsWith('groundwork-installed-'),'Use a clean Windows account or --portable: an existing real Groundwork installation must not be changed by this test');
+      }
+    }
+    const installed=spawnSync(upgradeFrom || installer,['/S',`/D=${installDir}`],{windowsHide:true,timeout:120000});
+    assert.equal(installed.status,0,`Installer failed: ${installed.error || installed.status}`);
+  }
   assert.ok(fs.existsSync(path.join(installDir,'groundwork-desktop.exe')),'Installed executable missing');
+  if (!portable && !upgradeFrom) {
+    const releaseBinary=path.resolve(__dirname,'../src-tauri/target/release/groundwork-desktop.exe');
+    if(fs.existsSync(releaseBinary)) {
+      // Tauri restores UNK in the build output after packaging its NSS-marked
+      // installer executable. Normalize only that documented bundle marker.
+      const digest=filename=>{
+        const bytes=fs.readFileSync(filename);
+        for(const kind of ['UNK','NSS']) {
+          const marker=Buffer.from('__TAURI_BUNDLE_TYPE_VAR_'+kind);
+          const offset=bytes.indexOf(marker);
+          if(offset>=0) bytes.write('XXX',offset+marker.length-3,'ascii');
+        }
+        return crypto.createHash('sha256').update(bytes).digest('hex');
+      };
+      assert.equal(digest(path.join(installDir,'groundwork-desktop.exe')),digest(releaseBinary),'Installer contains a stale native executable');
+    }
+  }
   try {
     await launch();
+    const second=spawn(path.join(installDir,'groundwork-desktop.exe'),[],{env,stdio:'ignore'});
+    await expect.poll(() => second.exitCode,{timeout:15000}).toBe(0);
+    assert.equal(app.exitCode,null,'Second launch closed the original application');
     const errors=[];
     page.on('pageerror',error=>errors.push(error.message));
     await page.route('https://**',route=>route.abort());
@@ -97,7 +134,7 @@ async function close() {
     await page.screenshot({path:path.join(resultsDir,'installed-welcome.png')});
     await page.getByRole('button',{name:'Continue locally',exact:true}).click();
     await page.reload();
-    await expect(page.getByRole('heading',{name:'Welcome home.'})).toBeVisible();
+    await expect(page.getByRole('region',{name:'Files and storage workspace'})).toBeVisible();
     await expect(page.getByRole('dialog',{name:'Welcome to Groundwork'})).toHaveCount(0);
     const preferences=await fetch(connection.url+'/api/system/preferences',{headers:{Authorization:'Bearer '+connection.token}});
     const cloudUrl=(await preferences.json()).cloud_sync_url;
@@ -115,42 +152,44 @@ async function close() {
       await page.getByRole('button',{name:'Home',exact:true}).click();
       console.log('Installed system-browser Google sign-in and logout passed');
     }
-    await page.getByRole('button',{name:'Add your first folder',exact:true}).click();
-    await page.getByText('Paste a folder location',{exact:true}).click();
-    await page.getByLabel('Folder location').fill(workspace);
-    await page.getByLabel('Folder name').fill('Installed test');
-    await page.getByRole('button',{name:'Add folder',exact:true}).click();
+    // Add the fixture through the real authenticated service. Native picker
+    // interaction is a separate manual check; this does not mock indexing.
+    const added=await fetch(connection.url+'/api/workspaces',{method:'POST',headers:{Authorization:'Bearer '+connection.token,'Content-Type':'application/json'},body:JSON.stringify({path:workspace,name:'Installed test'})});
+    assert.equal(added.status,200);
+    await page.reload();
+    await expect(page.getByRole('combobox',{name:'Current location'})).toContainText('Installed test',{timeout:20000});
+    await expect(page.getByText('sample.ts',{exact:true}).first()).toBeVisible({timeout:30000});
+    await expect.poll(async () => {
+      const response = await fetch(connection.url+'/api/index/status',{headers:{Authorization:'Bearer '+connection.token}});
+      return (await response.json()).status;
+    }, {timeout:60000}).toBe('completed');
     await page.screenshot({path:path.join(resultsDir,'installed-home.png')});
-    await page.getByRole('button',{name:'Projects',exact:true}).click();
-    await expect(page.getByRole('heading',{name:'installed-workflow',exact:true})).toBeVisible({timeout:20000});
-    await page.getByRole('button',{name:'Overview',exact:true}).click();
-    await expect(page.getByText('Initialize installed workflow',{exact:true})).toBeVisible();
-    await page.getByRole('button',{name:'Close dialog'}).click();
-    await page.keyboard.press('Control+k');
+    await page.getByRole('button',{name:'Contents',exact:true}).click();
+    await page.getByRole('button',{name:'File contents',exact:true}).click();
+    await page.getByRole('textbox',{name:'Search your files'}).fill('installed_live_change');
+    fs.writeFileSync(path.join(workspace,'live.txt'),'installed_live_change arrived while search was open');
+    await expect(page.locator('[data-result-index="0"]')).toContainText('live.txt',{timeout:30000});
     await page.getByRole('textbox',{name:'Search your files'}).fill('installed_workflow_needle');
     await expect(page.locator('[data-result-index="0"]')).toContainText('sample.ts',{timeout:20000});
     await page.screenshot({path:path.join(resultsDir,'installed-search.png')});
     await page.getByRole('button',{name:'Ask about this file'}).click();
-    await page.getByRole('button',{name:'Ask',exact:true}).click();
-    await expect(page.getByText('These excerpts match your search.',{exact:false}).first()).toBeVisible({timeout:20000});
+    await page.getByLabel('Answer with').selectOption('local');
+    await page.getByLabel('Your question').fill('installed_workflow_needle');
+    await page.locator('.desktop-tool-panel').getByRole('button',{name:'Ask',exact:true}).click();
+    await expect(page.getByText('These passages come from the files you selected.',{exact:false}).first()).toBeVisible({timeout:20000});
     await expect(page.getByText('real evidence',{exact:false}).first()).toBeVisible();
-    await page.getByRole('checkbox',{name:'Explore related files and save this work'}).check();
-    const investigationResponse=page.waitForResponse(response=>response.url().endsWith('/api/ai/investigate') && response.request().method()==='POST');
-    await page.getByRole('button',{name:'Ask',exact:true}).click();
-    const savedInvestigation=await (await investigationResponse).json();
-    assert.ok(savedInvestigation.session_id);
-    const expectedFile=fs.statSync(path.join(workspace,'sample.ts'),{bigint:true});
-    assert.ok(savedInvestigation.inspected_files.some(file=>{
-      const actualFile=fs.statSync(file,{bigint:true});
-      return actualFile.dev===expectedFile.dev && actualFile.ino===expectedFile.ino;
-    }),'Investigation did not inspect the actual source file');
+    await page.setViewportSize({width:900,height:600});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Workspace overflow at 900×600');
+    await page.screenshot({path:path.join(resultsDir,'installed-compact-ai.png')});
+    await page.getByRole('button',{name:'Expand tool panel',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Dock tool panel',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Dock tool panel',exact:true}).click();
+    await page.setViewportSize({width:1180,height:780});
+    await page.getByRole('button',{name:'Save for later',exact:true}).click();
+    await expect(page.getByText('Saved in Saved work.',{exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Saved work',exact:true}).click();
-    await page.getByRole('button',{name:'Continue',exact:true}).click();
-    await expect(page.getByPlaceholder('What would you like to know about your files?')).toHaveValue(/Continue Investigation/);
-    const resumedRequest=page.waitForRequest(request=>request.url().endsWith('/api/ai/query') && request.method()==='POST');
-    await page.getByRole('button',{name:'Ask',exact:true}).click();
-    assert.equal((await resumedRequest).postDataJSON().session_id,savedInvestigation.session_id);
-    await expect(page.getByText('These excerpts match your search.',{exact:false}).first()).toBeVisible();
+    await page.getByRole('button',{name:/^(Continue|Resume)$/}).click();
+    await expect(page.getByRole('heading',{name:'Saved findings',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Notes',exact:true}).click();
     await page.getByRole('button',{name:'New note',exact:true}).click();
     await page.getByPlaceholder('Give your note a title').fill('Installed note');
@@ -209,18 +248,65 @@ async function close() {
     await expect(page.getByText('Groundwork restarted. Your work is saved.',{exact:true})).toBeVisible({timeout:30000});
     connection=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('start_local_core'));
     await close();
+    if(upgradeFrom) {
+      const upgraded=spawnSync(installer,['/S',`/D=${installDir}`],{windowsHide:true,timeout:120000});
+      assert.equal(upgraded.status,0,'Upgrade installer failed');
+      assert.ok(fs.existsSync(path.join(root,'state')),'Upgrade removed user data');
+    }
     await launch();
     await page.getByRole('button',{name:'Notes',exact:true}).click();
     await page.getByText('Installed note',{exact:true}).first().click();
     await expect(page.getByText('Edited and persisted',{exact:false}).first()).toBeVisible();
     await page.screenshot({path:path.join(resultsDir,'installed-restarted.png')});
+    const versionState=await fetch(connection.url+'/health',{headers:{Authorization:'Bearer '+connection.token}}).then(r=>r.json());
+    assert.equal(versionState.version,JSON.parse(fs.readFileSync(path.resolve(__dirname,'../package.json'),'utf8')).version,'Installed engine version differs from release');
+    const preservedWorkspaces=await fetch(connection.url+'/api/workspaces',{headers:{Authorization:'Bearer '+connection.token}}).then(r=>r.json());
+    assert.ok(preservedWorkspaces.some(item=>item.path===workspace),'Relaunch/upgrade lost added workspace');
+    const savedFindings=await fetch(connection.url+'/api/context-sessions',{headers:{Authorization:'Bearer '+connection.token}}).then(r=>r.json());
+    assert.ok(savedFindings.length>0,'Upgrade lost saved AI findings');
+    assert.equal(fs.readFileSync(path.join(workspace,'sample.ts'),'utf8'),'export function installed_workflow_needle() { return \"real evidence\"; }\n','Upgrade modified a user file');
+    const storageResponse=await fetch(connection.url+'/api/system/file-storage?path='+encodeURIComponent(path.join(workspace,'sample.ts')),{headers:{Authorization:'Bearer '+connection.token}});
+    assert.equal(storageResponse.status,200,'Packaged storage detail endpoint unavailable');
+    assert.equal((await storageResponse.json()).logical_bytes,fs.statSync(path.join(workspace,'sample.ts')).size);
+    await page.getByRole('button',{name:'Files & storage',exact:true}).click();
+    await page.getByText('sample.ts',{exact:true}).first().click();
+    await expect(page.getByText('Allocated',{exact:true})).toBeVisible();
+    await expect(page.getByText('Hard links',{exact:true})).toBeVisible();
+    await page.screenshot({path:path.join(resultsDir,'installed-storage-details.png')});
+    await page.getByRole('button',{name:'Ask',exact:true}).click();
+    await page.getByLabel('Answer with').selectOption('local');
+    await page.getByLabel('Your question').fill('installed_workflow_needle');
+    const keyboardJob=page.waitForResponse(response=>response.url().endsWith('/api/ai/jobs/query') && response.request().method()==='POST');
+    await page.getByLabel('Your question').press('Control+Enter');
+    assert.equal((await keyboardJob).status(),200,'Ctrl+Enter did not start an answer');
+    await expect(page.getByText('These passages come from the files you selected.',{exact:false}).first()).toBeVisible();
+    if(upgradeFrom) console.log('Upgrade from previous installer preserved notes, workspace and original files; new storage details and keyboard AI interaction passed');
+    await page.getByRole('button',{name:'Files & storage',exact:true}).click();
+    const scanResponse=page.waitForResponse(response=>response.url().includes('/api/index/start') && response.request().method()==='POST');
+    await page.getByRole('button',{name:'Scan',exact:true}).click();
+    assert.equal((await scanResponse).status(),200,'Scan control request was rejected');
+    const resumeFixture=path.join(workspace,'resume-fixture');
+    fs.mkdirSync(resumeFixture);
+    for(let index=0;index<400;index++) fs.writeFileSync(path.join(resumeFixture,`resume-${index}.md`),`resume_button_finalmarker document ${index} with local indexing evidence`);
+    const headers={Authorization:'Bearer '+connection.token,'Content-Type':'application/json'};
+    assert.equal((await fetch(connection.url+'/api/index/start',{method:'POST',headers,body:'[]'})).status,200);
+    await expect(page.getByRole('button',{name:'Stop indexing',exact:true})).toBeVisible({timeout:30000});
+    await page.getByRole('button',{name:'Stop indexing',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Resume indexing',exact:true})).toBeVisible();
+    const resumeResponse=page.waitForResponse(response=>response.url().includes('/api/index/start') && response.request().method()==='POST');
+    await page.getByRole('button',{name:'Resume indexing',exact:true}).click();
+    assert.equal((await resumeResponse).status(),200,'Resume control request was rejected');
+    await expect.poll(async()=>fetch(connection.url+'/api/index/status',{headers}).then(r=>r.json()).then(p=>p.status),{timeout:120000}).toBe('completed');
+    const resumedSearch=await fetch(connection.url+'/api/search?q=resume_button_finalmarker&mode=lexical',{headers}).then(r=>r.json());
+    assert.ok(resumedSearch.results.length,'Resume button did not finish searchable-content preparation');
+    console.log('Native workspace footer stop/resume completed real 400-document indexing');
     await close();
     assert.deepEqual(errors,[]);
-    console.log('Installed desktop with empty PATH: silent install, native launch/backend startup, workspace UI, Git overview, keyboard search, grounded AI, investigation/save/resume, note create/edit, service restart, application shutdown/relaunch and persistence passed');
+    console.log(`${portable ? 'Portable desktop' : 'Installed desktop'} with empty PATH: ${portable ? '' : 'silent install, '}native launch/backend startup, single-instance activation, real workspace indexing, live content search, grounded local passages, save/resume, compact/expanded panels, note create/edit, service restart, application shutdown/relaunch and persistence passed`);
   } finally {
     try {await close();}catch(error){console.error('Cleanup:',error.message);}
     const uninstall=path.join(installDir,'uninstall.exe');
-    if(fs.existsSync(uninstall))spawnSync(uninstall,['/S'],{windowsHide:true,timeout:30000});
+    if(!portable && fs.existsSync(uninstall))spawnSync(uninstall,['/S'],{windowsHide:true,timeout:30000});
     restoreCiPolicy();
     // Keep failed runs and screenshots available for diagnosis.
   }

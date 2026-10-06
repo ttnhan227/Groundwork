@@ -102,13 +102,29 @@ class WatcherService:
 
     def _handle_changes(self, changes: set[tuple[Change, str]]) -> None:
         """Processes debounced filesystem events."""
+        from app.services.inventory_service import InventoryService
+        inventory = InventoryService()
         projects = self.project_service.list_projects()
         projects_dict = [p.model_dump() for p in projects]
+        database = self.settings.get_database_path()
+        runtime_files = {database, Path(str(database) + "-wal"), Path(str(database) + "-shm"), database.parent / "local-core.log", database.parent / "preferences.dat", database.parent / "preferences.tmp"}
 
+        touched = set()
+        rescan = False
         for change_type, path_str in changes:
             fpath = Path(path_str)
+            if fpath.resolve() in runtime_files:
+                continue
 
-            ws = self._find_workspace_for_path(fpath)
+            matching = self._find_workspaces_for_path(fpath)
+            matching = [ws for ws in matching if not any(parent.is_symlink() or parent.is_junction() for parent in fpath.parents if parent != Path(ws.path) and parent.is_relative_to(Path(ws.path)))]
+            ws = matching[0] if matching else None
+            for membership in matching:
+                inventory.update_path(membership, fpath, refresh=False)
+                touched.add(membership.id)
+            if ws:
+                if change_type == Change.added and fpath.is_dir() and not fpath.is_symlink() and not fpath.is_junction():
+                    rescan = True
             if ws and fpath.name in {".gitignore", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"}:
                 self.indexer_service.start_indexing(ws.id)
             if ".git" in fpath.parts:
@@ -121,7 +137,6 @@ class WatcherService:
                 continue
 
             # Find matching workspace
-            ws = self._find_workspace_for_path(fpath)
             if not ws:
                 continue
 
@@ -136,8 +151,8 @@ class WatcherService:
                 )
             elif change_type in (Change.added, Change.modified):
                 if fpath.is_file():
-                    indexed = self.indexer_service.index_single_file(fpath, ws.id, projects_dict)
-                    if indexed:
+                    self.indexer_service.index_single_file(fpath, ws.id, projects_dict)
+                    if change_type in (Change.added, Change.modified):
                         act_type = ActivityType.FILE_CREATED if change_type == Change.added else ActivityType.FILE_MODIFIED
                         verb = "Created" if change_type == Change.added else "Modified"
                         self.activity_service.record_activity(
@@ -147,15 +162,28 @@ class WatcherService:
                             details={"path": str(fpath)},
                         )
 
+        for workspace_id in touched:
+            inventory.refresh_totals(workspace_id)
+        if rescan:
+            # A copied directory can arrive as one event, without child events.
+            # Reconcile every membership so overlapping roots also gain children.
+            self.indexer_service.start_indexing()
+
     def _find_workspace_for_path(self, path: Path):
-        workspaces = self.workspace_service.list_workspaces()
-        for ws in workspaces:
+        matches = self._find_workspaces_for_path(path)
+        return matches[0] if matches else None
+
+    def _find_workspaces_for_path(self, path: Path):
+        matches = []
+        for ws in self.workspace_service.list_workspaces():
+            if not ws.is_active:
+                continue
             try:
                 path.relative_to(Path(ws.path))
-                return ws
+                matches.append(ws)
             except ValueError:
                 pass
-        return None
+        return sorted(matches, key=lambda ws: len(ws.path), reverse=True)
 
     def _should_ignore(self, path: Path) -> bool:
         name = path.name.lower()

@@ -125,7 +125,7 @@ jobs:
     name: Windows desktop installer
     runs-on: windows-latest
     env:
-      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL }}
+      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL || 'https://groundwork-api-597984371188.asia-southeast1.run.app' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -143,9 +143,17 @@ jobs:
       - run: npm run tauri -- build
         working-directory: desktop
       - run: python desktop/scripts/smoke-core.py
+      - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
+      - run: python desktop/scripts/smoke-storage.py
       - run: python desktop/scripts/smoke-scale.py
       - run: python desktop/scripts/smoke-sync.py
-      - run: ./desktop/scripts/smoke-installed-ci.ps1 -Installer desktop/src-tauri/target/release/bundle/nsis/Groundwork_0.1.0_x64-setup.exe
+      - name: Test generated Windows installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -LiteralPath desktop/src-tauri/target/release/bundle/nsis -Filter '*-setup.exe'
+          if (@($installer).Count -ne 1) { throw 'Expected one Windows installer' }
+          ./desktop/scripts/smoke-installed-ci.ps1 -Installer $installer.FullName
+          if ($LASTEXITCODE) { throw 'Installed application checks failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -30,27 +30,25 @@ test("builds the Groundwork static website shell", async () => {
   assert.match(html, /\/assets\/index-/);
 });
 
-test("includes local-first headline and developer value proposition", async () => {
+test("describes filename browsing separately from readable content", async () => {
   const page = await readSourceTree();
-  assert.match(page, /Find what you were/);
-  assert.match(page, /Groundwork helps you find, understand, and resume work scattered across your computer/);
-  assert.match(page, /Your files/);
-  assert.match(page, /The user's workspace belongs to the user's machine/);
+  assert.match(page, /Find files by name or path as they are discovered/);
+  assert.match(page, /supported readable formats/);
+  assert.match(page, /No\s+account needed/);
 });
 
-test("includes desktop download options and system specifications", async () => {
+test("download uses release metadata and discloses development differences", async () => {
   const page = await readSourceTree();
-  assert.match(page, /Download for Windows \(Tauri 2\)/);
-  assert.match(page, /Groundwork-Setup-1\.0\.0-x64\.msi/);
-  assert.match(page, /Groundwork-1\.0\.0-portable\.exe/);
-  assert.match(page, /Windows 10 \(1903\+\) or Windows 11/);
+  assert.match(page, /fetchWindowsRelease/);
+  assert.match(page, /Features shown in development documentation may be newer than the installer/);
+  assert.doesNotMatch(page, /Groundwork-Setup-1\.0\.0-x64\.msi/);
+  assert.match(page, /Windows 10 or 11/);
 });
 
-test("includes comprehensive documentation sections and privacy manifesto", async () => {
+test("organization documentation requires preview and reports partial coverage", async () => {
   const page = await readSourceTree();
-  assert.match(page, /Universal Search & Hybrid Ranking/);
-  assert.match(page, /AI Context Engine & Investigation/);
-  assert.match(page, /Groundwork Sync \(Optional Cloud Backend\)/);
-  assert.match(page, /Privacy Architecture & Security Model/);
-  assert.match(page, /NEVER uploaded/);
+  assert.match(page, /Scanning never moves or renames your files/);
+  assert.match(page, /exact displayed plan/);
+  assert.match(page, /Excerpts cover only part of a long document/);
+  assert.match(page, /built-in local answers through llama\.cpp/);
 });

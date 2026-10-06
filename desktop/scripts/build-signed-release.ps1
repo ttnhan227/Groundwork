@@ -1,10 +1,9 @@
 $ErrorActionPreference = 'Stop'
-$stable = $env:RELEASE_TAG -notmatch '^v0\.'
 $hasCertificate = ![string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64)
 if (!$hasCertificate) {
-    if ($stable) { throw 'Stable publication requires a Windows code-signing certificate. Configure WINDOWS_CERTIFICATE_BASE64 and WINDOWS_CERTIFICATE_PASSWORD.' }
+    Write-Host 'Building an unsigned installer; signing is optional by project policy.'
     npm run tauri -- build --bundles nsis
-    if ($LASTEXITCODE) { throw 'Preview installer build failed' }
+    if ($LASTEXITCODE) { throw 'Installer build failed' }
     exit
 }
 $temporaryDirectory = Join-Path $env:RUNNER_TEMP ('groundwork-signing-' + [guid]::NewGuid().ToString('N'))

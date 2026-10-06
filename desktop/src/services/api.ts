@@ -14,6 +14,11 @@ import type {
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
 
+export interface InstalledApp {
+  id: string; name: string; icon: string; publisher: string; version: string;
+  description: string; location: string; kind: string;
+}
+
 let connectionPromise: Promise<{ url: string; token?: string }> | undefined;
 function getConnection() {
   if (!connectionPromise) {
@@ -50,8 +55,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
+    if (
+      path.includes("/local-ai") ||
+      path.includes("/installed-apps") ||
+      path.includes("/organization") ||
+      path.includes("/jobs/") ||
+      path.includes("/actions/")
+    ) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        typeof body.detail === "string"
+          ? body.detail
+          : "Couldn't finish this task. Please try again.",
+      );
+    }
     const messages: Record<number, string> = {
       401: "Please sign in again, or check your email and password.",
+      403: "Access is restricted. Choose an accessible file inside an added folder.",
+      404: "This item is no longer available. Refresh the view and try again.",
       409: path.includes("/sync/google")
         ? "Sign in with your email first, then connect Google from Account → Sign-in options."
         : path === "/api/sync/login"
@@ -73,6 +94,164 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  fileStorage: (path: string) => request<{logical_bytes: number; allocated_bytes: number | null; hard_links: number; allocation_note: string}>(`/api/system/file-storage?path=${encodeURIComponent(path)}`),
+  cancelOrganization: () => request("/api/ai/organization", {method: "POST", body: JSON.stringify({action: "cancel"})}),
+  organizationProgress: () =>
+    request<{
+      phase: string;
+      checked: number;
+      completed: number;
+      total: number;
+      bytes: number;
+      current_size?: number;
+    }>("/api/ai/organization/progress"),
+  proposeAction: (instruction: string, paths: string[]) =>
+    request<
+      AssistantJob<{
+        proposal: { action: string; value: string };
+        confirmation_token: string;
+      }>
+    >("/api/ai/actions/propose", {
+      method: "POST",
+      body: JSON.stringify({ instruction, paths }),
+    }),
+  executeAction: (
+    proposal: { action: string; value: string },
+    confirmation_token: string,
+  ) =>
+    request<Record<string, unknown>>("/api/ai/actions/execute", {
+      method: "POST",
+      body: JSON.stringify({ proposal, confirmation_token }),
+    }),
+  localAIStatus: () =>
+    request<import("../components/assistant/LocalAISetup").LocalAIStatus>(
+      "/api/system/local-ai",
+    ),
+  localAIAction: (action: string, model?: string, path?: string) =>
+    request<import("../components/assistant/LocalAISetup").LocalAIStatus>(
+      "/api/system/local-ai",
+      { method: "POST", body: JSON.stringify({ action, model, path }) },
+    ),
+  importLocalModel: (filePath: string, modelId?: string) =>
+    request<{ status: string; model_id: string; name: string }>(
+      "/api/system/local-ai",
+      { method: "POST", body: JSON.stringify({ action: "import", path: filePath, model: modelId || "small" }) },
+    ),
+  startQuestion: (question: string, file_paths: string[], provider: string) =>
+    request<AssistantJob<AIQueryResponse>>("/api/ai/jobs/query", {
+      method: "POST",
+      body: JSON.stringify({ question, file_paths, provider }),
+    }),
+  assistantJob: <T>(id: string) =>
+    request<AssistantJob<T>>(`/api/ai/jobs/${id}`),
+  organize: <T>(values: Record<string, unknown>) =>
+    request<AssistantJob<T>>("/api/ai/organization", {
+      method: "POST",
+      body: JSON.stringify(values),
+    }),
+  organizationHistory: () =>
+    request<import("../components/assistant/OrganizeView").Plan[]>(
+      "/api/ai/organization/history",
+    ),
+  listRules: (folder?: string) =>
+    request<Array<{ id: string; folder_path: string; name: string; rule_type: string; instruction: string; categories: string[]; created_at: number; updated_at: number }>>(
+      "/api/ai/organization/rules" + (folder ? `?folder=${encodeURIComponent(folder)}` : ""),
+    ),
+  saveRule: (folder_path: string, name: string, rule_type: string, instruction = "", categories: string[] = []) =>
+    request<{ id: string; folder_path: string; name: string; rule_type: string; instruction: string; categories: string[] }>(
+      "/api/ai/organization",
+      { method: "POST", body: JSON.stringify({ action: "save_rule", destination: folder_path, rule_name: name, rule_type, instruction, categories }) },
+    ),
+  deleteRule: (rule_id: string) =>
+    request<{ success: boolean }>("/api/ai/organization", {
+      method: "POST",
+      body: JSON.stringify({ action: "delete_rule", rule_id }),
+    }),
+  runRule: (rule_id: string, destination?: string) =>
+    request<AssistantJob<import("../components/assistant/OrganizeView").Plan>>("/api/ai/organization", {
+      method: "POST",
+      body: JSON.stringify({ action: "run_rule", rule_id, destination: destination || "" }),
+    }),
+  listPreferences: () =>
+    request<Array<{ id: string; name: string; categories: string[]; instructions: string; created_at: number; updated_at: number }>>(
+      "/api/ai/organization/preferences",
+    ),
+  savePreference: (name: string, categories: string[], instructions = "") =>
+    request<{ id: string; name: string; categories: string[]; instructions: string }>(
+      "/api/ai/organization",
+      { method: "POST", body: JSON.stringify({ action: "save_preference", rule_name: name, categories, instruction: instructions }) },
+    ),
+  deletePreference: (id: string) =>
+    request<{ success: boolean }>("/api/ai/organization", {
+      method: "POST",
+      body: JSON.stringify({ action: "delete_preference", rule_id: id }),
+    }),
+  createSampleFolder: () =>
+    request<{ folder_path: string; files: string[]; message: string }>(
+      "/api/ai/organization/sample",
+      { method: "POST" },
+    ),
+  getDuplicates: (workspace_id?: string) =>
+    request<{
+      exact_duplicates: Array<{
+        sha256: string;
+        size_bytes: number;
+        file_count: number;
+        potential_waste_bytes: number;
+        files: Array<{ path: string; name: string; size_bytes: number; mtime: number; extension: string }>;
+      }>;
+      similar_names: Array<{
+        base_name: string;
+        file_count: number;
+        files: Array<{ path: string; name: string; size_bytes: number; mtime: number; extension: string }>;
+      }>;
+      total_exact_groups: number;
+      total_duplicate_files: number;
+      total_potential_waste_bytes: number;
+      note: string;
+    }>("/api/system/duplicates" + (workspace_id ? `?workspace_id=${encodeURIComponent(workspace_id)}` : "")),
+  getCapabilities: () =>
+    request<Record<string, { available: boolean; status?: string; label: string; description: string }>>(
+      "/api/system/capabilities",
+    ),
+  getReadableFormats: () =>
+    request<{
+      extensions: string[];
+      special_names: string[];
+      max_bytes: number;
+      max_files: number;
+      lines_per_file: number;
+    }>("/api/system/readable-formats"),
+  getComputerStatus: () =>
+    request<import("../components/computer/ComputerView").ComputerStatus>(
+      "/api/system/computer",
+    ),
+  getInstalledApps: (refresh = false) => request<{ apps: InstalledApp[]; supported: boolean }>(`/api/system/installed-apps?refresh=${refresh}`, { signal: AbortSignal.timeout(70000) }),
+  launchInstalledApp: (id: string) => request<{ success: boolean }>("/api/system/installed-apps/launch", { method: "POST", body: JSON.stringify({ path: id }) }),
+  desktopAction: (action: string, value: string, confirmation_token?: string) =>
+    request<{
+      success?: boolean;
+      path?: string;
+      confirmation_required?: boolean;
+      confirmation_token?: string;
+    }>("/api/system/desktop-action", {
+      method: "POST",
+      body: JSON.stringify({ action, value, confirmation_token }),
+    }),
+  browseInventory: (id: string, values: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    Object.entries(values).forEach(([key, value]) => {
+      if (value !== undefined) params.set(key, value);
+    });
+    return request<import("../types/api").InventoryResult>(
+      `/api/workspaces/${encodeURIComponent(id)}/inventory?${params}`,
+    );
+  },
+  browseAllInventory: (values: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    Object.entries(values).forEach(([key, value]) => { if (value !== undefined) params.set(key, value); });
+    return request<import("../types/api").InventoryResult>(`/api/workspaces/inventory/all?${params}`);
+  },
   restartLocalCore: async () => {
     if (!isTauri())
       throw new Error(
@@ -144,6 +323,7 @@ export const api = {
       : Promise.resolve(null),
 
   // Workspaces
+  pickAIModel: () => isTauri() ? invoke<string | null>("pick_ai_model") : Promise.resolve(null),
   listWorkspaces: () => request<Workspace[]>("/api/workspaces"),
   createWorkspace: (name: string, path: string) =>
     request<Workspace>("/api/workspaces", {
@@ -174,7 +354,15 @@ export const api = {
         : "/api/index/start",
       {
         method: "POST",
-        body: JSON.stringify({ workspace_id: workspaceId }),
+        body: JSON.stringify([]),
+      },
+    ),
+  indexSelectedFiles: (paths: string[], workspaceId?: string) =>
+    request<IndexProgress>(
+      "/api/index/selected" + (workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : ""),
+      {
+        method: "POST",
+        body: JSON.stringify(paths),
       },
     ),
   cancelIndexing: () =>
@@ -318,25 +506,29 @@ export const api = {
     }),
 
   // AI
-  queryAI: (
+  queryAI: async (
     question: string,
     projectId?: string,
     provider?: string,
     focusedPath?: string,
     focusedLine?: number,
     sessionId?: string,
+    filePaths: string[] = [],
   ) =>
-    request<AIQueryResponse>("/api/ai/query", {
-      method: "POST",
-      body: JSON.stringify({
-        question,
-        project_id: projectId,
-        provider,
-        focused_path: focusedPath,
-        focused_line: focusedLine,
-        session_id: sessionId,
+    waitForJob(
+      await request<AssistantJob<AIQueryResponse>>("/api/ai/jobs/query", {
+        method: "POST",
+        body: JSON.stringify({
+          question,
+          project_id: projectId,
+          provider,
+          file_paths: filePaths,
+          focused_path: focusedPath,
+          focused_line: focusedLine,
+          session_id: sessionId,
+        }),
       }),
-    }),
+    ),
   investigateProblem: (
     problemStatement: string,
     projectId?: string,
@@ -356,6 +548,7 @@ export const api = {
       evidence_count: number;
     }>("/api/ai/investigate", {
       method: "POST",
+      signal: AbortSignal.timeout(300000),
       body: JSON.stringify({
         problem_statement: problemStatement,
         project_id: projectId,
@@ -400,3 +593,20 @@ export const api = {
       error?: string;
     }>("/api/sync/trigger", { method: "POST" }),
 };
+
+export interface AssistantJob<T> {
+  id: string;
+  status: "running" | "complete" | "error" | "cancelled";
+  result: T | null;
+  error: string | null;
+}
+export async function waitForJob<T>(job: AssistantJob<T>): Promise<T> {
+  let current = job;
+  while (current.status === "running") {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    current = await api.assistantJob<T>(current.id);
+  }
+  if (current.status !== "complete" || current.result === null)
+    throw new Error(current.error || "Task cancelled.");
+  return current.result;
+}

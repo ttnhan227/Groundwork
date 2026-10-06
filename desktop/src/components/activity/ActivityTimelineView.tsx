@@ -176,6 +176,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
         </div>
       </div>
 
+      <p className="text-sm text-[var(--ink-secondary)] mb-4">This shows file changes and actions recorded by Groundwork. Modification dates do not show which files you opened or read.</p>
       {/* AI Context Synthesis Card */}
       <Card className="mb-6 border-[var(--hairline-strong)]">
         <div className="flex items-center justify-between mb-3">
@@ -312,7 +313,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
           <EmptyState
             icon={<Clock size={28} />}
             title="No events recorded for this timeframe"
-            description="As you edit files, run git commands, and search projects, events appear here."
+            description="File changes and actions recorded by Groundwork appear here. Modification dates do not show which files you opened or read."
             compact
           />
         ) : (
