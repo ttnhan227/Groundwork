@@ -1433,7 +1433,7 @@ dependencies = [
 
 [[package]]
 name = "groundwork-desktop"
-version = "1.0.2"
+version = "1.0.0"
 dependencies = [
  "reqwest 0.12.28",
  "rfd",

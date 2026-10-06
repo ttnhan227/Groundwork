@@ -39,11 +39,11 @@ Metadata discovery and searchable-content preparation are separate operations. T
 
 Storage API definitions: [Microsoft FileStandardInfo](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_standard_info), [Microsoft compressed/sparse file storage](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getcompressedfilesizew).
 
-## Publication follow-up
+## Publication validation follow-up
 
-The owner authorized publication on 2026-10-06. Commit `f59f9a2` and tag `v1.0.0` were pushed. Hosted CI exposed one development-URL test inheriting the release-mode environment. Its environment is now isolated; all 12 configuration regressions pass with `GITHUB_ACTIONS=true`. The superseded release run was cancelled. The corrected release uses `v1.0.1`, preserving the existing tag. The 1.0.0 installer hash and measurements above describe the locally validated candidate; the release workflow rebuilds and validates the 1.0.1 publication artifact.
+The owner authorized publishing 1.0.0 on 2026-10-06. Hosted CI exposed two issues before publication: a development-URL test inherited the release-mode flag, and Windows short-path aliases were not normalized for inventory browsing. Both are fixed. All 159 backend tests pass with CI mode enabled. The 25,000-file storage rerun passed ACL denial, abrupt WAL recovery, 600 mutations, and exact final bytes (1.453 seconds for recovered metadata discovery).
 
-The 1.0.1 hosted Windows storage gate then exposed short-path aliases in the runner temporary directory. Inventory browsing now resolves parent paths consistently with workspace registration. The stress fixture resolves its root and always closes SQLite. The full 159-test suite passed with CI mode enabled, and the 25,000-file stress rerun passed ACL denial, abrupt WAL recovery, 600 mutations, and exact final bytes (1.453 seconds for recovered metadata discovery). The next publication candidate is 1.0.2; previous tags remain unchanged and unpublished.
+Premature 1.0.1/1.0.2 candidate tags were removed at the owner's correction; neither had a published release. The intended release remains 1.0.0. Its unpublished tag will point to the final corrected commit after validation. The installer hash above records the earlier local candidate; the release workflow rebuilds and tests the final artifact before publication.
 
 ## Original publication handoff
 

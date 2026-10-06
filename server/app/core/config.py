@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     """Local Groundwork configuration settings."""
 
     app_name: str = "Groundwork Local"
-    app_version: str = "1.0.2"
+    app_version: str = "1.0.0"
     environment: str = Field(default="development", alias="ENVIRONMENT")
 
     # Local filesystem storage

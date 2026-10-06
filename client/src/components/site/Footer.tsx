@@ -45,8 +45,7 @@ export function Footer({ navigate }: { navigate: (path: string) => void }) {
           </nav>
         </div>
         <p className="text-sm text-[var(--ink-muted)] mt-10 pt-6 border-t border-[var(--hairline)]">
-          © {new Date().getFullYear()} Groundwork · Open source under Apache
-          2.0
+          © {new Date().getFullYear()} Groundwork · Open source under MIT
         </p>
       </div>
     </footer>
