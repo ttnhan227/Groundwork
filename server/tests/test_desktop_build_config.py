@@ -32,7 +32,9 @@ def test_ci_requires_variable_even_when_local_env_exists(monkeypatch, tmp_path):
         read_api_url(tmp_path)
 
 
-def test_normalizes_root_and_api_prefix():
+def test_normalizes_root_and_api_prefix(monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("GROUNDWORK_RELEASE_BUILD", raising=False)
     assert normalize(" https://accounts.example.com/api/v1/ ") == "https://accounts.example.com"
     assert normalize("http://localhost:8080/") == "http://localhost:8080"
 
