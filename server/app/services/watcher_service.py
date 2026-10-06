@@ -16,7 +16,7 @@ import watchfiles
 from watchfiles import Change
 
 from app.core.config import get_settings
-from app.models.types import ActivityType
+from app.models.types import ActivityType, IndexStatus
 from app.services.activity_service import ActivityService
 from app.services.indexer_service import IndexerService
 from app.services.project_service import ProjectService
@@ -80,6 +80,7 @@ class WatcherService:
                 continue
 
             try:
+                reconcile_after_registration = True
                 # Watch all existing roots with watchfiles
                 for changes in watchfiles.watch(
                     *existing_roots,
@@ -90,8 +91,13 @@ class WatcherService:
                     watch_filter=None,
                     rust_timeout=1000,
                 ):
+                    # Registration is lazy; reconcile changes that happened
+                    # between the original scan and the watcher starting.
+                    if reconcile_after_registration:
+                        reconcile_after_registration = False
+                        if self.indexer_service.get_progress().status != IndexStatus.CANCELLED:
+                            self.indexer_service.start_indexing()
                     if set(existing_roots) != set(self.workspace_service.get_allowed_roots()):
-                        self.indexer_service.start_indexing()
                         break
                     if changes:
                         self._handle_changes(changes)

@@ -4,7 +4,7 @@
 
 Groundwork 1.0.0 is already published. These automation changes do not replace that release or create another version.
 
-The deployment jobs are implemented. Production push deployment stays disabled until credentials are configured and the workflows have been exercised. The existing Render automatic deployment after CI remains enabled.
+The Google federation, limited deployment account, and Render hook are configured with owner approval. Both manual deployment workflows passed on 2026-10-06. Production push deployment is enabled; the next main CI run verifies automatic dispatch. The existing Render automatic deployment after CI remains enabled.
 
 Required repository configuration:
 
@@ -15,7 +15,7 @@ Required repository configuration:
 - Variable `PRODUCTION_AUTOMATION_ENABLED`: set to `true` only after the two deployment workflows pass.
 - Variable `DESKTOP_API_BASE_URL`: already set to the public Groundwork API URL.
 
-Do not put keys or deploy hooks in commits or chat. No service-account JSON key is needed. Google federation must restrict trust to this repository and its main branch/version-tag workflows. Grant the deploy account Cloud Run deployment access to Groundwork, Artifact Registry writer on `cloud-run-source-deploy`, and Service Account User on the existing runtime account. Preserve existing runtime database, OAuth, and JWT configuration. These permissions need owner approval before creation.
+Do not put keys or deploy hooks in commits or chat. No service-account JSON key is needed. Google federation must restrict trust to this repository and its main branch/version-tag workflows. Grant the deploy account Cloud Run deployment access to Groundwork, Artifact Registry writer on `cloud-run-source-deploy`, and Service Account User on the existing runtime account. Preserve existing runtime database, OAuth, and JWT configuration. The owner approved these permissions on 2026-10-06. The Google trust restricts repository ID 1311696074, owner ID 152136876, and main/version-tag refs; no permanent service-account key was created.
 
 ## Push to main
 
@@ -45,3 +45,5 @@ The installer bundles the desktop UI and local backend. Models are separate down
 4. Push a normal change to main and verify CI dispatches both deployment jobs automatically. No new app release is needed to test deployment automation.
 
 Signing remains optional by the owner's decision. Installer builds use the configured public HTTPS backend address. Production database and OAuth secrets stay in the existing Cloud Run configuration.
+
+Activation evidence: [backend deployment](https://github.com/ttnhan227/Groundwork/actions/runs/37428016061) and [website deployment](https://github.com/ttnhan227/Groundwork/actions/runs/37428019144) both passed. The public backend `/ready` and website `deployment.json` identify the deployed source commit.
