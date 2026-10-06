@@ -11,7 +11,7 @@ if (!process.argv[2]) throw new Error('Pass the NSIS installer path');
 const upgradeFrom = process.env.GROUNDWORK_UPGRADE_FROM ? path.resolve(process.env.GROUNDWORK_UPGRADE_FROM) : null;
 const portable = process.argv[2] === '--portable';
 const installer = portable ? null : path.resolve(process.argv[2]);
-const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'groundwork-installed-')));
+const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'groundwork-installed-')));
 const installDir = portable ? path.resolve(__dirname,'../src-tauri/target/release') : path.join(root, 'application');
 const resultsDir = path.resolve(__dirname, '../test-results');
 fs.mkdirSync(resultsDir, {recursive:true});
@@ -92,7 +92,7 @@ async function close() {
     for(const entry of registered) {
       const previous=entry.replace(/^"|"$/g,'');
       if(fs.existsSync(path.join(previous,'groundwork-desktop.exe'))) {
-        const parent=path.relative(os.tmpdir(),previous);
+        const parent=path.relative(fs.realpathSync.native(os.tmpdir()),fs.realpathSync.native(previous));
         assert.ok(!parent.startsWith('..') && !path.isAbsolute(parent) && parent.startsWith('groundwork-installed-'),'Use a clean Windows account or --portable: an existing real Groundwork installation must not be changed by this test');
       }
     }
@@ -261,7 +261,7 @@ async function close() {
     const versionState=await fetch(connection.url+'/health',{headers:{Authorization:'Bearer '+connection.token}}).then(r=>r.json());
     assert.equal(versionState.version,JSON.parse(fs.readFileSync(path.resolve(__dirname,'../package.json'),'utf8')).version,'Installed engine version differs from release');
     const preservedWorkspaces=await fetch(connection.url+'/api/workspaces',{headers:{Authorization:'Bearer '+connection.token}}).then(r=>r.json());
-    assert.ok(preservedWorkspaces.some(item=>item.path===workspace),'Relaunch/upgrade lost added workspace');
+    assert.ok(preservedWorkspaces.some(item=>fs.realpathSync.native(item.path)===fs.realpathSync.native(workspace)),'Relaunch/upgrade lost added workspace');
     const savedFindings=await fetch(connection.url+'/api/context-sessions',{headers:{Authorization:'Bearer '+connection.token}}).then(r=>r.json());
     assert.ok(savedFindings.length>0,'Upgrade lost saved AI findings');
     assert.equal(fs.readFileSync(path.join(workspace,'sample.ts'),'utf8'),'export function installed_workflow_needle() { return \"real evidence\"; }\n','Upgrade modified a user file');

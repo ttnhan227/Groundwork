@@ -41,7 +41,7 @@ Storage API definitions: [Microsoft FileStandardInfo](https://learn.microsoft.co
 
 ## Publication validation follow-up
 
-The owner authorized publishing 1.0.0 on 2026-10-06. Hosted CI exposed two issues before publication: a development-URL test inherited the release-mode flag, and Windows short-path aliases were not normalized for inventory browsing. Both are fixed. All 159 backend tests pass with CI mode enabled. The 25,000-file storage rerun passed ACL denial, abrupt WAL recovery, 600 mutations, and exact final bytes (1.453 seconds for recovered metadata discovery).
+The owner authorized publishing 1.0.0 on 2026-10-06. Hosted CI exposed two issues before publication: a development-URL test inherited the release-mode flag, and Windows short-path aliases were not normalized for inventory browsing. Both are fixed. The installed-app fixture also uses Windows native realpath resolution when checking persisted workspace paths, so short aliases are not mistaken for missing data. All 159 backend tests pass with CI mode enabled. The 25,000-file storage rerun passed ACL denial, abrupt WAL recovery, 600 mutations, and exact final bytes (1.453 seconds for recovered metadata discovery).
 
 Premature 1.0.1/1.0.2 candidate tags were removed at the owner's correction; neither had a published release. The intended release remains 1.0.0. Its unpublished tag will point to the final corrected commit after validation. The installer hash above records the earlier local candidate; the release workflow rebuilds and tests the final artifact before publication.
 
