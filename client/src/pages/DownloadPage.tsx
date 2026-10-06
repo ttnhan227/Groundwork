@@ -65,7 +65,7 @@ export const DownloadPage: React.FC = () => {
                   : "A Windows installer has not been published yet. It will appear here automatically after a release passes its checks."}
           </p>
           {release?.preview && <p className="text-sm text-[var(--ink-secondary)]">Groundwork is still in development. This preview is available to try; the finished 1.0 release is not ready yet.</p>}
-          <p className="text-sm text-[var(--ink-secondary)]">Features shown in development documentation may be newer than the installer. Check the release notes before downloading. Local AI models are separate downloads.</p>
+          <p className="text-sm text-[var(--ink-secondary)]">Includes the desktop workspace, search, Assistant, notes, and file organization. Local AI models are separate downloads. See release notes for changes and supported features.</p>
           {release ? (
             <a
               href={release.url}
@@ -112,7 +112,7 @@ export const DownloadPage: React.FC = () => {
               <strong>Continue locally</strong>.
             </li>
             <li>
-              From Home, choose <strong>Add your first folder</strong>. Your
+              Click <strong>Choose folder</strong> in the workspace toolbar. Your
               files stay on your computer.
             </li>
           </ol>

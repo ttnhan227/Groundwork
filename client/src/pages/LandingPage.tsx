@@ -2,10 +2,10 @@ import {
   Search,
   FolderOpen,
   FileText,
-  Clock,
   Download,
   ArrowRight,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 
 export function LandingPage({
@@ -17,16 +17,17 @@ export function LandingPage({
     <div>
       <section className="max-w-6xl mx-auto px-6 py-20 sm:py-28">
         <p className="text-[var(--ink-blue)] font-medium mb-5">
-          A little less searching. A little more doing.
+          Groundwork 1.0 · A desktop workspace for your files
         </p>
         <h1 className="max-w-4xl text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.12]">
-          Your files, notes, and unfinished thoughts.
+          Explore your files. Ask your AI.
           <br />
-          <span className="text-[var(--ink-blue)]">Back within reach.</span>
+          <span className="text-[var(--ink-blue)]">Stay in control.</span>
         </h1>
         <p className="max-w-2xl text-lg leading-relaxed text-[var(--ink-secondary)] mt-7">
-          Groundwork helps you find files on your computer, keep notes alongside
-          your work, and return to what you were doing. Start with a folder. No
+          Browse a folder tree, search files, inspect storage, and ask Assistant
+          in one compact desktop workspace. Keep notes and preview file organization
+          alongside your work. Start with a folder. No
           account needed.
         </p>
         <div className="flex flex-wrap gap-4 mt-9">
@@ -59,19 +60,19 @@ export function LandingPage({
                 text: "Find files by name or path as they are discovered. Search inside supported readable formats once preparation finishes.",
               },
               {
-                icon: FileText,
-                title: "Keep a thought close",
-                text: "Save a note, a reminder, or the next step while it's fresh in your mind.",
+                icon: Sparkles,
+                title: "Ask AI with sources",
+                text: "Get local AI answers from your files with sources to check. Download a model or import a GGUF file; online providers are optional.",
               },
               {
-                icon: Clock,
-                title: "Pick up where you left off",
-                text: "See recent changes and revisit questions and work you've saved.",
+                icon: FileText,
+                title: "Keep your work together",
+                text: "Save notes and useful AI findings. Return to recent changes and saved work without leaving the workspace.",
               },
               {
                 icon: FolderOpen,
-                title: "Understand your projects",
-                text: "For code projects, see an overview, recent changes, and the files behind an answer.",
+                title: "Explore and organize",
+                text: "Browse folders and files together, inspect logical sizes, and review proposed file moves before applying them. Change history includes undo.",
               },
             ].map((item) => (
               <article key={item.title} className="space-y-4">
@@ -110,8 +111,8 @@ export function LandingPage({
                 "Sign in to sync notes and saved searches, or choose Continue locally.",
               ],
               [
-                "Add your first folder",
-                "Choose a folder from Home. Search your files as Groundwork prepares them in the background.",
+                "Choose a folder or drive",
+                "Click Choose folder in the workspace toolbar. Browse and search as Groundwork prepares supported file contents in the background.",
               ],
             ].map(([title, text], index) => (
               <li key={title} className="flex gap-5">

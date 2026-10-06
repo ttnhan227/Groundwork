@@ -37,10 +37,10 @@ test("describes filename browsing separately from readable content", async () =>
   assert.match(page, /No\s+account needed/);
 });
 
-test("download uses release metadata and discloses development differences", async () => {
+test("download uses release metadata and discloses separate model downloads", async () => {
   const page = await readSourceTree();
   assert.match(page, /fetchWindowsRelease/);
-  assert.match(page, /Features shown in development documentation may be newer than the installer/);
+  assert.match(page, /Local AI models are separate downloads/);
   assert.doesNotMatch(page, /Groundwork-Setup-1\.0\.0-x64\.msi/);
   assert.match(page, /Windows 10 or 11/);
 });

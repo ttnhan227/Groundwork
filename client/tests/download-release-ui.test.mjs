@@ -16,7 +16,7 @@ test('download page picks up newer releases without rebuilding and handles missi
     fs.mkdirSync('test-results',{recursive:true});
     await page.setViewportSize({width:1280,height:900});
     await page.goto('http://127.0.0.1:18556');
-    await expect(page.getByRole('heading',{name:/Your files, notes, and unfinished thoughts/})).toBeVisible();
+    await expect(page.getByRole('heading',{name:/Explore your files\. Ask your AI/})).toBeVisible();
     await page.screenshot({path:'test-results/polished-website.png',fullPage:true});
     await page.getByRole('button',{name:'See how to get started',exact:true}).click();
     await expect(page.getByRole('heading',{name:'Start here',exact:true})).toBeVisible();

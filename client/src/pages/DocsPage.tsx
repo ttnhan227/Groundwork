@@ -18,8 +18,8 @@ const guides: Record<
         "The welcome window offers Google sign-in, email sign-in, or Continue locally. An account is optional. Local use keeps your notes and saved searches on this computer.",
       ],
       [
-        "Add a folder from Home",
-        "Click Add your first folder, then Choose folder. Pick your Documents folder or a project folder and click Add folder. Your original files stay in place.",
+        "Choose a folder or drive",
+        "Click Choose folder in the workspace toolbar. Pick your Documents folder, a project folder, or a drive. The folder tree and file table fill as scanning starts. Your original files stay in place.",
       ],
       [
         "Find something",
@@ -27,7 +27,7 @@ const guides: Record<
       ],
       [
         "Make yourself at home",
-        "Use Notes for ideas and reminders, Recent activity to see changes, and Saved work to return to questions you've kept. Manage the folders you search in Folders.",
+        "Browse the folder tree and search above the file table. Open Assistant alongside your files, Notes for ideas and reminders, and Saved work for findings you've kept. Select a location in the tree to manage or remove it.",
       ],
     ],
   },
@@ -46,7 +46,7 @@ const guides: Record<
       ],
       [
         "Add or remove folders",
-        "Open Folders to manage what Groundwork searches. Removing a folder from Groundwork doesn't delete your original files.",
+        "Use Choose folder to add a location. Select a location in the workspace tree to manage or remove it. Removing a folder from Groundwork doesn't delete your original files.",
       ],
       [
         "If a file is missing",
@@ -65,7 +65,7 @@ const guides: Record<
       ],
       [
         "Choose written answers",
-        "In the development version, Assistant offers built-in local answers through llama.cpp. Download a model in the app or import a compatible GGUF file. External providers remain optional; online providers require internet and may charge for usage. Check the downloaded release's changelog for available features.",
+        "Assistant offers built-in local answers through llama.cpp. Download a model in the app or import a compatible GGUF file. Models are separate from the installer. External providers remain optional; online providers require internet and may charge for usage.",
       ],
       [
         "Know what gets shared",
@@ -79,7 +79,7 @@ const guides: Record<
   },
   organize: {
     title: "Preview file organization",
-    intro: "Available in the development version. Scanning never moves or renames your files. Check release notes for installer availability.",
+    intro: "Review proposed changes before organizing your files. Scanning never moves or renames your files.",
     steps: [
       ["Choose files and a method", "Select files in Files, then open Organize. Group by file type or last modified date without AI. Content suggestions use supported excerpts and require a local model or your configured provider."],
       ["Review the proposed changes", "Choose a destination inside an added folder. Preview changes shows current and proposed locations. Edit suggestions, exclude files, or leave them unchanged when evidence is insufficient. The preview creates no folders or links."],
