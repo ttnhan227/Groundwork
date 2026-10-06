@@ -53,6 +53,8 @@ class WatcherService:
             return
 
         self._stop_event.clear()
+        # Startup already scans these roots in the application lifespan.
+        self._watched_paths = {str(path) for path in self.workspace_service.get_allowed_roots() if path.exists()}
         self._thread = threading.Thread(
             target=self._watch_loop,
             name="GroundworkWatcherThread",
@@ -95,7 +97,10 @@ class WatcherService:
                     # between the original scan and the watcher starting.
                     if reconcile_after_registration:
                         reconcile_after_registration = False
-                        if self.indexer_service.get_progress().status != IndexStatus.CANCELLED:
+                        registered_paths = {str(path) for path in existing_roots}
+                        added_paths = registered_paths - self._watched_paths
+                        self._watched_paths = registered_paths
+                        if added_paths and not self._stop_event.is_set() and self.indexer_service.get_progress().status != IndexStatus.CANCELLED:
                             self.indexer_service.start_indexing()
                     if set(existing_roots) != set(self.workspace_service.get_allowed_roots()):
                         break
