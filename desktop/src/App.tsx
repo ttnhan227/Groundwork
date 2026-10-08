@@ -2,6 +2,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import React, { useState, useEffect } from "react";
 import { DesktopCommandBar, ToolPanelHeader } from "./components/layout/DesktopCommandBar";
+import { BackgroundTaskStatus } from "./components/layout/BackgroundTaskStatus";
 import { ExplorerWorkspace } from "./components/folders/ExplorerWorkspace";
 
 import { GlobalSearchModal } from "./components/search/GlobalSearchModal";
@@ -21,6 +22,9 @@ import { api } from "./services/api";
 import { SelectionProvider } from "./services/selection";
 import { AssistantView } from "./components/assistant/AssistantView";
 import { OrganizeView } from "./components/assistant/OrganizeView";
+import { CollectionsView } from "./components/collections/CollectionsView";
+import { FilePreviewView } from "./components/folders/FilePreviewView";
+import type { FileCollection } from "./services/api";
 import type { Project, SearchResultItem } from "./types/api";
 
 export const App: React.FC = () => {
@@ -73,7 +77,23 @@ export const App: React.FC = () => {
   const accountDialogRef = React.useRef(accountDialog);
   accountDialogRef.current = accountDialog;
 
+  const [questionRequest, setQuestionRequest] = useState(0);
   const [contextQuestion, setContextQuestion] = useState("");
+  const [contextCollection, setContextCollection] = useState<FileCollection>();
+  const [preview, setPreview] = useState<{path: string; line: number}>();
+  const [readerFiles, setReaderFiles] = useState<string[]>([]);
+  const [assistantFocus, setAssistantFocus] = useState<{path: string; line: number}>();
+  useEffect(() => {
+    const show = (event: Event) => {
+      const detail = (event as CustomEvent<{path: string; line?: number; automatic?: boolean; neighbors?: string[]}>).detail;
+      if (!detail || typeof detail.path !== "string" ) return;
+      setReaderFiles(detail.neighbors?.filter(path => typeof path === "string").slice(0, 1000) || [detail.path]);
+      setPreview({path: detail.path, line: detail.line || 1});
+      setActiveTab("preview"); setIsSearchOpen(false);
+    };
+    window.addEventListener("groundwork-preview", show);
+    return () => window.removeEventListener("groundwork-preview", show);
+  }, [activeTab]);
   const [focusedFile, setFocusedFile] = useState<SearchResultItem | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>();
 
@@ -82,7 +102,7 @@ export const App: React.FC = () => {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
     listen("groundwork-search", () => {
-      if (!accountDialogRef.current) window.dispatchEvent(new Event("groundwork-focus-search"));
+      if (!accountDialogRef.current) setContentQuery(""); setIsSearchOpen(true);
     }).then((cleanup) => {
       if (cancelled) cleanup();
       else unlisten = cleanup;
@@ -102,7 +122,7 @@ export const App: React.FC = () => {
         (e.code === "Space" || e.key.toLowerCase() === "k")
       ) {
         e.preventDefault();
-        window.dispatchEvent(new Event("groundwork-focus-search"));
+        setContentQuery(""); setIsSearchOpen(true);
       } else if (e.key === "Escape" && isSearchOpen) {
         setIsSearchOpen(false);
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
@@ -125,6 +145,7 @@ export const App: React.FC = () => {
   };
 
   const handleAskAIWithContext = (query: string, file: SearchResultItem) => {
+    setContextCollection(undefined);
     setSelectedFiles([file.path]);
     setResumedSummary("");
     setFocusedFile(file);
@@ -143,11 +164,24 @@ export const App: React.FC = () => {
         return (
           <AssistantView
             initialQuestion={contextQuestion}
+            requestId={questionRequest}
+            compact={readingFile}
             savedSummary={resumedSummary}
+            collectionId={contextCollection?.id}
+            collectionName={contextCollection?.title}
+            onClearCollection={() => {setContextCollection(undefined); setSelectedFiles([]);}}
+            focusedLine={focusedFile && selectedFiles[0] === focusedFile.path ? focusedFile.line_number || 1 : assistantFocus && assistantFocus.path === selectedFiles[0] ? assistantFocus.line : 1}
           />
         );
       case "organize":
         return <OrganizeView />;
+      case "preview":
+        return null;
+      case "collections":
+        return <CollectionsView onAsk={(collection, question, paths = []) => {
+          setContextCollection(collection); setSelectedFiles(paths); setFocusedFile(null);
+          setContextQuestion(question); setResumedSummary(""); setActiveTab("assistant");
+        }} />;
       case "home":
         return (
           <HomeView
@@ -179,6 +213,7 @@ export const App: React.FC = () => {
           <ContextSessionsView
             selectedProjectId={null}
             onResume={(session) => {
+              setContextCollection(undefined);
               setSelectedFiles(session.files_inspected || []);
               setResumedSummary(session.summary || "");
               setFocusedFile(null);
@@ -199,7 +234,7 @@ export const App: React.FC = () => {
             selectedProjectId={selectedProjectId}
             initialQuestion={contextQuestion}
             focusedPath={focusedFile?.path}
-            focusedLine={focusedFile?.line_number || 1}
+            focusedLine={focusedFile && selectedFiles[0] === focusedFile.path ? focusedFile.line_number || 1 : 1}
             sessionId={sessionId}
           />
         );
@@ -214,19 +249,38 @@ export const App: React.FC = () => {
     }
   };
 
+  const readingFile = Boolean(preview && (activeTab === "preview" || (activeTab === "assistant" && selectedFiles.length === 1 && selectedFiles[0] === preview.path)));
+  const readerIndex = preview ? readerFiles.indexOf(preview.path) : -1;
+  const changeReaderFile = (offset: number) => {
+    const path = readerFiles[readerIndex + offset];
+    if (!path) return;
+    setPreview({path, line: 1}); setSelectedFiles([path]); setContextCollection(undefined);
+    setQuestionRequest(0); setContextQuestion(""); setFocusedFile(null); setActiveTab("preview");
+  };
+  const askFromReader = (question: string, line: number) => {
+    if (!preview) return;
+    setContextCollection(undefined); setSelectedFiles([preview.path]); setFocusedFile(null);
+    setAssistantFocus({path: preview.path, line}); setContextQuestion(question);
+    setQuestionRequest(Date.now()); setResumedSummary(""); setActiveTab("assistant");
+  };
   return (
     <SelectionProvider
-      navigate={setActiveTab}
+      navigate={(tab) => {setContextCollection(undefined); setActiveTab(tab);}}
       selected={selectedFiles}
       setSelected={setSelectedFiles}
     >
       <div className="desktop-shell">
-        <DesktopCommandBar active={activeTab} onTool={(tab) => setActiveTab(tab === "home" || tab === "projects" ? "folders" : tab)}
-          onSearch={() => window.dispatchEvent(new Event("groundwork-focus-search"))} />
-        <div className="desktop-work-area">
-          <ExplorerWorkspace />
-          {!["folders", "home", "projects"].includes(activeTab) && <aside className={`desktop-tool-panel ${expandedTool ? "is-expanded" : ""}`} aria-label="Tool panel">
-            <ToolPanelHeader active={activeTab} expanded={expandedTool} toggle={() => setExpandedTool(value => !value)} close={() => setActiveTab("folders")} />
+        <DesktopCommandBar active={activeTab} onTool={(tab) => {setContextCollection(undefined); setActiveTab(tab === "home" || tab === "projects" ? "folders" : tab);}}
+          onSearch={() => { setContentQuery(""); setIsSearchOpen(true); }} />
+        <BackgroundTaskStatus active={activeTab} onNavigate={tab => {if(tab === 'assistant') setContextQuestion(''); setActiveTab(tab);}}/>
+        <div className={`desktop-work-area ${readingFile ? "reader-work-area" : ""}`}>
+          <div className="desktop-explorer-host" hidden={readingFile}><ExplorerWorkspace active={!readingFile && ["folders", "home", "projects"].includes(activeTab)} /></div>
+          {readingFile && preview && <main className="desktop-reader" aria-label="File reader">
+            <FilePreviewView key={preview.path} path={preview.path} line={preview.line} showAI={activeTab === "preview"} onBack={() => setActiveTab("folders")} onAsk={askFromReader} onPreviousFile={readerIndex > 0 ? () => changeReaderFile(-1) : undefined} onNextFile={readerIndex >= 0 && readerIndex < readerFiles.length - 1 ? () => changeReaderFile(1) : undefined}/>
+          </main>}
+          {!["folders", "home", "projects", "preview"].includes(activeTab) && <aside className={`desktop-tool-panel ${expandedTool ? "is-expanded" : ""}`} aria-label="Tool panel">
+            <ToolPanelHeader active={activeTab} expanded={expandedTool} toggle={() => setExpandedTool(value => !value)} canExpand={!readingFile} close={() => setActiveTab(readingFile ? "preview" : "folders")} />
+            {readingFile && <button className="assistant-return-file" onClick={() => setActiveTab("preview")}>Close Assistant · Keep reading</button>}
             <main ref={mainScroll} className="desktop-tool-content">{renderActiveView()}</main>
           </aside>}
         </div>

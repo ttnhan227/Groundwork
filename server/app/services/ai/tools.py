@@ -207,22 +207,34 @@ class AIToolManager:
         allowed_roots = self.workspace_service.get_allowed_roots()
         try:
             valid_path = validate_workspace_path(path_str, allowed_roots)
-            if not valid_path.is_file():
-                return {"error": f"Not a file: {path_str}"}
-
             from app.services.indexer_service import IndexerService
             workspace = next((ws for ws in self.workspace_service.list_workspaces() if ws.is_active and valid_path.is_relative_to(Path(ws.path).resolve())), None)
-            if not workspace or IndexerService.get_instance()._is_ignored(valid_path, workspace.ignore_patterns, [], Path(workspace.path).resolve()):
+            if not workspace or IndexerService.get_instance()._is_ignored(valid_path, workspace.ignore_patterns, [], Path(workspace.path).resolve(), passive_preview=True):
                 return {"error": "File is excluded by workspace privacy rules"}
-            if valid_path.stat().st_size > 5 * 1024 * 1024:
-                return {"error": "File exceeds reading limit"}
-            from app.services.file_parser import FileParser
-            if not FileParser.is_supported(valid_path):
-                return {"error": "This format is listed in the inventory but cannot be read by AI"}
-            parsed = FileParser.parse_file(valid_path)
-            if parsed.is_binary or not parsed.content:
-                return {"error": "File has no readable text"}
-            lines = parsed.content.splitlines()
+            from app.services.file_parser import FileParser, IMAGE_EXTENSIONS
+            from app.services.file_evidence import metadata, folder_evidence
+            from app.services.collection_service import CollectionService
+            kind, coverage = 'text', 'Extracted text'
+            if valid_path.is_dir():
+                content = folder_evidence(valid_path, CollectionService().allowed)
+                kind, coverage = 'folder', 'Folder listing only; file contents not read.'
+            elif not valid_path.is_file():
+                return {'error': 'This file is missing or unavailable.'}
+            elif valid_path.stat().st_size > (32 if valid_path.suffix.lower() in IMAGE_EXTENSIONS | {'.pdf', '.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp', '.epub'} else 5) * 1024 * 1024:
+                content = metadata(valid_path, 'File exceeds the content-reading limit (5 MB for plain text; 32 MB for documents and images).')
+                kind, coverage = 'metadata', 'Metadata only; file is too large to read.'
+            elif not FileParser.is_supported(valid_path) and valid_path.suffix.lower() not in IMAGE_EXTENSIONS:
+                content = metadata(valid_path, 'This format has no content reader. Use its associated app to inspect contents.')
+                kind, coverage = 'metadata', 'Metadata only; format contents are unsupported.'
+            else:
+                parsed = FileParser.parse_file(valid_path, max_size_bytes=32 * 1024 * 1024, allow_ocr=True)
+                if parsed.is_binary or not parsed.content:
+                    content = metadata(valid_path, parsed.coverage if parsed.coverage != 'Extracted text' else 'No readable text could be extracted; the file may be damaged, binary, or unreadable.')
+                    kind, coverage = 'metadata', 'Metadata only; contents could not be extracted.'
+                else:
+                    content, coverage = parsed.content, parsed.coverage
+                    kind = 'ocr' if parsed.file_type == 'image' else 'text'
+            lines = content.splitlines()
             s = max(1, start_line or 1)
             e = min(len(lines), end_line or s + 199, s + 199)
             if query and len(lines) > 40:
@@ -243,6 +255,9 @@ class AIToolManager:
                 "start_line": s,
                 "end_line": e,
                 "content": "\n".join(numbered),
+                "evidence_kind": kind,
+                "coverage": coverage,
+                "file_details": {"name": valid_path.name, "location": str(valid_path.parent), "extension": valid_path.suffix.lower(), "size_bytes": valid_path.stat().st_size if valid_path.is_file() else None, "modified_timestamp": valid_path.stat().st_mtime},
             }
         except Exception as exc:
             return {"error": str(exc)}

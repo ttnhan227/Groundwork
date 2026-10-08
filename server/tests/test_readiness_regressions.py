@@ -132,9 +132,10 @@ def test_schema_upgrade_backs_up_committed_wal_and_rejects_newer_data(tmp_path):
     with sqlite3.connect(str(path) + ".schema-v0.bak") as backup:
         assert backup.execute("SELECT content FROM upgrade_evidence").fetchone()[0] == "preserved"
         assert backup.execute("PRAGMA user_version").fetchone()[0] == 0
-    assert upgraded.get_connection().execute("PRAGMA user_version").fetchone()[0] == 1
+    from app.database.local_db import SCHEMA_VERSION
+    assert upgraded.get_connection().execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     with upgraded.get_connection() as connection:
-        connection.execute("PRAGMA user_version = 2")
+        connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 1}")
     upgraded.close()
     database.close()
     with pytest.raises(RuntimeError, match="newer Groundwork"):

@@ -545,7 +545,7 @@ class IndexerService:
 
         return discovered
 
-    def _is_ignored(self, path: Path, ignore_patterns: list[str], gitignores: list[str], root: Path) -> bool:
+    def _is_ignored(self, path: Path, ignore_patterns: list[str], gitignores: list[str], root: Path, passive_preview: bool = False) -> bool:
         try:
             resolved = path.resolve()
             root = root.resolve()
@@ -563,7 +563,18 @@ class IndexerService:
         path = resolved
         suffix = "/" if path.is_dir() else ""
 
-        spec_key = tuple(sorted(self.settings.default_ignore_patterns + ignore_patterns))
+        patterns = self.settings.default_ignore_patterns + ignore_patterns
+        if passive_preview:
+            # These default exclusions avoid indexing binary media, rather than
+            # denying a user-requested passive preview or metadata reference.
+            binary_defaults = {p for p in self.settings.default_ignore_patterns if p.startswith('*.')}
+            # Older workspaces stored a full copy of the indexing defaults.
+            # Preserve their established preview behavior. New workspaces store
+            # only explicit exclusions, which are always honored.
+            legacy_defaults = set(self.settings.default_ignore_patterns).issubset(ignore_patterns)
+            explicit = [p for p in ignore_patterns if not legacy_defaults or p not in binary_defaults]
+            patterns = [p for p in self.settings.default_ignore_patterns if p not in binary_defaults] + explicit
+        spec_key = tuple(sorted(patterns))
         if not hasattr(self, "_spec_cache"):
             self._spec_cache = {}
         if spec_key not in self._spec_cache:

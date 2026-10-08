@@ -240,6 +240,7 @@ class SearchEngine:
         limit: int = 50,
         file_type: str | None = None,
         modified_after: float | None = None,
+        paths: list[str] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Queries SQLite FTS5 for content and chunk keyword matches."""
         conn = self.db.get_connection()
@@ -261,6 +262,11 @@ class SearchEngine:
             WHERE fts_chunks MATCH ?
             """
             params: list[Any] = [fts_query]
+            if paths is not None:
+                if not paths:
+                    return {}
+                sql += f" AND f.path IN ({','.join('?' for _ in paths)})"
+                params.extend(paths)
             if workspace_id:
                 sql += " AND f.workspace_id = ?"
                 params.append(workspace_id)

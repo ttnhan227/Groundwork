@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "../../services/api";
 import { Button, Card, Modal } from "../ui";
 import { InstalledApps } from "./InstalledApps";
@@ -19,6 +19,7 @@ export function ComputerView() {
   const [message, setMessage] = useState("");
   const [screenshotPath, setScreenshotPath] = useState("");
   const [busy, setBusy] = useState(false);
+  const actionRunning = useRef(false);
   useEffect(() => {
     let active = true;
     const load = () =>
@@ -41,6 +42,8 @@ export function ComputerView() {
     };
   }, []);
   const act = async (action: string, value = "", token?: string) => {
+    if (actionRunning.current) return;
+    actionRunning.current = true;
     setBusy(true);
     setMessage("");
     try {
@@ -60,7 +63,7 @@ export function ComputerView() {
         "Couldn't complete that action. Check the website address or try again.",
       );
     } finally {
-      setBusy(false);
+      actionRunning.current = false; setBusy(false);
     }
   };
   return (

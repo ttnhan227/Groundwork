@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Copy, File, Folder, FolderOpen, FolderPlus, HardDrive, RefreshCw, Search, X, Filter, PanelLeft, Clock, ListTree, ExternalLink, Sparkles, Wand2, Files } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
-import { api } from "../../services/api";
+import { api, previewFile } from "../../services/api";
 import { useSelection } from "../../services/selection";
 import type { IndexProgress, InventoryItem, InventoryResult, Project, StorageCategory, Workspace } from "../../types/api";
 import { categoryColors, formatBytes } from "./StorageCategoryStrip";
 import { AddFolderDialog } from "./FoldersView";
 import { StorageInsightsModal } from "./StorageInsightsModal";
 import { Modal } from "../ui";
+import { LoadingState } from "../ui/LoadingState";
 
 type Location = { workspace: string; path: string };
 type Branch = { items: InventoryItem[]; total: number; loading?: boolean; error?: string };
@@ -21,7 +22,7 @@ const displayShare = (bytes: number, total: number) => {
   return share > 0 && share < 0.1 ? "<0.1%" : `${share.toFixed(1)}%`;
 };
 
-export function ExplorerWorkspace() {
+export function ExplorerWorkspace({active: visible = true}: {active?: boolean}) {
   const { selected, setSelected, navigate } = useSelection();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -45,6 +46,7 @@ export function ExplorerWorkspace() {
   const [extension, setExtension] = useState("");
   const [allFiles, setAllFiles] = useState(false);
   const [recent, setRecent] = useState(false);
+  const [showDiskDetails, setShowDiskDetails] = useState(false);
   const [sort, setSort] = useState("size");
   const [descending, setDescending] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -232,7 +234,7 @@ export function ExplorerWorkspace() {
   }, [data?.updated_at, data?.scan_status, revision, loadBranch]);
   useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent) => {
-      if ((event.target as HTMLElement)?.closest("[role=dialog]")) return;
+      if (!visible || (event.target as HTMLElement)?.closest("[role=dialog]")) return;
       if (event.key === "F5") { event.preventDefault(); void scan(); }
       if (event.altKey && event.key === "ArrowLeft" && historyIndex > 0) { event.preventDefault(); setHistoryIndex(historyIndex - 1); go(history[historyIndex - 1], false); }
       if (event.altKey && event.key === "ArrowRight" && historyIndex >= 0 && historyIndex < history.length - 1) { event.preventDefault(); setHistoryIndex(historyIndex + 1); go(history[historyIndex + 1], false); }
@@ -253,7 +255,8 @@ export function ExplorerWorkspace() {
     target.addEventListener("pointermove", move); target.addEventListener("pointerup", end); target.addEventListener("pointercancel", end);
   };
   const open = async (item: InventoryItem, reveal = false) => {
-    try { const result = await (reveal ? api.revealFile(item.path) : item.kind === "folder" ? api.openFolder(item.path) : api.openFile(item.path)); if (!result.success) setError("Couldn't open this item. Try Show in Explorer."); }
+    if (!reveal) { if (item.kind === "file") previewFile(item.path, 1, false, rows.filter(row => row.item.kind === "file").map(row => row.item.path)); else if (location) go({workspace: item.workspace_id ?? location.workspace, path: item.path}); return; }
+    try { const result = await api.revealFile(item.path); if (!result.success) setError("Couldn't show this item in Explorer."); }
     catch { setError("Couldn't open this item. Try Show in Explorer."); }
   };
   const copyPath = async (path: string) => {
@@ -289,6 +292,7 @@ export function ExplorerWorkspace() {
     setSelected(event.ctrlKey || event.metaKey ? selected.includes(item.path) ? selected.filter((path) => path !== item.path) : [...selected, item.path] : [item.path]);
   };
   const rowKey = (event: KeyboardEvent<HTMLTableRowElement>, row: FileRow, index: number) => {
+    if ((event.target as HTMLElement).closest("input, button, select, textarea")) return;
     if (loading) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault(); const next = rows[index + (event.key === "ArrowDown" ? 1 : -1)];
@@ -332,18 +336,15 @@ export function ExplorerWorkspace() {
 
   return <section className="explorer" aria-label="Files and storage workspace">
     <div className="explorer-toolbar">
-      <button onClick={() => void addLocation()} disabled={busy}><FolderPlus size={15}/>Choose folder</button>
+      <button className="explorer-primary-action" onClick={() => void addLocation()} disabled={busy || !ready}><FolderPlus size={16}/>{busy ? "Adding folder…" : "Choose folder"}</button>
       <select aria-label="Current location" value={workspace?.id ?? ""} onChange={(event) => { const ws = workspaces.find((item) => item.id === event.target.value); if (ws) go({workspace: ws.id, path: ws.path}); }}>
         {!workspaces.length && <option value="">No locations added</option>}{workspaces.map((ws) => <option key={ws.id} value={ws.id}>{ws.name} — {ws.path}</option>)}
       </select>
-      <button disabled={!workspace || busy} onClick={() => void scan()} title="Refresh inventory (F5)"><RefreshCw size={14}/>Scan</button>
+      <button disabled={!workspace || busy} onClick={() => void scan()} title="Refresh files (F5)"><RefreshCw size={15}/>{busy ? "Refreshing…" : "Refresh"}</button>
+      <button disabled={!location || loading} onClick={() => {if(location) {setSelected([location.path]); navigate("assistant");}}}><Sparkles size={15}/>Ask about folder</button>
       {data?.scan_status === "scanning" && <button onClick={() => api.cancelIndexing().then(() => setNotice("Scan cancelled. Cached files remain available.")).catch(() => setError("Couldn't cancel the scan."))}>Stop scan</button>}
       <span className="explorer-separator"/>
-      <button disabled={!focused} onClick={() => focused && void open(focused, true)}><ExternalLink size={14}/>Explorer</button>
-      <button disabled={!selected.length} onClick={() => navigate("assistant")}><Sparkles size={14}/>Ask</button>
-      <button disabled={!selected.length} onClick={() => navigate("organize")}><Wand2 size={14}/>Organize</button>
-      <button disabled={!workspace} onClick={() => setDuplicates(true)}><Files size={14}/>Duplicates</button>
-      <button title="Search inside indexed text and documents (Ctrl+Shift+F)" onClick={() => window.dispatchEvent(new CustomEvent("groundwork-content-search", {detail: query}))}><Search size={14}/>Contents</button>
+      <details className="explorer-options"><summary>File tools</summary><div onClick={event => {if ((event.target as HTMLElement).closest("button")) event.currentTarget.parentElement?.removeAttribute("open");}}><button disabled={!focused} onClick={() => focused && void open(focused, true)}><ExternalLink size={15}/>Show in Explorer</button><button disabled={!selected.length} onClick={() => navigate("organize")}><Wand2 size={15}/>Organize selected files</button><button disabled={!workspace} onClick={() => setDuplicates(true)}><Files size={15}/>Find duplicate files</button><button onClick={() => window.dispatchEvent(new CustomEvent("groundwork-content-search", {detail: query}))}><Search size={15}/>Search document contents</button></div></details>
     </div>
     <div className="explorer-address">
       <button title="Back (Alt+Left)" aria-label="Back" disabled={historyIndex <= 0} onClick={() => { setHistoryIndex(historyIndex - 1); go(history[historyIndex - 1], false); }}><ArrowLeft size={15}/></button>
@@ -353,12 +354,10 @@ export function ExplorerWorkspace() {
       <button title="Copy current folder path" aria-label="Copy current folder path" disabled={!location} onClick={() => location && void copyPath(location.path)}><Copy size={13}/></button>
     </div>
     <div className="explorer-searchbar">
-      <Search size={15}/><input ref={searchInput} aria-label="Live file search" placeholder="Search this folder and subfolders · name, path, or *.pdf" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") clearFilters(); }}/>
+      <Search size={17}/><input ref={searchInput} aria-label="Live file search" placeholder="Find a file by name…" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") clearFilters(); }}/>
       <select aria-label="Search scope" value={searchScope} onChange={(event) => setSearchScope(event.target.value as typeof searchScope)}><option value="folder">This folder</option><option value="location">Entire location</option><option value="all">All locations</option></select>
       {query && <button aria-label="Clear search" onClick={() => setQuery("")}><X size={13}/></button>}
-      <button aria-pressed={allFiles} title="Show files from this folder and every subfolder" onClick={() => setAllFiles(!allFiles)}><ListTree size={14}/>All descendants</button>
-      <button aria-pressed={recent} title="Files changed within the last 7 days" onClick={() => { setRecent(!recent); setSort("modified"); setDescending(true); }}><Clock size={14}/>Recent</button>
-      <button title="Largest files throughout the current folder" onClick={() => { setAllFiles(true); setSort("size"); setDescending(true); }}>Largest files</button>
+      <details className="explorer-options"><summary>View options</summary><div onClick={event => {if ((event.target as HTMLElement).closest("button")) event.currentTarget.parentElement?.removeAttribute("open");}}><button aria-pressed={allFiles} onClick={() => setAllFiles(!allFiles)}><ListTree size={15}/>Include subfolders</button><button aria-pressed={recent} onClick={() => { setRecent(!recent); setSort("modified"); setDescending(true); }}><Clock size={15}/>Changed this week</button><button onClick={() => { setAllFiles(true); setSort("size"); setDescending(true); }}>Largest files first</button><button aria-pressed={showDiskDetails} onClick={() => setShowDiskDetails(!showDiskDetails)}>Show disk details</button></div></details>
       <button aria-label="Toggle folder tree" aria-pressed={treeOpen} onClick={() => setTreeOpen(!treeOpen)}><PanelLeft size={15}/></button>
     </div>
     {(category || extension || recent || allFiles) && <div className="explorer-filters"><Filter size={12}/>
@@ -369,6 +368,7 @@ export function ExplorerWorkspace() {
       <button onClick={clearFilters}>Clear filters</button><span>{searchScope === "all" ? "All added locations" : `Within ${searchScope === "location" ? workspace?.name : crumbs.at(-1)?.name ?? "selected folder"}`}</span>
     </div>}
     {error && <div className="explorer-error" role="alert">{error}<button onClick={() => { void refreshLocations(); setRevision((value) => value + 1); }}>Retry</button></div>}
+    {!ready && !error && <LoadingState title="Opening your workspace" detail="Connecting to the local file service…" skeleton/>}
     <div className="explorer-panes">
       {treeOpen && <aside className="explorer-tree" aria-label="Folder navigation" style={{width: treeWidth}}>
         <div className="explorer-pane-title">Folders & projects</div>
@@ -380,12 +380,14 @@ export function ExplorerWorkspace() {
       </aside>}
       {treeOpen && <div className="explorer-splitter" role="separator" tabIndex={0} aria-label="Resize folder pane" aria-orientation="vertical" aria-valuemin={120} aria-valuemax={450} aria-valuenow={treeWidth} onPointerDown={(event) => resizePane(event, "tree")} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); setTreeWidth(Math.min(450, Math.max(120, treeWidth + (event.key === "ArrowRight" ? 20 : -20)))); } }}/>}
       <div className="explorer-file-pane">
-        <div className="explorer-pane-title"><span>{filtered ? "Matching files" : "Directory tree"}</span><span>{data?.total.toLocaleString() ?? 0} items{loading ? " · Updating…" : ""}</span></div>
+        <div className="explorer-pane-title"><span>{filtered ? "Search results" : "Files"}</span><span>{data?.total.toLocaleString() ?? 0} items</span></div>
+        <div className="explorer-selection-bar">{selected.length ? <><strong>{selected.length} {selected.length === 1 ? "file" : "files"} selected</strong><button onClick={() => navigate("assistant")}><Sparkles size={15}/>Ask AI</button><button aria-label="Clear file selection" onClick={() => setSelected([])}><X size={15}/></button></> : <span>Double-click to open · Ctrl-click to select several files</span>}</div>
+        {loading && <LoadingState title={query ? "Finding matching files" : "Loading files"} detail="Your results will appear here." skeleton={!rows.length}/>}
         <div className="explorer-table-scroll" onKeyDown={(event) => {
           if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); setSelected(rows.filter((row) => row.item.kind === "file").map((row) => row.item.path)); }
         }}>
-          <table className={`explorer-table ${loading ? "is-updating" : ""}`} aria-busy={loading} aria-label="File tree and search results"><thead><tr>
-            <th className="explorer-name-col" aria-sort={sort === "name" ? descending ? "descending" : "ascending" : "none"}><button onClick={() => setOrder("name")}>Name{sort === "name" && (descending ? " ▾" : " ▴")}</button></th>
+          <table className={`explorer-table ${showDiskDetails ? "show-disk-details" : "simple-file-list"} ${loading ? "is-updating" : ""}`} aria-busy={loading} aria-label="File tree and search results"><thead><tr>
+            <th className="explorer-name-col" aria-sort={sort === "name" ? descending ? "descending" : "ascending" : "none"}><div className="explorer-name-heading"><input type="checkbox" aria-label="Select all files in this view" disabled={loading || !rows.some(row => row.item.kind === "file")} checked={rows.some(row => row.item.kind === "file") && rows.filter(row => row.item.kind === "file").every(row => selected.includes(row.item.path))} onChange={event => {const paths=rows.filter(row => row.item.kind === "file").map(row => row.item.path); setSelected(values => event.target.checked ? [...new Set([...values, ...paths])] : values.filter(path => !paths.includes(path)));}}/><button onClick={() => setOrder("name")}>Name{sort === "name" && (descending ? " ▾" : " ▴")}</button></div></th>
             <th aria-sort={sort === "size" ? descending ? "descending" : "ascending" : "none"}><button onClick={() => setOrder("size")}>Size{sort === "size" && (descending ? " ▾" : " ▴")}</button></th>
             <th>Parent %</th><th>Files</th><th aria-sort={sort === "type" ? descending ? "descending" : "ascending" : "none"}><button onClick={() => setOrder("type")}>Type{sort === "type" && (descending ? " ▾" : " ▴")}</button></th>
             <th aria-sort={sort === "modified" ? descending ? "descending" : "ascending" : "none"}><button onClick={() => setOrder("modified")}>Modified{sort === "modified" && (descending ? " ▾" : " ▴")}</button></th>
@@ -393,9 +395,10 @@ export function ExplorerWorkspace() {
             {rows.map((row, index) => { const {item, depth, parentBytes} = row; const share = parentBytes > 0 ? Math.min(100, item.size_bytes / parentBytes * 100) : 0; const expandedRow = rowExpanded.has(item.path); const branch = rowBranches[item.path];
               return <tr key={`${item.workspace_id ?? location?.workspace}:${item.path}`} data-file-row tabIndex={focused?.path === item.path || !focused && index === 0 ? 0 : -1} aria-selected={selected.includes(item.path) || focused?.path === item.path}
                 className={selected.includes(item.path) || focused?.path === item.path ? "is-selected" : ""}
-                onClick={(event) => chooseRow(item, event)} onDoubleClick={() => item.kind === "folder" && location ? go({workspace: item.workspace_id ?? location.workspace, path: item.path}) : void open(item)}
+                onClick={(event) => chooseRow(item, event)} onDoubleClick={event => {if ((event.target as HTMLElement).closest("input, button, a")) return; if (item.kind === "folder" && location) go({workspace: item.workspace_id ?? location.workspace, path: item.path}); else void open(item);}}
                 onKeyDown={(event) => rowKey(event, row, index)} onContextMenu={(event) => { event.preventDefault(); setFocused(item); if (item.kind === "file" && !selected.includes(item.path)) setSelected([item.path]); setContext({x: Math.min(event.clientX, window.innerWidth - 220), y: Math.min(event.clientY, window.innerHeight - 285), item}); }}>
                 <td title={item.path}><div className="explorer-file-name" style={{paddingLeft: depth * 16}}>
+                  {item.kind === "file" ? <input type="checkbox" aria-label={`Select ${item.name}`} checked={selected.includes(item.path)} disabled={loading} onClick={event => event.stopPropagation()} onChange={event => setSelected(values => event.target.checked ? [...new Set([...values, item.path])] : values.filter(path => path !== item.path))}/> : <span className="explorer-checkbox-space"/>}
                   {item.kind === "folder" && !filtered ? <button className="explorer-expander" aria-label={`${expandedRow ? "Collapse" : "Expand"} ${item.name} in table`} onClick={(event) => { event.stopPropagation(); void toggleRow(item); }}>{expandedRow ? <ChevronDown size={12}/> : <ChevronRight size={12}/>}</button> : <span className="explorer-expander"/>}
                   {item.kind === "folder" ? <Folder size={14} className="explorer-folder-icon"/> : <File size={13} style={{color: categoryColors[item.category || "other"]}}/>}
                   <span>{item.name}</span>{branch?.loading && <small>…</small>}
@@ -410,24 +413,26 @@ export function ExplorerWorkspace() {
               </tr>;
             })}
           </tbody></table>
-          {loading && !rows.length && <div className="explorer-empty" role="status">Updating files…</div>}
-          {!loading && !rows.length && <div className="explorer-empty">{!ready ? "Connecting to local service…" : !workspace ? <><FolderOpen size={32}/><strong>Your files, in one workspace</strong><span>Choose a folder or drive. Scanning and search start automatically.</span><button onClick={() => void addLocation()}>Choose folder</button></> : filtered ? <><Search size={24}/><strong>No matches in {crumbs.at(-1)?.name}</strong><span>Click another folder to search there, or clear your filters.</span><button onClick={clearFilters}>Clear filters</button></> : <><Folder size={24}/><strong>No inventoried items here</strong><span>{data?.scan_status === "scanning" ? "Files will appear as the scan progresses." : "Scan to refresh this folder."}</span><button onClick={() => void scan()}>Scan location</button></>}</div>}
+
+          {ready && !loading && !rows.length && <div className="explorer-empty">{!ready ? "Connecting to local service…" : !workspace ? <><FolderOpen size={32}/><strong>Your files, in one workspace</strong><span>Choose a folder or drive. Scanning and search start automatically.</span><button onClick={() => void addLocation()}>Choose folder</button></> : filtered ? <><Search size={24}/><strong>No matches in {crumbs.at(-1)?.name}</strong><span>Click another folder to search there, or clear your filters.</span><button onClick={clearFilters}>Clear filters</button></> : <><Folder size={24}/><strong>No inventoried items here</strong><span>{data?.scan_status === "scanning" ? "Files will appear as the scan progresses." : "Scan to refresh this folder."}</span><button onClick={() => void scan()}>Scan location</button></>}</div>}
         </div>
-        <div className="explorer-file-footer"><span>{selected.length} selected{focused ? ` · ${focused.name}` : " · Click to select · Double-click to open · Right-click for actions"}</span>
+        <div className="explorer-file-footer"><span>{selected.length} selected{focused ? ` · ${focused.name}` : " · Double-click or Enter to open · Tick files to group or compare"}</span>
           {!!data && data.total > pageSize && <div><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - pageSize))}>Previous</button><span>{offset + 1}–{Math.min(offset + pageSize, data.total)} / {data.total.toLocaleString()}</span><button disabled={offset + pageSize >= data.total} onClick={() => setOffset(offset + pageSize)}>Next</button></div>}
         </div>
       </div>
       <div className="explorer-splitter explorer-details-splitter" role="separator" tabIndex={0} aria-label="Resize details pane" aria-orientation="vertical" aria-valuemin={180} aria-valuemax={450} aria-valuenow={detailsWidth} onPointerDown={(event) => resizePane(event, "details")} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); setDetailsWidth(Math.min(450, Math.max(180, detailsWidth + (event.key === "ArrowLeft" ? 20 : -20)))); } }}/>
       <aside className="explorer-inspector" aria-label="Storage and selection details" style={{width: detailsWidth}}>
+        <details className="explorer-storage-breakdown"><summary>Storage breakdown</summary>
         <div className="explorer-pane-title" title="Logical file sizes. Allocated disk space can differ; each hard-linked pathname contributes to folder totals.">Storage by type · logical</div><p className="explorer-inspector-caption">{searchScope === "all" ? "All added locations" : workspace?.name ?? "No location"} · all subfolders</p>
         <div className="explorer-category-strip">{categories.filter((item) => item.size_bytes > 0).map((item) => <button key={item.category} title={`${item.label}: ${formatBytes(item.size_bytes)} · ${item.percentage.toFixed(1)}%`} aria-label={`Filter ${item.label}`} style={{width: `${item.percentage}%`, backgroundColor: categoryColors[item.category]}} onClick={() => { setExtension(""); setCategory(category === item.category ? "" : item.category); }}/>)}</div>
         <table className="explorer-category-table"><thead><tr><th>Category</th><th>Size</th><th>Files</th></tr></thead><tbody>{categories.map((item) => <tr key={item.category} className={category === item.category ? "is-selected" : ""}><td><button aria-pressed={category === item.category} onClick={() => { setExtension(""); setCategory(category === item.category ? "" : item.category); }}><i style={{backgroundColor: categoryColors[item.category]}}/>{item.label}{category === item.category && <X size={10}/>}</button></td><td>{formatBytes(item.size_bytes)}</td><td>{item.file_count.toLocaleString()}</td></tr>)}</tbody></table>
         <div className="explorer-summary"><span>{data?.files.toLocaleString() ?? 0} files</span><strong>{formatBytes(data?.bytes ?? 0)}</strong></div>
         {data?.scan_status && data.scan_status !== "completed" && <p className="explorer-inspector-caption">{data.scan_status === "scanning" ? "Scanning · totals are provisional" : "Partial or cached inventory"}</p>}
+        </details>
         <div className="explorer-pane-title">Selection details</div>
         {focused ? <div className="explorer-details"><strong>{focused.name}</strong><p className="explorer-selectable-path">{focused.path}</p><dl><dt>Size</dt><dd>{formatBytes(focused.size_bytes)}</dd>{focused.kind === "file" && <><dt>Allocated</dt><dd title={storage?.allocation_note}>{storage ? storage.allocated_bytes === null ? "Unavailable" : formatBytes(storage.allocated_bytes) : storageError ? "Unavailable" : "Reading…"}</dd><dt>Hard links</dt><dd>{storage?.hard_links ?? "—"}</dd></>}<dt>Type</dt><dd>{focused.kind === "folder" ? "Folder" : focused.extension || "File"}</dd><dt>Modified</dt><dd>{new Date(focused.mtime * 1000).toLocaleString()}</dd>{focused.kind === "folder" && <><dt>Files</dt><dd>{(focused.file_count ?? 0).toLocaleString()}</dd></>}</dl>
           {focused.kind === "file" && <p className="explorer-inspector-caption">{storageError || storage?.allocation_note}</p>}
-          <button onClick={() => void open(focused)}><ExternalLink size={13}/>Open</button><button onClick={() => void open(focused, true)}><FolderOpen size={13}/>Show in Explorer</button><button onClick={() => void copyPath(focused.path)}><Copy size={13}/>Copy path</button>
+          <button onClick={() => void open(focused)}><ExternalLink size={13}/>Open in Groundwork</button><button onClick={() => void open(focused, true)}><FolderOpen size={13}/>Show in Explorer</button><button onClick={() => void copyPath(focused.path)}><Copy size={13}/>Copy path</button>
           <button onClick={() => location && go({workspace: focused.workspace_id ?? location.workspace, path: focused.kind === "folder" ? focused.path : focused.parent})}><Search size={13}/>Search in this folder</button>
           {focused.extension && <button onClick={() => { setCategory(""); setExtension(focused.extension); }}><Filter size={13}/>Find same file type</button>}
         </div> : <p className="explorer-inspector-caption">Select a row to inspect it. Ctrl-click or Shift-click to select multiple files. Click a category or file type to find matching files.</p>}
@@ -452,7 +457,7 @@ export function ExplorerWorkspace() {
       }
     }}>
       <strong>{commandTarget.name}</strong>
-      <button role="menuitem" onClick={() => { void open(commandTarget); setContext(undefined); }}>Open</button><button role="menuitem" onClick={() => { void open(commandTarget, true); setContext(undefined); }}>Show in Explorer</button><button role="menuitem" onClick={() => { void copyPath(commandTarget.path); setContext(undefined); }}>Copy path</button>
+      <button role="menuitem" onClick={() => { void open(commandTarget); setContext(undefined); }}>Open in Groundwork</button><button role="menuitem" onClick={() => { void open(commandTarget, true); setContext(undefined); }}>Show in Explorer</button><button role="menuitem" onClick={() => { void copyPath(commandTarget.path); setContext(undefined); }}>Copy path</button>
       <button role="menuitem" onClick={() => location && go({workspace: commandTarget.workspace_id ?? location.workspace, path: commandTarget.kind === "folder" ? commandTarget.path : commandTarget.parent})}>Search in this folder</button>
       {commandTarget.extension && <button role="menuitem" onClick={() => { setExtension(commandTarget.extension); setCategory(""); setContext(undefined); }}>Find same file type</button>}
       <hr/><button role="menuitem" disabled={!selected.length} onClick={() => { navigate("assistant"); setContext(undefined); }}>Ask about selection</button><button role="menuitem" disabled={!selected.length} onClick={() => { navigate("organize"); setContext(undefined); }}>Organize selection…</button>

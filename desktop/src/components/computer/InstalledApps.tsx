@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { AppWindow, RefreshCw, Search } from "lucide-react";
 import { api, type InstalledApp } from "../../services/api";
 
@@ -10,6 +10,7 @@ export function InstalledApps() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [launching, setLaunching] = useState(false);
+  const launchRunning = useRef(false);
   const [supported, setSupported] = useState(true);
   const load = async (refresh = false) => {
     setLoading(true); setError("");
@@ -24,10 +25,12 @@ export function InstalledApps() {
   const filtered = useMemo(() => apps.filter(app => `${app.name} ${app.publisher} ${app.description}`.toLowerCase().includes(query.toLowerCase().trim())), [apps, query]);
   useEffect(() => { setSelected(previous => filtered.find(app => app.id === previous?.id) || filtered[0]); }, [filtered]);
   const launch = async (app: InstalledApp) => {
+    if (launchRunning.current) return;
+    launchRunning.current = true;
     setLaunching(true); setError(""); setMessage("");
     try { await api.launchInstalledApp(app.id); setMessage(`Opened ${app.name}.`); }
     catch (e) { setError(e instanceof Error ? e.message : "Couldn't launch this app."); }
-    finally { setLaunching(false); }
+    finally { launchRunning.current = false; setLaunching(false); }
   };
   const icon = (app: InstalledApp, size = 32) => app.icon
     ? <img src={app.icon} alt="" width={size} height={size} className="object-contain shrink-0" />

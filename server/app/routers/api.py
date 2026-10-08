@@ -134,6 +134,17 @@ def get_file_storage(path: str):
         raise HTTPException(status_code=503, detail="Storage information is unavailable for this file.") from exc
 
 
+@system_router.get("/file-preview")
+def file_preview(path: str = Query(max_length=4096), page: int = Query(default=1, ge=1, le=100000)):
+    from app.services.preview_service import PreviewService
+    try:
+        return PreviewService().preview(path, page)
+    except PermissionError as exc:
+        raise HTTPException(403, "Choose an accessible file inside an added folder.") from exc
+    except (ValueError, FileNotFoundError, OSError) as exc:
+        raise HTTPException(400, "This file or page is unavailable, missing, or excluded by your privacy rules.") from exc
+
+
 @system_router.get("/status")
 def get_system_status() -> dict[str, Any]:
     db = get_db()
@@ -423,6 +434,49 @@ def get_activity_summary(days: int = 2) -> dict[str, Any]:
 
 # --- Context Sessions Router ---
 context_router = APIRouter(prefix="/api/context-sessions", tags=["ContextSessions"])
+
+from app.services.collection_service import CollectionInput, CollectionService, CollectionConflict
+
+
+@context_router.get("/collections/list")
+def list_collections():
+    return CollectionService().list()
+
+
+@context_router.put("/collections/{collection_id}")
+def save_collection(collection_id: str, req: CollectionInput):
+    import re
+    if not re.fullmatch(r"[a-f0-9]{32}", collection_id):
+        raise HTTPException(400, "Unknown collection identifier.")
+    try:
+        return CollectionService().save(collection_id, req)
+    except CollectionConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (ValueError, PermissionError, OSError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@context_router.delete("/collections/{collection_id}")
+def delete_collection(collection_id: str, revision: int = Query(ge=1)):
+    try:
+        CollectionService().delete(collection_id, revision)
+        return {"deleted": True}
+    except CollectionConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+class CollectionSuggestionRequest(BaseModel):
+    paths: list[str] = Field(min_length=1, max_length=24)
+    provider: str = Field(default="builtin", pattern="^(builtin|ollama|gemini|openai)$")
+
+
+@context_router.post("/collections/suggest")
+def suggest_collections(req: CollectionSuggestionRequest):
+    from app.services.assistant_jobs import AssistantJobs
+    try:
+        return AssistantJobs.start(lambda: CollectionService().suggest(req.paths, req.provider))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @context_router.get("", response_model=list[ContextSessionResponse])

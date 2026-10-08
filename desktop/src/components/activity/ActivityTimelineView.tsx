@@ -14,7 +14,7 @@ import {
   Calendar,
   RefreshCw,
 } from "lucide-react";
-import { api } from "../../services/api";
+import { api, previewFile } from "../../services/api";
 import type { ActivityItem } from "../../types/api";
 import { Button, Card, Badge, EmptyState } from "../ui";
 
@@ -249,7 +249,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                     summaryData.modified_files.slice(0, 5).map((f) => (
                       <div
                         key={f.path}
-                        onClick={() => api.openFile(f.path)}
+                        onClick={() => previewFile(f.path)}
                         className="flex items-center justify-between text-sm text-[var(--ink-secondary)] hover:text-[var(--ink-blue)] cursor-pointer truncate py-0.5 group font-mono"
                       >
                         <span className="truncate">{f.filename}</span>
@@ -368,15 +368,15 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
                           <Button
                             variant="secondary"
                             size="xs"
-                            onClick={() => api.openFile(filePath)}
-                            title="Open File"
+                            onClick={() => previewFile(filePath)}
+                            title="Preview file"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             variant="secondary"
                             size="xs"
-                            onClick={() => api.revealFile(filePath)}
+                            onClick={() => api.revealFile(filePath).catch(e => setError(e.message))}
                             title="Reveal in Explorer"
                           >
                             <FolderOpen className="w-3.5 h-3.5" />

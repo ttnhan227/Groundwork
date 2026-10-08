@@ -19,6 +19,23 @@ export interface InstalledApp {
   description: string; location: string; kind: string;
 }
 
+export interface FileCollection {
+  id: string; title: string; revision: number;
+  members: Array<{path: string; reason: string; available?: boolean}>;
+}
+export interface CollectionSuggestions {
+  groups: Array<Pick<FileCollection, "title" | "members">>;
+  unassigned: string[]; coverage: string;
+}
+export interface FilePreview {
+  path: string; name: string; size: number; modified: number; page: number; pages: number;
+  kind: "text" | "pdf" | "image" | "unsupported"; text: string; image: string;
+  message: string; line_start: number; total_lines?: number; truncated?: boolean;
+}
+export function previewFile(path: string, line = 1, automatic = false, neighbors?: string[]) {
+  window.dispatchEvent(new CustomEvent("groundwork-preview", {detail: {path, line, automatic, neighbors}}));
+}
+
 let connectionPromise: Promise<{ url: string; token?: string }> | undefined;
 function getConnection() {
   if (!connectionPromise) {
@@ -37,9 +54,11 @@ function getConnection() {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const connection = await getConnection();
   const url = `${connection.url}${path}`;
+  const timeout = AbortSignal.timeout(15000);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   const res = await fetch(url, {
     ...options,
-    signal: options.signal ?? AbortSignal.timeout(15000),
+    signal,
     headers: {
       "Content-Type": "application/json",
       ...(connection.token
@@ -47,7 +66,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         : {}),
       ...(options.headers || {}),
     },
-  }).catch(() => {
+  }).catch((error) => {
+    if (options.signal?.aborted) throw error;
+    if (timeout.aborted) throw new Error(options.method && options.method !== "GET"
+      ? "This request timed out. Check whether it completed before trying again."
+      : "Groundwork took too long to respond. Please try again.");
     if (isTauri()) connectionPromise = undefined;
     throw new Error(
       "Couldn't connect right now. Please try again. Your local work is safe.",
@@ -57,6 +80,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     if (
       path.includes("/local-ai") ||
+      path.includes("/file-preview") ||
+      path.includes("/collections/") ||
       path.includes("/installed-apps") ||
       path.includes("/organization") ||
       path.includes("/jobs/") ||
@@ -137,11 +162,16 @@ export const api = {
       "/api/system/local-ai",
       { method: "POST", body: JSON.stringify({ action: "import", path: filePath, model: modelId || "small" }) },
     ),
-  startQuestion: (question: string, file_paths: string[], provider: string) =>
+  startQuestion: (question: string, file_paths: string[], provider: string, search_workspace = false, focused_line = 1, collection_id?: string) =>
     request<AssistantJob<AIQueryResponse>>("/api/ai/jobs/query", {
       method: "POST",
-      body: JSON.stringify({ question, file_paths, provider }),
+      body: JSON.stringify({ question, file_paths, provider, search_workspace, focused_line, collection_id }),
     }),
+  listCollections: () => request<FileCollection[]>("/api/context-sessions/collections/list"),
+  previewFile: (path: string, page = 1, signal?: AbortSignal) => request<FilePreview>(`/api/system/file-preview?${new URLSearchParams({path, page: String(page)})}`, {signal}),
+  saveCollection: (collection: FileCollection) => request<FileCollection>(`/api/context-sessions/collections/${collection.id}`, {method: "PUT", body: JSON.stringify(collection)}),
+  deleteCollection: (collection: FileCollection) => request(`/api/context-sessions/collections/${collection.id}?revision=${collection.revision}`, {method: "DELETE"}),
+  suggestCollections: (paths: string[], provider: string) => request<AssistantJob<CollectionSuggestions>>("/api/context-sessions/collections/suggest", {method: "POST", body: JSON.stringify({paths, provider})}),
   assistantJob: <T>(id: string) =>
     request<AssistantJob<T>>(`/api/ai/jobs/${id}`),
   organize: <T>(values: Record<string, unknown>) =>

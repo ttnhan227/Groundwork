@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   FileText,
   Plus,
@@ -10,7 +10,7 @@ import {
   Cloud,
   HardDrive,
 } from "lucide-react";
-import { api } from "../../services/api";
+import { api, previewFile } from "../../services/api";
 import type { Note, Project } from "../../types/api";
 import { Button, Card, Badge, Modal, EmptyState } from "../ui";
 
@@ -28,6 +28,9 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const mutation = useRef(false);
+  const fetchVersion = useRef(0);
+  const [saving, setSaving] = useState(false);
 
   // New Note Form
   const [newTitle, setNewTitle] = useState<string>("");
@@ -37,12 +40,14 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
   const [newTags, setNewTags] = useState<string>("");
 
   const fetchNotes = async () => {
+    const version = ++fetchVersion.current;
     setLoading(true);
     try {
       const [noteData, projData] = await Promise.all([
         api.listNotes(searchQuery || undefined, selectedProjectId || undefined),
         api.listProjects(),
       ]);
+      if (version !== fetchVersion.current) return;
       setNotes(noteData);
       setError("");
       setProjects(projData);
@@ -53,10 +58,11 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
           null,
       );
     } catch (err) {
+      if (version !== fetchVersion.current) return;
       console.error("Failed to load notes:", err);
       setError(String(err));
     } finally {
-      setLoading(false);
+      if (version === fetchVersion.current) setLoading(false);
     }
   };
 
@@ -66,7 +72,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
 
   const handleCreateNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || mutation.current) return;
+    mutation.current = true; setSaving(true);
 
     try {
       const tagsArray = newTags
@@ -101,11 +108,15 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
       fetchNotes();
     } catch (err) {
       setError(String(err));
+    } finally {
+      mutation.current = false; setSaving(false);
     }
   };
 
   const handleDeleteNote = async (id: string) => {
+    if (mutation.current) return;
     if (!confirm("Are you sure you want to delete this note?")) return;
+    mutation.current = true; setSaving(true);
     try {
       await api.deleteNote(id);
       if (selectedNote?.id === id) {
@@ -115,11 +126,13 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
     } catch (err) {
       console.error("Failed to delete note:", err);
       setError(String(err));
+    } finally {
+      mutation.current = false; setSaving(false);
     }
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
+    <div className="notes-page flex-1 flex overflow-hidden bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
       {error && !showCreateModal && (
         <p
           role="alert"
@@ -240,7 +253,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
                   )}
                   {selectedNote.file_path && (
                     <span
-                      onClick={() => api.openFile(selectedNote.file_path!)}
+                      onClick={() => previewFile(selectedNote.file_path!)}
                       className="flex items-center gap-1 text-[var(--ink-blue)] hover:underline cursor-pointer font-mono text-sm"
                     >
                       <ExternalLink className="w-3 h-3" />
@@ -279,6 +292,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
                 size="xs"
                 onClick={() => handleDeleteNote(selectedNote.id)}
                 title="Delete Note"
+                disabled={saving}
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete
@@ -320,6 +334,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
         <Modal
           isOpen={true}
           onClose={() => {
+            if (mutation.current) return;
             setShowCreateModal(false);
             setEditingId(null);
             setNewTitle("");
@@ -413,6 +428,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--hairline)]">
               <Button
                 type="button"
+                disabled={saving}
                 variant="secondary"
                 size="sm"
                 onClick={() => {
@@ -422,7 +438,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
               >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" size="sm">
+              <Button type="submit" variant="primary" size="sm" disabled={saving || !newTitle.trim()} isLoading={saving}>
                 Save note
               </Button>
             </div>

@@ -232,6 +232,8 @@ class AIQueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=12000)
     focused_path: str | None = None
     file_paths: list[str] = Field(default_factory=list, max_length=6)
+    search_workspace: bool = False
+    collection_id: str | None = None
     focused_line: int = Field(default=1, ge=1, le=10000000)
     project_id: str | None = None
     workspace_id: str | None = None
@@ -245,6 +247,9 @@ class CitationItem(BaseModel):
     line_start: int | None = None
     line_end: int | None = None
     snippet: str
+    evidence_kind: str = 'text'
+    coverage: str = 'Extracted text'
+    file_details: dict[str, Any] = Field(default_factory=dict)
 
 
 class AIQueryResponse(BaseModel):
@@ -261,6 +266,7 @@ class InvestigationRequest(BaseModel):
     problem_statement: str = Field(min_length=1, max_length=12000)
     project_id: str | None = None
     files: list[str] = Field(default_factory=list, max_length=6)
+    search_workspace: bool = False
     focused_line: int = Field(default=1, ge=1, le=10000000)
     session_id: str | None = None
     recent_errors: list[str] = Field(default_factory=list, max_length=20)

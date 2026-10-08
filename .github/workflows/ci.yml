@@ -96,6 +96,13 @@ jobs:
         working-directory: desktop
         run: npm run build
 
+      - name: Install browser test dependencies
+        working-directory: client
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Verify desktop onboarding and reader workflows
+        run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs
+
   # ──────────────────────────────────────────────
   # 4. Web Portal: Marketing & Docs Website Build
   # ──────────────────────────────────────────────
@@ -120,6 +127,19 @@ jobs:
       - name: Build web application bundle
         working-directory: client
         run: npm run build
+
+      - name: Verify website lint, content and release resolution
+        working-directory: client
+        run: |
+          npm run lint
+          node --test tests/rendered-html.test.mjs
+          node --experimental-strip-types --test tests/releases.test.mjs
+
+      - name: Verify download and navigation interactions
+        working-directory: client
+        run: |
+          npx playwright install --with-deps chromium
+          node --test tests/download-release-ui.test.mjs
 
   windows-installer:
     name: Windows desktop installer

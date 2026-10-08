@@ -66,7 +66,7 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: ./scripts/build-signed-release.ps1
         working-directory: desktop
-      - run: node --test desktop/tests/onboarding-ui.test.cjs
+      - run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs
       - run: server/.packaging-venv/Scripts/python.exe -m pytest server/tests -q
       - run: python desktop/scripts/smoke-core.py
       - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml

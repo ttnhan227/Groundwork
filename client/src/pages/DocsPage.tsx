@@ -23,7 +23,7 @@ const guides: Record<
       ],
       [
         "Find something",
-        "Click Find files or press Ctrl + Space. Filename search becomes available as files are discovered. Content search is a separate option for supported readable formats after preparation finishes.",
+        "Type in the file list to find names, or click Find (Ctrl + K) to search names and document text. Filename search becomes available as files are discovered; supported document content becomes searchable after indexing.",
       ],
       [
         "Make yourself at home",
@@ -68,12 +68,20 @@ const guides: Record<
         "Assistant offers built-in local answers through llama.cpp. Download a model in the app or import a compatible GGUF file. Models are separate from the installer. External providers remain optional; online providers require internet and may charge for usage.",
       ],
       [
+        "Ask about everyday files",
+        "Double-click a file or press Enter to open the built-in reader. Zoom, fit the view, and move between pages or files. Ask a question to open AI beside the document. AI reads text, PDFs, Word, Excel, PowerPoint, OpenDocument, and EPUB. On Windows, it can recognize written text in images and up to five scanned PDF pages. OCR can contain errors and does not interpret image scenes. Unsupported formats provide file details only.",
+      ],
+      [
+        "Understand a folder",
+        "Use Ask about folder to include its direct file listing and a small sample of nearby documents. The answer states which files were read; it does not recursively read every file. Group related files with Collections without moving originals.",
+      ],
+      [
         "Know what gets shared",
-        "Online AI receives your question and selected supported file excerpts when you choose that provider. Local answers stay on this computer. Excerpts cover only part of a long document; review coverage notices and original files before relying on an answer.",
+        "Online AI receives your question and the names, excerpts, recognized text, or file details used as evidence. Folder questions also share a bounded listing. Local answers and OCR stay on this computer. Review the provider and coverage notices before relying on an answer.",
       ],
       [
         "Check the sources",
-        "Use the source links to review the files behind an answer. Save useful findings as notes or saved work so you can return to them.",
+        "Source labels distinguish document text, recognized image text, file details, and folder listings. Use the links to open the evidence in the reader. Long documents are only partially read; plain text is limited to 5 MB and documents/images to 32 MB. Save useful findings for later. Names and sizes alone cannot prove that a file is safe to delete.",
       ],
     ],
   },

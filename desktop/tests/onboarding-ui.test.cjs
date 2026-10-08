@@ -155,6 +155,7 @@ test("first launch, local choice, account recovery, folders and nontechnical set
     await expect(
       page.getByRole("combobox", { name: "Current location" }),
     ).toBeVisible();
+    await page.getByRole("button", { name: "More tools", exact: true }).click();
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await page
@@ -193,6 +194,7 @@ test("first launch, local choice, account recovery, folders and nontechnical set
     ).toBeVisible();
     await page.screenshot({ path: path.join(results, "polished-account.png") });
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await page.getByRole("button", { name: "More tools", exact: true }).click();
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expect(page.getByLabel("Cloud server URL")).toHaveCount(0);
     assert.ok(!(await page.locator("body").innerText()).includes(serviceUrl));
@@ -235,6 +237,7 @@ test("first launch, local choice, account recovery, folders and nontechnical set
       .getByRole("button", { name: "Continue locally", exact: true })
       .click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "More tools", exact: true }).click();
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Couldn't check your account" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Try again", exact: true })).toBeEnabled();

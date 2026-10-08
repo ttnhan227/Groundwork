@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   FolderOpen,
   FolderTree,
@@ -89,8 +89,10 @@ export function OrganizeView() {
   const [provider, setProvider] = useState("builtin");
   const [providers, setProviders] = useState<Array<{id: string; name: string; is_local: boolean}>>([]);
   const [busy, setBusy] = useState(false);
+  const taskRunning = useRef(false);
   const [progress, setProgress] =
     useState<Awaited<ReturnType<typeof api.organizationProgress>>>();
+  const [formError, setFormError] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [plan, setPlan] = useState<Plan>();
@@ -108,10 +110,20 @@ export function OrganizeView() {
   const [prefInstructionsInput, setPrefInstructionsInput] = useState("");
   const activeRows = rows.filter((row) => row.included && !row.leave_unchanged);
 
+  const configure = async (work: () => Promise<void>) => {
+    if (taskRunning.current) return;
+    taskRunning.current = true; setBusy(true); setFormError(""); setError("");
+    try {await work();}
+    catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save this setup. Try again.";
+      setFormError(message); setError(message);
+    } finally {taskRunning.current = false; setBusy(false);}
+  };
+
   const loadHistory = () =>
     api
       .organizationHistory()
-      .then((values) => { setHistory(values); setError(""); })
+      .then(setHistory)
       .catch((e) => setError(e.message));
 
   const loadRules = () =>
@@ -174,7 +186,8 @@ export function OrganizeView() {
 
   // Simple non-AI rule application
   const applySimpleRule = async (ruleType: string, customCategories?: string[]) => {
-    if (!rows.length) return;
+    if (!rows.length || taskRunning.current) return;
+    taskRunning.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -209,11 +222,14 @@ export function OrganizeView() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't apply rule.");
     } finally {
+      taskRunning.current = false;
       setBusy(false);
     }
   };
 
   const task = async (action: string, values: Record<string, unknown>) => {
+    if (taskRunning.current) return;
+    taskRunning.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -259,6 +275,7 @@ export function OrganizeView() {
         e instanceof Error ? e.message : "Couldn't organize these files.",
       );
     } finally {
+      taskRunning.current = false;
       setBusy(false);
     }
   };
@@ -288,22 +305,19 @@ export function OrganizeView() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="ghost"
-            onClick={async () => {
-              try {
+            disabled={busy}
+            onClick={() => configure(async () => {
                 const sample = await api.createSampleFolder();
                 setSelected(sample.files);
                 setDestination(sample.folder_path);
                 setFolders((previous) => [...previous, {path: sample.folder_path, name: "Guided example"}]);
                 setNotice("Sample folder loaded! You can safely test preview, rules, and undo here.");
-              } catch {
-                setError("Couldn't create sample folder.");
-              }
-            }}
+            })}
           >
             <HelpCircle size={16} />
             Try guided example
           </Button>
-          <Button variant="ghost" onClick={() => setShowPreferencesModal(true)}>
+          <Button disabled={busy} variant="ghost" onClick={() => {setFormError(""); setShowPreferencesModal(true);}}>
             <Tag size={16} />
             Saved preferences
           </Button>
@@ -366,7 +380,8 @@ export function OrganizeView() {
                     size="sm"
                     disabled={busy}
                     onClick={async () => {
-                      setBusy(true);
+                      if (taskRunning.current) return;
+                      taskRunning.current = true; setBusy(true);
                       setError("");
                       setNotice("");
                       try {
@@ -384,7 +399,7 @@ export function OrganizeView() {
                       } catch (e) {
                         setError(e instanceof Error ? e.message : "Couldn't run rule.");
                       } finally {
-                        setBusy(false);
+                        taskRunning.current = false; setBusy(false);
                       }
                     }}
                   >
@@ -395,14 +410,9 @@ export function OrganizeView() {
                     size="sm"
                     variant="ghost"
                     disabled={busy}
-                    onClick={async () => {
-                      try {
-                        await api.deleteRule(rule.id);
-                        loadRules();
-                      } catch {
-                        setError("Couldn't delete rule.");
-                      }
-                    }}
+                    onClick={() => configure(async () => {
+                      await api.deleteRule(rule.id); await loadRules();
+                    })}
                   >
                     <Trash2 size={14} aria-hidden="true" />
                     <span className="sr-only">Delete rule {rule.name}</span>
@@ -762,7 +772,7 @@ export function OrganizeView() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowSaveRuleModal(true)}
+                disabled={busy} onClick={() => {setFormError(""); setShowSaveRuleModal(true);}}
               >
                 Save as rule
               </Button>
@@ -918,9 +928,10 @@ export function OrganizeView() {
       {showSaveRuleModal && (
         <Modal
           isOpen
-          onClose={() => setShowSaveRuleModal(false)}
+          onClose={() => {if (!busy) setShowSaveRuleModal(false);}}
           title="Save this setup as a reusable rule"
         >
+          {formError && <p role="alert" className="gw-notice">{formError}</p>}
           <div className="space-y-4 text-sm">
             <p className="text-[var(--ink-secondary)]">
               Store this folder's organization instructions, categories, and operation history locally. Rerunning will organize new/modified files without repeatedly moving unchanged files.
@@ -935,12 +946,11 @@ export function OrganizeView() {
               />
             </label>
             <div className="flex justify-end gap-2">
-              <Button onClick={() => setShowSaveRuleModal(false)}>Cancel</Button>
+              <Button disabled={busy} onClick={() => setShowSaveRuleModal(false)}>Cancel</Button>
               <Button
                 variant="primary"
-                disabled={!ruleNameInput.trim()}
-                onClick={async () => {
-                  try {
+                isLoading={busy} disabled={busy || !ruleNameInput.trim()}
+                onClick={() => configure(async () => {
                     await api.saveRule(
                       destination,
                       ruleNameInput.trim(),
@@ -954,10 +964,7 @@ export function OrganizeView() {
                     setRuleNameInput("");
                     loadRules();
                     setNotice("Rule saved successfully.");
-                  } catch {
-                    setError("Couldn't save rule.");
-                  }
-                }}
+})}
               >
                 Save rule
               </Button>
@@ -970,10 +977,11 @@ export function OrganizeView() {
       {showPreferencesModal && (
         <Modal
           isOpen
-          onClose={() => setShowPreferencesModal(false)}
+          onClose={() => {if (!busy) setShowPreferencesModal(false);}}
           title="Saved preferences"
           maxWidth="lg"
         >
+          {formError && <p role="alert" className="gw-notice">{formError}</p>}
           <div className="space-y-4 text-sm">
             <p className="text-[var(--ink-secondary)]">
               Preferences are saved on this computer. Using them fills in categories and instructions for your next task. If you choose a cloud provider, those instructions are sent when you request suggestions.
@@ -1018,10 +1026,9 @@ export function OrganizeView() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={async () => {
-                        await api.deletePreference(pref.id);
-                        loadPreferences();
-                      }}
+                      disabled={busy} onClick={() => configure(async () => {
+                        await api.deletePreference(pref.id); await loadPreferences();
+                      })}
                     >
                       <Trash2 size={12} aria-hidden="true" />
                       <span className="sr-only">Delete preference {pref.name}</span>
@@ -1058,9 +1065,8 @@ export function OrganizeView() {
               />
               <Button
                 size="sm"
-                disabled={!prefNameInput.trim()}
-                onClick={async () => {
-                  try {
+                isLoading={busy} disabled={busy || !prefNameInput.trim()}
+                onClick={() => configure(async () => {
                     await api.savePreference(
                       prefNameInput.trim(),
                       prefCategoriesInput.split(",").map((c) => c.trim()).filter(Boolean),
@@ -1070,17 +1076,14 @@ export function OrganizeView() {
                     setPrefCategoriesInput("");
                     setPrefInstructionsInput("");
                     loadPreferences();
-                  } catch {
-                    setError("Couldn't save preference.");
-                  }
-                }}
+})}
               >
                 Save preference
               </Button>
             </div>
 
             <div className="flex justify-end pt-2">
-              <Button onClick={() => setShowPreferencesModal(false)}>Close</Button>
+              <Button disabled={busy} onClick={() => setShowPreferencesModal(false)}>Close</Button>
             </div>
           </div>
         </Modal>

@@ -207,6 +207,7 @@ class OrganizationService:
                 f"{min(len(content), excerpt_limit)} of {len(content)} excerpt characters supplied"
                 if content else "Metadata only; no document content read"
             )
+            coverage = read.get('coverage', 'Contents unavailable') + '; ' + coverage
             evidence.append(
                 {
                     "id": index,

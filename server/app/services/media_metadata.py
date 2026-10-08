@@ -18,13 +18,13 @@ class CapabilitiesService:
         return {
             "text_indexing": {
                 "available": True,
-                "label": "Text & Code Browsing",
-                "description": "Fast keyword search, file browsing, and line-indexed reading for text, code, and configs.",
+                "label": "Documents & Text",
+                "description": "Search and read text, PDF, Word, Excel, PowerPoint, OpenDocument, and EPUB content. Layout and embedded images are omitted.",
             },
             "pdf_text": {
                 "available": True,
                 "label": "PDF Text Extraction",
-                "description": "Extracts selectable text and page structure from PDFs without OCR.",
+                "description": "Reads selectable PDF text. On explicit AI requests, local Windows OCR can read up to five scanned pages.",
             },
             "audio_metadata": {
                 "available": True,
@@ -32,10 +32,10 @@ class CapabilitiesService:
                 "description": "Reads standard tags (artist, album, track number, title, duration) from audio headers.",
             },
             "image_ocr": {
-                "available": False,
-                "status": "deferred",
+                "available": os.name == 'nt',
+                "status": "available" if os.name == 'nt' else "unavailable",
                 "label": "Image OCR",
-                "description": "Extracting text from images and scanned documents requires a separate OCR engine.",
+                "description": "Uses local Windows OCR for written text in images and scanned PDFs. Requires an installed Windows OCR language; results may contain recognition errors. Does not interpret image scenes.",
             },
             "image_understanding": {
                 "available": False,

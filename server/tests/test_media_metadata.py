@@ -9,8 +9,9 @@ def test_capabilities_registry_shows_deferred_models():
     assert caps["text_indexing"]["available"] is True
     assert caps["pdf_text"]["available"] is True
     assert caps["audio_metadata"]["available"] is True
-    assert caps["image_ocr"]["available"] is False
-    assert caps["image_ocr"]["status"] == "deferred"
+    import os
+    assert caps["image_ocr"]["available"] is (os.name == 'nt')
+    assert caps["image_ocr"]["status"] == ('available' if os.name == 'nt' else 'unavailable')
     assert caps["image_understanding"]["available"] is False
     assert caps["image_understanding"]["status"] == "deferred"
     assert caps["audio_transcription"]["available"] is False

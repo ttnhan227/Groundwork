@@ -16,14 +16,14 @@ test('download page picks up newer releases without rebuilding and handles missi
     fs.mkdirSync('test-results',{recursive:true});
     await page.setViewportSize({width:1280,height:900});
     await page.goto('http://127.0.0.1:18556');
-    await expect(page.getByRole('heading',{name:/Explore your files\. Ask your AI/})).toBeVisible();
+    await expect(page.getByRole('heading',{name:/Find your files\. Understand what matters/})).toBeVisible();
     await page.screenshot({path:'test-results/polished-website.png',fullPage:true});
-    await page.getByRole('button',{name:'See how to get started',exact:true}).click();
+    await page.getByRole('button',{name:'See how it works',exact:true}).click();
     await expect(page.getByRole('heading',{name:'Start here',exact:true})).toBeVisible();
     await expect(page.getByRole('heading',{name:'Sign in, or continue locally',exact:true})).toBeVisible();
     await page.setViewportSize({width:390,height:844});
     await page.getByRole('button',{name:'Open menu',exact:true}).click();
-    await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'Overview'}).click();
+    await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Home'}).click();
     await expect(page.getByRole('button',{name:'Open menu',exact:true})).toBeVisible();
     await page.screenshot({path:'test-results/polished-website-mobile.png',fullPage:true});
     await page.setViewportSize({width:1280,height:900});

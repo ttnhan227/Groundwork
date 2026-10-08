@@ -35,7 +35,8 @@ class WorkspaceService:
 
         ws_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
-        ignore_patterns = list(set(self.settings.default_ignore_patterns + data.ignore_patterns))
+        # Defaults are applied by the indexer, not stored as user privacy rules.
+        ignore_patterns = list(dict.fromkeys(data.ignore_patterns))
 
         conn = self.db.get_connection()
         with conn:

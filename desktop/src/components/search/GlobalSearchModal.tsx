@@ -9,7 +9,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { api } from "../../services/api";
+import { previewFile, api } from "../../services/api";
 import type {
   Project,
   SearchResponse,
@@ -219,9 +219,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     ) {
       e.preventDefault();
       rememberQuery();
-      api
-        .openFile(results[selectedIndex].path)
-        .catch((err) => setError(String(err)));
+      previewFile(results[selectedIndex].path, results[selectedIndex].line_number || 1);
+      onClose();
     }
   };
 
@@ -393,8 +392,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       key={
                         {
                           filename: "Names & paths",
-                          lexical: "File contents",
-                          hybrid: "Related contents",
+                          lexical: "Names & contents",
+                          hybrid: "Related meanings",
                           semantic: "Similar meanings",
                         }[m]
                       }
@@ -408,8 +407,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       {
                         {
                           filename: "Names & paths",
-                          lexical: "File contents",
-                          hybrid: "Related contents",
+                          lexical: "Names & contents",
+                          hybrid: "Related meanings",
                           semantic: "Similar meanings",
                         }[m]
                       }
@@ -437,8 +436,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     }
                     description={
                       query.trim()
-                        ? "Try adjusting terms, switching to lexical mode, or indexing additional directories."
-                        : "Type code tokens, class names, or plain-English concepts to locate scattered work."
+                        ? "Try a shorter phrase, check your filters, or wait for content indexing to finish."
+                        : "Search by what you remember: a name, a phrase, a date, or a topic. Names and readable contents are searched together."
                     }
                     compact
                   />
@@ -518,13 +517,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       size="xs"
                       variant="primary"
                       onClick={() =>
-                        api
-                          .openFile(results[selectedIndex].path)
-                          .catch((error) => alert(String(error)))
+                        previewFile(results[selectedIndex].path, results[selectedIndex].line_number || 1)
                       }
                     >
                       <ExternalLink size={12} />
-                      Open file
+                      Open in Groundwork
                     </Button>
                     <Button
                       size="xs"
@@ -532,7 +529,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       onClick={() =>
                         api
                           .revealFile(results[selectedIndex].path)
-                          .catch((error) => alert(String(error)))
+                          .catch((error) => setError(error instanceof Error ? error.message : String(error)))
                       }
                     >
                       <FolderOpen size={12} />

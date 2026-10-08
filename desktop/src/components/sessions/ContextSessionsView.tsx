@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   BookmarkCheck,
   Plus,
@@ -16,6 +16,7 @@ import {
 import { api } from "../../services/api";
 import type { ContextSession, Project } from "../../types/api";
 import { Button, Card, Badge, Modal, EmptyState } from "../ui";
+import { LoadingState } from "../ui/LoadingState";
 
 interface ContextSessionsViewProps {
   selectedProjectId: string | null;
@@ -30,6 +31,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState("");
+  const mutation = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(
@@ -65,7 +68,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || mutation.current) return;
+    mutation.current = true; setSaving(true);
 
     try {
       await api.createSession(
@@ -81,6 +85,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
     } catch (err) {
       console.error("Failed to create session:", err);
       setError("Couldn't save your work. Please try again.");
+    } finally {
+      mutation.current = false; setSaving(false);
     }
   };
 
@@ -88,12 +94,16 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
     id: string,
     newStatus: "active" | "paused" | "completed",
   ) => {
+    if (mutation.current) return;
+    mutation.current = true; setSaving(true);
     try {
       await api.updateSession(id, { status: newStatus });
       fetchSessions();
     } catch (err) {
       console.error("Failed to update status:", err);
       setError("Couldn't save that change. Please try again.");
+    } finally {
+      mutation.current = false; setSaving(false);
     }
   };
 
@@ -101,6 +111,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
     session: ContextSession,
     todoIndex: number,
   ) => {
+    if (mutation.current) return;
+    mutation.current = true; setSaving(true);
     const todos = [...session.todos];
     const current = todos[todoIndex];
     if (current.startsWith("[x] ")) {
@@ -117,6 +129,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
     } catch (err) {
       console.error("Failed to toggle todo:", err);
       setError("Couldn't save that change. Please try again.");
+    } finally {
+      mutation.current = false; setSaving(false);
     }
   };
 
@@ -126,7 +140,8 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
   });
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
+    <div className="saved-work-page flex-1 overflow-y-auto p-6 bg-[var(--paper)] text-[var(--ink)] font-sans w-full">
+      {saving && <LoadingState title="Saving your work" detail="Please wait for confirmation…"/>}
       {/* Top Header */}
       {error && (
         <p role="alert" className="gw-notice mb-4">
@@ -452,12 +467,13 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
       {showCreateModal && (
         <Modal
           isOpen={true}
-          onClose={() => setShowCreateModal(false)}
+          onClose={() => {if (!mutation.current) setShowCreateModal(false);}}
           eyebrow=""
           title="Save your work"
           maxWidth="md"
         >
           <form onSubmit={handleCreateSession} className="space-y-3.5">
+            {error && <p role="alert">{error}</p>}
             <div>
               <label className="block text-xs font-mono font-bold text-[var(--ink)] mb-1">
                 Name this work
@@ -506,13 +522,14 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--hairline)]">
               <Button
                 type="button"
+                disabled={saving}
                 variant="secondary"
                 size="sm"
                 onClick={() => setShowCreateModal(false)}
               >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" size="sm">
+              <Button type="submit" variant="primary" size="sm" disabled={saving || !newTitle.trim()} isLoading={saving}>
                 Save work
               </Button>
             </div>

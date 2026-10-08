@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Sparkles, LifeBuoy, Info } from "lucide-react";
 import { api } from "../../services/api";
 import type { SystemStatus } from "../../types/api";
@@ -6,14 +6,20 @@ import { Button, Card } from "../ui";
 
 export function SettingsView({ onConfigureAI }: { onConfigureAI: () => void }) {
   const [system, setSystem] = useState<SystemStatus | null>(null);
+  const [infoError, setInfoError] = useState(false);
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [infoRevision, setInfoRevision] = useState(0);
+  const operation = useRef(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api
-      .getSystemStatus()
-      .then(setSystem)
-      .catch(() => {});
-  }, []);
+    let mounted = true;
+    setInfoLoading(true); setInfoError(false);
+    api.getSystemStatus().then(value => {if (mounted) setSystem(value);})
+      .catch(() => {if (mounted) setInfoError(true);})
+      .finally(() => {if (mounted) setInfoLoading(false);});
+    return () => {mounted = false;};
+  }, [infoRevision]);
   return (
     <div className="gw-page max-w-3xl">
       <div>
@@ -44,10 +50,9 @@ export function SettingsView({ onConfigureAI }: { onConfigureAI: () => void }) {
           without signing in.
         </p>
         <p className="text-sm text-[var(--ink-muted)]">
-          {system
-            ? `Version ${system.app_version}`
-            : "Opening app information…"}
+          {infoLoading ? "Opening app information…" : infoError ? "Could not load app information." : system ? `Version ${system.app_version}` : "App information is unavailable."}
         </p>
+        {infoError && <Button disabled={infoLoading} onClick={() => setInfoRevision(value => value + 1)}>Retry app information</Button>}
       </Card>
       <details className="rounded-xl border border-[var(--hairline)] bg-[var(--surface)] p-5">
         <summary className="font-medium cursor-pointer flex items-center gap-2">
@@ -63,7 +68,8 @@ export function SettingsView({ onConfigureAI }: { onConfigureAI: () => void }) {
             <Button
               disabled={busy}
               onClick={async () => {
-                setBusy(true);
+                if (operation.current) return;
+                operation.current = true; setBusy(true);
                 try {
                   await api.startIndexing();
                   setMessage(
@@ -72,7 +78,7 @@ export function SettingsView({ onConfigureAI }: { onConfigureAI: () => void }) {
                 } catch {
                   setMessage("Couldn't refresh your files. Please try again.");
                 } finally {
-                  setBusy(false);
+                  operation.current = false; setBusy(false);
                 }
               }}
             >
@@ -81,7 +87,8 @@ export function SettingsView({ onConfigureAI }: { onConfigureAI: () => void }) {
             <Button
               disabled={busy}
               onClick={async () => {
-                setBusy(true);
+                if (operation.current) return;
+                operation.current = true; setBusy(true);
                 try {
                   await api.restartLocalCore();
                   setMessage("Groundwork restarted. Your work is saved.");
@@ -90,7 +97,7 @@ export function SettingsView({ onConfigureAI }: { onConfigureAI: () => void }) {
                     "Couldn't restart. Close Groundwork and open it again.",
                   );
                 } finally {
-                  setBusy(false);
+                  operation.current = false; setBusy(false);
                 }
               }}
             >

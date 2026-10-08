@@ -23,6 +23,18 @@ Groundwork is a desktop app for searching project folders, exploring Git history
 
 ---
 
+## Virtual collections
+
+Selecting a file previews it inside Groundwork. Double-click and Enter also use the preview; folders open within the workspace. Text previews show line numbers and paging, images render as passive PNG previews, PDFs show paged document images, and Office/OpenDocument/EPUB files show extracted text. Search results, collection members, and Assistant sources use the same preview pane. Every permitted file offers an AI question: supported formats supply text, while unsupported or oversized files supply clearly labeled metadata. External opening remains an explicit button.
+
+AI reads Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), OpenDocument (`.odt`, `.ods`, `.odp`), EPUB, PDF, and text/code. Document layout and embedded images are omitted; spreadsheet formulas use saved cached results, not recalculation. Images and scanned PDFs use local Windows OCR on explicit requests (up to five scanned PDF pages). OCR requires an installed Windows recognition language, may contain errors, and does not interpret objects, diagrams, or scenes. Audio/video and legacy binary Office formats currently provide metadata only. AI evidence labels distinguish extracted text, recognized image text, file details, and folder listings. No file is declared safe to delete or execute from metadata.
+
+**Ask about folder** supplies a bounded direct-child listing and samples up to five readable nearby files within the six-source limit. It does not recursively read a whole folder tree. Content reading is bounded to 5 MB for plain text and 32 MB for documents/images; PDFs extract at most 100 pages and Office XML has decompression limits. Files outside added locations, sensitive credentials, links, and explicit exclusions remain blocked. Image text is read on demand rather than running OCR across the entire disk.
+
+Collections group references to files without moving, copying, or deleting the originals. Select files in the workspace, open **Collections**, and create a group or ask a configured AI model to suggest groups. Review the names, membership, and reasons before saving. Files can belong to several collections; removing a collection removes only its references.
+
+AI suggestions accept up to 24 selected files and use filenames plus bounded opening excerpts. A collection holds up to 100 references. Ask a question within a saved collection to retrieve up to six relevant files with source citations, or select up to six members to compare. Missing or excluded files remain visible as unavailable references. Collections are stored locally; they are not cloud-synced. Online AI providers receive the selected names and excerpts only when requested.
+
 ## 📥 Use the app
 
 Download the Windows installer from [GitHub Releases](https://github.com/ttnhan227/Groundwork/releases) and run the `.exe`. Open Groundwork, sign in or choose **Continue locally**, then select **Add your first folder** on Home. Choose a folder and start searching as its files become ready.

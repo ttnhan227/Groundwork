@@ -48,6 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "home", label: "Home", icon: Home },
     { id: "folders", label: "Files", icon: FolderOpen },
     { id: "assistant", label: "Assistant", icon: BrainCircuit },
+    { id: "collections", label: "Collections", icon: BookmarkCheck },
     { id: "organize", label: "Organize", icon: FolderOpen },
     { id: "computer", label: "Your computer", icon: HardDrive },
     { id: "projects", label: "Projects", icon: FolderGit2 },

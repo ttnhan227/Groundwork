@@ -7,6 +7,8 @@ import { DocsPage } from "./pages/DocsPage";
 import { ChangelogPage } from "./pages/ChangelogPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 
+import { ProductInfoPage } from "./pages/ProductInfoPage";
+
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return window.location.pathname || "/";
@@ -27,6 +29,15 @@ export default function App() {
   };
 
   const renderCurrentPage = () => {
+    if (
+      ["/resources", "/about", "/contributors", "/contact"].includes(
+        currentPath,
+      )
+    ) {
+      return (
+        <ProductInfoPage page={currentPath.slice(1)} navigate={navigate} />
+      );
+    }
     if (currentPath === "/download") {
       return <DownloadPage />;
     }
@@ -45,11 +56,21 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[var(--paper)] text-[var(--ink)]">
-      <Navbar currentRoute={currentPath} navigate={navigate} />
-      <div className="flex-1">
-        {renderCurrentPage()}
+    <div className="product-site">
+      <a className="product-skip" href="#main-content">
+        Skip to content
+      </a>
+      <div className="product-announcement">
+        Groundwork for macOS is in development.{" "}
+        <button onClick={() => navigate("/about")}>View the roadmap</button>
       </div>
+      <Navbar currentRoute={currentPath} navigate={navigate} />
+      <main
+        id="main-content"
+        className={currentPath === "/" ? "product-home" : "product-inner"}
+      >
+        {renderCurrentPage()}
+      </main>
       <Footer navigate={navigate} />
     </div>
   );

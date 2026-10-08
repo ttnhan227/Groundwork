@@ -154,6 +154,9 @@ export interface CitationItem {
   line_start: number | null;
   line_end: number | null;
   snippet: string;
+  evidence_kind?: "text" | "ocr" | "metadata" | "folder";
+  coverage?: string;
+  file_details?: {name?: string; location?: string; extension?: string; size_bytes?: number | null; modified_timestamp?: number};
 }
 
 export interface AIQueryResponse {

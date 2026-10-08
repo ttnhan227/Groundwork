@@ -541,6 +541,7 @@ class InventoryService:
 
         from app.models.types import SearchResponse, SearchResultItem
         from app.services.file_parser import TEXT_EXTENSIONS, FileParser
+        from app.services.document_reader import OFFICE_EXTENSIONS
 
         start = time.perf_counter()
         clauses = ["i.kind='file'", "w.is_active=1", "instr(lower(i.path),lower(?)) > 0"]
@@ -562,7 +563,7 @@ class InventoryService:
         def category(ext: str) -> str:
             return "document" if ext == ".pdf" else FileParser._categorize_extension(ext)
 
-        supported = TEXT_EXTENSIONS | {".pdf"}
+        supported = TEXT_EXTENSIONS | {".pdf"} | OFFICE_EXTENSIONS
         names = ("dockerfile", "makefile", "license", "readme")
         if file_type:
             extensions = sorted(e for e in supported if category(e) == file_type)

@@ -16,7 +16,7 @@ from typing import Generator
 from app.core.config import get_settings
 
 logger = logging.getLogger("groundwork.db")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class LocalDatabase:
@@ -272,6 +272,14 @@ class LocalDatabase:
                 """)
 
                 # 9. Context Sessions ("Continue Where I Left Off")
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS file_collections (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    members_json TEXT NOT NULL DEFAULT '[]',
+                    revision INTEGER NOT NULL DEFAULT 1
+                );
+                """)
                 conn.execute("""
                 CREATE TABLE IF NOT EXISTS context_sessions (
                     id TEXT PRIMARY KEY,

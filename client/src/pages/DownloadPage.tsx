@@ -40,9 +40,7 @@ export const DownloadPage: React.FC = () => {
           <p className="text-xs font-mono uppercase tracking-widest text-[var(--ink-blue)]">
             Groundwork for Windows
           </p>
-          <h1 className="text-4xl font-serif font-bold">
-            Make yourself at home.
-          </h1>
+          <h1 className="text-4xl font-serif font-bold">Download Groundwork</h1>
           <p className="text-[var(--ink-secondary)]">
             Find your files, keep your notes, and return to your work.
           </p>
@@ -59,13 +57,22 @@ export const DownloadPage: React.FC = () => {
             {status === "loading"
               ? "Checking the latest version…"
               : release
-                ? `${release.preview ? 'Preview' : 'Latest release'}: ${release.version} · ${(release.bytes / 1048576).toFixed(1)} MB`
+                ? `${release.preview ? "Preview" : "Latest release"}: ${release.version} · ${(release.bytes / 1048576).toFixed(1)} MB`
                 : status === "error"
                   ? "Unable to check the latest version right now. You can check the releases page directly."
                   : "A Windows installer has not been published yet. It will appear here automatically after a release passes its checks."}
           </p>
-          {release?.preview && <p className="text-sm text-[var(--ink-secondary)]">Groundwork is still in development. This preview is available to try; the finished 1.0 release is not ready yet.</p>}
-          <p className="text-sm text-[var(--ink-secondary)]">Includes the desktop workspace, search, Assistant, notes, and file organization. Local AI models are separate downloads. See release notes for changes and supported features.</p>
+          {release?.preview && (
+            <p className="text-sm text-[var(--ink-secondary)]">
+              Groundwork is still in development. This preview is available to
+              try; the finished 1.0 release is not ready yet.
+            </p>
+          )}
+          <p className="text-sm text-[var(--ink-secondary)]">
+            Includes the desktop workspace, search, Assistant, notes, and file
+            organization. Local AI models are separate downloads. See release
+            notes for changes and supported features.
+          </p>
           {release ? (
             <a
               href={release.url}
@@ -103,6 +110,23 @@ export const DownloadPage: React.FC = () => {
             </div>
           </details>
         </div>
+        <section
+          className="bg-[var(--surface)] border border-[var(--hairline)] rounded-lg p-8 space-y-3"
+          aria-labelledby="macos-heading"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 id="macos-heading" className="text-xl font-semibold">
+              Groundwork for macOS
+            </h2>
+            <span className="text-xs font-medium rounded-full px-3 py-1 bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)]">
+              In development
+            </span>
+          </div>
+          <p className="text-[var(--ink-secondary)] leading-relaxed">
+            A macOS release is in progress. No public installer or release date
+            is available yet. Windows is the currently supported platform.
+          </p>
+        </section>
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">After downloading</h2>
           <ol className="list-decimal pl-5 space-y-3 text-[var(--ink-secondary)]">
@@ -112,8 +136,8 @@ export const DownloadPage: React.FC = () => {
               <strong>Continue locally</strong>.
             </li>
             <li>
-              Click <strong>Choose folder</strong> in the workspace toolbar. Your
-              files stay on your computer.
+              Click <strong>Choose folder</strong> in the workspace toolbar.
+              Your files stay on your computer.
             </li>
           </ol>
         </section>

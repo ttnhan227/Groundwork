@@ -49,6 +49,6 @@ test("organization documentation requires preview and reports partial coverage",
   const page = await readSourceTree();
   assert.match(page, /Scanning never moves or renames your files/);
   assert.match(page, /exact displayed plan/);
-  assert.match(page, /Excerpts cover only part of a long document/);
+  assert.match(page, /Long documents are only partially read/);
   assert.match(page, /built-in local answers through llama\.cpp/);
 });

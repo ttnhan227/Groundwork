@@ -1,158 +1,197 @@
 import {
-  Search,
-  FolderOpen,
-  FileText,
   Download,
   ArrowRight,
+  Search,
+  HardDrive,
   ShieldCheck,
   Sparkles,
+  FolderTree,
+  NotebookPen,
 } from "lucide-react";
-
 export function LandingPage({
   navigate,
 }: {
   navigate: (path: string) => void;
 }) {
   return (
-    <div>
-      <section className="max-w-6xl mx-auto px-6 py-20 sm:py-28">
-        <p className="text-[var(--ink-blue)] font-medium mb-5">
-          Groundwork 1.0 · A desktop workspace for your files
-        </p>
-        <h1 className="max-w-4xl text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.12]">
-          Explore your files. Ask your AI.
-          <br />
-          <span className="text-[var(--ink-blue)]">Stay in control.</span>
-        </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-[var(--ink-secondary)] mt-7">
-          Browse a folder tree, search files, inspect storage, and ask Assistant
-          in one compact desktop workspace. Keep notes and preview file organization
-          alongside your work. Start with a folder. No
-          account needed.
-        </p>
-        <div className="flex flex-wrap gap-4 mt-9">
-          <button
-            onClick={() => navigate("/download")}
-            className="site-primary"
-          >
-            <Download size={19} />
-            Download for Windows
-          </button>
-          <button onClick={() => navigate("/docs")} className="site-secondary">
-            See how to get started
-            <ArrowRight size={18} />
-          </button>
-        </div>
-        <p className="text-sm text-[var(--ink-muted)] mt-5">
-          Windows 10 or 11 · Search works offline · Optional account sync
-        </p>
-      </section>
-      <section className="border-y border-[var(--hairline)] bg-[var(--surface)]">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <h2 className="text-3xl font-semibold tracking-tight mb-9">
-            Get back to the work that matters.
-          </h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-7">
-            {[
-              {
-                icon: Search,
-                title: "Find the file you remember",
-                text: "Find files by name or path as they are discovered. Search inside supported readable formats once preparation finishes.",
-              },
-              {
-                icon: Sparkles,
-                title: "Ask AI with sources",
-                text: "Get local AI answers from your files with sources to check. Download a model or import a GGUF file; online providers are optional.",
-              },
-              {
-                icon: FileText,
-                title: "Keep your work together",
-                text: "Save notes and useful AI findings. Return to recent changes and saved work without leaving the workspace.",
-              },
-              {
-                icon: FolderOpen,
-                title: "Explore and organize",
-                text: "Browse folders and files together, inspect logical sizes, and review proposed file moves before applying them. Change history includes undo.",
-              },
-            ].map((item) => (
-              <article key={item.title} className="space-y-4">
-                <item.icon className="text-[var(--ink-blue)]" size={26} />
-                <h3 className="text-lg font-semibold">{item.title}</h3>
-                <p className="text-[var(--ink-secondary)] leading-relaxed">
-                  {item.text}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="grid md:grid-cols-2 gap-12">
-          <div>
-            <p className="text-[var(--ink-blue)] font-medium mb-4">
-              Ready when you are
-            </p>
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Three steps to your first search.
-            </h2>
-            <p className="text-[var(--ink-secondary)] mt-5 leading-relaxed">
-              Nothing to configure before you start. You can connect an account
-              or add an AI service later.
-            </p>
-          </div>
-          <ol className="space-y-7">
-            {[
-              [
-                "Install Groundwork",
-                "Download the Windows installer and open the app.",
-              ],
-              [
-                "Choose how to start",
-                "Sign in to sync notes and saved searches, or choose Continue locally.",
-              ],
-              [
-                "Choose a folder or drive",
-                "Click Choose folder in the workspace toolbar. Browse and search as Groundwork prepares supported file contents in the background.",
-              ],
-            ].map(([title, text], index) => (
-              <li key={title} className="flex gap-5">
-                <span className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] font-semibold">
-                  {index + 1}
-                </span>
-                <div>
-                  <h3 className="text-lg font-semibold">{title}</h3>
-                  <p className="text-[var(--ink-secondary)] mt-1 leading-relaxed">
-                    {text}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-      <section className="max-w-6xl mx-auto px-6 pb-20">
-        <div className="rounded-2xl bg-[var(--control-room)] text-white p-8 sm:p-12 flex flex-col md:flex-row gap-8 items-start">
-          <ShieldCheck className="shrink-0 text-[var(--signal)]" size={38} />
-          <div className="space-y-4">
-            <h2 className="text-3xl font-semibold">
-              Your files stay on your computer.
-            </h2>
-            <p className="max-w-3xl text-[var(--control-room-muted)] leading-relaxed">
-              Search and notes work without an internet connection. If you sign
-              in, you can sync your notes and saved searches. If you choose an
-              online AI service, only your question and relevant file excerpts
-              are sent when you ask.
-            </p>
+    <>
+      <section className="product-showcase">
+        <div className="product-first-glance">
+          <p className="product-eyebrow">
+            Groundwork · Your local desktop workspace
+          </p>
+          <h1>
+            Find your files.
+            <br />
+            <span>Understand what matters.</span>
+          </h1>
+          <p className="product-intro">
+            Find documents, read them, and ask about the details you need—
+            with answers you can trace back to the file.
+          </p>
+          <div className="product-hero-actions">
             <button
-              onClick={() => navigate("/privacy")}
-              className="inline-flex gap-2 items-center font-medium text-white underline underline-offset-4"
+              className="site-primary"
+              onClick={() => navigate("/download")}
             >
-              Read about your privacy
+              <Download size={18} />
+              Download for Windows
+            </button>
+            <button
+              className="site-secondary"
+              onClick={() => navigate("/docs")}
+            >
+              See how it works
               <ArrowRight size={17} />
             </button>
           </div>
+          <p className="product-hero-note">
+            Windows 10 / 11 · Search works offline · No account needed
+          </p>
+          <figure className="product-workspace-shot">
+            <a
+              href="/screenshots/workspace.png?v=20261008c"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open full-size workspace screenshot"
+            >
+              <img
+                src="/screenshots/workspace.png?v=20261008c"
+                alt="Groundwork built-in reader showing an apartment lease renewal beside its cited AI answer"
+                width={1440}
+                height={900}
+                fetchPriority="high"
+              />
+            </a>
+            <figcaption>
+              Read a lease renewal with its AI answer beside it, without opening another app.
+              Actual interface with illustrative sample documents.
+            </figcaption>
+          </figure>
         </div>
       </section>
-    </div>
+      <section
+        className="product-ai-feature"
+        aria-labelledby="ai-feature-title"
+      >
+        <div className="product-ai-copy">
+          <p className="product-eyebrow">More than finding a file</p>
+          <h2 id="ai-feature-title">
+            What changed?
+            <br />
+            What do I need to do?
+          </h2>
+          <p>
+            Ask about a receipt, document, spreadsheet, or folder. Read Office
+            documents and PDF text, or recognize written text in images and scanned
+            PDFs on Windows. Keep your files beside the answer.
+          </p>
+          <ul>
+            <li>
+              <strong>Check the source.</strong> Follow references back to your
+              files. See whether the answer used document text, OCR, or file details only.
+            </li>
+            <li>
+              <strong>Choose where AI runs.</strong> Use local excerpts, a local
+              model, or an online provider.
+            </li>
+            <li>
+              <strong>Stay in control.</strong> Review proposed changes before
+              applying them.
+            </li>
+          </ul>
+          <button className="utility-ai-link" onClick={() => navigate("/docs")}>
+            Explore Assistant
+            <ArrowRight size={17} />
+          </button>
+          <p className="product-ai-setup">
+            Generated answers require a configured model or provider. Matching
+            excerpts work locally.
+          </p>
+        </div>
+        <figure className="product-ai-shot">
+          <a
+            href="/screenshots/assistant.png?v=20261008c"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open full-size Assistant screenshot"
+          >
+            <div className="product-ai-crop">
+              <img
+                src="/screenshots/assistant.png?v=20261008c"
+                alt="Groundwork Assistant answering a lease renewal question with document sources"
+                width={392}
+                height={529}
+                loading="lazy"
+              />
+            </div>
+          </a>
+          <figcaption>
+            A real local AI answer identifying the rent increase and renewal deadline in a sample lease. Click to enlarge.
+          </figcaption>
+        </figure>
+      </section>
+      <section className="product-benefits" aria-labelledby="benefits-title">
+        <p className="product-eyebrow">Features & benefits</p>
+        <h2 id="benefits-title">Why use Groundwork?</h2>
+        <div className="product-benefit-grid">
+          {[
+            {
+              icon: FolderTree,
+              title: "One desktop workspace",
+              text: "Keep the folder tree, file list, storage details, and tools together. Select a file and act on it without navigating through separate screens.",
+            },
+            {
+              icon: Search,
+              title: "Find files and matching text",
+              text: "Find files by name or path as they are discovered. Search inside supported readable formats after indexing. Filter by file type or scope.",
+            },
+            {
+              icon: HardDrive,
+              title: "Understand your storage",
+              text: "Sort by size, compare folders, and explore storage by type. Folder totals show logical bytes; individual files can show allocated size and hard links where available.",
+            },
+            {
+              icon: Sparkles,
+              title: "AI grounded in your files",
+              text: "Ask about documents, spreadsheets, presentations, and recognized image text. Check source references and coverage labels. Unsupported formats provide file details only. Generative answers need a configured model.",
+            },
+            {
+              icon: ShieldCheck,
+              title: "Review before changes",
+              text: "Inspect duplicate candidates and preview organization plans before applying moves. Supported organization operations include history and undo.",
+            },
+            {
+              icon: NotebookPen,
+              title: "Keep useful context",
+              text: "Group related files in collections without moving originals. Save useful answers, notes, searches, and next steps. Your local file index stays on your computer.",
+            },
+          ].map((item) => (
+            <article key={item.title}>
+              <item.icon size={34} />
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="product-bottom-cta">
+        <h2>Ready to explore your files?</h2>
+        <p>
+          The Windows installer includes the local engine. No Python, Docker, or
+          database installation needed.
+        </p>
+        <button className="site-primary" onClick={() => navigate("/download")}>
+          <Download size={18} />
+          Get Groundwork for Windows
+        </button>
+        <button
+          className="product-roadmap-link"
+          onClick={() => navigate("/about")}
+        >
+          macOS roadmap
+        </button>
+      </section>
+    </>
   );
 }
