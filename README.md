@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Local workspace search, Git history, notes &amp; AI context</strong>
+  <strong>Find your files, read them, and ask AI about what matters</strong>
 </p>
 
 <p align="center">
@@ -19,13 +19,23 @@
 
 ## 📌 Overview
 
-Groundwork is a desktop app for searching project folders, exploring Git history, and collecting notes and AI context. SQLite stores your local workspace data. An optional backend handles accounts and sync.
+Groundwork is a Windows desktop app for finding files, reading documents, and asking questions about selected files and folders. Review proposed organization changes before applying them, or group files into collections without moving the originals. SQLite stores your local workspace data. An optional backend handles accounts and sync.
 
 ---
 
-## Virtual collections
+## Inside the app
 
-Selecting a file previews it inside Groundwork. Double-click and Enter also use the preview; folders open within the workspace. Text previews show line numbers and paging, images render as passive PNG previews, PDFs show paged document images, and Office/OpenDocument/EPUB files show extracted text. Search results, collection members, and Assistant sources use the same preview pane. Every permitted file offers an AI question: supported formats supply text, while unsupported or oversized files supply clearly labeled metadata. External opening remains an explicit button.
+Read a document and ask about it in the same workspace. Answers show their sources and distinguish extracted text, OCR, and metadata-only evidence.
+
+![Groundwork document reader with an AI answer and source references](client/public/screenshots/workspace.png)
+
+<img src="client/public/screenshots/assistant.png" alt="AI answer comparing rent changes and identifying the response deadline from a document" width="392" />
+
+These screenshots show the current implementation using a synthetic rental agreement. The published installer may lag behind the latest source changes.
+
+## Reading files and virtual collections
+
+Select a file, then double-click or press Enter to open the built-in reader; folders open within the workspace. Text previews show line numbers and paging, images render as passive PNG previews, PDFs show paged document images, and Office/OpenDocument/EPUB files show extracted text. Search results, collection members, and Assistant sources use the same preview pane. Every permitted file offers an AI question: supported formats supply text, while unsupported or oversized files supply clearly labeled metadata. External opening remains an explicit button.
 
 AI reads Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), OpenDocument (`.odt`, `.ods`, `.odp`), EPUB, PDF, and text/code. Document layout and embedded images are omitted; spreadsheet formulas use saved cached results, not recalculation. Images and scanned PDFs use local Windows OCR on explicit requests (up to five scanned PDF pages). OCR requires an installed Windows recognition language, may contain errors, and does not interpret objects, diagrams, or scenes. Audio/video and legacy binary Office formats currently provide metadata only. AI evidence labels distinguish extracted text, recognized image text, file details, and folder listings. No file is declared safe to delete or execute from metadata.
 
