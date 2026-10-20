@@ -45,6 +45,7 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
   const [question, setQuestion] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [response, setResponse] = useState<AIQueryResponse | null>(null);
   const [providers, setProviders] = useState<
     Array<{ id: string; name: string; is_local: boolean; active: boolean }>
@@ -172,7 +173,7 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
         selectedProjectId || undefined,
         response?.answer?.slice(0, 300),
       );
-      alert("Your work is saved.");
+      setNotice("Your work is saved.");
     }
   };
 
@@ -283,6 +284,11 @@ export const AIInvestigationView: React.FC<AIInvestigationViewProps> = ({
         {error && (
           <p role="alert" className="gw-notice mb-4">
             {error}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="gw-notice mb-4 text-[var(--success)]">
+            {notice}
           </p>
         )}
         <form onSubmit={handleRunInvestigation} className="space-y-3">

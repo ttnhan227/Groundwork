@@ -25,7 +25,7 @@ async function readSourceTree(directory = srcDir) {
 
 test("builds the Groundwork static website shell", async () => {
   const html = await readFile(distHtml, "utf8");
-  assert.match(html, /<title>Groundwork — Find what you were working on<\/title>/);
+  assert.match(html, /<title>Groundwork — Find your files, read them, and ask AI about what matters<\/title>/);
   assert.match(html, /<div id="root"><\/div>/);
   assert.match(html, /\/assets\/index-/);
 });

@@ -259,6 +259,7 @@ class AIQueryResponse(BaseModel):
     provider_used: str
     suggested_actions: list[dict[str, Any]] = Field(default_factory=list)
     session_id: str | None = None
+    citation_verification: dict[str, Any] | None = None
 
 
 class InvestigationRequest(BaseModel):

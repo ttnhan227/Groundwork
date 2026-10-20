@@ -1,6 +1,6 @@
 """Installed builds use hosted accounts; developer builds stay local."""
-import sys
 import json
+import sys
 
 from app.core.config import Settings
 

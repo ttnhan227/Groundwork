@@ -14,6 +14,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+
 from app.services.document_reader import OFFICE_EXTENSIONS, read_document
 
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.ico'}
@@ -141,8 +142,9 @@ class FileParser:
                     page = doc[i]
                     page_text = page.get_text()
                     if not page_text.strip() and allow_ocr and ocr_pages < 5:
-                        from app.services.ocr_service import read_image
                         import tempfile
+
+                        from app.services.ocr_service import read_image
                         ocr_pages += 1
                         with tempfile.TemporaryDirectory(prefix='groundwork-page-') as folder:
                             image_path = Path(folder) / 'page.png'
@@ -278,15 +280,17 @@ class FileParser:
             end_idx = min(start_idx + target_chunk_lines, total_lines)
             chunk_content = "".join(lines[start_idx:end_idx])
 
-            chunks.append(ParsedChunk(
-                chunk_index=chunk_num,
-                content=chunk_content.strip(),
-                char_start=line_offsets[start_idx],
-                char_end=line_offsets[end_idx],
-                line_start=start_idx + 1,
-                line_end=end_idx,
-            ))
-            chunk_num += 1
+            trimmed = chunk_content.strip()
+            if trimmed:
+                chunks.append(ParsedChunk(
+                    chunk_index=chunk_num,
+                    content=trimmed,
+                    char_start=line_offsets[start_idx],
+                    char_end=line_offsets[end_idx],
+                    line_start=start_idx + 1,
+                    line_end=end_idx,
+                ))
+                chunk_num += 1
 
             if end_idx >= total_lines:
                 break

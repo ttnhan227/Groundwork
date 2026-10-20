@@ -211,9 +211,9 @@ class AIToolManager:
             workspace = next((ws for ws in self.workspace_service.list_workspaces() if ws.is_active and valid_path.is_relative_to(Path(ws.path).resolve())), None)
             if not workspace or IndexerService.get_instance()._is_ignored(valid_path, workspace.ignore_patterns, [], Path(workspace.path).resolve(), passive_preview=True):
                 return {"error": "File is excluded by workspace privacy rules"}
-            from app.services.file_parser import FileParser, IMAGE_EXTENSIONS
-            from app.services.file_evidence import metadata, folder_evidence
             from app.services.collection_service import CollectionService
+            from app.services.file_evidence import folder_evidence, metadata
+            from app.services.file_parser import IMAGE_EXTENSIONS, FileParser
             kind, coverage = 'text', 'Extracted text'
             if valid_path.is_dir():
                 content = folder_evidence(valid_path, CollectionService().allowed)

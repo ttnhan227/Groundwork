@@ -232,6 +232,7 @@ After installing Python and npm dependencies, run from the repository root:
 
 ```powershell
 .\server\.venv\Scripts\python.exe -m pytest server/tests
+.\server\.venv\Scripts\python.exe server/eval/rag_citation_eval.py
 npm --prefix desktop run build
 npm --prefix client run build
 ```

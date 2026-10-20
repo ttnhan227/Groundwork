@@ -540,8 +540,8 @@ class InventoryService:
         from datetime import datetime, timezone
 
         from app.models.types import SearchResponse, SearchResultItem
-        from app.services.file_parser import TEXT_EXTENSIONS, FileParser
         from app.services.document_reader import OFFICE_EXTENSIONS
+        from app.services.file_parser import TEXT_EXTENSIONS, FileParser
 
         start = time.perf_counter()
         clauses = ["i.kind='file'", "w.is_active=1", "instr(lower(i.path),lower(?)) > 0"]

@@ -1,6 +1,6 @@
 # AI context engine
 
-The engine retrieves bounded local file evidence, optionally adds related Git history, and sends that context to the explicitly selected provider. Citations contain actual retrieved paths and excerpt line ranges. They identify the evidence provided to the model; generated prose is not automatically fact-checked.
+The engine retrieves bounded local file evidence, optionally adds related Git history, and sends that context to the explicitly selected provider. Citations contain actual retrieved paths and excerpt line ranges. They identify the evidence provided to the model. An automated, deterministic `CitationVerifier` parses inline citations in generated responses, validates cited sources against retrieved evidence filenames and line bounds, flags hallucinated or unverified references, and returns a structured verification report with citation precision metrics.
 
 Local mode is an extractive evidence viewer, not a local language model. It shows a clear missing-evidence response instead of treating prompt instructions as evidence. Ollama supplies optional on-device generation. OpenAI and Gemini supply optional remote generation. Provider failures are returned as errors rather than silently relabeling an offline answer as a cloud response.
 

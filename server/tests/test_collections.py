@@ -1,13 +1,15 @@
 import json
 import uuid
+
 import pytest
+
 from app.core import config
-from app.database.local_db import reset_db, get_db, LocalDatabase, SCHEMA_VERSION
+from app.database.local_db import SCHEMA_VERSION, LocalDatabase, reset_db
 from app.models.types import AIQueryRequest, WorkspaceCreate
-from app.services.workspace_service import WorkspaceService
-from app.services.indexer_service import IndexerService
-from app.services.collection_service import CollectionService, CollectionInput, CollectionConflict
 from app.services.ai.context_engine import AIContextEngine
+from app.services.collection_service import CollectionConflict, CollectionInput, CollectionService
+from app.services.indexer_service import IndexerService
+from app.services.workspace_service import WorkspaceService
 
 
 @pytest.fixture

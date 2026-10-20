@@ -34,6 +34,7 @@ from app.services.activity_service import ActivityService
 from app.services.ai.context_engine import AIContextEngine
 from app.services.ai.investigation import InvestigationService
 from app.services.ai.tools import AIToolManager
+from app.services.collection_service import CollectionConflict, CollectionInput, CollectionService
 from app.services.context_service import ContextService
 from app.services.git_service import GitService
 from app.services.indexer_service import IndexerService
@@ -435,7 +436,6 @@ def get_activity_summary(days: int = 2) -> dict[str, Any]:
 # --- Context Sessions Router ---
 context_router = APIRouter(prefix="/api/context-sessions", tags=["ContextSessions"])
 
-from app.services.collection_service import CollectionInput, CollectionService, CollectionConflict
 
 
 @context_router.get("/collections/list")
@@ -587,6 +587,15 @@ def assistant_job(job_id: str):
         raise HTTPException(404, str(exc)) from exc
 
 
+@ai_router.post("/jobs/{job_id}/cancel")
+def cancel_assistant_job(job_id: str):
+    from app.services.assistant_jobs import AssistantJobs
+    try:
+        return AssistantJobs.cancel(job_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 class OrganizationRequest(BaseModel):
     action: str
     paths: list[str] = Field(default_factory=list, max_length=100)
@@ -705,6 +714,10 @@ def create_organization_sample():
 def query_ai(req: AIQueryRequest) -> AIQueryResponse:
     try:
         return AIContextEngine().query(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -713,6 +726,10 @@ def query_ai(req: AIQueryRequest) -> AIQueryResponse:
 def run_investigation(req: InvestigationRequest) -> dict[str, Any]:
     try:
         return InvestigationService().run_investigation(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -724,7 +741,14 @@ def list_ai_tools() -> list[dict[str, Any]]:
 
 @ai_router.post("/tools/execute")
 def execute_ai_tool(req: ToolExecutionRequest) -> dict[str, Any]:
-    return AIToolManager().execute_tool(req.tool_name, req.arguments, req.confirmation_token)
+    try:
+        return AIToolManager().execute_tool(req.tool_name, req.arguments, req.confirmation_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(exc)}") from exc
 
 
 @ai_router.get("/providers")

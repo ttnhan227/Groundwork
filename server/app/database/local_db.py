@@ -390,10 +390,14 @@ class LocalDatabase:
                 conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     def close(self) -> None:
-        """Closes all open database connections."""
+        """Closes all open database connections and checkpoints WAL to release Windows locks."""
         with self._lock:
             for conn in list(self._connections):
                 try:
+                    try:
+                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                    except Exception:
+                        pass
                     conn.close()
                 except Exception:
                     pass

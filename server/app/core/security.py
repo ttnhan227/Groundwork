@@ -63,6 +63,8 @@ def command_argv(command: str) -> list[str]:
 
 def validate_workspace_path(path_str: str, allowed_roots: Sequence[str | Path]) -> Path:
     """Ensures a path exists, resolves symlinks, and falls inside an allowed root."""
+    if not path_str or not str(path_str).strip():
+        raise ValueError("Path cannot be empty.")
     target = Path(path_str).resolve()
     for root in allowed_roots:
         resolved_root = Path(root).resolve()

@@ -1,5 +1,3 @@
-import tempfile
-import time
 from pathlib import Path
 
 import pytest
@@ -159,8 +157,8 @@ def test_unmatched_categories_stay_at_original_location(org_env):
 def test_long_document_retrieves_later_relevant_section(org_env):
     service, folder = org_env
     from app.models.types import WorkspaceCreate
-    from app.services.workspace_service import WorkspaceService
     from app.services.ai.tools import AIToolManager
+    from app.services.workspace_service import WorkspaceService
     WorkspaceService().create_workspace(WorkspaceCreate(name="Reading fixture", path=str(folder)))
     source = folder / "long.txt"
     source.write_text("\n".join(["General background"] * 120 + ["Invoice payment receipt"] * 10))

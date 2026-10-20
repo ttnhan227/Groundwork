@@ -1,6 +1,7 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from app.routers.api import system_router
 from app.services import installed_apps
 

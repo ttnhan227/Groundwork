@@ -285,7 +285,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                                 .openFile(
                                   `${selectedOverview.path}/${file.name}`,
                                 )
-                                .catch((error) => alert(String(error)))
+                                .catch((error) => setError(String(error)))
                             }
                           >
                             Open
@@ -299,7 +299,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                                     file.name,
                                   )
                                   .then(setFileHistory)
-                                  .catch((error) => alert(String(error)))
+                                  .catch((error) => setError(String(error)))
                               }
                             >
                               History
@@ -330,7 +330,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       api
                         .getFileHistory(selectedOverview.id, file.file)
                         .then(setFileHistory)
-                        .catch((error) => alert(String(error)))
+                        .catch((error) => setError(String(error)))
                     }
                   >
                     <span>{file.status}</span>

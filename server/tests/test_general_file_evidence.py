@@ -1,17 +1,19 @@
 import os
 import zipfile
-import pytest
+
 import fitz
+import pytest
 from PIL import Image, ImageDraw, ImageFont
+
 from app.core import config
-from app.database.local_db import reset_db, get_db
-from app.models.types import WorkspaceCreate, AIQueryRequest
-from app.services.workspace_service import WorkspaceService
-from app.services.ai.tools import AIToolManager
+from app.database.local_db import get_db, reset_db
+from app.models.types import AIQueryRequest, WorkspaceCreate
 from app.services.ai.context_engine import AIContextEngine
-from app.services.file_parser import FileParser
+from app.services.ai.tools import AIToolManager
 from app.services.document_reader import read_document
+from app.services.file_parser import FileParser
 from app.services.preview_service import PreviewService
+from app.services.workspace_service import WorkspaceService
 
 
 @pytest.fixture

@@ -175,7 +175,7 @@ class SearchEngine:
         q_lower = query.lower()
         terms = [t for t in re.findall(r"[\w.-]+", q_lower) if len(t) >= 2]
 
-        where_clauses = []
+        where_clauses = ["workspace_id IN (SELECT id FROM workspaces WHERE is_active = 1)"]
         params: list[Any] = []
 
         name_conditions = ["(filename LIKE ? OR relative_path LIKE ?)"]
@@ -259,7 +259,8 @@ class SearchEngine:
             FROM fts_chunks fc
             JOIN chunks c ON fc.chunk_id = c.id
             JOIN files f ON c.file_id = f.id
-            WHERE fts_chunks MATCH ?
+            JOIN workspaces w ON f.workspace_id = w.id
+            WHERE fts_chunks MATCH ? AND w.is_active = 1
             """
             params: list[Any] = [fts_query]
             if paths is not None:
@@ -279,7 +280,8 @@ class SearchEngine:
             if modified_after is not None:
                 sql += " AND f.mtime >= ?"
                 params.append(modified_after)
-            sql += f" ORDER BY rank ASC LIMIT {limit};"
+            sql += " ORDER BY rank ASC LIMIT ?;"
+            params.append(limit)
 
             rows = conn.execute(sql, params).fetchall()
             if not rows and len(words) > 1:
@@ -324,7 +326,8 @@ class SearchEngine:
         SELECT c.file_id, c.line_start, c.content, c.embedding_json
         FROM chunks c
         JOIN files f ON c.file_id = f.id
-        WHERE c.embedding_json IS NOT NULL AND f.hash LIKE ?
+        JOIN workspaces w ON f.workspace_id = w.id
+        WHERE c.embedding_json IS NOT NULL AND f.hash LIKE ? AND w.is_active = 1
         """
         params: list[Any] = [self.embeddings.model_id + ":%"]
         if workspace_id:
@@ -371,8 +374,9 @@ class SearchEngine:
         sql = f"""
         SELECT f.*, p.name as project_name
         FROM files f
+        JOIN workspaces w ON f.workspace_id = w.id
         LEFT JOIN projects p ON f.project_id = p.id
-        WHERE f.id IN ({placeholders});
+        WHERE w.is_active = 1 AND f.id IN ({placeholders});
         """
         rows = conn.execute(sql, file_ids).fetchall()
         return {r["id"]: dict(r) for r in rows}

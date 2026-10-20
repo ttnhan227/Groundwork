@@ -1,9 +1,9 @@
 """Local Windows OCR. Image text is evidence, never visual scene understanding."""
 import base64
 import os
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 
 SCRIPT = r'''
 $ErrorActionPreference = 'Stop'

@@ -4,9 +4,9 @@ Evaluated against 15 curated developer queries on current Groundwork core source
 
 | Retrieval Mode | Recall @ 1 (%) | Recall @ 5 (%) | MRR (Mean Reciprocal Rank) | Avg Latency (ms) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Lexical** | 100.0% | 100.0% | 1.0 | 3.81 ms |
-| **Semantic** | 86.7% | 100.0% | 0.913 | 79.77 ms |
-| **Hybrid** | 100.0% | 100.0% | 1.0 | 78.48 ms |
+| **Lexical** | 100.0% | 100.0% | 1.0 | 37.54 ms |
+| **Semantic** | 86.7% | 100.0% | 0.922 | 984.7 ms |
+| **Hybrid** | 100.0% | 100.0% | 1.0 | 1530.01 ms |
 
 ### Key Findings:
 - **Hybrid Retrieval** achieves balanced retrieval by combining FTS5 lexical matching with vector and recency signals.

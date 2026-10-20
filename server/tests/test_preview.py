@@ -1,13 +1,14 @@
-import io
 import zipfile
+
+import fitz
 import pytest
 from PIL import Image
-import fitz
+
 from app.core import config
 from app.database.local_db import reset_db
 from app.models.types import WorkspaceCreate
-from app.services.workspace_service import WorkspaceService
 from app.services.preview_service import PreviewService
+from app.services.workspace_service import WorkspaceService
 
 
 @pytest.fixture

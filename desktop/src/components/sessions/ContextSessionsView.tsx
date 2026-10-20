@@ -353,7 +353,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                           });
                           await fetchSessions();
                         } catch (error) {
-                          alert(String(error));
+                          setError(error instanceof Error ? error.message : String(error));
                         }
                       }}
                     >

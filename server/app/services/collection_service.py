@@ -6,12 +6,13 @@ import os
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from app.database.local_db import get_db
+
 from app.core.security import validate_workspace_path
-from app.services.workspace_service import WorkspaceService
-from app.services.indexer_service import IndexerService
-from app.services.ai.tools import AIToolManager
+from app.database.local_db import get_db
 from app.services.ai.providers import get_llm_provider
+from app.services.ai.tools import AIToolManager
+from app.services.indexer_service import IndexerService
+from app.services.workspace_service import WorkspaceService
 
 
 class Member(BaseModel):
@@ -63,7 +64,6 @@ class CollectionService:
         title = data.title.strip()
         if not title:
             raise ValueError("Give the collection a name.")
-        conn = get_db().get_connection()
         with get_db().transaction() as cursor:
             cursor.execute("BEGIN IMMEDIATE")
             row = cursor.execute("SELECT * FROM file_collections WHERE id=?", (collection_id,)).fetchone()
@@ -84,6 +84,7 @@ class CollectionService:
 
     def relevant_paths(self, collection, question):
         import re
+
         from app.services.search_engine import SearchEngine
         stop = {"what", "when", "where", "which", "who", "how", "is", "are", "the", "a", "an", "and", "or", "in", "of", "to", "my", "our", "files", "file", "please", "tell", "me", "about", "find", "does", "did", "can", "you", "it", "for", "with"}
         query = " ".join(w for w in re.findall(r"\w+", question) if w.lower() not in stop)

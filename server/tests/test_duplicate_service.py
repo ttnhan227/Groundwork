@@ -1,12 +1,8 @@
-import tempfile
-from pathlib import Path
 
-import pytest
 
 from app.core import config
 from app.models.types import WorkspaceCreate
 from app.services.duplicate_service import DuplicateService
-from app.services.indexer_service import IndexerService
 from app.services.inventory_service import InventoryService
 from app.services.workspace_service import WorkspaceService
 

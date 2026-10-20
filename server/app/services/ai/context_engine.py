@@ -16,6 +16,7 @@ from pathlib import Path
 
 from app.models.types import AIQueryRequest, AIQueryResponse, CitationItem
 from app.services.ai.providers import get_llm_provider
+from app.services.ai.citation_verifier import CitationVerifier
 from app.services.ai.tools import AIToolManager
 
 logger = logging.getLogger("groundwork.ai.context")
@@ -62,6 +63,19 @@ class AIContextEngine:
     def query(self, req: AIQueryRequest) -> AIQueryResponse:
         """Executes a bounded context AI query with explicit token budgeting and chunk boundaries."""
         all_selected = list(dict.fromkeys(([req.focused_path] if req.focused_path else []) + req.file_paths))
+        if req.workspace_id and all_selected:
+            from app.services.workspace_service import WorkspaceService
+            target_ws = WorkspaceService().get_workspace(req.workspace_id)
+            if not target_ws or not target_ws.is_active:
+                raise ValueError("The requested workspace is not available or inactive.")
+            ws_root = Path(target_ws.path).resolve()
+            for p in all_selected:
+                try:
+                    resolved_p = Path(p).resolve()
+                    if not resolved_p.is_relative_to(ws_root):
+                        raise ValueError(f"Cross-workspace access denied: file '{Path(p).name}' is not in workspace '{target_ws.name}'.")
+                except (ValueError, OSError) as exc:
+                    raise ValueError(f"Cross-workspace access denied: {exc}") from exc
         if req.collection_id:
             from app.services.collection_service import CollectionService
             collection = CollectionService().get(req.collection_id)
@@ -100,7 +114,7 @@ class AIContextEngine:
         # children. Never recurse through an entire disk or bypass privacy rules.
         folder_notices = []
         from app.services.collection_service import CollectionService
-        from app.services.file_parser import FileParser, IMAGE_EXTENSIONS
+        from app.services.file_parser import IMAGE_EXTENSIONS, FileParser
         expanded = list(all_selected)
         for raw in all_selected:
             try:
@@ -247,4 +261,5 @@ class AIContextEngine:
             provider_used=provider_name,
             suggested_actions=suggested_actions,
             session_id=None,
+            citation_verification=CitationVerifier.verify(answer, citations).to_dict(),
         )

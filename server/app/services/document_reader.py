@@ -1,7 +1,7 @@
 """Passive, bounded document extraction. No Office automation or macros."""
-from pathlib import Path
 import re
 import zipfile
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 OFFICE_EXTENSIONS = {'.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp', '.epub'}

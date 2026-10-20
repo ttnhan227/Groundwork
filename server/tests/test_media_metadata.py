@@ -1,5 +1,4 @@
 import struct
-from pathlib import Path
 
 from app.services.media_metadata import CapabilitiesService, read_audio_metadata
 

@@ -150,6 +150,7 @@ def test_selected_storage_reports_allocation_and_shared_hard_links(inventory_env
 @pytest.mark.skipif(os.name != "nt", reason="NTFS sparse allocation")
 def test_sparse_storage_keeps_64_bit_logical_size(inventory_env):
     import subprocess
+
     from app.services.storage_metadata import file_storage
     root, _, _ = inventory_env
     source = root / "sparse.bin"
@@ -172,6 +173,7 @@ def test_sparse_storage_keeps_64_bit_logical_size(inventory_env):
 
 def test_storage_route_validates_scope_and_missing_file(inventory_env, tmp_path):
     from fastapi.testclient import TestClient
+
     from app.local_main import app
     root, _, _ = inventory_env
     source = root / "example.bin"

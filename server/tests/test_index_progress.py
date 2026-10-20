@@ -1,3 +1,5 @@
+import pytest
+
 from app.core import config
 from app.database.local_db import reset_db
 from app.models.types import WorkspaceCreate
@@ -90,12 +92,12 @@ def test_all_inventories_are_available_before_content_processing(tmp_path, monke
         reset_db()
 
 
-import pytest
 
 
 @pytest.mark.parametrize("explicit_resume", [True, False])
 def test_resume_during_cancellation_is_queued_but_watcher_does_not_restart(monkeypatch, explicit_resume):
     import threading
+
     from app.models.types import IndexStatus
     indexer = IndexerService()
     entered, release = threading.Event(), threading.Event()

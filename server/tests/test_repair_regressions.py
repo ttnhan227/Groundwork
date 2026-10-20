@@ -43,7 +43,9 @@ def test_shell_operators_and_mutating_git_are_blocked():
 
 def test_search_filters_recent_results_and_trained_semantics(tmp_path, monkeypatch):
     import os
+
     import pytest
+
     from app.core import config
     from app.database.local_db import reset_db
     from app.models.types import WorkspaceCreate
@@ -102,6 +104,7 @@ def test_mutating_tools_need_confirmation():
 
 def test_indexing_content_changes_and_ignore_cleanup(tmp_path, monkeypatch):
     import os
+
     from app.core import config
     from app.database.local_db import get_db, reset_db
     from app.models.types import WorkspaceCreate
@@ -136,6 +139,7 @@ def test_indexing_content_changes_and_ignore_cleanup(tmp_path, monkeypatch):
 
 def test_untrusted_browser_origin_is_rejected():
     from fastapi.testclient import TestClient
+
     from app.main import app
     response = TestClient(app).get("/api/workspaces", headers={"Origin": "https://untrusted.example"})
     assert response.status_code == 403
@@ -143,7 +147,9 @@ def test_untrusted_browser_origin_is_rejected():
 
 def test_private_preferences_are_encrypted_and_not_public(tmp_path, monkeypatch):
     import sys
+
     import pytest
+
     from app.core import config
     from app.services.preferences_service import PreferencesService
     if sys.platform != "win32":
@@ -161,6 +167,7 @@ def test_private_preferences_are_encrypted_and_not_public(tmp_path, monkeypatch)
 
 def test_sync_does_not_drop_unacknowledged_queue(tmp_path, monkeypatch):
     import httpx
+
     from app.core import config
     from app.database.local_db import get_db, reset_db
     from app.models.types import NoteCreate

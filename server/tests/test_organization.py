@@ -158,8 +158,8 @@ def test_unreadable_selection_does_not_load_or_contact_provider(organizer, monke
     service, folder = organizer
     source = folder / "unreadable.bin"
     source.write_bytes(b"fixture")
-    from app.services.ai.tools import AIToolManager
     from app.services.ai import providers
+    from app.services.ai.tools import AIToolManager
     monkeypatch.setattr(AIToolManager, "execute_tool", lambda *args: {"error": "Unsupported format"})
     monkeypatch.setattr(providers, "get_llm_provider", lambda *args: pytest.fail("No evidence must not contact AI"))
     result = service.suggest([str(source)], "Organize by topic")

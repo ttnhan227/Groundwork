@@ -2,7 +2,6 @@
 import base64
 import io
 import warnings
-from pathlib import Path
 
 from app.services.collection_service import CollectionService
 from app.services.file_parser import FileParser

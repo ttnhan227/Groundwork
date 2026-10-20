@@ -43,3 +43,14 @@ class AssistantJobs:
             if job_id not in cls.jobs:
                 raise ValueError("This task is no longer available. Check saved work or operation history.")
             return dict(cls.jobs[job_id])
+
+    @classmethod
+    def cancel(cls, job_id):
+        with cls.lock:
+            if job_id not in cls.jobs:
+                raise ValueError("This task is no longer available. Check saved work or operation history.")
+            job = cls.jobs[job_id]
+            if job["status"] == "running":
+                job["status"] = "cancelled"
+                job["error"] = "Task cancelled by user."
+            return dict(job)
