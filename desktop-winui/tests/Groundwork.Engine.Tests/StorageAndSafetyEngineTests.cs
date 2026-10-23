@@ -83,6 +83,14 @@ public sealed class StorageAndSafetyEngineTests : IDisposable
         Assert.Equal(300_000, foldersByName["Media"]);
         Assert.Equal(50_000, foldersByName["Projects"]);
         Assert.Equal(50_000, foldersByName["Src"]);
+
+        Assert.NotNull(result.AllFolders);
+        Assert.True(result.AllFolders.Count >= 4); // Root, Media, Projects, Src
+        var root = result.AllFolders[0];
+        Assert.Equal(-1, root.ParentId);
+        Assert.Equal(450_000, root.LogicalBytes);
+        Assert.Equal(3, root.RecursiveFileCount);
+        Assert.Equal(3, root.RecursiveFolderCount);
     }
 
     [Fact]

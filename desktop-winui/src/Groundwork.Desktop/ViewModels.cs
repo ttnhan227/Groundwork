@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Text.Json;
+using Microsoft.UI.Xaml;
 
 namespace Groundwork.Desktop;
 
-// XAML-generated type info requires public parameterless constructors and settable properties,
-// so these are plain classes (not records / required / init-only members).
+// XAML-generated type info requires public parameterless constructors and settable properties.
 
 public sealed class VolumeRowViewModel
 {
@@ -25,6 +29,60 @@ public sealed class VolumeRowViewModel
         this.UsedPercent = UsedPercent;
         this.MftBadge = MftBadge;
     }
+}
+
+public sealed class StorageBarSegmentViewModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string FormattedSize { get; set; } = string.Empty;
+    public double Percent { get; set; }
+    public string ColorHex { get; set; } = "#6F91FF";
+    public string TooltipText => $"{Name}: {FormattedSize} ({Percent:F1}%)";
+}
+
+public sealed class StorageTreeNodeViewModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public int Id { get; set; }
+    public int ParentId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public bool IsDirectory { get; set; }
+    public long SizeBytes { get; set; }
+    public long AllocatedBytes { get; set; }
+    public int RecursiveFileCount { get; set; }
+    public int RecursiveFolderCount { get; set; }
+    public string FormattedSize { get; set; } = string.Empty;
+    public string FormattedAllocated { get; set; } = string.Empty;
+    public string ItemsSummary { get; set; } = string.Empty;
+    public string LastModifiedFormatted { get; set; } = string.Empty;
+    public double PercentOfDrive { get; set; }
+    public string PercentLabel { get; set; } = string.Empty;
+    public int DepthLevel { get; set; }
+    public Thickness IndentThickness => new(DepthLevel * 16, 0, 0, 0);
+
+    private bool _isExpanded;
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpanderGlyph)));
+            }
+        }
+    }
+
+    public bool HasChildren => IsDirectory && (RecursiveFolderCount > 0 || RecursiveFileCount > 0);
+    public string ExpanderGlyph => IsExpanded ? "\uE70D" : "\uE76C"; // ChevronDown / ChevronRight
+    public string NodeGlyph => IsDirectory ? "\uE8B7" : "\uE8A5"; // Folder / File
+    public string NodeGlyphColor => IsDirectory ? "#6F91FF" : "#94A3B8";
+
+    public StorageTreeNodeViewModel() { }
 }
 
 public sealed class FileRowViewModel
@@ -95,6 +153,43 @@ public sealed class CleanupCandidateRowViewModel
     public string Reason { get; set; } = string.Empty;
     public string FormattedSize { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+}
+
+public sealed class DuplicateGroupCardViewModel
+{
+    public string Sha256 { get; set; } = string.Empty;
+    public string Sha256Short => Sha256.Length > 16 ? Sha256[..16] + "..." : Sha256;
+    public string FormattedSize { get; set; } = string.Empty;
+    public string SummaryText { get; set; } = string.Empty;
+    public long PotentialWasteBytes { get; set; }
+    public string FormattedWaste { get; set; } = string.Empty;
+    public List<DuplicateItemRowViewModel> Files { get; set; } = [];
+}
+
+public sealed class DuplicateItemRowViewModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+    public string FullPath { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string FormattedSize { get; set; } = string.Empty;
+    public string ModifiedDate { get; set; } = string.Empty;
+    public bool IsHardLinkAlias { get; set; }
+    public string StatusBadge { get; set; } = string.Empty;
+    public string StatusBadgeBackground { get; set; } = string.Empty;
+    public string StatusBadgeForeground { get; set; } = string.Empty;
 }
 
 public sealed class InstalledAppRowViewModel
@@ -192,6 +287,60 @@ public sealed class NoteRowViewModel
         this.Title = Title;
         this.Content = Content;
         this.UpdatedAt = UpdatedAt;
+    }
+}
+
+public sealed class AppSettingsModel
+{
+    public string ThemeMode { get; set; } = "Dark";
+    public string DefaultScanPath { get; set; } = @"C:\";
+    public int ParallelThreads { get; set; } = Math.Clamp(Environment.ProcessorCount, 2, 16);
+    public bool AlwaysRecycleBin { get; set; } = true;
+    public bool ConfirmBeforeDelete { get; set; } = true;
+    public string AiProvider { get; set; } = "builtin";
+    public string OllamaUrl { get; set; } = "http://127.0.0.1:11434";
+    public string ExcludedExtensions { get; set; } = ".tmp,.bak,.log";
+    public string ExcludedPaths { get; set; } = @"$Recycle.Bin,System Volume Information";
+}
+
+public static class AppSettingsService
+{
+    private static readonly string SettingsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Groundwork");
+    private static readonly string SettingsFile = Path.Combine(SettingsDir, "settings.json");
+    private static AppSettingsModel? _cached;
+
+    public static AppSettingsModel Load()
+    {
+        if (_cached != null) return _cached;
+        try
+        {
+            if (File.Exists(SettingsFile))
+            {
+                string json = File.ReadAllText(SettingsFile);
+                var settings = JsonSerializer.Deserialize<AppSettingsModel>(json);
+                if (settings != null)
+                {
+                    _cached = settings;
+                    return settings;
+                }
+            }
+        }
+        catch { }
+
+        _cached = new AppSettingsModel();
+        return _cached;
+    }
+
+    public static void Save(AppSettingsModel settings)
+    {
+        _cached = settings;
+        try
+        {
+            Directory.CreateDirectory(SettingsDir);
+            string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(SettingsFile, json);
+        }
+        catch { }
     }
 }
 

@@ -12,8 +12,8 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 1. Top Branded Command Bar (Groundwork Signature Dark Navy Bar) -->
-        <Border Grid.Row="0" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,0,0,1" Padding="16,10">
+        <!-- 1. TOP BRANDED COMMAND BAR (Groundwork Signature Control Room Header) -->
+        <Border Grid.Row="0" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,0,0,1" Padding="14,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -21,711 +21,835 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Brand Identity: Layered Storage Symbol + Title -->
-                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Border Width="34" Height="34" CornerRadius="8" Background="#1B3A60" BorderBrush="#3266A2" BorderThickness="1">
-                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <!-- Multi-tier Groundwork Layer Symbol -->
-                            <FontIcon Glyph="&#xEDA2;" FontSize="18" Foreground="#6F91FF" />
-                        </Grid>
+                <!-- Brand Identity: Precision Vector Plumb-Bob & Isometric Foundation Layers -->
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Border Width="32" Height="32" CornerRadius="7" Background="#162D4A" BorderBrush="#2C5282" BorderThickness="1">
+                        <Viewbox Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <Canvas Width="24" Height="24">
+                                <!-- Top Arrow -->
+                                <Path Fill="{ThemeResource GwAccentBrush}" Data="M12,2 L15,5.5 H13 V9 H11 V5.5 H9 Z" Opacity="0.95" />
+                                <!-- Top Foundation Layer -->
+                                <Path Stroke="{ThemeResource GwAccentBrush}" StrokeThickness="1.75" StrokeLineJoin="Round" Data="M12,7.5 L20,11.5 L12,15.5 L4,11.5 Z" Opacity="0.9" />
+                                <!-- Middle Foundation Layer -->
+                                <Path Stroke="{ThemeResource GwAccentBrush}" StrokeThickness="1.75" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M4,14.5 L12,18.5 L20,14.5" Opacity="0.7" />
+                                <!-- Base Foundation Layer -->
+                                <Path Stroke="{ThemeResource GwAccentBrush}" StrokeThickness="1.75" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M4,17.5 L12,21.5 L20,17.5" Opacity="0.5" />
+                            </Canvas>
+                        </Viewbox>
                     </Border>
-                    <StackPanel Orientation="Vertical" Spacing="1">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Groundwork" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" />
-                            <Border Padding="6,1" CornerRadius="4" Background="#1E3E66">
-                                <TextBlock Text="1.0 Desktop" FontSize="10" FontWeight="SemiBold" Foreground="#A5C6FF" />
-                            </Border>
-                        </StackPanel>
-                        <TextBlock Text="Local Windows Storage Analyzer, Safe Cleanup, Uninstaller &amp; AI Operator" FontSize="11" Foreground="#94A3B8" />
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="Groundwork" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                        <Border Padding="5,1" CornerRadius="4" Background="#1E3E66">
+                            <TextBlock Text="1.0" FontSize="10" FontWeight="SemiBold" Foreground="#A5C6FF" />
+                        </Border>
                     </StackPanel>
                 </StackPanel>
 
+                <!-- Top Horizontal Navigation Tabs (Files, Cleanup, Apps, AI, Search, Organize, Settings) -->
+                <NavigationView
+                    x:Name="TopCommandNav"
+                    Grid.Column="1"
+                    PaneDisplayMode="Top"
+                    IsBackButtonVisible="Collapsed"
+                    IsSettingsVisible="False"
+                    SelectionChanged="OnNavigationSelectionChanged"
+                    Background="Transparent">
+                    <NavigationView.MenuItems>
+                        <NavigationViewItem Content="Files &amp; Storage" Tag="Storage" IsSelected="True">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xEDA2;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="Cleanup &amp; Duplicates" Tag="Cleanup">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="Delete" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="Installed Apps" Tag="Apps">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="AI Operator" Tag="Assistant">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="Search" Tag="Search">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="Find" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="File Organization" Tag="Organize">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="Settings" Tag="Settings">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                    </NavigationView.MenuItems>
+                </NavigationView>
+
                 <!-- Right Side Actions & Core Status Badge -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <!-- Live Core Status Pill with Glowing Dot -->
-                    <Border Padding="10,5" CornerRadius="14" Background="#0C1B2B" BorderBrush="#24456A" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" Fill="{ThemeResource GwSignalGreenBrush}" />
-                            <TextBlock x:Name="SidecarStatusBadge" Text="Local Core: Ready (Offline-Capable)" FontSize="11" FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                    <Border Padding="9,4" CornerRadius="12" Background="#0C1B2B" BorderBrush="#24456A" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                            <Ellipse Width="7" Height="7" Fill="{ThemeResource GwSignalGreenBrush}" />
+                            <TextBlock x:Name="SidecarStatusBadge" Text="Local Core: Ready" FontSize="11" FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                         </StackPanel>
                     </Border>
 
-                    <!-- Quick Primary Action -->
                     <Button x:Name="QuickScanPrimaryDriveButton" Content="Scan Primary Drive" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnQuickScanPrimaryDriveClick" />
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- 2. Main NavigationView with Custom Styled Panels -->
-        <NavigationView
-            x:Name="MainNavView"
-            Grid.Row="1"
-            IsBackButtonVisible="Collapsed"
-            IsSettingsVisible="False"
-            PaneDisplayMode="Left"
-            OpenPaneLength="240"
-            SelectionChanged="OnNavigationSelectionChanged"
-            Background="{ThemeResource GwSidebarBackgroundBrush}">
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="Drives &amp; Storage" Tag="Storage" IsSelected="True">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xEDA2;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Cleanup &amp; Duplicates" Tag="Cleanup">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Delete" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Installed Apps &amp; Leftovers" Tag="Apps">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="AllApps" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="AI Operator &amp; Assistant" Tag="Assistant">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Message" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Content="Search &amp; Saved Searches" Tag="Search">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Find" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="File Organization &amp; Undo" Tag="Organize">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Folder" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Projects, Notes &amp; Settings" Tag="WorkspaceTools">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Setting" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.MenuItems>
+        <!-- 2. MAIN CONTENT AREA (Tabbed Workspaces) -->
+        <Grid Grid.Row="1" Padding="20,16" Background="{ThemeResource GwPageBackgroundBrush}">
 
-            <Grid Padding="24,20" Background="{ThemeResource GwPageBackgroundBrush}">
-                <!-- 1. DRIVES & STORAGE PANEL -->
-                <ScrollViewer x:Name="StoragePanel" Visibility="Visible" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <!-- Panel Branded Header Card -->
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                    <Border Width="44" Height="44" CornerRadius="8" Background="#1A2D48" BorderBrush="#2A4870" BorderThickness="1">
-                                        <FontIcon Glyph="&#xEDA2;" FontSize="20" Foreground="#6F91FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="Detected Drives &amp; Whole-Volume Storage Analysis" Style="{StaticResource GwPanelTitleStyle}" />
-                                        <TextBlock Text="Automatic drive discovery with zero folder configuration. Scan any volume using parallel Win32 directory walker or on-demand elevated NTFS MFT enumeration." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                    </StackPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <Button Content="Refresh Drives" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshDrivesClick" />
-                                    <Button x:Name="ScanTargetFolderButton" Content="Scan Custom Path..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" />
-                                    <Button x:Name="ElevatedMftScanButton" Content="Fast NTFS MFT Scan" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnElevatedMftScanClick" />
-                                    <Button x:Name="CancelScanButton" Content="Cancel Scan" IsEnabled="False" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCancelScanClick" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
+            <!-- ======================================================== -->
+            <!-- 1. FILES & STORAGE WORKSPACE (WizTree + Explorer Experience) -->
+            <!-- ======================================================== -->
+            <Grid x:Name="StoragePanel" Visibility="Visible">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                        <!-- Custom Path Input Box -->
-                        <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="ScanPathTextBox" PlaceholderText="Target Drive or Folder Path (e.g., C:\ or C:\Users\YourName)..." VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Content="Run Fast Scan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnRunScanPathClick" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
-
-                        <!-- Discovered Volumes List -->
-                        <Border Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="Mounted Windows Volumes" Style="{StaticResource GwCardTitleStyle}" />
-                                    <Border Padding="6,1" CornerRadius="4" Background="{ThemeResource GwPageBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                        <TextBlock Text="Select volume to scan" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" />
-                                    </Border>
-                                </StackPanel>
-                                <ListView x:Name="VolumesListView" SelectionMode="Single" SelectionChanged="OnVolumeSelectionChanged" MaxHeight="220">
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="local:VolumeRowViewModel">
-                                            <Border Padding="10,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                <Grid ColumnSpacing="16">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="220" />
-                                                        <ColumnDefinition Width="120" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="180" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                                        <FontIcon Glyph="&#xEDA2;" FontSize="15" Foreground="{ThemeResource GwAccentBrush}" />
-                                                        <TextBlock Text="{x:Bind VolumeName}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="1" Text="{x:Bind FileSystemLabel}" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" />
-                                                    <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
-                                                        <ProgressBar Value="{x:Bind UsedPercent}" Maximum="100" Height="6" CornerRadius="3" Foreground="{ThemeResource GwAccentBrush}" />
-                                                        <TextBlock Text="{x:Bind CapacitySummary}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                                                    </StackPanel>
-                                                    <Border Grid.Column="3" Padding="8,2" CornerRadius="10" HorizontalAlignment="Right" VerticalAlignment="Center" Background="{ThemeResource GwPageBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                                        <TextBlock Text="{x:Bind MftBadge}" FontSize="11" Foreground="{ThemeResource GwAccentBrush}" />
-                                                    </Border>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Live Scan Summary Metrics -->
-                        <Border Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="8">
-                                <TextBlock x:Name="ScanSummaryHeaderText" Text="No active scan run yet. Select a volume above or click 'Run Fast Scan'." Style="{StaticResource GwCardTitleStyle}" />
-                                <ProgressBar x:Name="ScanActivityProgressBar" IsIndeterminate="False" Value="0" Maximum="100" Visibility="Collapsed" Height="6" CornerRadius="3" Foreground="{ThemeResource GwAccentBrush}" />
-                                <TextBlock x:Name="ScanMetricsDetailText" Text="Logical vs. Allocated bytes, scan throughput, and access-denied counts appear here in real time." Style="{StaticResource GwPanelSubtitleStyle}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Category Breakdown & Largest Folders / Largest Files -->
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Border Grid.Column="0" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="Largest Folders (Rollup)" Style="{StaticResource GwCardTitleStyle}" />
-                                    <ListView x:Name="LargestFoldersListView" SelectionMode="None" MaxHeight="320">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:FolderRowViewModel">
-                                                <Grid Padding="6,6" ColumnSpacing="12" Margin="0,1">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="90" />
-                                                        <ColumnDefinition Width="95" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel>
-                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="1" Text="{x:Bind FileCountLabel}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Column="1" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="Largest Files (Logical vs. Allocated)" Style="{StaticResource GwCardTitleStyle}" />
-                                    <ListView x:Name="LargestFilesListView" SelectionMode="None" MaxHeight="320">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:FileRowViewModel">
-                                                <Grid Padding="6,6" ColumnSpacing="12" Margin="0,1">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="100" />
-                                                        <ColumnDefinition Width="95" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel>
-                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="1" Text="{x:Bind FormattedAllocated}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <!-- Storage Categories -->
-                        <Border Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="Storage Breakdown by Category" Style="{StaticResource GwCardTitleStyle}" />
-                                <ListView x:Name="CategoriesListView" SelectionMode="None" MaxHeight="220">
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="local:CategoryRowViewModel">
-                                            <Grid Padding="6,5" ColumnSpacing="16">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="220" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="190" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{x:Bind Label}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
-                                                <ProgressBar Grid.Column="1" Value="{x:Bind SharePercent}" Maximum="100" Height="6" CornerRadius="3" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="2" Text="{x:Bind SummaryText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 2. CLEANUP & DUPLICATES PANEL -->
-                <ScrollViewer x:Name="CleanupPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <!-- Panel Branded Header Card (Teal Accent) -->
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                    <Border Width="44" Height="44" CornerRadius="8" Background="{ThemeResource GwTealBgBrush}" BorderBrush="{ThemeResource GwTealBrush}" BorderThickness="1">
-                                        <SymbolIcon Symbol="Delete" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="Rule-Based Cleanup &amp; 3-Stage SHA-256 Duplicate Finder" Style="{StaticResource GwPanelTitleStyle}" />
-                                        <TextBlock Text="Detects exact duplicates (skips hard links &amp; cloud placeholders), temporary caches, and stale archives. Defaults safely to Windows Recycle Bin." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                    </StackPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <Button Content="Analyze Scanned Target" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnRunCleanupScanClick" />
-                                    <ComboBox x:Name="CleanupModeComboBox" SelectedIndex="0" Width="210">
-                                        <ComboBoxItem Content="Move to Recycle Bin (Safe)" Tag="recycle" />
-                                        <ComboBoxItem Content="Permanent Delete" Tag="permanent" />
-                                    </ComboBox>
-                                    <Button x:Name="ReviewAndCleanButton" Content="Review &amp; Clean Selected..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnReviewAndCleanSelectedClick" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <Border Padding="16,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <TextBlock x:Name="CleanupSummaryBannerText" Text="Run a drive/folder scan first or click 'Analyze Scanned Target' to evaluate cleanup rules and 3-stage duplicates." FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
-                        </Border>
-
-                        <Border Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="Cleanup &amp; Duplicate Candidates" Style="{StaticResource GwCardTitleStyle}" />
-                                <ListView x:Name="CleanupCandidatesListView" SelectionMode="Multiple" MaxHeight="480">
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="local:CleanupCandidateRowViewModel">
-                                            <Border Padding="8,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                <Grid ColumnSpacing="14">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="190" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="110" />
-                                                        <ColumnDefinition Width="100" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Padding="8,3" CornerRadius="4" Background="{ThemeResource GwPageBackgroundBrush}" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                        <TextBlock Text="{x:Bind RuleName}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" />
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1">
-                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{x:Bind Reason}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind Confidence}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                    <TextBlock Grid.Column="3" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 3. INSTALLED APPS & LEFTOVERS PANEL -->
-                <ScrollViewer x:Name="AppsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <!-- Panel Branded Header Card (Royal Blue Accent) -->
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                    <Border Width="44" Height="44" CornerRadius="8" Background="#1B2942" BorderBrush="#2F4C7A" BorderThickness="1">
-                                        <SymbolIcon Symbol="AllApps" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="Installed Applications, Uninstaller &amp; Leftover Scanner" Style="{StaticResource GwPanelTitleStyle}" />
-                                        <TextBlock Text="Enumerates 64-bit, 32-bit (WOW6432Node), and per-user applications. Monitors uninstallation exit before tracing leftovers." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                    </StackPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <TextBox x:Name="AppSearchFilterBox" PlaceholderText="Filter apps by name or publisher..." Width="240" TextChanged="OnAppFilterTextChanged" />
-                                    <Button Content="Refresh Apps" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshInstalledAppsClick" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.25*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Installed Apps List -->
-                            <Border Grid.Column="0" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="InstalledAppsCountText" Text="Installed Applications" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                            <Button Content="Scan Leftovers" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanSelectedAppLeftoversClick" />
-                                            <Button Content="Uninstall &amp; Scan..." Style="{StaticResource GwPrimaryButtonStyle}" Click="OnUninstallSelectedAppClick" />
-                                        </StackPanel>
-                                    </Grid>
-                                    <ListView x:Name="InstalledAppsListView" SelectionMode="Single" MaxHeight="480" SelectionChanged="OnInstalledAppSelectionChanged">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:InstalledAppRowViewModel">
-                                                <Border Padding="8,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                    <Grid ColumnSpacing="12">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="95" />
-                                                            <ColumnDefinition Width="95" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{x:Bind Publisher}" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
-                                                        </StackPanel>
-                                                        <TextBlock Grid.Column="1" Text="{x:Bind Version}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                        <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Leftover Inspection & Safe Removal -->
-                            <Border Grid.Column="1" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="LeftoversTitleText" Text="Leftovers &amp; Registry Traces" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Content="Recycle Selected..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCleanSelectedLeftoversClick" />
-                                    </Grid>
-                                    <TextBlock x:Name="LeftoversSummaryText" Text="Select an installed app above or enter an uninstalled name below to scan leftover folders and registry keys." Style="{StaticResource GwPanelSubtitleStyle}" />
-
-                                    <Grid ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="ManualLeftoverAppNameBox" PlaceholderText="App Name (e.g. Chrome)" />
-                                        <TextBox x:Name="ManualLeftoverPublisherBox" Grid.Column="1" PlaceholderText="Publisher (optional)" />
-                                        <Button Grid.Column="2" Content="Scan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnManualLeftoverScanClick" />
-                                    </Grid>
-
-                                    <ListView x:Name="LeftoversListView" SelectionMode="Multiple" MaxHeight="260">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:LeftoverItemRowViewModel">
-                                                <Border Padding="6,6" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                    <Grid ColumnSpacing="10">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="90" />
-                                                            <ColumnDefinition Width="85" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{x:Bind FullPath}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{x:Bind Evidence}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                        </StackPanel>
-                                                        <TextBlock Grid.Column="1" Text="{x:Bind Confidence}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                        <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-
-                                    <TextBlock Text="Read-Only Registry Keys (HKCU / HKLM)" Style="{StaticResource GwCardTitleStyle}" FontSize="13" />
-                                    <ListView x:Name="RegistryLeftoversListView" SelectionMode="None" MaxHeight="130" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 4. AI OPERATOR & ASSISTANT PANEL -->
-                <ScrollViewer x:Name="AssistantPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <!-- Panel Branded Header Card (Purple AI Accent) -->
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                <Border Width="44" Height="44" CornerRadius="8" Background="{ThemeResource GwPurpleBgBrush}" BorderBrush="{ThemeResource GwPurpleBrush}" BorderThickness="1">
-                                    <SymbolIcon Symbol="Message" Foreground="{ThemeResource GwPurpleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="Local-First AI Operator &amp; Grounded Storage Assistant" Style="{StaticResource GwPanelTitleStyle}" />
-                                    <TextBlock Text="Explains storage usage, duplicates, cleanup safety, and files with verified citations. 100% offline via local operator or loopback Ollama." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="What takes up the most space?" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOperatorPromptPresetClick" Tag="What is taking up the most space and how can I free up space safely?" />
-                            <Button Content="Explain duplicates &amp; cleanup" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOperatorPromptPresetClick" Tag="Summarize the duplicate files and cleanup candidates and explain which ones are safe to recycle." />
-                            <Button Content="Explain largest installed apps" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOperatorPromptPresetClick" Tag="Which installed applications use the most disk space?" />
+                <!-- Row 0: Volume Selector & Quick Controls -->
+                <Border Grid.Row="0" Margin="0,0,0,12" Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <TextBlock Text="Target Drive:" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="DrivesComboBox" Width="260" SelectionChanged="OnDrivesComboBoxSelectionChanged" VerticalAlignment="Center" />
+                            <TextBox x:Name="ScanPathTextBox" PlaceholderText="Target folder path (e.g. C:\)..." Width="280" VerticalAlignment="Center" />
+                            <Button Content="Browse..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" VerticalAlignment="Center" />
+                            <Button Content="Run Fast Scan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnRunScanPathClick" VerticalAlignment="Center" />
+                            <Button x:Name="ElevatedMftScanButton" Content="Fast NTFS MFT" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnElevatedMftScanClick" VerticalAlignment="Center" />
                         </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="CancelScanButton" Content="Cancel Scan" IsEnabled="False" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCancelScanClick" />
+                            <Button Content="Refresh Drives" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshDrivesClick" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
-                        <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid ColumnSpacing="10">
+                <!-- Row 1: Proportional Storage Breakdown Bar (WizTree-style representation) -->
+                <Border Grid.Row="1" Margin="0,0,0,12" Padding="14,10" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Drive Space Breakdown (Top Folders &amp; Categories)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                            <TextBlock Grid.Column="1" x:Name="StorageBreakdownSummaryText" Text="Select a drive and click 'Run Fast Scan' to visualize disk allocation." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                        </Grid>
+                        <!-- Segmented Visual Bar -->
+                        <Border Height="14" CornerRadius="4" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                            <Grid x:Name="StorageBreakdownBarGrid" />
+                        </Border>
+                        <!-- Legend Pills -->
+                        <ItemsControl x:Name="StorageBreakdownLegendControl">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="16" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:StorageBarSegmentViewModel">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind TooltipText}">
+                                        <Border Width="10" Height="10" CornerRadius="2" Background="{x:Bind ColorHex}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{x:Bind Name}" FontSize="11" FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{x:Bind FormattedSize}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Row 2: Live Scan Summary & Metrics Banner -->
+                <Border Grid.Row="2" Margin="0,0,0,12" Padding="12,8" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <TextBlock x:Name="ScanSummaryHeaderText" Text="Ready. Click 'Run Fast Scan' or 'Scan Primary Drive'." FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                            <TextBlock x:Name="ScanMetricsDetailText" Text="" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ProgressBar Grid.Column="1" x:Name="ScanActivityProgressBar" IsIndeterminate="False" Value="0" Maximum="100" Visibility="Collapsed" Width="140" Height="5" CornerRadius="2" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <!-- Row 3: Hierarchical File Tree Grid (WizTree + Explorer) -->
+                <Border Grid.Row="3" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Tree Table Column Header -->
+                        <Border Grid.Row="0" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
+                            <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" MinWidth="260" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="130" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox x:Name="AssistantQuestionBox" PlaceholderText="Ask about storage usage, duplicates, application leftovers, or workspace documents..." VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Content="Ask Operator" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnAskOperatorClick" VerticalAlignment="Center" />
+                                <TextBlock Text="Folder / File Name" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Grid.Column="1" Text="% of Drive" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                <TextBlock Grid.Column="2" Text="Size" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="3" Text="Allocated" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="4" Text="Items" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="5" Text="Last Modified" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
 
-                        <Border Padding="20,18" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <Border Padding="8,3" CornerRadius="4" Background="{ThemeResource GwPurpleBgBrush}" HorizontalAlignment="Left">
-                                    <TextBlock x:Name="AssistantProviderBadge" Text="Provider: Local Deterministic Operator (Offline)" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwPurpleBrush}" />
-                                </Border>
-                                <TextBlock x:Name="AssistantAnswerTextBlock" Text="Ask a question above or click one of the quick prompts to analyze your scanned storage, duplicates, and applications." Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True" LineHeight="22" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
+                        <!-- Virtualized Hierarchical Tree ListView -->
+                        <ListView x:Name="StorageTreeListView" Grid.Row="1" SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="local:StorageTreeNodeViewModel">
+                                    <Grid Margin="0,1" Padding="6,4" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MinWidth="260" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="95" />
+                                            <ColumnDefinition Width="95" />
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="130" />
+                                        </Grid.ColumnDefinitions>
 
-                <!-- 5. SEARCH & SAVED SEARCHES PANEL -->
-                <ScrollViewer x:Name="SearchPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                <Border Width="44" Height="44" CornerRadius="8" Background="#1E2E42" BorderBrush="#324B6B" BorderThickness="1">
-                                    <SymbolIcon Symbol="Find" Foreground="#6F91FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <!-- Context Menu -->
+                                        <Grid.ContextFlyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem Text="Open in Windows File Explorer" Click="OnOpenInExplorerClick">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem Text="Copy Full Path" Click="OnCopyPathClick">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutSeparator />
+                                                <MenuFlyoutItem Text="Scan This Folder" Click="OnScanThisFolderClick">
+                                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xEDA2;" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                            </MenuFlyout>
+                                        </Grid.ContextFlyout>
+
+                                        <!-- Indented Expander + Folder Icon + Name -->
+                                        <StackPanel Orientation="Horizontal" Margin="{x:Bind IndentThickness}" Spacing="6" VerticalAlignment="Center">
+                                            <!-- Expander Chevron Button -->
+                                            <Button
+                                                Width="20"
+                                                Height="20"
+                                                Padding="0"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Visibility="{x:Bind HasChildren}"
+                                                Click="OnTreeNodeExpanderClick">
+                                                <FontIcon Glyph="{x:Bind ExpanderGlyph, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                            </Button>
+
+                                            <!-- Folder/File Icon -->
+                                            <FontIcon Glyph="{x:Bind NodeGlyph}" FontSize="14" Foreground="{x:Bind NodeGlyphColor}" VerticalAlignment="Center" />
+
+                                            <!-- Name Text -->
+                                            <TextBlock Text="{x:Bind Name}" FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        </StackPanel>
+
+                                        <!-- % of Drive Mini Bar -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <ProgressBar Value="{x:Bind PercentOfDrive}" Maximum="100" Width="60" Height="5" CornerRadius="2" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{x:Bind PercentLabel}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+
+                                        <!-- Formatted Size -->
+                                        <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+
+                                        <!-- Allocated Size -->
+                                        <TextBlock Grid.Column="3" Text="{x:Bind FormattedAllocated}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+
+                                        <!-- Items Summary -->
+                                        <TextBlock Grid.Column="4" Text="{x:Bind ItemsSummary}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+
+                                        <!-- Last Modified -->
+                                        <TextBlock Grid.Column="5" Text="{x:Bind LastModifiedFormatted}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Border>
+
+                <!-- Row 4: Category Summary Footer Pill -->
+                <Border Grid.Row="4" Margin="0,10,0,0" Padding="12,6" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ItemsControl x:Name="CategoriesPillsControl">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="16" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:CategoryRowViewModel">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Label}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                        <TextBlock Text="{x:Bind SummaryText}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Grid.Column="1" Text="Right-click any folder to open in Windows Explorer or scan directly." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ======================================================== -->
+            <!-- 2. CLEANUP & DUPLICATES PANEL -->
+            <!-- ======================================================== -->
+            <ScrollViewer x:Name="CleanupPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16">
+                    <!-- Header Card -->
+                    <Border Padding="16,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwTealBgBrush}" BorderBrush="{ThemeResource GwTealBrush}" BorderThickness="1">
+                                    <SymbolIcon Symbol="Delete" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="Hybrid Workspace Search &amp; Saved Searches" Style="{StaticResource GwPanelTitleStyle}" />
-                                    <TextBlock Text="Search across indexed workspace files using hybrid lexical (FTS5) + semantic (ONNX) or fast filename matching." Style="{StaticResource GwPanelSubtitleStyle}" />
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Safe Storage Cleanup &amp; 3-Stage SHA-256 Duplicate Groups" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
+                                    <TextBlock Text="Grouped duplicate files with hard-link protection, cache removal rules, and Recycle Bin safety." Style="{StaticResource GwPanelSubtitleStyle}" />
                                 </StackPanel>
                             </StackPanel>
-                        </Border>
-
-                        <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="170" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="SearchQueryTextBox" PlaceholderText="Search filenames, code symbols, or document content..." VerticalAlignment="Center" />
-                                <ComboBox x:Name="SearchModeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                    <ComboBoxItem Content="Hybrid Search" Tag="hybrid" />
-                                    <ComboBoxItem Content="Filename Only" Tag="filename" />
-                                    <ComboBoxItem Content="Lexical (FTS5)" Tag="lexical" />
-                                    <ComboBoxItem Content="Semantic (ONNX)" Tag="semantic" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <ComboBox x:Name="CleanupModeComboBox" SelectedIndex="0" Width="220" VerticalAlignment="Center">
+                                    <ComboBoxItem Content="Move to Recycle Bin (Safe)" Tag="recycle" />
+                                    <ComboBoxItem Content="Permanent Delete" Tag="permanent" />
                                 </ComboBox>
-                                <Button Grid.Column="2" Content="Search" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnExecuteSearchClick" VerticalAlignment="Center" />
-                                <Button Grid.Column="3" Content="Save Query" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnSaveCurrentSearchClick" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
+                                <Button Content="Analyze Target" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnRunCleanupScanClick" VerticalAlignment="Center" />
+                                <Button x:Name="ReviewAndCleanButton" Content="Review &amp; Clean Selected..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnReviewAndCleanSelectedClick" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
 
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="300" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+                    <!-- Summary Banner -->
+                    <Border Padding="14,10" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <TextBlock x:Name="CleanupSummaryBannerText" Text="Scan a target drive first, then click 'Analyze Target' to evaluate duplicate groups and cleanable temporary files." FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                    </Border>
 
-                            <Border Grid.Column="0" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
+                    <!-- Grouped Duplicate Cards -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Exact Duplicate Groups (Identical SHA-256 Content)" Style="{StaticResource GwCardTitleStyle}" />
+                            <ListView x:Name="DuplicateGroupsListView" SelectionMode="None" MaxHeight="380">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="local:DuplicateGroupCardViewModel">
+                                        <Border Padding="12,10" Margin="0,4" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                                            <StackPanel Spacing="8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Border Padding="6,2" CornerRadius="4" Background="{ThemeResource GwPageBackgroundBrush}">
+                                                            <TextBlock Text="{x:Bind Sha256Short}" FontSize="11" FontFamily="Consolas" Foreground="{ThemeResource GwTealBrush}" />
+                                                        </Border>
+                                                        <TextBlock Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                        <TextBlock Text="{x:Bind SummaryText}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind FormattedWaste}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" />
+                                                </Grid>
+                                                <!-- Files Inside Group -->
+                                                <ItemsControl ItemsSource="{x:Bind Files}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Padding="4,3" ColumnSpacing="10">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="130" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding FullPath}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                                <Border Grid.Column="2" Padding="6,1" CornerRadius="3" Background="{Binding StatusBadgeBackground}" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding StatusBadge}" FontSize="10" Foreground="{Binding StatusBadgeForeground}" />
+                                                                </Border>
+                                                                <TextBlock Grid.Column="3" Text="{Binding ModifiedDate}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Rule-Based Cleanup Candidates -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Cache &amp; Temporary File Cleanup Candidates" Style="{StaticResource GwCardTitleStyle}" />
+                            <ListView x:Name="CleanupCandidatesListView" SelectionMode="Multiple" MaxHeight="300">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="local:CleanupCandidateRowViewModel">
+                                        <Border Padding="8,6" Margin="0,2" CornerRadius="5" Background="{ThemeResource GwCardBackgroundHoverBrush}">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="170" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="90" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Padding="6,2" CornerRadius="3" Background="{ThemeResource GwPageBackgroundBrush}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind RuleName}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind FullPath}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Reason}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{x:Bind Confidence}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                <TextBlock Grid.Column="3" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ======================================================== -->
+            <!-- 3. INSTALLED APPS & LEFTOVERS PANEL (Revo Uninstaller Experience) -->
+            <!-- ======================================================== -->
+            <Grid x:Name="AppsPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Header & Search Filter -->
+                <Border Grid.Row="0" Margin="0,0,0,12" Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Border Width="38" Height="38" CornerRadius="7" Background="#1B2942" BorderBrush="#2F4C7A" BorderThickness="1">
+                                <SymbolIcon Symbol="AllApps" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Installed Applications, Uninstaller &amp; Leftovers" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
+                                <TextBlock Text="Two-step guided uninstall: monitors process exit code, then scans AppData, ProgramData and Registry for leftovers." Style="{StaticResource GwPanelSubtitleStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <TextBox x:Name="AppSearchFilterBox" PlaceholderText="Search applications or publishers..." Width="260" TextChanged="OnAppFilterTextChanged" VerticalAlignment="Center" />
+                            <Button Content="Refresh Apps" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshInstalledAppsClick" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Two-Column Layout: Left = App Grid, Right = 2-Step Workflow & Leftovers -->
+                <Grid Grid.Row="1" ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.25*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Apps Grid -->
+                    <Border Grid.Column="0" Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="InstalledAppsCountText" Text="Installed Applications" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource GwTextPrimaryBrush}" Margin="0,0,0,8" />
+                            <ListView x:Name="InstalledAppsListView" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnInstalledAppSelectionChanged">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="local:InstalledAppRowViewModel">
+                                        <Border Padding="8,7" Margin="0,2" CornerRadius="5" Background="{ThemeResource GwCardBackgroundHoverBrush}">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="90" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Publisher}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="{x:Bind Version}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
+                    <!-- Revo-Style 2-Step Workflow & Leftovers Inspector -->
+                    <Border Grid.Column="1" Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Guided Uninstallation &amp; Leftover Traces" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource GwTextPrimaryBrush}" Margin="0,0,0,8" />
+
+                            <!-- 2-Step Action Card -->
+                            <Border Grid.Row="1" Margin="0,0,0,12" Padding="12,10" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Saved Searches" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Content="Delete" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnDeleteSavedSearchClick" />
+                                        <TextBlock Text="Step 1: Standard Uninstaller" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Uninstall Selected App..." Style="{StaticResource GwPrimaryButtonStyle}" Click="OnUninstallSelectedAppClick" />
                                     </Grid>
-                                    <ListView x:Name="SavedSearchesListView" SelectionMode="Single" SelectionChanged="OnSavedSearchSelected" MaxHeight="400">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:SavedSearchRowViewModel">
-                                                <Border Padding="8,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                    <StackPanel Spacing="2">
-                                                        <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                                                        <TextBlock Text="{x:Bind QueryText}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Step 2: Deep Leftover Scan" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Scan Leftovers" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanSelectedAppLeftoversClick" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <TextBlock x:Name="SearchResultsHeaderText" Text="Search Results" Style="{StaticResource GwCardTitleStyle}" />
-                                    <ListView x:Name="SearchResultsListView" SelectionMode="Single" MaxHeight="420">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:SearchResultRowViewModel">
-                                                <Border Padding="8,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                    <StackPanel Spacing="3">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                                                            <TextBlock Grid.Column="1" Text="{x:Bind ScoreLabel}" FontSize="11" Foreground="{ThemeResource GwAccentBrush}" />
-                                                        </Grid>
-                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{x:Bind Snippet}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                            <!-- Leftovers List -->
+                            <Grid Grid.Row="2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock x:Name="LeftoversSummaryText" Text="Select an application on the left to inspect leftover directories and registry entries." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" Margin="0,0,0,6" />
+                                <ListView x:Name="LeftoversListView" Grid.Row="1" SelectionMode="Multiple">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="local:LeftoverItemRowViewModel">
+                                            <Border Padding="6,5" Margin="0,2" CornerRadius="4" Background="{ThemeResource GwCardBackgroundHoverBrush}">
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="75" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind Name}" FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 6. FILE ORGANIZATION & UNDO PANEL -->
-                <ScrollViewer x:Name="OrganizePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <!-- Panel Branded Header Card (Amber Accent) -->
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                <Border Width="44" Height="44" CornerRadius="8" Background="{ThemeResource GwAmberBgBrush}" BorderBrush="{ThemeResource GwAmberBrush}" BorderThickness="1">
-                                    <SymbolIcon Symbol="Folder" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="Safe File Organization &amp; Stream-Preserving Undo" Style="{StaticResource GwPanelTitleStyle}" />
-                                    <TextBlock Text="Organize by category, extension, or date while preserving NTFS alternate data streams, timestamps, and ACL security." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <Grid ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="OrganizeFolderBox" PlaceholderText="Folder path to preview organization..." VerticalAlignment="Center" />
-                                <ComboBox x:Name="OrganizeRuleTypeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                    <ComboBoxItem Content="By File Category" Tag="category" />
-                                    <ComboBoxItem Content="By Modified Month" Tag="date" />
-                                    <ComboBoxItem Content="By Extension" Tag="extension" />
-                                </ComboBox>
-                                <Button Grid.Column="2" Content="Preview Plan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnPreviewOrganizeClick" VerticalAlignment="Center" />
-                                <Button Grid.Column="3" Content="Refresh History" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshOrganizationHistoryClick" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind Confidence}" FontSize="10" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
                             </Grid>
-                        </Border>
 
-                        <Border Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="Organization Preview &amp; Undo History" Style="{StaticResource GwCardTitleStyle}" />
-                                <TextBlock x:Name="OrganizationStatusText" Text="Select a folder above or inspect recent organization runs from the local core." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                <ListView x:Name="OrganizationHistoryListView" SelectionMode="None" MaxHeight="340" />
+                            <!-- Clean Selected Leftovers Button -->
+                            <Button Grid.Row="3" Margin="0,10,0,0" Content="Safe Clean Selected Leftovers (Recycle Bin)" Style="{StaticResource GwPrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="OnCleanSelectedLeftoversClick" />
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- ======================================================== -->
+            <!-- 4. AI OPERATOR PANEL -->
+            <!-- ======================================================== -->
+            <ScrollViewer x:Name="AssistantPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16">
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwPurpleBgBrush}" BorderBrush="{ThemeResource GwPurpleBrush}" BorderThickness="1">
+                                <SymbolIcon Symbol="Message" Foreground="{ThemeResource GwPurpleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Local-First AI Storage Operator &amp; Grounded Assistant" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
+                                <TextBlock Text="Explains storage usage, duplicates, cleanup safety, and files with verified citations. 100% offline via local operator or loopback Ollama." Style="{StaticResource GwPanelSubtitleStyle}" />
                             </StackPanel>
-                        </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="What takes up the most space?" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOperatorPromptPresetClick" Tag="What is taking up the most space and how can I free up space safely?" />
+                        <Button Content="Explain duplicates &amp; cleanup" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOperatorPromptPresetClick" Tag="Summarize the duplicate files and cleanup candidates and explain which ones are safe to recycle." />
+                        <Button Content="Explain largest installed apps" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOperatorPromptPresetClick" Tag="Which installed applications use the most disk space?" />
                     </StackPanel>
-                </ScrollViewer>
 
-                <!-- 7. PROJECTS, NOTES & AI SETTINGS PANEL -->
-                <ScrollViewer x:Name="WorkspaceToolsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="18">
-                        <Border Padding="16,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                                <Border Width="44" Height="44" CornerRadius="8" Background="#1E293B" BorderBrush="#334155" BorderThickness="1">
-                                    <SymbolIcon Symbol="Setting" Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="Local Notes, Projects &amp; On-Device AI Settings" Style="{StaticResource GwPanelTitleStyle}" />
-                                    <TextBlock Text="Manage SQLite notes and configure on-device AI providers (Built-in GGUF, Local Excerpts, Ollama, or optional DPAPI keys)." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <Grid ColumnSpacing="16">
+                    <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <Grid ColumnSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-
-                            <!-- Local Notes -->
-                            <Border Grid.Column="0" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="Local Workspace Notes (SQLite)" Style="{StaticResource GwCardTitleStyle}" />
-                                    <TextBox x:Name="NoteTitleBox" PlaceholderText="Note title..." />
-                                    <TextBox x:Name="NoteContentBox" PlaceholderText="Write a local note..." AcceptsReturn="True" Height="80" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Content="Save Note" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnSaveNoteClick" />
-                                        <Button Content="Refresh Notes" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshNotesClick" />
-                                    </StackPanel>
-                                    <ListView x:Name="NotesListView" SelectionMode="Single" MaxHeight="260">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="local:NoteRowViewModel">
-                                                <Border Padding="8,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
-                                                    <StackPanel Spacing="2">
-                                                        <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                                                        <TextBlock Text="{x:Bind Content}" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{x:Bind UpdatedAt}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- AI Provider & DPAPI Settings -->
-                            <Border Grid.Column="1" Padding="18,16" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="14">
-                                    <TextBlock Text="AI Provider &amp; Local Privacy Configuration" Style="{StaticResource GwCardTitleStyle}" />
-                                    <ComboBox x:Name="AiProviderComboBox" Header="Active AI Provider" SelectedIndex="0" HorizontalAlignment="Stretch">
-                                        <ComboBoxItem Content="Built-in AI (On-Device Local GGUF / Operator)" Tag="builtin" />
-                                        <ComboBoxItem Content="Local Workspace Excerpts Only (Deterministic)" Tag="local" />
-                                        <ComboBoxItem Content="Ollama (Loopback Local LLM)" Tag="ollama" />
-                                        <ComboBoxItem Content="OpenAI (Optional Cloud Key)" Tag="openai" />
-                                        <ComboBoxItem Content="Google Gemini (Optional Cloud Key)" Tag="gemini" />
-                                    </ComboBox>
-                                    <TextBox x:Name="OllamaUrlBox" Header="Ollama Loopback URL" Text="http://127.0.0.1:11434" />
-                                    <Button Content="Save AI Preferences (DPAPI Protected)" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnSaveAiPreferencesClick" />
-                                    <TextBlock x:Name="AiPreferencesStatusText" Text="Core storage scanning, duplicate detection, cleanup, and app uninstallation work 100% offline with no AI key." Style="{StaticResource GwPanelSubtitleStyle}" />
-                                </StackPanel>
-                            </Border>
+                            <TextBox x:Name="AssistantQuestionBox" PlaceholderText="Ask about storage, duplicates, application leftovers, or workspace documents..." VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Ask Operator" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnAskOperatorClick" VerticalAlignment="Center" />
                         </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
-        </NavigationView>
+                    </Border>
 
-        <!-- 3. Bottom Status Bar (Consistent with Top Command Bar) -->
-        <Border Grid.Row="2" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,7">
+                    <Border Padding="18,16" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="10">
+                            <Border Padding="7,2" CornerRadius="4" Background="{ThemeResource GwPurpleBgBrush}" HorizontalAlignment="Left">
+                                <TextBlock x:Name="AssistantProviderBadge" Text="Provider: Local Deterministic Operator (Offline)" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwPurpleBrush}" />
+                            </Border>
+                            <TextBlock x:Name="AssistantAnswerTextBlock" Text="Ask a question above or click one of the quick prompts to analyze your scanned storage, duplicates, and applications." Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True" LineHeight="22" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ======================================================== -->
+            <!-- 5. SEARCH PANEL -->
+            <!-- ======================================================== -->
+            <ScrollViewer x:Name="SearchPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16">
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Border Width="40" Height="40" CornerRadius="7" Background="#1E2E42" BorderBrush="#324B6B" BorderThickness="1">
+                                <SymbolIcon Symbol="Find" Foreground="#6F91FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Hybrid Workspace Search &amp; Saved Searches" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
+                                <TextBlock Text="Search indexed workspace files using hybrid lexical (FTS5) + semantic (ONNX) or fast filename matching." Style="{StaticResource GwPanelSubtitleStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="SearchQueryTextBox" PlaceholderText="Search filenames, code symbols, or document content..." VerticalAlignment="Center" />
+                            <ComboBox x:Name="SearchModeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                <ComboBoxItem Content="Hybrid Search" Tag="hybrid" />
+                                <ComboBoxItem Content="Filename Only" Tag="filename" />
+                                <ComboBoxItem Content="Lexical (FTS5)" Tag="lexical" />
+                                <ComboBoxItem Content="Semantic (ONNX)" Tag="semantic" />
+                            </ComboBox>
+                            <Button Grid.Column="2" Content="Search" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnExecuteSearchClick" VerticalAlignment="Center" />
+                            <Button Grid.Column="3" Content="Save Query" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnSaveCurrentSearchClick" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="280" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Saved Searches" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Delete" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnDeleteSavedSearchClick" />
+                                </Grid>
+                                <ListView x:Name="SavedSearchesListView" SelectionMode="Single" SelectionChanged="OnSavedSearchSelected" MaxHeight="380">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="local:SavedSearchRowViewModel">
+                                            <Border Padding="7,7" Margin="0,2" CornerRadius="5" Background="{ThemeResource GwCardBackgroundHoverBrush}">
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                    <TextBlock Text="{x:Bind QueryText}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10">
+                                <TextBlock x:Name="SearchResultsHeaderText" Text="Search Results" Style="{StaticResource GwCardTitleStyle}" />
+                                <ListView x:Name="SearchResultsListView" SelectionMode="Single" MaxHeight="380">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="local:SearchResultRowViewModel">
+                                            <Border Padding="8,7" Margin="0,2" CornerRadius="5" Background="{ThemeResource GwCardBackgroundHoverBrush}">
+                                                <StackPanel Spacing="3">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                        <TextBlock Grid.Column="1" Text="{x:Bind ScoreLabel}" FontSize="11" Foreground="{ThemeResource GwAccentBrush}" />
+                                                    </Grid>
+                                                    <TextBlock Text="{x:Bind FullPath}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Snippet}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ======================================================== -->
+            <!-- 6. FILE ORGANIZATION PANEL -->
+            <!-- ======================================================== -->
+            <ScrollViewer x:Name="OrganizePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16">
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwAmberBgBrush}" BorderBrush="{ThemeResource GwAmberBrush}" BorderThickness="1">
+                                <SymbolIcon Symbol="Folder" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Safe File Organization &amp; Stream-Preserving Undo" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
+                                <TextBlock Text="Organize by category, extension, or date while preserving NTFS alternate data streams, timestamps, and ACL security." Style="{StaticResource GwPanelSubtitleStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="OrganizeFolderBox" PlaceholderText="Folder path to preview organization..." VerticalAlignment="Center" />
+                            <ComboBox x:Name="OrganizeRuleTypeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                <ComboBoxItem Content="By File Category" Tag="category" />
+                                <ComboBoxItem Content="By Modified Month" Tag="date" />
+                                <ComboBoxItem Content="By Extension" Tag="extension" />
+                            </ComboBox>
+                            <Button Grid.Column="2" Content="Preview Plan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnPreviewOrganizeClick" VerticalAlignment="Center" />
+                            <Button Grid.Column="3" Content="Refresh History" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshOrganizationHistoryClick" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Organization Preview &amp; Undo History" Style="{StaticResource GwCardTitleStyle}" />
+                            <TextBlock x:Name="OrganizationStatusText" Text="Select a folder above or inspect recent organization runs from the local core." Style="{StaticResource GwPanelSubtitleStyle}" />
+                            <ListView x:Name="OrganizationHistoryListView" SelectionMode="None" MaxHeight="300" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ======================================================== -->
+            <!-- 7. DEDICATED NATIVE SETTINGS PANEL (Fluent Settings Experience) -->
+            <!-- ======================================================== -->
+            <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
+                    <!-- Header -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Border Width="40" Height="40" CornerRadius="7" Background="#1E293B" BorderBrush="#334155" BorderThickness="1">
+                                <SymbolIcon Symbol="Setting" Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Groundwork Application Settings" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
+                                <TextBlock Text="Configure appearance, scanning concurrency, deletion safety, and on-device AI provider. Persisted to AppData." Style="{StaticResource GwPanelSubtitleStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Appearance Card -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Appearance &amp; Visual Theme" Style="{StaticResource GwCardTitleStyle}" />
+                            <ComboBox x:Name="ThemeModeComboBox" Header="Theme Palette" Width="260" SelectionChanged="OnThemeModeSelectionChanged">
+                                <ComboBoxItem Content="Dark Theme (Control Room)" Tag="Dark" />
+                                <ComboBoxItem Content="Light Theme (Paper)" Tag="Light" />
+                                <ComboBoxItem Content="Use Windows System Setting" Tag="System" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Storage Scanner Card -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Storage Scanner Engine" Style="{StaticResource GwCardTitleStyle}" />
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="DefaultScanPathBox" Header="Default Scan Path" Text="C:\" />
+                                <TextBox x:Name="ParallelThreadsBox" Grid.Column="1" Header="Parallel Worker Threads (2 - 16)" Text="8" />
+                            </Grid>
+                            <TextBox x:Name="ExcludedPathsBox" Header="Excluded Paths (comma separated)" Text="$Recycle.Bin,System Volume Information" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Cleanup Safety Card -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Cleanup &amp; Deletion Safety" Style="{StaticResource GwCardTitleStyle}" />
+                            <ToggleSwitch x:Name="AlwaysRecycleBinToggle" Header="Always default to Windows Recycle Bin" IsOn="True" />
+                            <ToggleSwitch x:Name="ConfirmBeforeDeleteToggle" Header="Confirm before executing cleanup" IsOn="True" />
+                            <TextBlock Text="Protected System Paths: C:\Windows, C:\Program Files, System32, and root volumes are blocked from deletion." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- AI Operator Card -->
+                    <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="On-Device AI Operator &amp; Privacy" Style="{StaticResource GwCardTitleStyle}" />
+                            <ComboBox x:Name="SettingsAiProviderComboBox" Header="AI Provider" Width="320">
+                                <ComboBoxItem Content="Built-in AI (On-Device Local GGUF / Operator)" Tag="builtin" />
+                                <ComboBoxItem Content="Local Workspace Excerpts Only (Deterministic)" Tag="local" />
+                                <ComboBoxItem Content="Ollama (Loopback Local LLM)" Tag="ollama" />
+                                <ComboBoxItem Content="OpenAI (Optional Cloud Key)" Tag="openai" />
+                                <ComboBoxItem Content="Google Gemini (Optional Cloud Key)" Tag="gemini" />
+                            </ComboBox>
+                            <TextBox x:Name="SettingsOllamaUrlBox" Header="Ollama Loopback URL" Text="http://127.0.0.1:11434" Width="320" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Save Settings Button -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Save Preferences" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnSaveSettingsClick" />
+                        <TextBlock x:Name="SettingsSavedNoticeText" Text="" FontSize="12" Foreground="{ThemeResource GwSignalGreenBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+        </Grid>
+
+        <!-- 3. BOTTOM STATUS BAR -->
+        <Border Grid.Row="2" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,1,0,0" Padding="14,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

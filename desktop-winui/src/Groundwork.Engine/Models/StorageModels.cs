@@ -69,7 +69,8 @@ public sealed record DriveScanResult(
     IReadOnlyList<ScannedEntry> LargestFolders,
     IReadOnlyList<ScannedEntry> TopLevelSpaceMap,
     IReadOnlyList<CategorySummary> CategoryBreakdown,
-    IReadOnlyList<ScannedEntry> AllEntries
+    IReadOnlyList<ScannedEntry> AllEntries,
+    IReadOnlyList<ScannedEntry>? AllFolders = null
 );
 
 public sealed record DuplicateFileEntry(

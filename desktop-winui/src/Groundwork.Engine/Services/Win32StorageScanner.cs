@@ -73,21 +73,52 @@ public sealed class Win32StorageScanner
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool FindClose(IntPtr hFindFile);
 
-    private sealed class MutableNode
+    private sealed class MutableFolderNode
     {
         public int Id;
         public int ParentId;
         public required string Name;
         public required string FullPath;
-        public required string Extension;
-        public required string Category;
-        public bool IsDirectory;
         public long LogicalBytes;
         public long AllocatedBytes;
         public int RecursiveFileCount;
         public int RecursiveFolderCount;
         public long LastWriteUnixSeconds;
         public uint FileAttributes;
+    }
+
+    private sealed class FolderTable
+    {
+        private const int ChunkBits = 14; // 16,384 nodes per chunk
+        private const int ChunkSize = 1 << ChunkBits;
+        private const int ChunkMask = ChunkSize - 1;
+        private readonly MutableFolderNode?[][] _chunks = new MutableFolderNode?[2048][];
+        private int _count;
+
+        public int Count => Volatile.Read(ref _count);
+
+        public int Allocate(int count)
+        {
+            int start = Interlocked.Add(ref _count, count) - count;
+            int end = start + count;
+            int startChunk = start >> ChunkBits;
+            int endChunk = (end - 1) >> ChunkBits;
+            for (int c = startChunk; c <= endChunk; c++)
+            {
+                if (Volatile.Read(ref _chunks[c]) == null)
+                {
+                    var newChunk = new MutableFolderNode?[ChunkSize];
+                    Interlocked.CompareExchange(ref _chunks[c], newChunk, null);
+                }
+            }
+            return start;
+        }
+
+        public MutableFolderNode this[int index]
+        {
+            get => _chunks[index >> ChunkBits][index & ChunkMask]!;
+            set => _chunks[index >> ChunkBits][index & ChunkMask] = value;
+        }
     }
 
     public async Task<DriveScanResult> ScanAsync(
@@ -121,20 +152,15 @@ public sealed class Win32StorageScanner
         var sw = Stopwatch.StartNew();
         const long clusterSize = 4096;
 
-        var folders = new List<MutableNode>(capacity: 16384);
-        var files = new List<MutableNode>(capacity: 65536);
-        var accessDenied = new ConcurrentBag<string>();
-        var syncLock = new object();
+        var folderTable = new FolderTable();
+        int rootIdx = folderTable.Allocate(1);
 
-        var rootNode = new MutableNode
+        var rootNode = new MutableFolderNode
         {
-            Id = 0,
+            Id = rootIdx,
             ParentId = -1,
             Name = string.IsNullOrEmpty(Path.GetFileName(normalizedRoot)) ? normalizedRoot : Path.GetFileName(normalizedRoot),
             FullPath = normalizedRoot,
-            Extension = string.Empty,
-            Category = "folder",
-            IsDirectory = true,
             LogicalBytes = 0,
             AllocatedBytes = 0,
             RecursiveFileCount = 0,
@@ -142,9 +168,9 @@ public sealed class Win32StorageScanner
             LastWriteUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             FileAttributes = FILE_ATTRIBUTE_DIRECTORY
         };
-        folders.Add(rootNode);
+        folderTable[0] = rootNode;
 
-        // Work queue of (FolderNodeIndex, FullDirectoryPath)
+        var accessDenied = new ConcurrentBag<string>();
         var workQueue = new ConcurrentQueue<(int FolderIdx, string Path)>();
         workQueue.Enqueue((0, normalizedRoot));
 
@@ -155,15 +181,23 @@ public sealed class Win32StorageScanner
         long lastReportTicks = sw.ElapsedTicks;
         long reportIntervalTicks = Stopwatch.Frequency / 5; // 200ms
 
-        int maxDegree = Math.Clamp(Environment.ProcessorCount, 2, 8);
+        int maxDegree = Math.Clamp(Environment.ProcessorCount, 2, 16);
         int activeWorkers = 0;
+
+        var allWorkerTopFiles = new ConcurrentBag<PriorityQueue<ScannedEntry, long>>();
+        var allWorkerCategories = new ConcurrentBag<Dictionary<string, (long Count, long Bytes)>>();
+        var allRetainedChunks = new ConcurrentQueue<List<ScannedEntry>>();
 
         using var doneEvent = new ManualResetEventSlim(false);
 
         Parallel.For(0, maxDegree, new ParallelOptions { CancellationToken = cancellationToken }, _ =>
         {
-            var localFiles = new List<MutableNode>(256);
-            var localSubfolders = new List<MutableNode>(64);
+            var localFiles = new List<ScannedEntry>(128);
+            var localSubfolderNames = new List<(string Name, string FullPath, long MTime, uint Attr)>(32);
+
+            var threadTopFiles = new PriorityQueue<ScannedEntry, long>(topN + 1);
+            var threadCategoryTotals = new Dictionary<string, (long Count, long Bytes)>(StringComparer.OrdinalIgnoreCase);
+            var currentRetainedChunk = retainAllEntries ? new List<ScannedEntry>(4096) : null;
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -187,7 +221,7 @@ public sealed class Win32StorageScanner
                 try
                 {
                     localFiles.Clear();
-                    localSubfolders.Clear();
+                    localSubfolderNames.Clear();
 
                     string searchSpec = ToExtendedSearchPattern(current.Path);
                     IntPtr hFind = FindFirstFileExW(
@@ -224,7 +258,7 @@ public sealed class Win32StorageScanner
                             bool isReparse = (attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
                             if (isReparse)
                             {
-                                // Never traverse junctions, symlinks, or mount points to prevent loops and cross-volume walks
+                                // Never traverse junctions, symlinks, or volume mount points to prevent infinite loops and cross-volume walks
                                 continue;
                             }
 
@@ -234,17 +268,7 @@ public sealed class Win32StorageScanner
 
                             if (isDir)
                             {
-                                localSubfolders.Add(new MutableNode
-                                {
-                                    ParentId = current.FolderIdx,
-                                    Name = name,
-                                    FullPath = childPath,
-                                    Extension = string.Empty,
-                                    Category = "folder",
-                                    IsDirectory = true,
-                                    LastWriteUnixSeconds = mtimeUnix,
-                                    FileAttributes = attrs
-                                });
+                                localSubfolderNames.Add((name, childPath, mtimeUnix, attrs));
                             }
                             else
                             {
@@ -254,21 +278,21 @@ public sealed class Win32StorageScanner
                                 string ext = Path.GetExtension(name).ToLowerInvariant();
                                 string cat = FileCategoryClassifier.ClassifyExtension(ext);
 
-                                localFiles.Add(new MutableNode
-                                {
-                                    ParentId = current.FolderIdx,
-                                    Name = name,
-                                    FullPath = childPath,
-                                    Extension = ext,
-                                    Category = cat,
-                                    IsDirectory = false,
-                                    LogicalBytes = size,
-                                    AllocatedBytes = alloc,
-                                    RecursiveFileCount = 1,
-                                    RecursiveFolderCount = 0,
-                                    LastWriteUnixSeconds = mtimeUnix,
-                                    FileAttributes = attrs
-                                });
+                                localFiles.Add(new ScannedEntry(
+                                    Id: 0,
+                                    ParentId: current.FolderIdx,
+                                    Name: name,
+                                    FullPath: childPath,
+                                    Extension: ext,
+                                    Category: cat,
+                                    IsDirectory: false,
+                                    LogicalBytes: size,
+                                    AllocatedBytes: alloc,
+                                    RecursiveFileCount: 1,
+                                    RecursiveFolderCount: 0,
+                                    LastWriteUnixSeconds: mtimeUnix,
+                                    FileAttributes: attrs
+                                ));
                             }
                         } while (FindNextFileW(hFind, out findData));
                     }
@@ -281,35 +305,77 @@ public sealed class Win32StorageScanner
                     long batchAlloc = 0;
                     for (int i = 0; i < localFiles.Count; i++)
                     {
-                        batchLogical += localFiles[i].LogicalBytes;
-                        batchAlloc += localFiles[i].AllocatedBytes;
-                    }
+                        var f = localFiles[i];
+                        batchLogical += f.LogicalBytes;
+                        batchAlloc += f.AllocatedBytes;
 
-                    lock (syncLock)
-                    {
-                        var parentFolder = folders[current.FolderIdx];
-                        parentFolder.LogicalBytes += batchLogical;
-                        parentFolder.AllocatedBytes += batchAlloc;
-                        parentFolder.RecursiveFileCount += localFiles.Count;
-                        parentFolder.RecursiveFolderCount += localSubfolders.Count;
-
-                        foreach (var sub in localSubfolders)
+                        // Category breakdown update
+                        if (threadCategoryTotals.TryGetValue(f.Category, out var prev))
                         {
-                            int newIdx = folders.Count;
-                            sub.Id = newIdx;
-                            folders.Add(sub);
-                            workQueue.Enqueue((newIdx, sub.FullPath));
+                            threadCategoryTotals[f.Category] = (prev.Count + 1, prev.Bytes + f.LogicalBytes);
+                        }
+                        else
+                        {
+                            threadCategoryTotals[f.Category] = (1, f.LogicalBytes);
                         }
 
-                        foreach (var file in localFiles)
+                        // Top-N min-heap
+                        if (threadTopFiles.Count < topN)
                         {
-                            file.Id = files.Count;
-                            files.Add(file);
+                            threadTopFiles.Enqueue(f, f.LogicalBytes);
+                        }
+                        else if (f.LogicalBytes > threadTopFiles.Peek().LogicalBytes)
+                        {
+                            threadTopFiles.Dequeue();
+                            threadTopFiles.Enqueue(f, f.LogicalBytes);
+                        }
+
+                        if (retainAllEntries && currentRetainedChunk != null)
+                        {
+                            currentRetainedChunk.Add(f);
+                            if (currentRetainedChunk.Count >= 4096)
+                            {
+                                allRetainedChunks.Enqueue(currentRetainedChunk);
+                                currentRetainedChunk = new List<ScannedEntry>(4096);
+                            }
+                        }
+                    }
+
+                    // Store direct folder metrics on this folder (sole owner of current.FolderIdx)
+                    var parentFolder = folderTable[current.FolderIdx];
+                    parentFolder.LogicalBytes = batchLogical;
+                    parentFolder.AllocatedBytes = batchAlloc;
+                    parentFolder.RecursiveFileCount = localFiles.Count;
+                    parentFolder.RecursiveFolderCount = localSubfolderNames.Count;
+
+                    // Allocate subfolder IDs lock-free and enqueue for traversal
+                    if (localSubfolderNames.Count > 0)
+                    {
+                        int startIdx = folderTable.Allocate(localSubfolderNames.Count);
+                        for (int j = 0; j < localSubfolderNames.Count; j++)
+                        {
+                            int subId = startIdx + j;
+                            var subInfo = localSubfolderNames[j];
+                            var subNode = new MutableFolderNode
+                            {
+                                Id = subId,
+                                ParentId = current.FolderIdx,
+                                Name = subInfo.Name,
+                                FullPath = subInfo.FullPath,
+                                LogicalBytes = 0,
+                                AllocatedBytes = 0,
+                                RecursiveFileCount = 0,
+                                RecursiveFolderCount = 0,
+                                LastWriteUnixSeconds = subInfo.MTime,
+                                FileAttributes = subInfo.Attr
+                            };
+                            folderTable[subId] = subNode;
+                            workQueue.Enqueue((subId, subInfo.FullPath));
                         }
                     }
 
                     long currentFiles = Interlocked.Add(ref filesScanned, localFiles.Count);
-                    long currentFolders = Interlocked.Add(ref foldersScanned, localSubfolders.Count);
+                    long currentFolders = Interlocked.Add(ref foldersScanned, localSubfolderNames.Count);
                     long currentBytes = Interlocked.Add(ref totalLogicalBytes, batchLogical);
                     Interlocked.Add(ref totalAllocatedBytes, batchAlloc);
 
@@ -340,19 +406,28 @@ public sealed class Win32StorageScanner
                     }
                 }
             }
+
+            allWorkerTopFiles.Add(threadTopFiles);
+            allWorkerCategories.Add(threadCategoryTotals);
+            if (retainAllEntries && currentRetainedChunk != null && currentRetainedChunk.Count > 0)
+            {
+                allRetainedChunks.Enqueue(currentRetainedChunk);
+            }
         });
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        int totalFolders = folderTable.Count;
+
         // Bottom-up O(N) folder size rollup: since child folders always have Id > ParentId,
-        // iterating from folders.Count - 1 down to 1 rolls up all descendants in a single pass.
-        for (int i = folders.Count - 1; i >= 1; i--)
+        // iterating from totalFolders - 1 down to 1 rolls up all descendants in a single pass.
+        for (int i = totalFolders - 1; i >= 1; i--)
         {
-            var child = folders[i];
+            var child = folderTable[i];
             int pIdx = child.ParentId;
-            if (pIdx >= 0 && pIdx < folders.Count)
+            if (pIdx >= 0 && pIdx < totalFolders)
             {
-                var parent = folders[pIdx];
+                var parent = folderTable[pIdx];
                 parent.LogicalBytes += child.LogicalBytes;
                 parent.AllocatedBytes += child.AllocatedBytes;
                 parent.RecursiveFileCount += child.RecursiveFileCount;
@@ -360,21 +435,46 @@ public sealed class Win32StorageScanner
             }
         }
 
-        // Compute category breakdown
-        var catTotals = new Dictionary<string, (long Count, long Bytes)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var f in files)
+        // Convert folders to ScannedEntry list
+        var allFoldersList = new List<ScannedEntry>(totalFolders);
+        for (int i = 0; i < totalFolders; i++)
         {
-            if (catTotals.TryGetValue(f.Category, out var prev))
+            var f = folderTable[i];
+            allFoldersList.Add(new ScannedEntry(
+                Id: f.Id,
+                ParentId: f.ParentId,
+                Name: f.Name,
+                FullPath: f.FullPath,
+                Extension: string.Empty,
+                Category: "folder",
+                IsDirectory: true,
+                LogicalBytes: f.LogicalBytes,
+                AllocatedBytes: f.AllocatedBytes,
+                RecursiveFileCount: f.RecursiveFileCount,
+                RecursiveFolderCount: f.RecursiveFolderCount,
+                LastWriteUnixSeconds: f.LastWriteUnixSeconds,
+                FileAttributes: f.FileAttributes
+            ));
+        }
+
+        // Merge categories across workers
+        var globalCatTotals = new Dictionary<string, (long Count, long Bytes)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var wCat in allWorkerCategories)
+        {
+            foreach (var kvp in wCat)
             {
-                catTotals[f.Category] = (prev.Count + 1, prev.Bytes + f.LogicalBytes);
-            }
-            else
-            {
-                catTotals[f.Category] = (1, f.LogicalBytes);
+                if (globalCatTotals.TryGetValue(kvp.Key, out var prev))
+                {
+                    globalCatTotals[kvp.Key] = (prev.Count + kvp.Value.Count, prev.Bytes + kvp.Value.Bytes);
+                }
+                else
+                {
+                    globalCatTotals[kvp.Key] = (kvp.Value.Count, kvp.Value.Bytes);
+                }
             }
         }
 
-        var categoryBreakdown = catTotals
+        var categoryBreakdown = globalCatTotals
             .Select(kvp => new CategorySummary(
                 Key: kvp.Key,
                 Label: FileCategoryClassifier.CategoryLabels.GetValueOrDefault(kvp.Key, "Other Files"),
@@ -385,79 +485,77 @@ public sealed class Win32StorageScanner
             .OrderByDescending(c => c.TotalBytes)
             .ToList();
 
-        var largestFiles = files
-            .OrderByDescending(f => f.LogicalBytes)
-            .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(topN)
-            .Select(ToScannedEntry)
-            .ToList();
+        // Merge top files across workers
+        var mergedTopFiles = new PriorityQueue<ScannedEntry, long>(topN + 1);
+        foreach (var wQueue in allWorkerTopFiles)
+        {
+            while (wQueue.TryDequeue(out var file, out var priority))
+            {
+                if (mergedTopFiles.Count < topN)
+                {
+                    mergedTopFiles.Enqueue(file, priority);
+                }
+                else if (priority > mergedTopFiles.Peek().LogicalBytes)
+                {
+                    mergedTopFiles.Dequeue();
+                    mergedTopFiles.Enqueue(file, priority);
+                }
+            }
+        }
 
-        var largestFolders = folders
+        var largestFilesList = new List<ScannedEntry>(mergedTopFiles.Count);
+        while (mergedTopFiles.TryDequeue(out var file, out _))
+        {
+            largestFilesList.Add(file);
+        }
+        largestFilesList.Reverse(); // Largest first
+
+        var largestFolders = allFoldersList
             .Skip(1) // Skip root itself
             .Where(d => d.LogicalBytes > 0)
             .OrderByDescending(d => d.LogicalBytes)
             .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
             .Take(topN)
-            .Select(ToScannedEntry)
             .ToList();
 
-        var topLevelChildren = folders
-            .Skip(1)
-            .Where(d => d.ParentId == 0 && d.LogicalBytes > 0)
-            .Concat(files.Where(f => f.ParentId == 0 && f.LogicalBytes > 0))
-            .OrderByDescending(e => e.LogicalBytes)
-            .Take(24)
-            .Select(ToScannedEntry)
+        var topLevelSpaceMap = allFoldersList
+            .Where(d => d.ParentId == 0)
+            .OrderByDescending(d => d.LogicalBytes)
             .ToList();
 
-        IReadOnlyList<ScannedEntry> allEntries = retainAllEntries
-            ? folders.Concat(files).Select(ToScannedEntry).ToList()
-            : Array.Empty<ScannedEntry>();
-
-        sw.Stop();
-        progress?.Report(new ScanProgressReport(
-            RootPath: normalizedRoot,
-            Mode: ScanEngineMode.StandardWin32,
-            CurrentDirectory: normalizedRoot,
-            FilesScanned: files.Count,
-            FoldersScanned: folders.Count,
-            TotalLogicalBytes: totalLogicalBytes,
-            AccessDeniedCount: accessDenied.Count,
-            ElapsedMilliseconds: sw.Elapsed.TotalMilliseconds
-        ));
+        IReadOnlyList<ScannedEntry> allEntries;
+        if (retainAllEntries)
+        {
+            var combinedEntries = new List<ScannedEntry>(allFoldersList.Count + (int)filesScanned);
+            combinedEntries.AddRange(allFoldersList);
+            foreach (var chunk in allRetainedChunks)
+            {
+                combinedEntries.AddRange(chunk);
+            }
+            allEntries = combinedEntries;
+        }
+        else
+        {
+            allEntries = Array.Empty<ScannedEntry>();
+        }
 
         return new DriveScanResult(
             RootPath: normalizedRoot,
             EngineUsed: ScanEngineMode.StandardWin32,
-            TotalFiles: files.Count,
-            TotalFolders: folders.Count,
+            TotalFiles: filesScanned,
+            TotalFolders: foldersScanned,
             TotalLogicalBytes: totalLogicalBytes,
             TotalAllocatedBytes: totalAllocatedBytes,
-            ElapsedMilliseconds: Math.Round(sw.Elapsed.TotalMilliseconds, 2),
-            AccessDeniedPaths: accessDenied.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList(),
-            LargestFiles: largestFiles,
+            ElapsedMilliseconds: sw.Elapsed.TotalMilliseconds,
+            AccessDeniedPaths: accessDenied.ToArray(),
+            LargestFiles: largestFilesList,
             LargestFolders: largestFolders,
-            TopLevelSpaceMap: topLevelChildren,
+            TopLevelSpaceMap: topLevelSpaceMap,
             CategoryBreakdown: categoryBreakdown,
-            AllEntries: allEntries
+            AllEntries: allEntries,
+            AllFolders: allFoldersList
         );
     }
-
-    private static ScannedEntry ToScannedEntry(MutableNode n) => new(
-        Id: n.Id,
-        ParentId: n.ParentId,
-        Name: n.Name,
-        FullPath: n.FullPath,
-        Extension: n.Extension,
-        Category: n.Category,
-        IsDirectory: n.IsDirectory,
-        LogicalBytes: n.LogicalBytes,
-        AllocatedBytes: n.AllocatedBytes,
-        RecursiveFileCount: n.RecursiveFileCount,
-        RecursiveFolderCount: n.RecursiveFolderCount,
-        LastWriteUnixSeconds: n.LastWriteUnixSeconds,
-        FileAttributes: n.FileAttributes
-    );
 
     private static string ToExtendedSearchPattern(string path)
     {
