@@ -42,9 +42,21 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<SearchResultRowViewModel> SearchResults { get; } = new();
     public ObservableCollection<NoteRowViewModel> Notes { get; } = new();
 
+    private static void StartupLog(string msg)
+    {
+        try
+        {
+            string log = Path.Combine(Path.GetTempPath(), "groundwork-startup.log");
+            File.AppendAllText(log, $"{DateTime.Now:HH:mm:ss.fff} [PID {Environment.ProcessId}] {msg}\n");
+        }
+        catch { }
+    }
+
     public MainWindow()
     {
+        StartupLog("MainWindow constructor start");
         this.InitializeComponent();
+        StartupLog("InitializeComponent complete");
 
         VolumesListView.ItemsSource = Volumes;
         LargestFoldersListView.ItemsSource = LargestFolders;
@@ -60,13 +72,24 @@ public sealed partial class MainWindow : Window
 
         this.Closed += OnMainWindowClosed;
         InitializeStartupState();
+        StartupLog("MainWindow constructor complete");
     }
 
     private async void InitializeStartupState()
     {
-        RefreshDrivesList();
-        await RefreshInstalledAppsAsync();
-        _ = InitializeOptionalSidecarAsync();
+        try
+        {
+            StartupLog("InitializeStartupState start");
+            RefreshDrivesList();
+            StartupLog($"RefreshDrivesList complete ({Volumes.Count} volumes)");
+            await RefreshInstalledAppsAsync();
+            StartupLog($"RefreshInstalledAppsAsync complete ({_allInstalledApps.Count} apps)");
+            _ = InitializeOptionalSidecarAsync();
+        }
+        catch (Exception ex)
+        {
+            StartupLog($"InitializeStartupState EXCEPTION: {ex.Message}\n{ex.StackTrace}");
+        }
     }
 
     private async Task InitializeOptionalSidecarAsync()
