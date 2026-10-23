@@ -87,8 +87,10 @@ public sealed class StorageTreeNodeViewModel : INotifyPropertyChanged
     public bool HasChildren => IsDirectory && (RecursiveFolderCount > 0 || RecursiveFileCount > 0);
     public Microsoft.UI.Xaml.Visibility HasChildrenVisibility => HasChildren ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     public string ExpanderGlyph => IsExpanded ? "\uE70D" : "\uE76C"; // ChevronDown / ChevronRight
-    public string NodeGlyph => IsDirectory ? "\uE8B7" : "\uE8A5"; // Folder / File
-    public string NodeGlyphColor => IsDirectory ? "#6F91FF" : "#94A3B8";
+    public string Glyph { get; set; } = string.Empty;
+    public string GlyphColor { get; set; } = string.Empty;
+    public string NodeGlyph => !string.IsNullOrEmpty(Glyph) ? Glyph : (IsDirectory ? "\uE8B7" : "\uE8A5");
+    public string NodeGlyphColor => !string.IsNullOrEmpty(GlyphColor) ? GlyphColor : (IsDirectory ? "#6F91FF" : "#94A3B8");
 
     public StorageTreeNodeViewModel() { }
 }

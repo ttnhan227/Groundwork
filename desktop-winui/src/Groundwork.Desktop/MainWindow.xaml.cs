@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
 
     private CancellationTokenSource? _scanCts;
     private DriveScanResult? _lastScanResult;
+    private Dictionary<int, List<ScannedEntry>>? _childrenByParentId;
     private DuplicateScanReport? _lastDuplicateReport;
     private IReadOnlyList<InstalledApplicationInfo> _allInstalledApps = Array.Empty<InstalledApplicationInfo>();
     private string _currentLeftoverInstallLocation = string.Empty;
@@ -53,7 +54,6 @@ public sealed partial class MainWindow : Window
         StorageTreeListView.ItemsSource = StorageTreeNodes;
         StorageFileListView.ItemsSource = ScannedFiles;
         StorageBreakdownLegendControl.ItemsSource = StorageBarSegments;
-        CategoriesPillsControl.ItemsSource = Categories;
         DuplicateGroupsListView.ItemsSource = DuplicateGroups;
         CleanupCandidatesListView.ItemsSource = CleanupCandidates;
         InstalledAppsListView.ItemsSource = InstalledApps;
@@ -466,8 +466,8 @@ public sealed partial class MainWindow : Window
                 if (token.IsCancellationRequested) break;
 
                 DriveScanResult driveRes = requestElevatedMft
-                    ? await _mftScanner.ScanWithFallbackAsync(drive.RootPath, requestElevationIfNeeded: true, mftHelperExecutablePath: Path.Combine(AppContext.BaseDirectory, "Groundwork.MftHelper.exe"), cancellationToken: token)
-                    : await _win32Scanner.ScanAsync(drive.RootPath, cancellationToken: token);
+                    ? await _mftScanner.ScanWithFallbackAsync(drive.RootPath, requestElevationIfNeeded: true, mftHelperExecutablePath: Path.Combine(AppContext.BaseDirectory, "Groundwork.MftHelper.exe"), retainAllEntries: true, cancellationToken: token)
+                    : await _win32Scanner.ScanAsync(drive.RootPath, retainAllEntries: true, cancellationToken: token);
 
                 totalLogical += driveRes.TotalLogicalBytes;
                 totalAllocated += driveRes.TotalAllocatedBytes;
@@ -492,6 +492,7 @@ public sealed partial class MainWindow : Window
                     FileAttributes: 0x10
                 );
                 allCombinedFolders.Add(driveRootEntry);
+                allCombinedEntries.Add(driveRootEntry);
 
                 if (driveRes.AllFolders != null)
                 {
@@ -499,6 +500,23 @@ public sealed partial class MainWindow : Window
                     {
                         int pId = f.ParentId <= 0 ? driveRootId : f.ParentId + driveRootId;
                         allCombinedFolders.Add(f with { Id = f.Id + driveRootId, ParentId = pId });
+                    }
+                }
+
+                if (driveRes.AllEntries != null && driveRes.AllEntries.Count > 0)
+                {
+                    foreach (var e in driveRes.AllEntries)
+                    {
+                        int pId = e.ParentId <= 0 ? driveRootId : e.ParentId + driveRootId;
+                        allCombinedEntries.Add(e with { Id = e.Id + driveRootId, ParentId = pId });
+                    }
+                }
+                else if (driveRes.AllFolders != null)
+                {
+                    foreach (var f in driveRes.AllFolders)
+                    {
+                        int pId = f.ParentId <= 0 ? driveRootId : f.ParentId + driveRootId;
+                        allCombinedEntries.Add(f with { Id = f.Id + driveRootId, ParentId = pId });
                     }
                 }
 
@@ -618,49 +636,99 @@ public sealed partial class MainWindow : Window
             StorageBreakdownSummaryText.Text = $"Top folders represent {StorageBarSegments.Sum(s => s.Percent):F1}% of {ByteFormatter.FormatBytes(result.TotalLogicalBytes)} disk space.";
         }
 
-        // 2. Hierarchical File Tree View
+        // 2. Build fast lookup of children by parentId
+        _childrenByParentId = new Dictionary<int, List<ScannedEntry>>();
+        var allSource = (result.AllEntries != null && result.AllEntries.Count > 0)
+            ? result.AllEntries
+            : (IReadOnlyList<ScannedEntry>)(result.AllFolders ?? Array.Empty<ScannedEntry>());
+
+        foreach (var entry in allSource)
+        {
+            if (!_childrenByParentId.TryGetValue(entry.ParentId, out var list))
+            {
+                list = new List<ScannedEntry>();
+                _childrenByParentId[entry.ParentId] = list;
+            }
+            list.Add(entry);
+        }
+
+        // 3. Hierarchical File Tree View (Roots: shows root folders AND root files)
         StorageTreeNodes.Clear();
         long totalDriveBytes = Math.Max(1, result.TotalLogicalBytes);
 
-        if (result.AllFolders != null && result.AllFolders.Count > 0)
+        List<ScannedEntry> rootEntries;
+        if (!_childrenByParentId.TryGetValue(0, out rootEntries!))
         {
-            var rootFolders = result.AllFolders
-                .Where(f => f.ParentId <= 0)
-                .OrderByDescending(f => f.LogicalBytes)
-                .ToList();
-
-            foreach (var f in rootFolders)
-            {
-                double pct = totalDriveBytes > 0 ? (double)f.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
-                StorageTreeNodes.Add(new StorageTreeNodeViewModel
-                {
-                    Id = f.Id,
-                    ParentId = f.ParentId,
-                    Name = f.Name,
-                    FullPath = f.FullPath,
-                    IsDirectory = true,
-                    SizeBytes = f.LogicalBytes,
-                    AllocatedBytes = f.AllocatedBytes,
-                    RecursiveFileCount = f.RecursiveFileCount,
-                    RecursiveFolderCount = f.RecursiveFolderCount,
-                    FormattedSize = ByteFormatter.FormatBytes(f.LogicalBytes),
-                    FormattedAllocated = ByteFormatter.FormatBytes(f.AllocatedBytes),
-                    ItemsSummary = $"{f.RecursiveFileCount + f.RecursiveFolderCount:N0} items",
-                    Attributes = FormatAttributes(f.FileAttributes),
-                    LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(f.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
-                    PercentOfDrive = pct,
-                    PercentLabel = $"{pct:F1}%",
-                    DepthLevel = 0,
-                    IsExpanded = false
-                });
-            }
+            rootEntries = allSource.Where(e => e.ParentId <= 0).ToList();
         }
 
-        // 3. Flat File View (Top Largest Scanned Files - WizTree File View)
+        var rootFolders = rootEntries.Where(f => f.IsDirectory).OrderByDescending(f => f.LogicalBytes).ToList();
+        var rootFiles = rootEntries.Where(f => !f.IsDirectory).OrderByDescending(f => f.LogicalBytes).ToList();
+
+        foreach (var f in rootFolders)
+        {
+            double pct = totalDriveBytes > 0 ? (double)f.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
+            StorageTreeNodes.Add(new StorageTreeNodeViewModel
+            {
+                Id = f.Id,
+                ParentId = f.ParentId,
+                Name = f.Name,
+                FullPath = f.FullPath,
+                IsDirectory = true,
+                SizeBytes = f.LogicalBytes,
+                AllocatedBytes = f.AllocatedBytes,
+                RecursiveFileCount = f.RecursiveFileCount,
+                RecursiveFolderCount = f.RecursiveFolderCount,
+                FormattedSize = ByteFormatter.FormatBytes(f.LogicalBytes),
+                FormattedAllocated = ByteFormatter.FormatBytes(f.AllocatedBytes),
+                ItemsSummary = $"{f.RecursiveFileCount + f.RecursiveFolderCount:N0} items",
+                Attributes = FormatAttributes(f.FileAttributes),
+                LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(f.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
+                PercentOfDrive = pct,
+                PercentLabel = $"{pct:F1}%",
+                PercentOfParent = 100.0,
+                PercentOfParentLabel = "100%",
+                DepthLevel = 0,
+                IsExpanded = false
+            });
+        }
+
+        foreach (var file in rootFiles)
+        {
+            double pct = totalDriveBytes > 0 ? (double)file.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
+            string ext = string.IsNullOrEmpty(file.Extension) ? Path.GetExtension(file.FullPath).ToLowerInvariant() : file.Extension;
+            StorageTreeNodes.Add(new StorageTreeNodeViewModel
+            {
+                Id = file.Id,
+                ParentId = file.ParentId,
+                Name = file.Name,
+                FullPath = file.FullPath,
+                IsDirectory = false,
+                SizeBytes = file.LogicalBytes,
+                AllocatedBytes = file.AllocatedBytes,
+                FormattedSize = ByteFormatter.FormatBytes(file.LogicalBytes),
+                FormattedAllocated = ByteFormatter.FormatBytes(file.AllocatedBytes),
+                ItemsSummary = "1 file",
+                Attributes = FormatAttributes(file.FileAttributes),
+                LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(file.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
+                PercentOfDrive = pct,
+                PercentLabel = $"{pct:F1}%",
+                PercentOfParent = 100.0,
+                PercentOfParentLabel = "100%",
+                Extension = ext,
+                FileType = GetFileTypeDescription(ext),
+                Glyph = GetGlyphForCategory(file.Category),
+                GlyphColor = GetColorForCategory(file.Category),
+                DepthLevel = 0,
+                IsExpanded = false
+            });
+        }
+
+        // 4. Flat File View (Top Largest Scanned Files - WizTree File View)
         ScannedFiles.Clear();
         var filesSource = (result.LargestFiles != null && result.LargestFiles.Count > 0)
             ? result.LargestFiles
-            : result.AllEntries.Where(e => !e.IsDirectory).OrderByDescending(e => e.LogicalBytes).Take(500);
+            : (result.AllEntries ?? Array.Empty<ScannedEntry>()).Where(e => !e.IsDirectory).OrderByDescending(e => e.LogicalBytes).Take(500);
 
         foreach (var file in filesSource)
         {
@@ -687,17 +755,14 @@ public sealed partial class MainWindow : Window
             });
         }
 
-        // 4. Category Breakdown Pills
-        Categories.Clear();
-        foreach (var c in result.CategoryBreakdown)
-        {
-            Categories.Add(new CategoryRowViewModel(
-                Label: c.Label,
-                SummaryText: $"{ByteFormatter.FormatBytes(c.TotalBytes)} ({c.SharePercent:F1}%)",
-                SharePercent: c.SharePercent));
-        }
+        UpdateViewCountSummary();
+    }
 
-        ViewTabSummaryText.Text = $"Tree View: Showing {StorageTreeNodes.Count} roots • File View: Showing {ScannedFiles.Count} files";
+    private void UpdateViewCountSummary()
+    {
+        int folders = StorageTreeNodes.Count(n => n.IsDirectory);
+        int files = StorageTreeNodes.Count(n => !n.IsDirectory);
+        ViewTabSummaryText.Text = $"Tree View: {folders} folders, {files} files loaded • Double-click folder to expand or file to open";
     }
 
     private void OnTreeNodeExpanderClick(object sender, RoutedEventArgs e)
@@ -710,7 +775,7 @@ public sealed partial class MainWindow : Window
 
     private void ToggleTreeNode(StorageTreeNodeViewModel node)
     {
-        if (_lastScanResult?.AllFolders == null) return;
+        if (_lastScanResult == null || !node.IsDirectory) return;
 
         if (node.IsExpanded)
         {
@@ -743,92 +808,232 @@ public sealed partial class MainWindow : Window
             int idx = StorageTreeNodes.IndexOf(node);
             if (idx < 0) return;
 
-            var children = _lastScanResult.AllFolders
-                .Where(f => f.ParentId == node.Id)
-                .OrderByDescending(f => f.LogicalBytes)
-                .ToList();
-
-            int insertIdx = idx + 1;
-            long totalDriveBytes = Math.Max(1, _lastScanResult.TotalLogicalBytes);
-            foreach (var child in children)
+            List<ScannedEntry>? children = null;
+            if (_childrenByParentId != null && _childrenByParentId.TryGetValue(node.Id, out var cachedList))
             {
-                double pct = totalDriveBytes > 0 ? (double)child.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
-                var childVm = new StorageTreeNodeViewModel
-                {
-                    Id = child.Id,
-                    ParentId = child.ParentId,
-                    Name = child.Name,
-                    FullPath = child.FullPath,
-                    IsDirectory = true,
-                    SizeBytes = child.LogicalBytes,
-                    AllocatedBytes = child.AllocatedBytes,
-                    RecursiveFileCount = child.RecursiveFileCount,
-                    RecursiveFolderCount = child.RecursiveFolderCount,
-                    FormattedSize = ByteFormatter.FormatBytes(child.LogicalBytes),
-                    FormattedAllocated = ByteFormatter.FormatBytes(child.AllocatedBytes),
-                    ItemsSummary = $"{child.RecursiveFileCount + child.RecursiveFolderCount:N0} items",
-                    Attributes = FormatAttributes(child.FileAttributes),
-                    LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(child.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
-                    PercentOfDrive = pct,
-                    PercentLabel = $"{pct:F1}%",
-                    DepthLevel = node.DepthLevel + 1,
-                    IsExpanded = false
-                };
-                StorageTreeNodes.Insert(insertIdx++, childVm);
+                children = cachedList;
             }
+            else if (_lastScanResult.AllEntries != null && _lastScanResult.AllEntries.Count > 0)
+            {
+                children = _lastScanResult.AllEntries.Where(e => e.ParentId == node.Id).ToList();
+            }
+            else if (_lastScanResult.AllFolders != null)
+            {
+                children = _lastScanResult.AllFolders.Where(e => e.ParentId == node.Id).ToList();
+            }
+
+            if (children != null && children.Count > 0)
+            {
+                var childFolders = children.Where(c => c.IsDirectory).OrderByDescending(c => c.LogicalBytes).ToList();
+                var childFiles = children.Where(c => !c.IsDirectory).OrderByDescending(c => c.LogicalBytes).ToList();
+
+                int insertIdx = idx + 1;
+                long totalDriveBytes = Math.Max(1, _lastScanResult.TotalLogicalBytes);
+
+                // 1. Insert child folders
+                foreach (var child in childFolders)
+                {
+                    double pct = totalDriveBytes > 0 ? (double)child.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
+                    double pctParent = node.SizeBytes > 0 ? (double)child.LogicalBytes / node.SizeBytes * 100.0 : 0.0;
+                    var childVm = new StorageTreeNodeViewModel
+                    {
+                        Id = child.Id,
+                        ParentId = child.ParentId,
+                        Name = child.Name,
+                        FullPath = child.FullPath,
+                        IsDirectory = true,
+                        SizeBytes = child.LogicalBytes,
+                        AllocatedBytes = child.AllocatedBytes,
+                        RecursiveFileCount = child.RecursiveFileCount,
+                        RecursiveFolderCount = child.RecursiveFolderCount,
+                        FormattedSize = ByteFormatter.FormatBytes(child.LogicalBytes),
+                        FormattedAllocated = ByteFormatter.FormatBytes(child.AllocatedBytes),
+                        ItemsSummary = $"{child.RecursiveFileCount + child.RecursiveFolderCount:N0} items",
+                        Attributes = FormatAttributes(child.FileAttributes),
+                        LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(child.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
+                        PercentOfDrive = pct,
+                        PercentLabel = $"{pct:F1}%",
+                        PercentOfParent = pctParent,
+                        PercentOfParentLabel = $"{pctParent:F1}%",
+                        DepthLevel = node.DepthLevel + 1,
+                        IsExpanded = false
+                    };
+                    StorageTreeNodes.Insert(insertIdx++, childVm);
+                }
+
+                // 2. Insert child files (folders show files too!)
+                int maxFilesToShow = 250;
+                var filesToShow = childFiles.Take(maxFilesToShow).ToList();
+
+                foreach (var file in filesToShow)
+                {
+                    double pct = totalDriveBytes > 0 ? (double)file.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
+                    double pctParent = node.SizeBytes > 0 ? (double)file.LogicalBytes / node.SizeBytes * 100.0 : 0.0;
+                    string ext = string.IsNullOrEmpty(file.Extension) ? Path.GetExtension(file.FullPath).ToLowerInvariant() : file.Extension;
+
+                    var fileVm = new StorageTreeNodeViewModel
+                    {
+                        Id = file.Id,
+                        ParentId = file.ParentId,
+                        Name = file.Name,
+                        FullPath = file.FullPath,
+                        IsDirectory = false,
+                        SizeBytes = file.LogicalBytes,
+                        AllocatedBytes = file.AllocatedBytes,
+                        RecursiveFileCount = 0,
+                        RecursiveFolderCount = 0,
+                        FormattedSize = ByteFormatter.FormatBytes(file.LogicalBytes),
+                        FormattedAllocated = ByteFormatter.FormatBytes(file.AllocatedBytes),
+                        ItemsSummary = "1 file",
+                        Attributes = FormatAttributes(file.FileAttributes),
+                        LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(file.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
+                        PercentOfDrive = pct,
+                        PercentLabel = $"{pct:F1}%",
+                        PercentOfParent = pctParent,
+                        PercentOfParentLabel = $"{pctParent:F1}%",
+                        Extension = ext,
+                        FileType = GetFileTypeDescription(ext),
+                        Glyph = GetGlyphForCategory(file.Category),
+                        GlyphColor = GetColorForCategory(file.Category),
+                        DepthLevel = node.DepthLevel + 1,
+                        IsExpanded = false
+                    };
+                    StorageTreeNodes.Insert(insertIdx++, fileVm);
+                }
+
+                if (childFiles.Count > maxFilesToShow)
+                {
+                    int remaining = childFiles.Count - maxFilesToShow;
+                    long remainingBytes = childFiles.Skip(maxFilesToShow).Sum(f => f.LogicalBytes);
+                    StorageTreeNodes.Insert(insertIdx++, new StorageTreeNodeViewModel
+                    {
+                        Name = $"... and {remaining:N0} more smaller files ({ByteFormatter.FormatBytes(remainingBytes)})",
+                        FullPath = node.FullPath,
+                        IsDirectory = false,
+                        SizeBytes = remainingBytes,
+                        FormattedSize = ByteFormatter.FormatBytes(remainingBytes),
+                        DepthLevel = node.DepthLevel + 1,
+                        Glyph = "\uE8A5",
+                        GlyphColor = "#64748B"
+                    });
+                }
+            }
+
             node.IsExpanded = true;
         }
+
+        UpdateViewCountSummary();
     }
 
     // ==========================================
-    // WIZTREE VIEW TABS & DOUBLE-CLICK NAVIGATION
+    // UNIFIED STORAGE EXPLORER ACTIONS & NAVIGATION
     // ==========================================
 
     private void OnViewTreeTabClick(object sender, RoutedEventArgs e)
     {
         TreeContentGrid.Visibility = Visibility.Visible;
         FileContentGrid.Visibility = Visibility.Collapsed;
-        AboutContentGrid.Visibility = Visibility.Collapsed;
 
         ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
         ViewFileTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
-        ViewAboutTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
-        ViewTabSummaryText.Text = "Tree View: Double-click any folder to expand/collapse • Right-click for context actions";
+        UpdateViewCountSummary();
     }
 
     private void OnViewFileTabClick(object sender, RoutedEventArgs e)
     {
         TreeContentGrid.Visibility = Visibility.Collapsed;
         FileContentGrid.Visibility = Visibility.Visible;
-        AboutContentGrid.Visibility = Visibility.Collapsed;
 
         ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
         ViewFileTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
-        ViewAboutTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
-        ViewTabSummaryText.Text = $"File View: Showing {ScannedFiles.Count:N0} largest scanned files • Double-click to open in Explorer";
+        ViewTabSummaryText.Text = $"Largest Files (Flat): Showing {ScannedFiles.Count:N0} largest files across target • Double-click to open in Explorer";
     }
 
-    private void OnViewAboutTabClick(object sender, RoutedEventArgs e)
+    private void OnTreeFilterTextChanged(object sender, TextChangedEventArgs e)
     {
-        TreeContentGrid.Visibility = Visibility.Collapsed;
-        FileContentGrid.Visibility = Visibility.Collapsed;
-        AboutContentGrid.Visibility = Visibility.Visible;
+        string query = TreeFilterTextBox.Text.Trim();
+        if (string.IsNullOrEmpty(query))
+        {
+            if (_lastScanResult != null)
+            {
+                PopulateStorageScanViews(_lastScanResult);
+            }
+            return;
+        }
 
-        ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
-        ViewFileTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
-        ViewAboutTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
-        ViewTabSummaryText.Text = "About Groundwork 1.0 Enterprise Storage Engine";
+        if (_lastScanResult?.AllEntries == null || _lastScanResult.AllEntries.Count == 0) return;
+
+        long totalDriveBytes = Math.Max(1, _lastScanResult.TotalLogicalBytes);
+        var matches = _lastScanResult.AllEntries
+            .Where(entry => entry.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                            (!string.IsNullOrEmpty(entry.Extension) && entry.Extension.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(entry => entry.LogicalBytes)
+            .Take(300)
+            .ToList();
+
+        StorageTreeNodes.Clear();
+        foreach (var m in matches)
+        {
+            double pct = totalDriveBytes > 0 ? (double)m.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
+            string ext = string.IsNullOrEmpty(m.Extension) ? Path.GetExtension(m.FullPath).ToLowerInvariant() : m.Extension;
+
+            StorageTreeNodes.Add(new StorageTreeNodeViewModel
+            {
+                Id = m.Id,
+                ParentId = m.ParentId,
+                Name = m.Name,
+                FullPath = m.FullPath,
+                IsDirectory = m.IsDirectory,
+                SizeBytes = m.LogicalBytes,
+                AllocatedBytes = m.AllocatedBytes,
+                RecursiveFileCount = m.RecursiveFileCount,
+                RecursiveFolderCount = m.RecursiveFolderCount,
+                FormattedSize = ByteFormatter.FormatBytes(m.LogicalBytes),
+                FormattedAllocated = ByteFormatter.FormatBytes(m.AllocatedBytes),
+                ItemsSummary = m.IsDirectory ? $"{m.RecursiveFileCount + m.RecursiveFolderCount:N0} items" : "1 file",
+                Attributes = FormatAttributes(m.FileAttributes),
+                LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(m.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
+                PercentOfDrive = pct,
+                PercentLabel = $"{pct:F1}%",
+                Extension = ext,
+                FileType = m.IsDirectory ? "Folder" : GetFileTypeDescription(ext),
+                Glyph = m.IsDirectory ? "\uE8B7" : GetGlyphForCategory(m.Category),
+                GlyphColor = m.IsDirectory ? "#6F91FF" : GetColorForCategory(m.Category),
+                DepthLevel = 0,
+                IsExpanded = false
+            });
+        }
+
+        ViewTabSummaryText.Text = $"Filter '{query}': {StorageTreeNodes.Count} matching items found";
+    }
+
+    private void OnClearTreeFilterClick(object sender, RoutedEventArgs e)
+    {
+        TreeFilterTextBox.Text = string.Empty;
+    }
+
+    private void OnCollapseAllTreeNodesClick(object sender, RoutedEventArgs e)
+    {
+        if (_lastScanResult != null)
+        {
+            PopulateStorageScanViews(_lastScanResult);
+        }
     }
 
     private void OnTreeRowDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is StorageTreeNodeViewModel node)
         {
-            if (node.IsDirectory && node.HasChildren)
+            if (node.IsDirectory)
             {
                 ToggleTreeNode(node);
-                e.Handled = true;
             }
+            else
+            {
+                // Double click on a file opens it in Windows Explorer
+                OpenPathInExplorer(node.FullPath);
+            }
+            e.Handled = true;
         }
     }
 
@@ -836,23 +1041,34 @@ public sealed partial class MainWindow : Window
     {
         if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
         {
-            if (e.Key is Windows.System.VirtualKey.Enter or Windows.System.VirtualKey.Space)
+            if (node.IsDirectory)
             {
-                if (node.IsDirectory && node.HasChildren)
+                if (e.Key is Windows.System.VirtualKey.Enter or Windows.System.VirtualKey.Space)
+                {
+                    if (node.HasChildren)
+                    {
+                        ToggleTreeNode(node);
+                        e.Handled = true;
+                    }
+                }
+                else if (e.Key == Windows.System.VirtualKey.Right && !node.IsExpanded && node.HasChildren)
+                {
+                    ToggleTreeNode(node);
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Left && node.IsExpanded)
                 {
                     ToggleTreeNode(node);
                     e.Handled = true;
                 }
             }
-            else if (e.Key == Windows.System.VirtualKey.Right && !node.IsExpanded && node.HasChildren)
+            else
             {
-                ToggleTreeNode(node);
-                e.Handled = true;
-            }
-            else if (e.Key == Windows.System.VirtualKey.Left && node.IsExpanded)
-            {
-                ToggleTreeNode(node);
-                e.Handled = true;
+                if (e.Key == Windows.System.VirtualKey.Enter)
+                {
+                    OpenPathInExplorer(node.FullPath);
+                    e.Handled = true;
+                }
             }
         }
     }
