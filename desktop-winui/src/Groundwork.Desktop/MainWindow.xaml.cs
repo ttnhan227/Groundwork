@@ -194,7 +194,7 @@ public sealed partial class MainWindow : Window
                 FileSystemLabel: $"{v.FileSystem} • {v.DriveType}",
                 CapacitySummary: $"{ByteFormatter.FormatBytes(v.UsedBytes)} used of {ByteFormatter.FormatBytes(v.TotalBytes)}",
                 UsedPercent: v.UsedPercent,
-                MftBadge: v.SupportsUsnMftScan ? "NTFS MFT Supported" : "Standard Walker"
+                MftBadge: v.SupportsUsnMftScan ? "Instant Scan Ready" : "Standard Walker"
             );
             Volumes.Add(vm);
 

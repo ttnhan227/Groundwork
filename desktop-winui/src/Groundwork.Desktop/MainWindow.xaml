@@ -125,7 +125,7 @@
                             <TextBox x:Name="ScanPathTextBox" PlaceholderText="Folder path (e.g. C:\)..." Width="240" VerticalAlignment="Center" />
                             <Button Content="Browse..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" VerticalAlignment="Center" />
                             <Button Content="Run Fast Scan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnRunScanPathClick" VerticalAlignment="Center" />
-                            <Button x:Name="ElevatedMftScanButton" Content="Fast NTFS MFT" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnElevatedMftScanClick" VerticalAlignment="Center" />
+                            <Button x:Name="ElevatedMftScanButton" Content="Instant Scan (Admin)" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnElevatedMftScanClick" VerticalAlignment="Center" ToolTipService.ToolTip="Scans the entire drive in 1-2 seconds by reading the Windows drive index directly. Requires administrator permission." />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <Button x:Name="CancelScanButton" Content="Cancel Scan" IsEnabled="False" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCancelScanClick" />
@@ -1014,7 +1014,7 @@
                                             <!-- Scan Actions -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                 <Button Content="Scan Drive" Tag="{x:Bind RootPath}" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnModalScanDriveClick" />
-                                                <Button Content="Fast MFT" Tag="{x:Bind RootPath}" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalFastMftScanClick" />
+                                                <Button Content="Instant Scan (Admin)" Tag="{x:Bind RootPath}" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalFastMftScanClick" ToolTipService.ToolTip="Instant 1-2 second scan by reading the Windows disk index directly. Requires UAC admin prompt." />
                                             </StackPanel>
                                         </Grid>
                                     </Border>
