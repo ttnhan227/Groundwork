@@ -92,6 +92,8 @@ public sealed class InstalledAppsEngineService
                         string installLocation = (appKey.GetValue("InstallLocation") as string)?.Trim().Trim('"') ?? string.Empty;
                         string uninstallString = (appKey.GetValue("UninstallString") as string)?.Trim() ?? string.Empty;
                         string quietUninstall = (appKey.GetValue("QuietUninstallString") as string)?.Trim() ?? string.Empty;
+                        string displayIcon = (appKey.GetValue("DisplayIcon") as string)?.Trim() ?? string.Empty;
+                        string iconPngPath = AppIconService.ExtractAndCacheIcon(displayIcon, installLocation) ?? string.Empty;
 
                         long? estimatedBytes = null;
                         object? rawSize = appKey.GetValue("EstimatedSize");
@@ -140,7 +142,8 @@ public sealed class InstalledAppsEngineService
                             EstimatedSizeBytes: estimatedBytes,
                             Source: "Win32 Registry",
                             CanUninstall: canUninstall,
-                            IsSystemComponent: isSystem));
+                            IsSystemComponent: isSystem,
+                            IconPngPath: iconPngPath));
                     }
                     catch
                     {

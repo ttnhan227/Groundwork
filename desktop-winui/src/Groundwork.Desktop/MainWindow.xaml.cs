@@ -12,6 +12,7 @@ using Groundwork.Engine.Models;
 using Groundwork.Engine.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 
 namespace Groundwork.Desktop;
 
@@ -42,6 +43,7 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<LeftoverItemRowViewModel> LeftoverItems { get; } = new();
     public ObservableCollection<SavedSearchRowViewModel> SavedSearches { get; } = new();
     public ObservableCollection<SearchResultRowViewModel> SearchResults { get; } = new();
+    public ItemMetadataViewModel SelectedMetadata { get; } = new();
 
     public MainWindow()
     {
@@ -68,6 +70,10 @@ public sealed partial class MainWindow : Window
             _settings = AppSettingsService.Load();
             ApplyLoadedSettings();
             RefreshDrivesList();
+            
+            // Pop up the drive selection modal immediately on every launch
+            StartupDriveModalOverlay.Visibility = Visibility.Visible;
+
             await RefreshInstalledAppsAsync();
             _ = InitializeOptionalSidecarAsync();
         }
@@ -493,9 +499,251 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // ==========================================
+    // 0. STARTUP DRIVE SELECTION MODAL
+    // ==========================================
+
+    private void OnOpenDriveSelectionModalClick(object sender, RoutedEventArgs e)
+    {
+        RefreshDrivesList();
+        StartupDriveModalOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void OnCloseDriveModalClick(object sender, RoutedEventArgs e)
+    {
+        StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private async void OnModalScanDriveClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string rootPath && !string.IsNullOrWhiteSpace(rootPath))
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            ScanPathTextBox.Text = rootPath;
+            await RunStorageScanAsync(rootPath, requestElevatedMft: false);
+        }
+    }
+
+    private async void OnModalFastMftScanClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string rootPath && !string.IsNullOrWhiteSpace(rootPath))
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            ScanPathTextBox.Text = rootPath;
+            await RunStorageScanAsync(rootPath, requestElevatedMft: true);
+        }
+    }
+
+    private async void OnModalBrowseCustomFolderClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FolderPicker();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder;
+        picker.FileTypeFilter.Add("*");
+
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder != null)
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            ScanPathTextBox.Text = folder.Path;
+            await RunStorageScanAsync(folder.Path, requestElevatedMft: false);
+        }
+    }
+
+    // ==========================================
+    // 1. FILE TREE RIGHT-CLICK & METADATA INSPECTOR
+    // ==========================================
+
+    private void OnStorageTreeSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
+        {
+            UpdateSelectedItemMetadata(node);
+        }
+    }
+
+    private void OnTreeRowRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is StorageTreeNodeViewModel node)
+        {
+            StorageTreeListView.SelectedItem = node;
+            UpdateSelectedItemMetadata(node);
+
+            var flyout = new MenuFlyout();
+
+            var openItem = new MenuFlyoutItem { Text = "Open in Windows File Explorer", Icon = new SymbolIcon(Symbol.Folder) };
+            openItem.Click += (s, args) => OpenPathInExplorer(node.FullPath);
+            flyout.Items.Add(openItem);
+
+            var copyItem = new MenuFlyoutItem { Text = "Copy Full Path", Icon = new SymbolIcon(Symbol.Copy) };
+            copyItem.Click += (s, args) => CopyPathToClipboard(node.FullPath);
+            flyout.Items.Add(copyItem);
+
+            flyout.Items.Add(new MenuFlyoutSeparator());
+
+            var scanItem = new MenuFlyoutItem { Text = "Scan This Folder", Icon = new FontIcon { Glyph = "\uEDA2" } };
+            scanItem.Click += async (s, args) =>
+            {
+                ScanPathTextBox.Text = node.FullPath;
+                await RunStorageScanAsync(node.FullPath, requestElevatedMft: false);
+            };
+            flyout.Items.Add(scanItem);
+
+            var inspectItem = new MenuFlyoutItem { Text = "Inspect Metadata & Attributes", Icon = new SymbolIcon(Symbol.Document) };
+            inspectItem.Click += (s, args) => UpdateSelectedItemMetadata(node);
+            flyout.Items.Add(inspectItem);
+
+            var recycleItem = new MenuFlyoutItem { Text = "Safe Move to Recycle Bin...", Icon = new SymbolIcon(Symbol.Delete) };
+            recycleItem.Click += async (s, args) => await PromptSafeRecycleNodeAsync(node);
+            flyout.Items.Add(recycleItem);
+
+            flyout.ShowAt(fe, e.GetPosition(fe));
+            e.Handled = true;
+        }
+    }
+
+    private void UpdateSelectedItemMetadata(StorageTreeNodeViewModel node)
+    {
+        try
+        {
+            SelectedMetadata.Name = node.Name;
+            SelectedMetadata.FullPath = node.FullPath;
+            SelectedMetadata.FormattedSize = node.FormattedSize;
+            SelectedMetadata.ExactBytes = $"{node.SizeBytes:N0} bytes";
+            SelectedMetadata.FormattedAllocated = node.FormattedAllocated;
+            SelectedMetadata.ItemsSummary = node.ItemsSummary;
+            SelectedMetadata.Glyph = node.NodeGlyph;
+            SelectedMetadata.HasSelection = true;
+
+            if (Directory.Exists(node.FullPath))
+            {
+                var dirInfo = new DirectoryInfo(node.FullPath);
+                SelectedMetadata.KindLabel = "Folder / Directory";
+                SelectedMetadata.CreatedDate = $"Created: {dirInfo.CreationTime:yyyy-MM-dd HH:mm:ss}";
+                SelectedMetadata.LastModifiedDate = $"Modified: {dirInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}";
+                SelectedMetadata.Attributes = dirInfo.Attributes.ToString();
+            }
+            else if (File.Exists(node.FullPath))
+            {
+                var fileInfo = new FileInfo(node.FullPath);
+                string ext = fileInfo.Extension.ToLowerInvariant();
+                SelectedMetadata.KindLabel = string.IsNullOrEmpty(ext) ? "File" : $"{ext.ToUpperInvariant()[1..]} File";
+                SelectedMetadata.CreatedDate = $"Created: {fileInfo.CreationTime:yyyy-MM-dd HH:mm:ss}";
+                SelectedMetadata.LastModifiedDate = $"Modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}";
+                SelectedMetadata.Attributes = fileInfo.Attributes.ToString();
+            }
+            else
+            {
+                SelectedMetadata.KindLabel = node.IsDirectory ? "Folder" : "File";
+                SelectedMetadata.CreatedDate = "-";
+                SelectedMetadata.LastModifiedDate = $"Modified: {node.LastModifiedFormatted}";
+                SelectedMetadata.Attributes = node.IsDirectory ? "Directory" : "Normal";
+            }
+        }
+        catch (Exception ex)
+        {
+            SelectedMetadata.Attributes = $"Inaccessible ({ex.Message})";
+        }
+    }
+
+    private void OnInspectorOpenExplorerClick(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(SelectedMetadata.FullPath))
+        {
+            OpenPathInExplorer(SelectedMetadata.FullPath);
+        }
+    }
+
+    private void OnInspectorCopyPathClick(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(SelectedMetadata.FullPath))
+        {
+            CopyPathToClipboard(SelectedMetadata.FullPath);
+        }
+    }
+
+    private async void OnInspectorScanFolderClick(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(SelectedMetadata.FullPath))
+        {
+            ScanPathTextBox.Text = SelectedMetadata.FullPath;
+            await RunStorageScanAsync(SelectedMetadata.FullPath, requestElevatedMft: false);
+        }
+    }
+
+    private async void OnInspectorRecycleClick(object sender, RoutedEventArgs e)
+    {
+        if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
+        {
+            await PromptSafeRecycleNodeAsync(node);
+        }
+    }
+
+    private void CopyPathToClipboard(string path)
+    {
+        try
+        {
+            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dataPackage.SetText(path);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            FooterStatusText.Text = $"Copied path to clipboard: {path}";
+        }
+        catch (Exception ex)
+        {
+            FooterStatusText.Text = $"Failed to copy path: {ex.Message}";
+        }
+    }
+
+    private async Task PromptSafeRecycleNodeAsync(StorageTreeNodeViewModel node)
+    {
+        if (string.IsNullOrWhiteSpace(node.FullPath)) return;
+
+        // Protected check
+        string full = Path.GetFullPath(node.FullPath);
+        string? root = Path.GetPathRoot(full);
+        if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
+        {
+            FooterStatusText.Text = "Safety Guard: Cannot delete the root of a drive.";
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Confirm Move to Recycle Bin",
+            Content = $"Are you sure you want to move this item to the Windows Recycle Bin?\n\nPath: {node.FullPath}\nSize: {node.FormattedSize}",
+            PrimaryButtonText = "Move to Recycle Bin",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        var res = await dialog.ShowAsync();
+        if (res == ContentDialogResult.Primary)
+        {
+            try
+            {
+                bool success = SafeCleanupService.MoveToRecycleBin(node.FullPath);
+                if (success)
+                {
+                    StorageTreeNodes.Remove(node);
+                    FooterStatusText.Text = $"Successfully moved to Recycle Bin: {node.FullPath}";
+                }
+                else
+                {
+                    FooterStatusText.Text = $"Failed to move to Recycle Bin (File may be in use or access denied): {node.FullPath}";
+                }
+            }
+            catch (Exception ex)
+            {
+                FooterStatusText.Text = $"Recycle error: {ex.Message}";
+            }
+        }
+    }
+
     private void OnOpenInExplorerClick(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuFlyoutItem item && item.DataContext is StorageTreeNodeViewModel node)
+        if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
         {
             OpenPathInExplorer(node.FullPath);
         }
@@ -503,17 +751,15 @@ public sealed partial class MainWindow : Window
 
     private void OnCopyPathClick(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuFlyoutItem item && item.DataContext is StorageTreeNodeViewModel node)
+        if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
         {
-            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            dataPackage.SetText(node.FullPath);
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            CopyPathToClipboard(node.FullPath);
         }
     }
 
     private void OnScanThisFolderClick(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuFlyoutItem item && item.DataContext is StorageTreeNodeViewModel node)
+        if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
         {
             ScanPathTextBox.Text = node.FullPath;
             _ = RunStorageScanAsync(node.FullPath, requestElevatedMft: false);

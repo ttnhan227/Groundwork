@@ -89,6 +89,7 @@
                         </StackPanel>
                     </Border>
 
+                    <Button Content="Select Drive..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOpenDriveSelectionModalClick" />
                     <Button x:Name="QuickScanPrimaryDriveButton" Content="Scan Primary Drive" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnQuickScanPrimaryDriveClick" />
                 </StackPanel>
             </Grid>
@@ -107,6 +108,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Row 0: Volume Selector & Quick Controls -->
@@ -116,10 +118,11 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                            <TextBlock Text="Target Drive:" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
-                            <ComboBox x:Name="DrivesComboBox" Width="260" SelectionChanged="OnDrivesComboBoxSelectionChanged" VerticalAlignment="Center" />
-                            <TextBox x:Name="ScanPathTextBox" PlaceholderText="Target folder path (e.g. C:\)..." Width="280" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <Button Content="Select Drive..." Style="{StaticResource GwPrimaryButtonStyle}" Click="OnOpenDriveSelectionModalClick" VerticalAlignment="Center" />
+                            <TextBlock Text="Target:" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="DrivesComboBox" Width="220" SelectionChanged="OnDrivesComboBoxSelectionChanged" VerticalAlignment="Center" />
+                            <TextBox x:Name="ScanPathTextBox" PlaceholderText="Folder path (e.g. C:\)..." Width="240" VerticalAlignment="Center" />
                             <Button Content="Browse..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" VerticalAlignment="Center" />
                             <Button Content="Run Fast Scan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnRunScanPathClick" VerticalAlignment="Center" />
                             <Button x:Name="ElevatedMftScanButton" Content="Fast NTFS MFT" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnElevatedMftScanClick" VerticalAlignment="Center" />
@@ -174,7 +177,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                            <TextBlock x:Name="ScanSummaryHeaderText" Text="Ready. Click 'Run Fast Scan' or 'Scan Primary Drive'." FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                            <TextBlock x:Name="ScanSummaryHeaderText" Text="Ready. Click 'Run Fast Scan' or 'Select Drive...' to begin." FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                             <TextBlock x:Name="ScanMetricsDetailText" Text="" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                         <ProgressBar Grid.Column="1" x:Name="ScanActivityProgressBar" IsIndeterminate="False" Value="0" Maximum="100" Visibility="Collapsed" Width="140" Height="5" CornerRadius="2" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
@@ -210,10 +213,18 @@
                         </Border>
 
                         <!-- Virtualized Hierarchical Tree ListView -->
-                        <ListView x:Name="StorageTreeListView" Grid.Row="1" SelectionMode="Single">
+                        <ListView x:Name="StorageTreeListView" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnStorageTreeSelectionChanged">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="12,0,12,0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="MinHeight" Value="30" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="local:StorageTreeNodeViewModel">
-                                    <Grid Margin="0,1" Padding="6,4" ColumnSpacing="12">
+                                    <Grid Margin="0" Padding="0,3" ColumnSpacing="12" Background="Transparent" RightTapped="OnTreeRowRightTapped">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" MinWidth="260" />
                                             <ColumnDefinition Width="110" />
@@ -223,35 +234,21 @@
                                             <ColumnDefinition Width="130" />
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- Context Menu -->
-                                        <Grid.ContextFlyout>
-                                            <MenuFlyout>
-                                                <MenuFlyoutItem Text="Open in Windows File Explorer" Click="OnOpenInExplorerClick">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                                <MenuFlyoutItem Text="Copy Full Path" Click="OnCopyPathClick">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                                <MenuFlyoutSeparator />
-                                                <MenuFlyoutItem Text="Scan This Folder" Click="OnScanThisFolderClick">
-                                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xEDA2;" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                            </MenuFlyout>
-                                        </Grid.ContextFlyout>
-
                                         <!-- Indented Expander + Folder Icon + Name -->
                                         <StackPanel Orientation="Horizontal" Margin="{x:Bind IndentThickness}" Spacing="6" VerticalAlignment="Center">
-                                            <!-- Expander Chevron Button -->
-                                            <Button
-                                                Width="20"
-                                                Height="20"
-                                                Padding="0"
-                                                Background="Transparent"
-                                                BorderThickness="0"
-                                                Visibility="{x:Bind HasChildren}"
-                                                Click="OnTreeNodeExpanderClick">
-                                                <FontIcon Glyph="{x:Bind ExpanderGlyph, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
-                                            </Button>
+                                            <!-- Fixed 20px Slot for Expander Chevron so items without children never shift -->
+                                            <Grid Width="20" Height="20" VerticalAlignment="Center">
+                                                <Button
+                                                    Width="20"
+                                                    Height="20"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Visibility="{x:Bind HasChildrenVisibility}"
+                                                    Click="OnTreeNodeExpanderClick">
+                                                    <FontIcon Glyph="{x:Bind ExpanderGlyph, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                                </Button>
+                                            </Grid>
 
                                             <!-- Folder/File Icon -->
                                             <FontIcon Glyph="{x:Bind NodeGlyph}" FontSize="14" Foreground="{x:Bind NodeGlyphColor}" VerticalAlignment="Center" />
@@ -284,8 +281,76 @@
                     </Grid>
                 </Border>
 
-                <!-- Row 4: Category Summary Footer Pill -->
-                <Border Grid.Row="4" Margin="0,10,0,0" Padding="12,6" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                <!-- Row 4: Item Properties & Real Win32 Metadata Inspector Card -->
+                <Border Grid.Row="4" Margin="0,10,0,0" Padding="14,10" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Selected Item Top Identity Bar & Quick Actions -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <Border Width="30" Height="30" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                                    <FontIcon Glyph="{x:Bind SelectedMetadata.Glyph, Mode=OneWay}" FontSize="14" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Spacing="1">
+                                    <TextBlock Text="{x:Bind SelectedMetadata.Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind SelectedMetadata.FullPath, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" MaxWidth="540" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button Content="Open in Explorer" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnInspectorOpenExplorerClick" />
+                                <Button Content="Copy Path" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnInspectorCopyPathClick" />
+                                <Button Content="Scan Folder" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnInspectorScanFolderClick" />
+                                <Button Content="Safe Recycle" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnInspectorRecycleClick" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Detailed Properties Columns -->
+                        <Grid Grid.Row="1" Margin="0,10,0,0" ColumnSpacing="24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="LOGICAL SIZE" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.FormattedSize, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.ExactBytes, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="ALLOCATED ON DISK" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.FormattedAllocated, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.ItemsSummary, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Spacing="2">
+                                <TextBlock Text="ATTRIBUTES" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.Attributes, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.KindLabel, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3" Spacing="2">
+                                <TextBlock Text="TIMESTAMPS" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.LastModifiedDate, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="{x:Bind SelectedMetadata.CreatedDate, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- Row 5: Category Summary Footer Pill -->
+                <Border Grid.Row="5" Margin="0,10,0,0" Padding="12,6" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -491,16 +556,22 @@
                                         <Border Padding="8,7" Margin="0,2" CornerRadius="5" Background="{ThemeResource GwCardBackgroundHoverBrush}">
                                             <Grid ColumnSpacing="12">
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="28" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="100" />
                                                     <ColumnDefinition Width="90" />
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel VerticalAlignment="Center">
+                                                <!-- Genuine Windows Application Icon with Fallback -->
+                                                <Grid Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE71D;" FontSize="18" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <Image Source="{x:Bind IconPngPath}" Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Text="{x:Bind Publisher}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="1" Text="{x:Bind Version}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                <TextBlock Grid.Column="2" Text="{x:Bind Version}" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                <TextBlock Grid.Column="3" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -862,5 +933,112 @@
                 <TextBlock Grid.Column="1" x:Name="FooterEngineText" Text="Engine: Groundwork.Engine (.NET 10 + PyInstaller Sidecar)" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" />
             </Grid>
         </Border>
+
+        <!-- ======================================================== -->
+        <!-- 4. MODAL OVERLAY: STARTUP DRIVE SELECTION & INSTANT SCAN -->
+        <!-- ======================================================== -->
+        <Grid x:Name="StartupDriveModalOverlay" Grid.RowSpan="3" Background="#D9070B14" Visibility="Collapsed">
+            <Border
+                Width="720"
+                MaxHeight="580"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Padding="28,24"
+                CornerRadius="12"
+                Background="{ThemeResource GwPageBackgroundBrush}"
+                BorderBrush="{ThemeResource GwCardBorderBrush}"
+                BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Modal Header -->
+                    <Grid Grid.Row="0" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <Border Width="34" Height="34" CornerRadius="8" Background="{ThemeResource GwTealBgBrush}" BorderBrush="{ThemeResource GwTealBrush}" BorderThickness="1">
+                                    <FontIcon Glyph="&#xEDA2;" FontSize="18" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="Select Drive or Folder to Analyze" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="Choose a local storage volume to immediately map directory trees, discover large files, and find duplicate waste." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" Margin="44,0,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" VerticalAlignment="Top" Padding="6" Background="Transparent" BorderThickness="0" Click="OnCloseDriveModalClick">
+                            <SymbolIcon Symbol="Cancel" Foreground="{ThemeResource GwTextMutedBrush}" />
+                        </Button>
+                    </Grid>
+
+                    <!-- Drives Cards List -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16">
+                        <ItemsControl x:Name="ModalDrivesItemsControl" ItemsSource="{x:Bind Volumes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:VolumeRowViewModel">
+                                    <Border Margin="0,4" Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="42" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Drive Disk Icon -->
+                                            <Border Width="40" Height="40" CornerRadius="8" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xEDA2;" FontSize="20" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <!-- Details & Progress Bar -->
+                                            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{x:Bind VolumeName}" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                        <Border Padding="6,1" CornerRadius="4" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind FileSystemLabel}" FontSize="10" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind CapacitySummary}" FontSize="12" FontWeight="Medium" Foreground="{ThemeResource GwTextSecondaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <ProgressBar Value="{x:Bind UsedPercent}" Maximum="100" Height="6" CornerRadius="3" Foreground="{ThemeResource GwAccentBrush}" />
+                                            </StackPanel>
+
+                                            <!-- Scan Actions -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Content="Scan Drive" Tag="{x:Bind RootPath}" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnModalScanDriveClick" />
+                                                <Button Content="Fast MFT" Tag="{x:Bind RootPath}" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalFastMftScanClick" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- Bottom Action Row: Custom Folder Picker + Close -->
+                    <Border Grid.Row="2" Padding="0,12,0,0" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <Button Content="Browse Custom Folder..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalBrowseCustomFolderClick" />
+                                <TextBlock Text="Or select any folder on your PC to scan" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Dismiss" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCloseDriveModalClick" />
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

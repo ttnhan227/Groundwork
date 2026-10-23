@@ -78,6 +78,7 @@ public sealed class StorageTreeNodeViewModel : INotifyPropertyChanged
     }
 
     public bool HasChildren => IsDirectory && (RecursiveFolderCount > 0 || RecursiveFileCount > 0);
+    public Microsoft.UI.Xaml.Visibility HasChildrenVisibility => HasChildren ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     public string ExpanderGlyph => IsExpanded ? "\uE70D" : "\uE76C"; // ChevronDown / ChevronRight
     public string NodeGlyph => IsDirectory ? "\uE8B7" : "\uE8A5"; // Folder / File
     public string NodeGlyphColor => IsDirectory ? "#6F91FF" : "#94A3B8";
@@ -203,11 +204,13 @@ public sealed class InstalledAppRowViewModel
     public string FormattedSize { get; set; } = string.Empty;
     public string UninstallString { get; set; } = string.Empty;
     public bool CanUninstall { get; set; }
+    public string IconPngPath { get; set; } = string.Empty;
+    public bool HasIcon => !string.IsNullOrEmpty(IconPngPath);
     public Groundwork.Engine.Models.InstalledApplicationInfo? RawModel { get; set; }
 
     public InstalledAppRowViewModel() { }
 
-    public InstalledAppRowViewModel(string Id, string Name, string Publisher, string Version, string InstallDate, string InstallLocation, string FormattedSize, string UninstallString, bool CanUninstall, Groundwork.Engine.Models.InstalledApplicationInfo RawModel)
+    public InstalledAppRowViewModel(string Id, string Name, string Publisher, string Version, string InstallDate, string InstallLocation, string FormattedSize, string UninstallString, bool CanUninstall, Groundwork.Engine.Models.InstalledApplicationInfo RawModel, string IconPngPath = "")
     {
         this.Id = Id;
         this.Name = Name;
@@ -219,6 +222,7 @@ public sealed class InstalledAppRowViewModel
         this.UninstallString = UninstallString;
         this.CanUninstall = CanUninstall;
         this.RawModel = RawModel;
+        this.IconPngPath = string.IsNullOrEmpty(IconPngPath) ? (RawModel?.IconPngPath ?? "") : IconPngPath;
     }
 }
 
@@ -362,5 +366,94 @@ public static class ByteFormatter
             idx++;
         }
         return idx == 0 ? $"{b:N0} B" : $"{val:F1} {units[idx]}";
+    }
+}
+
+public sealed class ItemMetadataViewModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private string _name = "No item selected";
+    public string Name
+    {
+        get => _name;
+        set { _name = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name))); }
+    }
+
+    private string _fullPath = string.Empty;
+    public string FullPath
+    {
+        get => _fullPath;
+        set { _fullPath = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FullPath))); }
+    }
+
+    private string _kindLabel = "Select a folder or file to inspect properties";
+    public string KindLabel
+    {
+        get => _kindLabel;
+        set { _kindLabel = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(KindLabel))); }
+    }
+
+    private string _formattedSize = "-";
+    public string FormattedSize
+    {
+        get => _formattedSize;
+        set { _formattedSize = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FormattedSize))); }
+    }
+
+    private string _exactBytes = "-";
+    public string ExactBytes
+    {
+        get => _exactBytes;
+        set { _exactBytes = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExactBytes))); }
+    }
+
+    private string _formattedAllocated = "-";
+    public string FormattedAllocated
+    {
+        get => _formattedAllocated;
+        set { _formattedAllocated = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FormattedAllocated))); }
+    }
+
+    private string _itemsSummary = "-";
+    public string ItemsSummary
+    {
+        get => _itemsSummary;
+        set { _itemsSummary = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ItemsSummary))); }
+    }
+
+    private string _createdDate = "-";
+    public string CreatedDate
+    {
+        get => _createdDate;
+        set { _createdDate = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CreatedDate))); }
+    }
+
+    private string _lastModifiedDate = "-";
+    public string LastModifiedDate
+    {
+        get => _lastModifiedDate;
+        set { _lastModifiedDate = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastModifiedDate))); }
+    }
+
+    private string _attributes = "-";
+    public string Attributes
+    {
+        get => _attributes;
+        set { _attributes = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Attributes))); }
+    }
+
+    private bool _hasSelection;
+    public bool HasSelection
+    {
+        get => _hasSelection;
+        set { _hasSelection = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSelection))); }
+    }
+
+    private string _glyph = "\uE8B7";
+    public string Glyph
+    {
+        get => _glyph;
+        set { _glyph = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Glyph))); }
     }
 }

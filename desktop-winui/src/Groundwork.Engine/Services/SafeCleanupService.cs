@@ -527,6 +527,11 @@ public sealed class SafeCleanupService
         return full;
     }
 
+    public static bool MoveToRecycleBin(string fullPath)
+    {
+        return SendToRecycleBinWindows(fullPath);
+    }
+
     private static bool SendToRecycleBinWindows(string fullPath)
     {
         if (!OperatingSystem.IsWindows())

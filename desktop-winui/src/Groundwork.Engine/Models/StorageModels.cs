@@ -154,7 +154,8 @@ public sealed record InstalledApplicationInfo(
     long? EstimatedSizeBytes,
     string Source,
     bool CanUninstall,
-    bool IsSystemComponent
+    bool IsSystemComponent,
+    string IconPngPath = ""
 );
 
 public sealed record LeftoverFileSystemItem(
