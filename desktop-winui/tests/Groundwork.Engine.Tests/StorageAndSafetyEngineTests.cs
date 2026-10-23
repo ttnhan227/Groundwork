@@ -289,4 +289,44 @@ public sealed class StorageAndSafetyEngineTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await scanner.ScanAsync(repoRoot, cancellationToken: cts.Token));
     }
+
+    [Fact]
+    public async Task CsvStorageReader_ParsesWizTreeCsv_ReconstructsHierarchyAndCategories()
+    {
+        string tempCsv = Path.GetTempFileName() + ".csv";
+        try
+        {
+            string csvContent =
+                "\"File Name\",\"Size\",\"Allocated\",\"Modified\",\"Attributes\",\"Files\",\"Folders\"\r\n" +
+                "\"C:\\TestRoot\",2097152,2097152,\"2026-10-23 12:00:00\",16,2,1\r\n" +
+                "\"C:\\TestRoot\\SubFolder\",1048576,1048576,\"2026-10-23 12:00:00\",16,1,0\r\n" +
+                "\"C:\\TestRoot\\SubFolder\\video.mp4\",1048576,1048576,\"2026-10-23 12:00:00\",32,0,0\r\n" +
+                "\"C:\\TestRoot\\document.pdf\",1048576,1048576,\"2026-10-23 12:00:00\",32,0,0\r\n";
+
+            await File.WriteAllTextAsync(tempCsv, csvContent);
+
+            var result = CsvStorageReader.LoadFromCsv(tempCsv);
+
+            Assert.NotNull(result);
+            Assert.Equal("C:\\", result.RootPath);
+            Assert.Equal(2, result.TotalFiles);
+            Assert.Equal(2, result.TotalFolders);
+            Assert.Equal(2097152, result.TotalLogicalBytes);
+            Assert.Equal(2, result.LargestFiles.Count);
+            Assert.NotEmpty(result.CategoryBreakdown);
+            Assert.Contains(result.CategoryBreakdown, c => c.Key == "video");
+            Assert.Contains(result.CategoryBreakdown, c => c.Key == "document");
+
+            // Verify folders tree structure
+            Assert.NotNull(result.AllFolders);
+            Assert.NotEmpty(result.AllFolders);
+            var root = result.AllFolders.FirstOrDefault(f => f.FullPath == "C:\\TestRoot");
+            Assert.NotNull(root);
+            Assert.Equal(2, root.RecursiveFileCount);
+        }
+        finally
+        {
+            if (File.Exists(tempCsv)) File.Delete(tempCsv);
+        }
+    }
 }

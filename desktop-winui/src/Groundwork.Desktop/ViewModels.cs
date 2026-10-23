@@ -59,6 +59,13 @@ public sealed class StorageTreeNodeViewModel : INotifyPropertyChanged
     public string LastModifiedFormatted { get; set; } = string.Empty;
     public double PercentOfDrive { get; set; }
     public string PercentLabel { get; set; } = string.Empty;
+    public double PercentOfParent { get; set; }
+    public string PercentOfParentLabel { get; set; } = string.Empty;
+    public string FilesCountFormatted => IsDirectory ? $"{RecursiveFileCount:N0}" : "-";
+    public string FoldersCountFormatted => IsDirectory ? $"{RecursiveFolderCount:N0}" : "-";
+    public string Attributes { get; set; } = string.Empty;
+    public string Extension { get; set; } = string.Empty;
+    public string FileType { get; set; } = string.Empty;
     public int DepthLevel { get; set; }
     public Thickness IndentThickness => new(DepthLevel * 16, 0, 0, 0);
 
@@ -89,11 +96,21 @@ public sealed class StorageTreeNodeViewModel : INotifyPropertyChanged
 public sealed class FileRowViewModel
 {
     public string Name { get; set; } = string.Empty;
+    public string Extension { get; set; } = string.Empty;
+    public string FileType { get; set; } = string.Empty;
+    public string Folder { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public long AllocatedBytes { get; set; }
     public string FormattedSize { get; set; } = string.Empty;
     public string FormattedAllocated { get; set; } = string.Empty;
-    public long SizeBytes { get; set; }
+    public double PercentOfTotal { get; set; }
+    public string PercentLabel { get; set; } = string.Empty;
+    public string LastModifiedFormatted { get; set; } = string.Empty;
+    public string Attributes { get; set; } = string.Empty;
+    public string Glyph { get; set; } = "\uE8A5";
+    public string GlyphColor { get; set; } = "#6F91FF";
 
     public FileRowViewModel() { }
 
@@ -105,6 +122,8 @@ public sealed class FileRowViewModel
         this.FormattedSize = FormattedSize;
         this.FormattedAllocated = FormattedAllocated;
         this.SizeBytes = SizeBytes;
+        this.Extension = System.IO.Path.GetExtension(FullPath).ToLowerInvariant();
+        this.Folder = System.IO.Path.GetDirectoryName(FullPath) ?? string.Empty;
     }
 }
 

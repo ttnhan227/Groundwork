@@ -43,6 +43,7 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<LeftoverItemRowViewModel> LeftoverItems { get; } = new();
     public ObservableCollection<SavedSearchRowViewModel> SavedSearches { get; } = new();
     public ObservableCollection<SearchResultRowViewModel> SearchResults { get; } = new();
+    public ObservableCollection<FileRowViewModel> ScannedFiles { get; } = new();
     public ItemMetadataViewModel SelectedMetadata { get; } = new();
 
     public MainWindow()
@@ -50,6 +51,7 @@ public sealed partial class MainWindow : Window
         this.InitializeComponent();
 
         StorageTreeListView.ItemsSource = StorageTreeNodes;
+        StorageFileListView.ItemsSource = ScannedFiles;
         StorageBreakdownLegendControl.ItemsSource = StorageBarSegments;
         CategoriesPillsControl.ItemsSource = Categories;
         DuplicateGroupsListView.ItemsSource = DuplicateGroups;
@@ -185,6 +187,14 @@ public sealed partial class MainWindow : Window
         Volumes.Clear();
         DrivesComboBox.Items.Clear();
 
+        // 1. [All Hard Drives] option (WizTree feature)
+        var allDrivesItem = new ComboBoxItem
+        {
+            Content = "[All Hard Drives] (All fixed storage volumes)",
+            Tag = "__ALL_DRIVES__"
+        };
+        DrivesComboBox.Items.Add(allDrivesItem);
+
         var discovered = _driveDiscovery.DiscoverVolumes();
         foreach (var v in discovered)
         {
@@ -206,9 +216,14 @@ public sealed partial class MainWindow : Window
             DrivesComboBox.Items.Add(comboItem);
         }
 
-        if (DrivesComboBox.Items.Count > 0)
+        // 2. Select Folder, CSV, MFT options (WizTree source selector)
+        DrivesComboBox.Items.Add(new ComboBoxItem { Content = "📁 Select Folder...", Tag = "__SELECT_FOLDER__" });
+        DrivesComboBox.Items.Add(new ComboBoxItem { Content = "📄 Select CSV File... (WizTree / Groundwork export)", Tag = "__SELECT_CSV__" });
+        DrivesComboBox.Items.Add(new ComboBoxItem { Content = "⚡ Select MFT File... (Raw $MFT file or dump)", Tag = "__SELECT_MFT__" });
+
+        if (DrivesComboBox.Items.Count > 1)
         {
-            DrivesComboBox.SelectedIndex = 0;
+            DrivesComboBox.SelectedIndex = 1;
         }
     }
 
@@ -217,11 +232,30 @@ public sealed partial class MainWindow : Window
         RefreshDrivesList();
     }
 
-    private void OnDrivesComboBoxSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void OnDrivesComboBoxSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DrivesComboBox.SelectedItem is ComboBoxItem item && item.Tag is string rootPath)
+        if (DrivesComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
         {
-            ScanPathTextBox.Text = rootPath;
+            if (tag == "__ALL_DRIVES__")
+            {
+                ScanPathTextBox.Text = "[All Hard Drives]";
+            }
+            else if (tag == "__SELECT_FOLDER__")
+            {
+                await PickAndScanFolderAsync();
+            }
+            else if (tag == "__SELECT_CSV__")
+            {
+                await PickAndScanCsvAsync();
+            }
+            else if (tag == "__SELECT_MFT__")
+            {
+                await PickAndScanMftAsync();
+            }
+            else
+            {
+                ScanPathTextBox.Text = tag;
+            }
         }
     }
 
@@ -235,35 +269,26 @@ public sealed partial class MainWindow : Window
     private async void OnRunScanPathClick(object sender, RoutedEventArgs e)
     {
         string path = ScanPathTextBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(path))
+        if (string.IsNullOrWhiteSpace(path) || path.StartsWith("[All", StringComparison.OrdinalIgnoreCase))
         {
-            path = @"C:\";
+            await RunMultiDriveScanAsync(requestElevatedMft: false);
+            return;
         }
         await RunStorageScanAsync(path, requestElevatedMft: false);
     }
 
     private async void OnScanCustomPathClick(object sender, RoutedEventArgs e)
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder;
-        picker.FileTypeFilter.Add("*");
-
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder != null)
-        {
-            ScanPathTextBox.Text = folder.Path;
-            await RunStorageScanAsync(folder.Path, requestElevatedMft: false);
-        }
+        await PickAndScanFolderAsync();
     }
 
     private async void OnElevatedMftScanClick(object sender, RoutedEventArgs e)
     {
         string path = ScanPathTextBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(path))
+        if (string.IsNullOrWhiteSpace(path) || path.StartsWith("[All", StringComparison.OrdinalIgnoreCase))
         {
-            path = @"C:\";
+            await RunMultiDriveScanAsync(requestElevatedMft: true);
+            return;
         }
         await RunStorageScanAsync(path, requestElevatedMft: true);
     }
@@ -328,6 +353,228 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task PickAndScanFolderAsync()
+    {
+        var picker = new Windows.Storage.Pickers.FolderPicker();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder;
+        picker.FileTypeFilter.Add("*");
+
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder != null)
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            ScanPathTextBox.Text = folder.Path;
+            await RunStorageScanAsync(folder.Path, requestElevatedMft: false);
+        }
+    }
+
+    private async Task PickAndScanCsvAsync()
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
+        picker.FileTypeFilter.Add(".csv");
+
+        var file = await picker.PickSingleFileAsync();
+        if (file != null)
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            ScanPathTextBox.Text = file.Path;
+            try
+            {
+                ScanSummaryHeaderText.Text = $"Loading CSV: {file.Name}...";
+                ScanActivityProgressBar.Visibility = Visibility.Visible;
+                ScanActivityProgressBar.IsIndeterminate = true;
+
+                var result = await Task.Run(() => CsvStorageReader.LoadFromCsv(file.Path));
+                _lastScanResult = result;
+                PopulateStorageScanViews(result);
+
+                ScanSummaryHeaderText.Text = $"CSV Loaded: {file.Name} — {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders";
+                ScanMetricsDetailText.Text = $"Size: {ByteFormatter.FormatBytes(result.TotalLogicalBytes)} | Time: {result.ElapsedMilliseconds:F0}ms";
+                FooterStatusText.Text = $"Loaded CSV {file.Name} ({result.TotalFiles:N0} files).";
+            }
+            catch (Exception ex)
+            {
+                ScanSummaryHeaderText.Text = $"CSV Import Error: {ex.Message}";
+                FooterStatusText.Text = $"Failed to parse CSV: {ex.Message}";
+            }
+            finally
+            {
+                ScanActivityProgressBar.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private async Task PickAndScanMftAsync()
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder;
+        picker.FileTypeFilter.Add("*");
+        picker.FileTypeFilter.Add(".mft");
+        picker.FileTypeFilter.Add(".bin");
+
+        var file = await picker.PickSingleFileAsync();
+        if (file != null)
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            ScanPathTextBox.Text = file.Path;
+            await RunStorageScanAsync(file.Path, requestElevatedMft: true);
+        }
+    }
+
+    private async Task RunMultiDriveScanAsync(bool requestElevatedMft)
+    {
+        var readyDrives = Volumes.Where(v => !string.IsNullOrWhiteSpace(v.RootPath)).ToList();
+        if (readyDrives.Count == 0)
+        {
+            readyDrives.Add(new VolumeRowViewModel(@"C:\", "Local Disk (C:)", "NTFS", "-", 0, ""));
+        }
+
+        _scanCts?.Cancel();
+        _scanCts = new CancellationTokenSource();
+        var token = _scanCts.Token;
+
+        CancelScanButton.IsEnabled = true;
+        ScanActivityProgressBar.Visibility = Visibility.Visible;
+        ScanActivityProgressBar.IsIndeterminate = true;
+        ScanSummaryHeaderText.Text = $"Scanning {readyDrives.Count} hard drives in parallel...";
+        ScanMetricsDetailText.Text = "Aggregating all local volumes (WizTree multi-drive mode)...";
+
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var allCombinedEntries = new List<ScannedEntry>();
+            var allCombinedFolders = new List<ScannedEntry>();
+            var allTopFiles = new List<ScannedEntry>();
+            var accessDenied = new List<string>();
+            var categoriesMap = new Dictionary<string, (long Count, long Bytes)>(StringComparer.OrdinalIgnoreCase);
+
+            long totalLogical = 0;
+            long totalAllocated = 0;
+            long totalFiles = 0;
+            long totalFolders = 0;
+            int globalFolderId = 10000;
+
+            foreach (var drive in readyDrives)
+            {
+                if (token.IsCancellationRequested) break;
+
+                DriveScanResult driveRes = requestElevatedMft
+                    ? await _mftScanner.ScanWithFallbackAsync(drive.RootPath, requestElevationIfNeeded: true, mftHelperExecutablePath: Path.Combine(AppContext.BaseDirectory, "Groundwork.MftHelper.exe"), cancellationToken: token)
+                    : await _win32Scanner.ScanAsync(drive.RootPath, cancellationToken: token);
+
+                totalLogical += driveRes.TotalLogicalBytes;
+                totalAllocated += driveRes.TotalAllocatedBytes;
+                totalFiles += driveRes.TotalFiles;
+                totalFolders += driveRes.TotalFolders;
+                accessDenied.AddRange(driveRes.AccessDeniedPaths);
+
+                int driveRootId = globalFolderId++;
+                var driveRootEntry = new ScannedEntry(
+                    Id: driveRootId,
+                    ParentId: 0,
+                    Name: $"{drive.VolumeName}",
+                    FullPath: drive.RootPath,
+                    Extension: "",
+                    Category: "Drive",
+                    IsDirectory: true,
+                    LogicalBytes: driveRes.TotalLogicalBytes,
+                    AllocatedBytes: driveRes.TotalAllocatedBytes,
+                    RecursiveFileCount: (int)Math.Min(int.MaxValue, driveRes.TotalFiles),
+                    RecursiveFolderCount: (int)Math.Min(int.MaxValue, driveRes.TotalFolders),
+                    LastWriteUnixSeconds: DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    FileAttributes: 0x10
+                );
+                allCombinedFolders.Add(driveRootEntry);
+
+                if (driveRes.AllFolders != null)
+                {
+                    foreach (var f in driveRes.AllFolders)
+                    {
+                        int pId = f.ParentId <= 0 ? driveRootId : f.ParentId + driveRootId;
+                        allCombinedFolders.Add(f with { Id = f.Id + driveRootId, ParentId = pId });
+                    }
+                }
+
+                if (driveRes.LargestFiles != null)
+                {
+                    allTopFiles.AddRange(driveRes.LargestFiles);
+                }
+
+                foreach (var c in driveRes.CategoryBreakdown)
+                {
+                    if (!categoriesMap.TryGetValue(c.Label, out var existing))
+                    {
+                        existing = (0, 0);
+                    }
+                    categoriesMap[c.Label] = (existing.Count + c.FileCount, existing.Bytes + c.TotalBytes);
+                }
+            }
+
+            sw.Stop();
+
+            var combinedBreakdown = categoriesMap
+                .OrderByDescending(kv => kv.Value.Bytes)
+                .Take(8)
+                .Select(kv => new CategorySummary(
+                    Key: kv.Key.ToLowerInvariant(),
+                    Label: kv.Key,
+                    FileCount: kv.Value.Count,
+                    TotalBytes: kv.Value.Bytes,
+                    SharePercent: totalLogical > 0 ? (double)kv.Value.Bytes / totalLogical * 100.0 : 0.0
+                ))
+                .ToList();
+
+            var combinedResult = new DriveScanResult(
+                RootPath: "[All Hard Drives]",
+                EngineUsed: requestElevatedMft ? ScanEngineMode.ElevatedNtfsMft : ScanEngineMode.StandardWin32,
+                TotalFiles: totalFiles,
+                TotalFolders: totalFolders,
+                TotalLogicalBytes: totalLogical,
+                TotalAllocatedBytes: totalAllocated,
+                ElapsedMilliseconds: sw.Elapsed.TotalMilliseconds,
+                AccessDeniedPaths: accessDenied,
+                LargestFiles: allTopFiles.OrderByDescending(f => f.LogicalBytes).Take(200).ToList(),
+                LargestFolders: allCombinedFolders.OrderByDescending(f => f.LogicalBytes).Take(50).ToList(),
+                TopLevelSpaceMap: allCombinedFolders.Where(f => f.ParentId == 0).ToList(),
+                CategoryBreakdown: combinedBreakdown,
+                AllEntries: allCombinedEntries,
+                AllFolders: allCombinedFolders
+            );
+
+            _lastScanResult = combinedResult;
+            PopulateStorageScanViews(combinedResult);
+
+            double secs = Math.Max(0.001, combinedResult.ElapsedMilliseconds / 1000.0);
+            double rate = combinedResult.TotalFiles / secs;
+            ScanSummaryHeaderText.Text = $"Multi-Drive Scan Complete — {readyDrives.Count} drives, {combinedResult.TotalFiles:N0} files, {combinedResult.TotalFolders:N0} folders";
+            ScanMetricsDetailText.Text = $"Total Size: {ByteFormatter.FormatBytes(combinedResult.TotalLogicalBytes)} | Time: {secs:F2}s ({rate:N0} files/sec)";
+            FooterStatusText.Text = $"Scanned all {readyDrives.Count} hard drives in {secs:F2}s ({rate:N0} files/sec).";
+        }
+        catch (OperationCanceledException)
+        {
+            ScanSummaryHeaderText.Text = "Multi-drive scan cancelled.";
+            FooterStatusText.Text = "Scan cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ScanSummaryHeaderText.Text = $"Multi-drive scan error: {ex.Message}";
+            FooterStatusText.Text = $"Scan failed: {ex.Message}";
+        }
+        finally
+        {
+            CancelScanButton.IsEnabled = false;
+            ScanActivityProgressBar.IsIndeterminate = false;
+            ScanActivityProgressBar.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void PopulateStorageScanViews(DriveScanResult result)
     {
         // 1. Proportional Visual Storage Breakdown Bar
@@ -371,13 +618,12 @@ public sealed partial class MainWindow : Window
             StorageBreakdownSummaryText.Text = $"Top folders represent {StorageBarSegments.Sum(s => s.Percent):F1}% of {ByteFormatter.FormatBytes(result.TotalLogicalBytes)} disk space.";
         }
 
-        // 2. Hierarchical File Tree
+        // 2. Hierarchical File Tree View
         StorageTreeNodes.Clear();
+        long totalDriveBytes = Math.Max(1, result.TotalLogicalBytes);
+
         if (result.AllFolders != null && result.AllFolders.Count > 0)
         {
-            long totalDriveBytes = Math.Max(1, result.TotalLogicalBytes);
-
-            // Populate root items (ParentId == -1 or ParentId == 0)
             var rootFolders = result.AllFolders
                 .Where(f => f.ParentId <= 0)
                 .OrderByDescending(f => f.LogicalBytes)
@@ -399,7 +645,8 @@ public sealed partial class MainWindow : Window
                     RecursiveFolderCount = f.RecursiveFolderCount,
                     FormattedSize = ByteFormatter.FormatBytes(f.LogicalBytes),
                     FormattedAllocated = ByteFormatter.FormatBytes(f.AllocatedBytes),
-                    ItemsSummary = $"{f.RecursiveFileCount:N0} files • {f.RecursiveFolderCount:N0} folders",
+                    ItemsSummary = $"{f.RecursiveFileCount + f.RecursiveFolderCount:N0} items",
+                    Attributes = FormatAttributes(f.FileAttributes),
                     LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(f.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
                     PercentOfDrive = pct,
                     PercentLabel = $"{pct:F1}%",
@@ -409,7 +656,38 @@ public sealed partial class MainWindow : Window
             }
         }
 
-        // 3. Category Breakdown Pills
+        // 3. Flat File View (Top Largest Scanned Files - WizTree File View)
+        ScannedFiles.Clear();
+        var filesSource = (result.LargestFiles != null && result.LargestFiles.Count > 0)
+            ? result.LargestFiles
+            : result.AllEntries.Where(e => !e.IsDirectory).OrderByDescending(e => e.LogicalBytes).Take(500);
+
+        foreach (var file in filesSource)
+        {
+            double pct = totalDriveBytes > 0 ? (double)file.LogicalBytes / totalDriveBytes * 100.0 : 0.0;
+            string ext = string.IsNullOrEmpty(file.Extension) ? Path.GetExtension(file.FullPath).ToLowerInvariant() : file.Extension;
+            ScannedFiles.Add(new FileRowViewModel
+            {
+                Name = file.Name,
+                Extension = ext,
+                FileType = GetFileTypeDescription(ext),
+                Folder = Path.GetDirectoryName(file.FullPath) ?? string.Empty,
+                FullPath = file.FullPath,
+                Category = file.Category,
+                SizeBytes = file.LogicalBytes,
+                AllocatedBytes = file.AllocatedBytes,
+                FormattedSize = ByteFormatter.FormatBytes(file.LogicalBytes),
+                FormattedAllocated = ByteFormatter.FormatBytes(file.AllocatedBytes),
+                PercentOfTotal = pct,
+                PercentLabel = $"{pct:F1}%",
+                LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(file.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
+                Attributes = FormatAttributes(file.FileAttributes),
+                Glyph = GetGlyphForCategory(file.Category),
+                GlyphColor = GetColorForCategory(file.Category)
+            });
+        }
+
+        // 4. Category Breakdown Pills
         Categories.Clear();
         foreach (var c in result.CategoryBreakdown)
         {
@@ -418,6 +696,8 @@ public sealed partial class MainWindow : Window
                 SummaryText: $"{ByteFormatter.FormatBytes(c.TotalBytes)} ({c.SharePercent:F1}%)",
                 SharePercent: c.SharePercent));
         }
+
+        ViewTabSummaryText.Text = $"Tree View: Showing {StorageTreeNodes.Count} roots • File View: Showing {ScannedFiles.Count} files";
     }
 
     private void OnTreeNodeExpanderClick(object sender, RoutedEventArgs e)
@@ -486,7 +766,8 @@ public sealed partial class MainWindow : Window
                     RecursiveFolderCount = child.RecursiveFolderCount,
                     FormattedSize = ByteFormatter.FormatBytes(child.LogicalBytes),
                     FormattedAllocated = ByteFormatter.FormatBytes(child.AllocatedBytes),
-                    ItemsSummary = $"{child.RecursiveFileCount:N0} files • {child.RecursiveFolderCount:N0} folders",
+                    ItemsSummary = $"{child.RecursiveFileCount + child.RecursiveFolderCount:N0} items",
+                    Attributes = FormatAttributes(child.FileAttributes),
                     LastModifiedFormatted = DateTimeOffset.FromUnixTimeSeconds(child.LastWriteUnixSeconds).LocalDateTime.ToString("yyyy-MM-dd HH:mm"),
                     PercentOfDrive = pct,
                     PercentLabel = $"{pct:F1}%",
@@ -498,6 +779,231 @@ public sealed partial class MainWindow : Window
             node.IsExpanded = true;
         }
     }
+
+    // ==========================================
+    // WIZTREE VIEW TABS & DOUBLE-CLICK NAVIGATION
+    // ==========================================
+
+    private void OnViewTreeTabClick(object sender, RoutedEventArgs e)
+    {
+        TreeContentGrid.Visibility = Visibility.Visible;
+        FileContentGrid.Visibility = Visibility.Collapsed;
+        AboutContentGrid.Visibility = Visibility.Collapsed;
+
+        ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
+        ViewFileTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+        ViewAboutTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+        ViewTabSummaryText.Text = "Tree View: Double-click any folder to expand/collapse • Right-click for context actions";
+    }
+
+    private void OnViewFileTabClick(object sender, RoutedEventArgs e)
+    {
+        TreeContentGrid.Visibility = Visibility.Collapsed;
+        FileContentGrid.Visibility = Visibility.Visible;
+        AboutContentGrid.Visibility = Visibility.Collapsed;
+
+        ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+        ViewFileTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
+        ViewAboutTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+        ViewTabSummaryText.Text = $"File View: Showing {ScannedFiles.Count:N0} largest scanned files • Double-click to open in Explorer";
+    }
+
+    private void OnViewAboutTabClick(object sender, RoutedEventArgs e)
+    {
+        TreeContentGrid.Visibility = Visibility.Collapsed;
+        FileContentGrid.Visibility = Visibility.Collapsed;
+        AboutContentGrid.Visibility = Visibility.Visible;
+
+        ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+        ViewFileTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+        ViewAboutTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
+        ViewTabSummaryText.Text = "About Groundwork 1.0 Enterprise Storage Engine";
+    }
+
+    private void OnTreeRowDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is StorageTreeNodeViewModel node)
+        {
+            if (node.IsDirectory && node.HasChildren)
+            {
+                ToggleTreeNode(node);
+                e.Handled = true;
+            }
+        }
+    }
+
+    private void OnStorageTreeKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (StorageTreeListView.SelectedItem is StorageTreeNodeViewModel node)
+        {
+            if (e.Key is Windows.System.VirtualKey.Enter or Windows.System.VirtualKey.Space)
+            {
+                if (node.IsDirectory && node.HasChildren)
+                {
+                    ToggleTreeNode(node);
+                    e.Handled = true;
+                }
+            }
+            else if (e.Key == Windows.System.VirtualKey.Right && !node.IsExpanded && node.HasChildren)
+            {
+                ToggleTreeNode(node);
+                e.Handled = true;
+            }
+            else if (e.Key == Windows.System.VirtualKey.Left && node.IsExpanded)
+            {
+                ToggleTreeNode(node);
+                e.Handled = true;
+            }
+        }
+    }
+
+    private void OnFileRowDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is FileRowViewModel file)
+        {
+            OpenPathInExplorer(file.FullPath);
+            e.Handled = true;
+        }
+    }
+
+    private void OnStorageFileSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (StorageFileListView.SelectedItem is FileRowViewModel file)
+        {
+            UpdateSelectedFileMetadata(file);
+        }
+    }
+
+    private void OnFileRowRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is FileRowViewModel file)
+        {
+            StorageFileListView.SelectedItem = file;
+            UpdateSelectedFileMetadata(file);
+
+            var flyout = new MenuFlyout();
+
+            var openItem = new MenuFlyoutItem { Text = "Open in Windows File Explorer", Icon = new SymbolIcon(Symbol.Folder) };
+            openItem.Click += (s, args) => OpenPathInExplorer(file.FullPath);
+            flyout.Items.Add(openItem);
+
+            var copyItem = new MenuFlyoutItem { Text = "Copy Full Path", Icon = new SymbolIcon(Symbol.Copy) };
+            copyItem.Click += (s, args) => CopyPathToClipboard(file.FullPath);
+            flyout.Items.Add(copyItem);
+
+            flyout.Items.Add(new MenuFlyoutSeparator());
+
+            var recycleItem = new MenuFlyoutItem { Text = "Safe Move to Recycle Bin...", Icon = new SymbolIcon(Symbol.Delete) };
+            recycleItem.Click += async (s, args) =>
+            {
+                var node = new StorageTreeNodeViewModel
+                {
+                    FullPath = file.FullPath,
+                    Name = file.Name,
+                    FormattedSize = file.FormattedSize,
+                    IsDirectory = false
+                };
+                await PromptSafeRecycleNodeAsync(node);
+                ScannedFiles.Remove(file);
+            };
+            flyout.Items.Add(recycleItem);
+
+            flyout.ShowAt(fe, e.GetPosition(fe));
+            e.Handled = true;
+        }
+    }
+
+    private void UpdateSelectedFileMetadata(FileRowViewModel file)
+    {
+        try
+        {
+            SelectedMetadata.Name = file.Name;
+            SelectedMetadata.FullPath = file.FullPath;
+            SelectedMetadata.FormattedSize = file.FormattedSize;
+            SelectedMetadata.ExactBytes = $"{file.SizeBytes:N0} bytes";
+            SelectedMetadata.FormattedAllocated = file.FormattedAllocated;
+            SelectedMetadata.ItemsSummary = "1 file";
+            SelectedMetadata.Glyph = file.Glyph;
+            SelectedMetadata.HasSelection = true;
+            SelectedMetadata.KindLabel = $"{file.FileType} ({file.Extension})";
+            SelectedMetadata.Attributes = file.Attributes;
+
+            if (File.Exists(file.FullPath))
+            {
+                var fi = new FileInfo(file.FullPath);
+                SelectedMetadata.CreatedDate = $"Created: {fi.CreationTime:yyyy-MM-dd HH:mm:ss}";
+                SelectedMetadata.LastModifiedDate = $"Modified: {fi.LastWriteTime:yyyy-MM-dd HH:mm:ss}";
+            }
+            else
+            {
+                SelectedMetadata.CreatedDate = "-";
+                SelectedMetadata.LastModifiedDate = $"Modified: {file.LastModifiedFormatted}";
+            }
+        }
+        catch (Exception ex)
+        {
+            SelectedMetadata.Attributes = $"Inaccessible ({ex.Message})";
+        }
+    }
+
+    private static string FormatAttributes(uint attr)
+    {
+        Span<char> chars = stackalloc char[7];
+        int len = 0;
+        if ((attr & 0x00000020) != 0) chars[len++] = 'A'; // Archive
+        if ((attr & 0x00000010) != 0) chars[len++] = 'D'; // Directory
+        if ((attr & 0x00000001) != 0) chars[len++] = 'R'; // ReadOnly
+        if ((attr & 0x00000002) != 0) chars[len++] = 'H'; // Hidden
+        if ((attr & 0x00000004) != 0) chars[len++] = 'S'; // System
+        if ((attr & 0x00000800) != 0) chars[len++] = 'C'; // Compressed
+        if ((attr & 0x00004000) != 0) chars[len++] = 'E'; // Encrypted
+        return len == 0 ? "-" : new string(chars[..len]);
+    }
+
+    private static string GetFileTypeDescription(string ext)
+    {
+        if (string.IsNullOrWhiteSpace(ext)) return "File";
+        string clean = ext.TrimStart('.').ToLowerInvariant();
+        return clean switch
+        {
+            "exe" => "Application",
+            "dll" => "Application Extension",
+            "sys" => "System File",
+            "zip" or "7z" or "rar" or "tar" or "gz" => "Compressed Archive",
+            "mp4" or "mkv" or "avi" or "mov" or "wmv" => "Video File",
+            "mp3" or "wav" or "flac" or "aac" or "m4a" => "Audio File",
+            "jpg" or "jpeg" or "png" or "gif" or "webp" or "bmp" or "svg" => "Image File",
+            "pdf" => "PDF Document",
+            "docx" or "doc" => "Word Document",
+            "xlsx" or "xls" or "csv" => "Spreadsheet",
+            "pptx" or "ppt" => "Presentation",
+            "txt" or "log" or "md" => "Text Document",
+            "iso" or "vhd" or "vhdx" => "Disk Image",
+            "json" or "xml" or "yaml" or "yml" => "Data File",
+            "cs" or "cpp" or "c" or "h" or "py" or "rs" or "js" or "ts" => "Source Code",
+            _ => $"{clean.ToUpperInvariant()} File"
+        };
+    }
+
+    private static string GetGlyphForCategory(string category) => (category ?? string.Empty).ToLowerInvariant() switch
+    {
+        "code" => "\uE943",
+        "documents" => "\uE8A5",
+        "media" => "\uEB9F",
+        "archives" => "\uE8B7",
+        "data" => "\uE802",
+        _ => "\uE8A5"
+    };
+
+    private static string GetColorForCategory(string category) => (category ?? string.Empty).ToLowerInvariant() switch
+    {
+        "code" => "#38BDF8",
+        "documents" => "#60A5FA",
+        "media" => "#A78BFA",
+        "archives" => "#F59E0B",
+        "data" => "#34D399",
+        _ => "#94A3B8"
+    };
 
     // ==========================================
     // 0. STARTUP DRIVE SELECTION MODAL
@@ -536,19 +1042,26 @@ public sealed partial class MainWindow : Window
 
     private async void OnModalBrowseCustomFolderClick(object sender, RoutedEventArgs e)
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder;
-        picker.FileTypeFilter.Add("*");
+        await PickAndScanFolderAsync();
+    }
 
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder != null)
-        {
-            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
-            ScanPathTextBox.Text = folder.Path;
-            await RunStorageScanAsync(folder.Path, requestElevatedMft: false);
-        }
+    private async void OnModalScanAllDrivesClick(object sender, RoutedEventArgs e)
+    {
+        StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+        ScanPathTextBox.Text = "[All Hard Drives]";
+        await RunMultiDriveScanAsync(requestElevatedMft: false);
+    }
+
+    private async void OnModalOpenCsvClick(object sender, RoutedEventArgs e)
+    {
+        StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+        await PickAndScanCsvAsync();
+    }
+
+    private async void OnModalOpenMftClick(object sender, RoutedEventArgs e)
+    {
+        StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+        await PickAndScanMftAsync();
     }
 
     // ==========================================
