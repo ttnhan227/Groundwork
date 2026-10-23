@@ -365,7 +365,9 @@ def test_provider_malformed_json_responses(monkeypatch):
         monkeypatch.setattr(
             httpx,
             "Client",
-            lambda **kwargs: httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=payload))),
+            lambda payload=payload, **kwargs: httpx.Client(
+                transport=httpx.MockTransport(lambda req, payload=payload: httpx.Response(200, json=payload))
+            ),
         )
         with pytest.raises(RuntimeError, match="could not complete"):
             OpenAIProvider(api_key="test-key").generate("Test prompt")
@@ -384,6 +386,7 @@ def test_validate_workspace_path_rejects_empty():
 
 def test_api_error_status_codes_on_client_errors(audit_environment):
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     client = TestClient(app)

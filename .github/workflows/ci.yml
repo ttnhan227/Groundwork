@@ -100,8 +100,8 @@ jobs:
         working-directory: client
         run: npm ci && npx playwright install --with-deps chromium
 
-      - name: Verify desktop onboarding and reader workflows
-        run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs
+      - name: Verify desktop onboarding, reader, cleanup and computer workflows
+        run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs desktop/tests/cleanup-computer-ui.test.cjs
 
   # ──────────────────────────────────────────────
   # 4. Web Portal: Marketing & Docs Website Build

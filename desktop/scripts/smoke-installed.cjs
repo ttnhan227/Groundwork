@@ -141,7 +141,7 @@ async function close() {
     assert.ok(process.env.DESKTOP_API_BASE_URL,'Set DESKTOP_API_BASE_URL to verify the installed build configuration');
     assert.equal(cloudUrl,process.env.DESKTOP_API_BASE_URL.trim().replace(/\/$/,'').replace(/\/api\/v1$/,''));
     if (process.env.GROUNDWORK_VERIFY_GOOGLE_SIGNIN === '1') {
-      await page.getByRole('button',{name:'Account',exact:true}).click();
+      await page.getByRole('button',{name:'More tools',exact:true}).click(); await page.getByRole('button',{name:'Account',exact:true}).click();
       await page.getByRole('button',{name:'Sign in',exact:true}).click();
       await page.getByRole('button',{name:'Sign in with Google',exact:true}).click();
       console.log('Complete Google sign-in in the system browser opened by Groundwork');
@@ -149,7 +149,7 @@ async function close() {
       await page.screenshot({path:path.join(resultsDir,'installed-google-signin.png')});
       await page.getByRole('button',{name:'Sign out',exact:true}).click();
       await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();
-      await page.getByRole('button',{name:'Home',exact:true}).click();
+      await page.getByRole('button',{name:'Files',exact:true}).click();
       console.log('Installed system-browser Google sign-in and logout passed');
     }
     // Add the fixture through the real authenticated service. Native picker
@@ -164,7 +164,7 @@ async function close() {
       return (await response.json()).status;
     }, {timeout:60000}).toBe('completed');
     await page.screenshot({path:path.join(resultsDir,'installed-home.png')});
-    await page.getByRole('button',{name:'Contents',exact:true}).click();
+    await page.locator('.desktop-find').click();
     await page.getByRole('button',{name:'File contents',exact:true}).click();
     await page.getByRole('textbox',{name:'Search your files'}).fill('installed_live_change');
     fs.writeFileSync(path.join(workspace,'live.txt'),'installed_live_change arrived while search was open');
@@ -173,9 +173,9 @@ async function close() {
     await expect(page.locator('[data-result-index="0"]')).toContainText('sample.ts',{timeout:20000});
     await page.screenshot({path:path.join(resultsDir,'installed-search.png')});
     await page.getByRole('button',{name:'Ask about this file'}).click();
-    await page.getByLabel('Answer with').selectOption('local');
+    await page.locator('details.assistant-settings summary').click(); await page.getByLabel('Answer with').selectOption('local');
     await page.getByLabel('Your question').fill('installed_workflow_needle');
-    await page.locator('.desktop-tool-panel').getByRole('button',{name:'Ask',exact:true}).click();
+    await page.locator('.desktop-tool-panel').getByRole('button',{name:/^(Ask|Ask selected files|Find and answer)$/}).click();
     await expect(page.getByText('These passages come from the files you selected.',{exact:false}).first()).toBeVisible({timeout:20000});
     await expect(page.getByText('real evidence',{exact:false}).first()).toBeVisible();
     await page.setViewportSize({width:900,height:600});
@@ -187,10 +187,10 @@ async function close() {
     await page.setViewportSize({width:1180,height:780});
     await page.getByRole('button',{name:'Save for later',exact:true}).click();
     await expect(page.getByText('Saved in Saved work.',{exact:true})).toBeVisible();
-    await page.getByRole('button',{name:'Saved work',exact:true}).click();
+    await page.getByRole('button',{name:'More tools',exact:true}).click(); await page.getByRole('button',{name:'Saved work',exact:true}).click();
     await page.getByRole('button',{name:/^(Continue|Resume)$/}).click();
     await expect(page.getByRole('heading',{name:'Saved findings',exact:true})).toBeVisible();
-    await page.getByRole('button',{name:'Notes',exact:true}).click();
+    await page.getByRole('button',{name:'More tools',exact:true}).click(); await page.getByRole('button',{name:'Notes',exact:true}).click();
     await page.getByRole('button',{name:'New note',exact:true}).click();
     await page.getByPlaceholder('Give your note a title').fill('Installed note');
     await page.getByPlaceholder('Write your note here…').fill('Created through the installed desktop UI');
@@ -201,7 +201,7 @@ async function close() {
     await page.getByPlaceholder('Write your note here…').fill('Edited and persisted');
     await page.getByRole('button',{name:'Save note'}).click();
     await expect(page.getByText('Edited and persisted',{exact:false}).first()).toBeVisible();
-    await page.getByRole('button',{name:'Account',exact:true}).click();
+    await page.getByRole('button',{name:'More tools',exact:true}).click(); await page.getByRole('button',{name:'Account',exact:true}).click();
     if (process.env.GROUNDWORK_VERIFY_LIVE_SYNC === '1') {
       const accountEmail=`release-check-${crypto.randomUUID()}@example.com`;
       const accountPassword=crypto.randomBytes(32).toString('base64url');
@@ -241,7 +241,7 @@ async function close() {
       await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();
       console.log('Live Cloud Run registration, logout, login and private metadata sync passed');
     }
-    await page.getByRole('button',{name:'Settings',exact:true}).click();
+    await page.getByRole('button',{name:'More tools',exact:true}).click(); await page.getByRole('button',{name:'Settings',exact:true}).click();
     assert.ok(!(await page.locator('body').innerText()).includes(cloudUrl),'Private service URL leaked into Settings');
     await page.getByText('Troubleshooting',{exact:true}).click();
     await page.getByRole('button',{name:'Restart Groundwork engine'}).click();
@@ -254,7 +254,7 @@ async function close() {
       assert.ok(fs.existsSync(path.join(root,'state')),'Upgrade removed user data');
     }
     await launch();
-    await page.getByRole('button',{name:'Notes',exact:true}).click();
+    await page.getByRole('button',{name:'More tools',exact:true}).click(); await page.getByRole('button',{name:'Notes',exact:true}).click();
     await page.getByText('Installed note',{exact:true}).first().click();
     await expect(page.getByText('Edited and persisted',{exact:false}).first()).toBeVisible();
     await page.screenshot({path:path.join(resultsDir,'installed-restarted.png')});
@@ -268,22 +268,22 @@ async function close() {
     const storageResponse=await fetch(connection.url+'/api/system/file-storage?path='+encodeURIComponent(path.join(workspace,'sample.ts')),{headers:{Authorization:'Bearer '+connection.token}});
     assert.equal(storageResponse.status,200,'Packaged storage detail endpoint unavailable');
     assert.equal((await storageResponse.json()).logical_bytes,fs.statSync(path.join(workspace,'sample.ts')).size);
-    await page.getByRole('button',{name:'Files & storage',exact:true}).click();
+    await page.getByRole('button',{name:'Files',exact:true}).click();
     await page.getByText('sample.ts',{exact:true}).first().click();
     await expect(page.getByText('Allocated',{exact:true})).toBeVisible();
     await expect(page.getByText('Hard links',{exact:true})).toBeVisible();
     await page.screenshot({path:path.join(resultsDir,'installed-storage-details.png')});
-    await page.getByRole('button',{name:'Ask',exact:true}).click();
-    await page.getByLabel('Answer with').selectOption('local');
+    await page.getByRole('button',{name:'Assistant',exact:true}).click();
+    await page.locator('details.assistant-settings summary').click(); await page.getByLabel('Answer with').selectOption('local');
     await page.getByLabel('Your question').fill('installed_workflow_needle');
     const keyboardJob=page.waitForResponse(response=>response.url().endsWith('/api/ai/jobs/query') && response.request().method()==='POST');
     await page.getByLabel('Your question').press('Control+Enter');
     assert.equal((await keyboardJob).status(),200,'Ctrl+Enter did not start an answer');
     await expect(page.getByText('These passages come from the files you selected.',{exact:false}).first()).toBeVisible();
     if(upgradeFrom) console.log('Upgrade from previous installer preserved notes, workspace and original files; new storage details and keyboard AI interaction passed');
-    await page.getByRole('button',{name:'Files & storage',exact:true}).click();
+    await page.getByRole('button',{name:'Files',exact:true}).click();
     const scanResponse=page.waitForResponse(response=>response.url().includes('/api/index/start') && response.request().method()==='POST');
-    await page.getByRole('button',{name:'Scan',exact:true}).click();
+    await page.getByRole('button',{name:'Refresh',exact:true}).click();
     assert.equal((await scanResponse).status(),200,'Scan control request was rejected');
     const resumeFixture=path.join(workspace,'resume-fixture');
     fs.mkdirSync(resumeFixture);

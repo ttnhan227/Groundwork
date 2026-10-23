@@ -6,7 +6,6 @@ import type {
   Note,
   Project,
   ProjectOverview,
-  SavedSearch,
   SearchResponse,
   SystemStatus,
   Workspace,
@@ -17,6 +16,157 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 export interface InstalledApp {
   id: string; name: string; icon: string; publisher: string; version: string;
   description: string; location: string; kind: string;
+  install_location?: string;
+  install_date?: string;
+  uninstall_string?: string;
+  quiet_uninstall_string?: string;
+  estimated_size_bytes?: number | null;
+  registry_key?: string;
+  can_launch?: boolean;
+  can_uninstall?: boolean;
+}
+
+export interface StorageOverviewResponse {
+  drives: Array<{
+    path: string;
+    total_bytes: number;
+    used_bytes: number;
+    free_bytes: number;
+    used_percent: number;
+    workspaces: Array<{ id: string; name: string; path: string }>;
+  }>;
+  workspaces: Array<{
+    id: string;
+    name: string;
+    path: string;
+    files: number;
+    bytes: number;
+    scan_status: string;
+  }>;
+  total_files: number;
+  total_bytes: number;
+  category_breakdown: Array<{
+    key: string;
+    label: string;
+    files: number;
+    bytes: number;
+    percent: number;
+  }>;
+  largest_files: Array<{
+    workspace_id: string;
+    path: string;
+    name: string;
+    parent: string;
+    extension: string;
+    category: string;
+    size_bytes: number;
+    mtime: number;
+    share_percent: number;
+    allocated_bytes?: number | null;
+    allocation_note?: string;
+  }>;
+  largest_folders: Array<{
+    workspace_id: string;
+    path: string;
+    name: string;
+    parent: string;
+    size_bytes: number;
+    file_count: number;
+    mtime: number;
+    share_percent: number;
+  }>;
+  space_map: Array<{
+    workspace_id: string;
+    path: string;
+    name: string;
+    kind: "file" | "folder";
+    category: string;
+    size_bytes: number;
+    file_count: number;
+    mtime: number;
+    share_percent: number;
+  }>;
+}
+
+export interface CleanupCandidateItem {
+  path: string;
+  name: string;
+  parent: string;
+  size_bytes: number;
+  mtime: number;
+  age_days: number;
+  rule_id: string;
+  confidence: "high" | "review_required";
+  reason: string;
+  sha256?: string;
+  kept_reference_path?: string;
+}
+
+export interface CleanupRuleSummary {
+  id: string;
+  name: string;
+  description: string;
+  risk_level: "low" | "medium";
+  candidate_count: number;
+  reclaimable_bytes: number;
+  items: CleanupCandidateItem[];
+}
+
+export interface CleanupScanResponse {
+  rules: CleanupRuleSummary[];
+  total_candidates: number;
+  total_reclaimable_bytes: number;
+  scanned_workspaces: number;
+  safety_notice: string;
+}
+
+export interface CleanupProposalResponse {
+  proposal: Record<string, unknown>;
+  items: Array<{ path: string; name: string; kind: string; size_bytes: number }>;
+  skipped: Array<{ path: string; reason: string }>;
+  total_bytes: number;
+  item_count: number;
+  confirmation_token: string;
+  warning: string;
+}
+
+export interface CleanupExecutionResponse {
+  status: "completed" | "partial" | "failed";
+  mode: string;
+  removed: Array<{ path: string; name: string; kind: string; size_bytes: number; method: string }>;
+  failed: Array<{ path: string; reason: string }>;
+  skipped: Array<{ path: string; reason: string }>;
+  removed_count: number;
+  bytes_reclaimed: number;
+}
+
+export interface LeftoverScanResponse {
+  app_id: string;
+  app_name: string;
+  publisher: string;
+  install_location: string;
+  leftovers: Array<{
+    path: string;
+    name: string;
+    kind: "folder" | "file";
+    location_group: string;
+    size_bytes: number;
+    file_count: number;
+    mtime: number;
+    confidence: "high" | "review_required";
+    evidence: string;
+  }>;
+  registry_leftovers: Array<{
+    key: string;
+    confidence: "high" | "review_required";
+    evidence: string;
+  }>;
+  total_count: number;
+  high_confidence_count: number;
+  review_required_count: number;
+  total_reclaimable_bytes: number;
+  high_confidence_bytes: number;
+  safety_notice: string;
 }
 
 export interface FileCollection {
@@ -83,6 +233,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       path.includes("/file-preview") ||
       path.includes("/collections/") ||
       path.includes("/installed-apps") ||
+      path.includes("/cleanup/") ||
+      path.includes("/storage-overview") ||
       path.includes("/organization") ||
       path.includes("/jobs/") ||
       path.includes("/actions/")
@@ -120,7 +272,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   fileStorage: (path: string) => request<{logical_bytes: number; allocated_bytes: number | null; hard_links: number; allocation_note: string}>(`/api/system/file-storage?path=${encodeURIComponent(path)}`),
-  cancelOrganization: () => request("/api/ai/organization", {method: "POST", body: JSON.stringify({action: "cancel"})}),
   organizationProgress: () =>
     request<{
       phase: string;
@@ -130,24 +281,6 @@ export const api = {
       bytes: number;
       current_size?: number;
     }>("/api/ai/organization/progress"),
-  proposeAction: (instruction: string, paths: string[]) =>
-    request<
-      AssistantJob<{
-        proposal: { action: string; value: string };
-        confirmation_token: string;
-      }>
-    >("/api/ai/actions/propose", {
-      method: "POST",
-      body: JSON.stringify({ instruction, paths }),
-    }),
-  executeAction: (
-    proposal: { action: string; value: string },
-    confirmation_token: string,
-  ) =>
-    request<Record<string, unknown>>("/api/ai/actions/execute", {
-      method: "POST",
-      body: JSON.stringify({ proposal, confirmation_token }),
-    }),
   localAIStatus: () =>
     request<import("../components/assistant/LocalAISetup").LocalAIStatus>(
       "/api/system/local-ai",
@@ -240,24 +373,82 @@ export const api = {
       total_potential_waste_bytes: number;
       note: string;
     }>("/api/system/duplicates" + (workspace_id ? `?workspace_id=${encodeURIComponent(workspace_id)}` : "")),
-  getCapabilities: () =>
-    request<Record<string, { available: boolean; status?: string; label: string; description: string }>>(
-      "/api/system/capabilities",
-    ),
-  getReadableFormats: () =>
-    request<{
-      extensions: string[];
-      special_names: string[];
-      max_bytes: number;
-      max_files: number;
-      lines_per_file: number;
-    }>("/api/system/readable-formats"),
   getComputerStatus: () =>
     request<import("../components/computer/ComputerView").ComputerStatus>(
       "/api/system/computer",
     ),
   getInstalledApps: (refresh = false) => request<{ apps: InstalledApp[]; supported: boolean }>(`/api/system/installed-apps?refresh=${refresh}`, { signal: AbortSignal.timeout(70000) }),
   launchInstalledApp: (id: string) => request<{ success: boolean }>("/api/system/installed-apps/launch", { method: "POST", body: JSON.stringify({ path: id }) }),
+  proposeAppUninstall: (id: string) =>
+    request<{
+      proposal: {
+        action: string;
+        app_id: string;
+        app_name: string;
+        publisher: string;
+        version: string;
+        install_location: string;
+        uninstall_command: string;
+        argv: string[];
+      };
+      confirmation_token: string;
+      warning: string;
+    }>("/api/system/installed-apps/uninstall/propose", {
+      method: "POST",
+      body: JSON.stringify({ path: id }),
+    }),
+  executeAppUninstall: (proposal: Record<string, unknown>, confirmation_token: string) =>
+    request<{
+      status: string;
+      pid: number;
+      app_id: string;
+      app_name: string;
+      publisher: string;
+      install_location: string;
+      command: string;
+      can_scan_leftovers: boolean;
+    }>("/api/system/installed-apps/uninstall/execute", {
+      method: "POST",
+      body: JSON.stringify({ proposal, confirmation_token }),
+    }),
+  scanAppLeftovers: (params: { app_id?: string; app_name?: string; publisher?: string; install_location?: string }) =>
+    request<LeftoverScanResponse>("/api/system/installed-apps/leftovers", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  proposeLeftoverCleanup: (paths: string[], mode: "recycle" | "permanent" = "recycle") =>
+    request<CleanupProposalResponse>("/api/system/installed-apps/leftovers/propose", {
+      method: "POST",
+      body: JSON.stringify({ paths, mode }),
+    }),
+  executeLeftoverCleanup: (proposal: Record<string, unknown>, confirmation_token: string) =>
+    request<CleanupExecutionResponse>("/api/system/installed-apps/leftovers/execute", {
+      method: "POST",
+      body: JSON.stringify({ proposal, confirmation_token }),
+    }),
+  getStorageOverview: (workspace_id?: string, limit = 12) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (workspace_id) params.set("workspace_id", workspace_id);
+    return request<StorageOverviewResponse>(`/api/system/storage-overview?${params.toString()}`);
+  },
+  scanCleanupCandidates: (workspace_id?: string, stale_days = 60, min_large_mb = 25) => {
+    const params = new URLSearchParams({
+      stale_days: String(stale_days),
+      min_large_mb: String(min_large_mb),
+    });
+    if (workspace_id) params.set("workspace_id", workspace_id);
+    return request<CleanupScanResponse>(`/api/system/cleanup/scan?${params.toString()}`);
+  },
+  proposeCleanup: (paths: string[], mode: "recycle" | "permanent" = "recycle") =>
+    request<CleanupProposalResponse>("/api/system/cleanup/propose", {
+      method: "POST",
+      body: JSON.stringify({ paths, mode }),
+    }),
+  executeCleanup: (proposal: Record<string, unknown>, confirmation_token: string) =>
+    request<CleanupExecutionResponse>("/api/system/cleanup/execute", {
+      method: "POST",
+      body: JSON.stringify({ proposal, confirmation_token }),
+    }),
   desktopAction: (action: string, value: string, confirmation_token?: string) =>
     request<{
       success?: boolean;
@@ -385,14 +576,6 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify([]),
-      },
-    ),
-  indexSelectedFiles: (paths: string[], workspaceId?: string) =>
-    request<IndexProgress>(
-      "/api/index/selected" + (workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : ""),
-      {
-        method: "POST",
-        body: JSON.stringify(paths),
       },
     ),
   cancelIndexing: () =>
@@ -523,71 +706,7 @@ export const api = {
   deleteNote: (id: string) =>
     request<{ deleted: boolean }>(`/api/notes/${id}`, { method: "DELETE" }),
 
-  // Saved Searches
-  listSavedSearches: () => request<SavedSearch[]>("/api/saved-searches"),
-  createSavedSearch: (title: string, query: string) =>
-    request<SavedSearch>("/api/saved-searches", {
-      method: "POST",
-      body: JSON.stringify({ title, query }),
-    }),
-  deleteSavedSearch: (id: string) =>
-    request<{ deleted: boolean }>(`/api/saved-searches/${id}`, {
-      method: "DELETE",
-    }),
-
   // AI
-  queryAI: async (
-    question: string,
-    projectId?: string,
-    provider?: string,
-    focusedPath?: string,
-    focusedLine?: number,
-    sessionId?: string,
-    filePaths: string[] = [],
-  ) =>
-    waitForJob(
-      await request<AssistantJob<AIQueryResponse>>("/api/ai/jobs/query", {
-        method: "POST",
-        body: JSON.stringify({
-          question,
-          project_id: projectId,
-          provider,
-          file_paths: filePaths,
-          focused_path: focusedPath,
-          focused_line: focusedLine,
-          session_id: sessionId,
-        }),
-      }),
-    ),
-  investigateProblem: (
-    problemStatement: string,
-    projectId?: string,
-    provider?: string,
-    focusedPath?: string,
-    focusedLine?: number,
-    sessionId?: string,
-  ) =>
-    request<{
-      session_id: string;
-      title: string;
-      analysis: string;
-      provider_used: string;
-      citations: AIQueryResponse["citations"];
-      inspected_files: string[];
-      related_commits: any[];
-      evidence_count: number;
-    }>("/api/ai/investigate", {
-      method: "POST",
-      signal: AbortSignal.timeout(300000),
-      body: JSON.stringify({
-        problem_statement: problemStatement,
-        project_id: projectId,
-        provider,
-        files: focusedPath ? [focusedPath] : [],
-        focused_line: focusedLine || 1,
-        session_id: sessionId,
-      }),
-    }),
   listProviders: () =>
     request<
       Array<{ id: string; name: string; is_local: boolean; active: boolean }>

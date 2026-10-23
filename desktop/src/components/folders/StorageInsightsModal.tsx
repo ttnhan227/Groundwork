@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Copy, FileText, FolderOpen, ExternalLink, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Copy, FileText, FolderOpen, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { api } from "../../services/api";
+import { useSelection } from "../../services/selection";
 import { Button, Card, Modal, Badge } from "../ui";
 
 interface DuplicateFile {
@@ -62,6 +63,7 @@ export function StorageInsightsModal({
   workspaceName?: string;
   onClose: () => void;
 }) {
+  const { navigate } = useSelection();
   const [data, setData] = useState<DuplicatesData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -178,14 +180,27 @@ export function StorageInsightsModal({
             </div>
 
             {/* Non-destructive guarantee notice */}
-            <div className="p-3 bg-[var(--paper-subtle)] border border-[var(--hairline)] rounded-lg text-xs text-[var(--ink-secondary)] space-y-1">
-              <div className="flex items-center gap-1.5 font-semibold text-[var(--ink-primary)]">
-                <CheckCircle2 size={14} className="text-green-600" />
-                <span>Safe & Non-Destructive Review</span>
+            <div className="p-3 bg-[var(--paper-subtle)] border border-[var(--hairline)] rounded-lg text-xs text-[var(--ink-secondary)] flex flex-wrap items-center justify-between gap-2">
+              <div className="space-y-1 flex-1 min-w-[220px]">
+                <div className="flex items-center gap-1.5 font-semibold text-[var(--ink-primary)]">
+                  <CheckCircle2 size={14} className="text-green-600" />
+                  <span>Deterministic SHA-256 Duplicate Review</span>
+                </div>
+                <p>
+                  This inspection view never deletes files automatically. To remove redundant duplicate copies (with Recycle Bin recovery and explicit confirmation), open Storage & Cleanup.
+                </p>
               </div>
-              <p>
-                Deletion workflows are deferred until safe recovery is fully verified. Groundwork displays duplicate groups and locations without deleting anything, and never uses AI to label files as "unnecessary".
-              </p>
+              <Button
+                size="xs"
+                variant="primary"
+                onClick={() => {
+                  onClose();
+                  navigate("cleanup");
+                }}
+              >
+                <Trash2 size={13} />
+                Open in Storage & Cleanup
+              </Button>
             </div>
 
             {/* Tabs */}

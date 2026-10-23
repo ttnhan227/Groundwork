@@ -140,14 +140,6 @@ export interface Note {
   sync_status: string;
 }
 
-export interface SavedSearch {
-  id: string;
-  title: string;
-  query: string;
-  filters: Record<string, any>;
-  created_at: string;
-}
-
 export interface CitationItem {
   path: string;
   filename: string;
@@ -157,6 +149,24 @@ export interface CitationItem {
   evidence_kind?: "text" | "ocr" | "metadata" | "folder";
   coverage?: string;
   file_details?: {name?: string; location?: string; extension?: string; size_bytes?: number | null; modified_timestamp?: number};
+}
+
+export interface CitationVerificationReport {
+  total_citations: number;
+  valid_citations: number;
+  invalid_citations: number;
+  citation_precision: number;
+  unsupported_claims_warning: boolean;
+  grounded: boolean;
+  references: Array<{
+    raw: string;
+    filename: string;
+    line_start?: number | null;
+    line_end?: number | null;
+    is_valid_source: boolean;
+    is_valid_lines: boolean;
+    reason: string;
+  }>;
 }
 
 export interface AIQueryResponse {
@@ -169,8 +179,10 @@ export interface AIQueryResponse {
     action: string;
     path?: string;
     title?: string;
+    view?: string;
   }>;
   session_id: string | null;
+  citation_verification?: CitationVerificationReport;
 }
 
 export interface SystemStatus {

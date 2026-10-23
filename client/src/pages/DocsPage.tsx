@@ -7,11 +7,11 @@ const guides: Record<
 > = {
   "getting-started": {
     title: "Start here",
-    intro: "From installation to your first search, in a few minutes.",
+    intro: "From installation to storage cleanup and your first search, in a few minutes.",
     steps: [
       [
         "Install and open Groundwork",
-        "Download the Windows installer from the Download page. Open it and follow the installation steps. Groundwork includes what it needs to search your files.",
+        "Download the Windows installer from the Download page. Open it and follow the installation steps. Groundwork includes what it needs to analyze storage, inspect apps, and search your files.",
       ],
       [
         "Sign in, or continue locally",
@@ -19,15 +19,42 @@ const guides: Record<
       ],
       [
         "Choose a folder or drive",
-        "Click Choose folder in the workspace toolbar. Pick your Documents folder, a project folder, or a drive. The folder tree and file table fill as scanning starts. Your original files stay in place.",
+        "Click Choose folder in the workspace toolbar. Pick your Downloads, Documents, a project folder, or a drive. The folder tree and file table fill as scanning starts. Your original files stay in place.",
       ],
       [
-        "Find something",
-        "Type in the file list to find names, or click Find (Ctrl + K) to search names and document text. Filename search becomes available as files are discovered; supported document content becomes searchable after indexing.",
+        "Analyze storage, duplicates, and apps",
+        "Open Cleanup to inspect proportional folder hotspots, mounted drive capacity, and SHA-256 exact duplicate files. Open Computer to browse installed Windows apps by size, launch official uninstallers, or scan AppData and ProgramData for leftover files.",
       ],
       [
-        "Make yourself at home",
-        "Browse the folder tree and search above the file table. Open Assistant alongside your files, Notes for ideas and reminders, and Saved work for findings you've kept. Select a location in the tree to manage or remove it.",
+        "Find something & ask AI",
+        "Type in the file list to find names, or click Find (Ctrl + K) to search names and document text. Open Assistant alongside your files to ask questions about documents, disk space, duplicate candidates, or installed applications.",
+      ],
+    ],
+  },
+  cleanup: {
+    title: "Storage, duplicates & apps",
+    intro:
+      "Inspect disk hotspots, remove verified duplicates, and clean up application leftovers safely.",
+    steps: [
+      [
+        "Proportional space map & hotspots",
+        "Open Cleanup to view a visual breakdown of your largest folders, largest files, and mounted Windows drives. Click any folder or file to reveal it in Explorer or preview it in the built-in reader.",
+      ],
+      [
+        "Deterministic SHA-256 duplicate & cleanup rules",
+        "Groundwork identifies byte-for-byte identical duplicate files using SHA-256 hashing while always preserving the oldest original copy. Additional rules surface temporary logs, build caches, empty files, and stale downloads.",
+      ],
+      [
+        "Installed apps & guided uninstaller",
+        "Open Computer to inspect installed Win32 and Store applications with estimated sizes, publishers, and install dates. When an app registers an uninstaller, Groundwork shows the exact command and requires your confirmation before launching it.",
+      ],
+      [
+        "Post-uninstall leftover scanner",
+        "Scan an installed or recently uninstalled app to detect leftover folders in AppData (Roaming, Local, LocalLow) and ProgramData. Registry keys under HKCU/HKLM are shown as read-only evidence and are never auto-deleted.",
+      ],
+      [
+        "Explicit confirmation & Recycle Bin recovery",
+        "No file or folder is ever deleted automatically or by AI. Every cleanup action uses a one-time confirmation token and defaults to sending items to the Windows Recycle Bin.",
       ],
     ],
   },
@@ -57,11 +84,11 @@ const guides: Record<
   ai: {
     title: "Ask your files",
     intro:
-      "Find relevant passages or get a written answer with sources you can check.",
+      "Find relevant passages, inspect PC storage and apps, or get a written answer with sources you can check.",
     steps: [
       [
         "Start without setup",
-        "Ask your files can find matching passages on this computer without an account or API key. This mode retrieves sources; it doesn't generate an AI-written answer.",
+        "Ask your files can find matching passages and run read-only storage, duplicate, and installed-app inspections on this computer without an account or API key. This mode retrieves sources and live metrics; it doesn't generate an AI-written answer.",
       ],
       [
         "Choose written answers",
@@ -72,8 +99,8 @@ const guides: Record<
         "Double-click a file or press Enter to open the built-in reader. Zoom, fit the view, and move between pages or files. Ask a question to open AI beside the document. AI reads text, PDFs, Word, Excel, PowerPoint, OpenDocument, and EPUB. On Windows, it can recognize written text in images and up to five scanned PDF pages. OCR can contain errors and does not interpret image scenes. Unsupported formats provide file details only.",
       ],
       [
-        "Understand a folder",
-        "Use Ask about folder to include its direct file listing and a small sample of nearby documents. The answer states which files were read; it does not recursively read every file. Group related files with Collections without moving originals.",
+        "Understand a folder, disk space, or apps",
+        "Use Ask about folder to include its direct file listing and a small sample of nearby documents, or use the quick prompts in Assistant to analyze disk space, find duplicates, or list installed apps. Group related files with Collections without moving originals.",
       ],
       [
         "Know what gets shared",

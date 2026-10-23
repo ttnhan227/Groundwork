@@ -42,7 +42,8 @@ export const DownloadPage: React.FC = () => {
           </p>
           <h1 className="text-4xl font-serif font-bold">Download Groundwork</h1>
           <p className="text-[var(--ink-secondary)]">
-            Find your files, keep your notes, and return to your work.
+            Find your files, reclaim disk space, manage installed apps, and ask
+            grounded questions in one local workspace.
           </p>
           <p className="text-sm text-[var(--ink-muted)]">
             For Windows 10 or 11 (64-bit). No separate tools or database to
@@ -69,9 +70,12 @@ export const DownloadPage: React.FC = () => {
             </p>
           )}
           <p className="text-sm text-[var(--ink-secondary)]">
-            Includes the desktop workspace, search, Assistant, notes, and file
-            organization. Local AI models are separate downloads. See release
-            notes for changes and supported features.
+            Includes the desktop workspace, built-in document reader, storage
+            analyzer &amp; proportional space map, SHA-256 duplicate remover,
+            installed applications &amp; guided uninstaller with AppData/ProgramData
+            leftover scanner, Assistant, notes, and file organization.
+            Local AI models are separate downloads. See release notes for
+            changes and supported features.
           </p>
           {release ? (
             <a

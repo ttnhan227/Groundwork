@@ -25,6 +25,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -113,21 +114,23 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
     }
   };
 
-  const handleDeleteNote = async (id: string) => {
-    if (mutation.current) return;
-    if (!confirm("Are you sure you want to delete this note?")) return;
-    mutation.current = true; setSaving(true);
+  const confirmDeleteNote = async () => {
+    if (!noteToDelete || mutation.current) return;
+    mutation.current = true;
+    setSaving(true);
     try {
-      await api.deleteNote(id);
-      if (selectedNote?.id === id) {
+      await api.deleteNote(noteToDelete.id);
+      if (selectedNote?.id === noteToDelete.id) {
         setSelectedNote(null);
       }
+      setNoteToDelete(null);
       fetchNotes();
     } catch (err) {
       console.error("Failed to delete note:", err);
       setError(String(err));
     } finally {
-      mutation.current = false; setSaving(false);
+      mutation.current = false;
+      setSaving(false);
     }
   };
 
@@ -252,13 +255,15 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
                     </span>
                   )}
                   {selectedNote.file_path && (
-                    <span
+                    <button
+                      type="button"
                       onClick={() => previewFile(selectedNote.file_path!)}
-                      className="flex items-center gap-1 text-[var(--ink-blue)] hover:underline cursor-pointer font-mono text-sm"
+                      className="inline-flex items-center gap-1 text-[var(--ink-blue)] hover:underline cursor-pointer font-mono text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink-blue)] rounded-xs"
+                      title="Preview related file"
                     >
                       <ExternalLink className="w-3 h-3" />
                       {selectedNote.file_path}
-                    </span>
+                    </button>
                   )}
                   <Badge variant="neutral" className="font-mono text-xs">
                     {selectedNote.sync_status === "synced" ? (
@@ -290,7 +295,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
               <Button
                 variant="danger"
                 size="xs"
-                onClick={() => handleDeleteNote(selectedNote.id)}
+                onClick={() => setNoteToDelete(selectedNote)}
                 title="Delete Note"
                 disabled={saving}
               >
@@ -443,6 +448,45 @@ export const NotesView: React.FC<NotesViewProps> = ({ selectedProjectId }) => {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {noteToDelete && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            if (!saving) setNoteToDelete(null);
+          }}
+          title="Delete this note?"
+          maxWidth="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-[var(--ink-secondary)]">
+              Are you sure you want to delete “{noteToDelete.title}”? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--hairline)]">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={saving}
+                onClick={() => setNoteToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                disabled={saving}
+                isLoading={saving}
+                onClick={confirmDeleteNote}
+              >
+                Delete note
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

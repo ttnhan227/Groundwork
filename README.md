@@ -19,19 +19,27 @@
 
 ## 📌 Overview
 
-Groundwork is a Windows desktop app for finding files, reading documents, and asking questions about selected files and folders. Review proposed organization changes before applying them, or group files into collections without moving the originals. SQLite stores your local workspace data. An optional backend handles accounts and sync.
+Groundwork is a local-first Windows desktop workspace for finding files, reading documents, analyzing disk space, removing exact SHA-256 duplicates, managing installed applications and leftover data, and asking grounded AI questions about your files and computer. Review every proposed organization, cleanup, or leftover removal before applying it—removable items move to the Windows Recycle Bin rather than being permanently erased. SQLite stores your local workspace data. An optional backend handles accounts and sync.
 
 ---
 
 ## Inside the app
 
-Read a document and ask about it in the same workspace. Answers show their sources and distinguish extracted text, OCR, and metadata-only evidence.
+Read a document, inspect storage hotspots, clean up duplicates, manage installed apps, and ask about your workspace in one calm interface. Answers show their sources and distinguish extracted text, OCR, live system/storage tools, and metadata-only evidence.
 
 ![Groundwork document reader with an AI answer and source references](client/public/screenshots/workspace.png)
 
 <img src="client/public/screenshots/assistant.png" alt="AI answer comparing rent changes and identifying the response deadline from a document" width="392" />
 
-These screenshots show the current implementation using a synthetic rental agreement. The published installer may lag behind the latest source changes.
+![Storage analyzer, proportional space map, largest folders, and exact SHA-256 duplicate remover](client/public/screenshots/cleanup.png)
+
+![Installed applications, guided uninstaller, and AppData/ProgramData leftover scanner](client/public/screenshots/computer.png)
+
+## Storage cleanup, installed apps, and grounded AI
+
+- **Storage Analyzer & SHA-256 Cleanup (`Cleanup`)**: Inspect a proportional space map by file category, drill into the largest folders and heaviest files, and run a two-stage size + SHA-256 duplicate detector across your added locations. One copy in every duplicate group stays locked as `Keep` so you never delete all copies by mistake, and selected duplicates or safe cleanup candidates (`node_modules`, `.venv`, `__pycache__`, `.pytest_cache`, temp logs, old installers) move to the Windows Recycle Bin after confirmation.
+- **Installed Apps & Leftover Scanner (`Computer`)**: Browse installed Windows applications from registry keys (`HKLM`, `WOW6432Node`, `HKCU`) with publisher, version, install date, and estimated footprint. Launch an app's official uninstaller through Groundwork's guided uninstaller modal, then scan `AppData\Local`, `AppData\Roaming`, and `ProgramData` for orphaned folders left behind by uninstalled apps and move selected leftovers to the Recycle Bin.
+- **Grounded AI Operator (`Assistant`)**: Ask natural-language questions about your selected files, folders, disk space hotspots, exact duplicate groups, safe cleanup candidates, and installed applications using live local evidence.
 
 ## Reading files and virtual collections
 
@@ -206,14 +214,14 @@ For a local installer build, set `DESKTOP_API_BASE_URL` in the project-root `.en
 CI builds reject localhost backend addresses. For a local release candidate, set `GROUNDWORK_RELEASE_BUILD=1` to require an HTTPS hosted-backend address as well. The validation scripts support a fresh installed build and a portable executable with an isolated data directory and an empty developer PATH; neither check replaces testing on a clean Windows installation.
 
 1. Commit and push your changes.
-2. Create and push a new version tag (0.x while the product is unfinished).
+2. Create and push the `v1.0.0` release tag (or trigger **Publish Windows desktop release** with `v1.0.0`).
 3. Check **Publish Windows desktop release** in GitHub Actions.
 
 For example, using a version number that has not been published:
 
 ```sh
-git tag v0.1.1
-git push origin v0.1.1
+git tag -f v1.0.0
+git push origin -f v1.0.0
 ```
 
 A normal branch push runs CI. A version tag triggers the installer build, tests, and GitHub release publication. Failed checks prevent publication.

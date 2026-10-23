@@ -282,7 +282,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 setCategory(item);
                 setSelectedIndex(0);
               }}
-              className={`capitalize cursor-pointer ${category === item ? "text-[var(--ink-blue)] font-bold" : "text-[var(--ink-muted)]"}`}
+              className={`capitalize cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink-blue)] rounded px-1.5 py-0.5 ${category === item ? "text-[var(--ink-blue)] font-bold" : "text-[var(--ink-muted)] hover:text-[var(--ink)]"}`}
             >
               {item}
             </button>
@@ -398,7 +398,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         }[m]
                       }
                       onClick={() => setMode(m)}
-                      className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-sm capitalize transition-all font-mono font-semibold cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-sm capitalize transition-all font-mono font-semibold cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink-blue)] ${
                         mode === m
                           ? "bg-[var(--control-room)] text-white shadow-[var(--shadow-subtle)]"
                           : "hover:bg-[var(--surface-hover)] text-[var(--ink-secondary)]"

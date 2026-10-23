@@ -13,10 +13,11 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from app.models.types import AIQueryRequest, AIQueryResponse, CitationItem
-from app.services.ai.providers import get_llm_provider
 from app.services.ai.citation_verifier import CitationVerifier
+from app.services.ai.providers import get_llm_provider
 from app.services.ai.tools import AIToolManager
 
 logger = logging.getLogger("groundwork.ai.context")
@@ -39,11 +40,218 @@ CRITICAL RULES:
 """
 
 
+def _format_bytes_human(num_bytes: int | float | None) -> str:
+    if num_bytes is None:
+        return "Size not reported"
+    val = float(max(0, num_bytes))
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if val < 1024 or unit == "TB":
+            return f"{int(val)} B" if unit == "B" else f"{val:.1f} {unit}"
+        val /= 1024
+    return f"{val:.1f} TB"
+
+
+OPERATOR_STORAGE_PATTERNS = (
+    "taking up space",
+    "most space",
+    "largest file",
+    "largest folder",
+    "biggest file",
+    "biggest folder",
+    "disk space",
+    "storage overview",
+    "storage breakdown",
+    "drive space",
+    "using space",
+    "storage hotspot",
+)
+OPERATOR_CLEANUP_PATTERNS = (
+    "duplicate file",
+    "exact duplicate",
+    "find duplicate",
+    "cleanup candidate",
+    "free up space",
+    "reclaim space",
+    "reclaimable",
+    "temp file",
+    "temporary file",
+    "cache file",
+    "stale file",
+    "unused file",
+    "old installer",
+)
+OPERATOR_APP_PATTERNS = (
+    "installed app",
+    "installed program",
+    "installed software",
+    "large app",
+    "uninstall",
+    "leftover",
+)
+
+
 class AIContextEngine:
     """Retrieves bounded workspace context and coordinates with LLM providers."""
 
     def __init__(self) -> None:
         self.tools = AIToolManager()
+
+    @staticmethod
+    def _detect_operator_intent(question: str) -> list[str]:
+        q = (question or "").lower()
+        intents: list[str] = []
+        if any(pat in q for pat in OPERATOR_STORAGE_PATTERNS):
+            intents.append("storage")
+        if any(pat in q for pat in OPERATOR_CLEANUP_PATTERNS):
+            intents.append("cleanup")
+        if any(pat in q for pat in OPERATOR_APP_PATTERNS):
+            intents.append("apps")
+        return intents
+
+    def _run_operator_query(self, req: AIQueryRequest, intents: list[str]) -> AIQueryResponse:
+        """Executes deterministic local PC utility tools and synthesizes a grounded operator report."""
+        citations: list[CitationItem] = []
+        sections: list[str] = []
+        suggested_actions: list[dict[str, Any]] = []
+
+        if "storage" in intents:
+            overview = self.tools.execute_tool(
+                "analyze_storage",
+                {"workspace_id": req.workspace_id, "limit": 8},
+            )
+            total_files = overview.get("total_files", 0)
+            total_bytes = overview.get("total_bytes", 0)
+            drives = overview.get("drives", [])
+            drive_lines = [
+                f"- Drive `{d['path']}`: {_format_bytes_human(d['used_bytes'])} used of {_format_bytes_human(d['total_bytes'])} ({d['used_percent']}% full, {_format_bytes_human(d['free_bytes'])} free)"
+                for d in drives[:4]
+            ]
+            cats = overview.get("category_breakdown", [])
+            cat_summary = ", ".join(
+                f"{c['label']} ({_format_bytes_human(c['bytes'])}, {c['percent']}%)"
+                for c in cats[:5]
+            ) or "No categorized files scanned yet"
+
+            top_files = overview.get("largest_files", [])[:6]
+            top_folders = overview.get("largest_folders", [])[:5]
+
+            sec = [
+                f"### Storage Overview ({total_files:,} scanned files · {_format_bytes_human(total_bytes)})",
+            ]
+            if drive_lines:
+                sec.append("**Mounted Drives:**\n" + "\n".join(drive_lines))
+            sec.append(f"**Category Breakdown:** {cat_summary}")
+            if top_folders:
+                sec.append(
+                    "**Largest Folders:**\n"
+                    + "\n".join(
+                        f"- `{f['name']}` ({_format_bytes_human(f['size_bytes'])}, {f.get('file_count', 0)} files) — `{f['path']}`"
+                        for f in top_folders
+                    )
+                )
+            if top_files:
+                sec.append(
+                    "**Largest Files:**\n"
+                    + "\n".join(
+                        f"- `{f['name']}` ({_format_bytes_human(f['size_bytes'])}) [source: {f['name']}:1]"
+                        for f in top_files
+                    )
+                )
+            sections.append("\n\n".join(sec))
+
+            for f in top_files:
+                if len(citations) < 6:
+                    citations.append(
+                        CitationItem(
+                            path=f["path"],
+                            filename=f["name"],
+                            line_start=1,
+                            line_end=1,
+                            snippet=f"Size: {_format_bytes_human(f['size_bytes'])} ({f['size_bytes']:,} bytes) · Category: {f.get('category', 'other')}",
+                            evidence_kind="metadata",
+                            coverage="Storage inventory metadata",
+                            file_details={
+                                "name": f["name"],
+                                "location": f.get("parent", ""),
+                                "extension": f.get("extension", ""),
+                                "size_bytes": f["size_bytes"],
+                                "modified_timestamp": f.get("mtime"),
+                            },
+                        )
+                    )
+            suggested_actions.append({"label": "Open Storage & Files", "action": "navigate", "view": "folders"})
+
+        if "cleanup" in intents:
+            scan = self.tools.execute_tool(
+                "scan_cleanup_candidates",
+                {"workspace_id": req.workspace_id, "stale_days": 60},
+            )
+            total_cand = scan.get("total_candidates", 0)
+            reclaimable = scan.get("total_reclaimable_bytes", 0)
+            rule_lines = []
+            for rule in scan.get("rules", []):
+                if rule.get("candidate_count", 0) > 0:
+                    rule_lines.append(
+                        f"- **{rule['name']}**: {rule['candidate_count']} item(s) · {_format_bytes_human(rule['reclaimable_bytes'])} potentially reclaimable"
+                    )
+                    for item in rule.get("items", [])[:3]:
+                        rule_lines.append(
+                            f"  - `{item['name']}` ({_format_bytes_human(item['size_bytes'])}) — {item['reason']} [source: {item['name']}:1]"
+                        )
+                        if len(citations) < 6 and not any(c.path == item["path"] for c in citations):
+                            citations.append(
+                                CitationItem(
+                                    path=item["path"],
+                                    filename=item["name"],
+                                    line_start=1,
+                                    line_end=1,
+                                    snippet=f"{item['reason']} · Size: {_format_bytes_human(item['size_bytes'])}",
+                                    evidence_kind="metadata",
+                                    coverage="Cleanup rule analysis",
+                                    file_details={
+                                        "name": item["name"],
+                                        "location": item.get("parent", ""),
+                                        "size_bytes": item["size_bytes"],
+                                        "modified_timestamp": item.get("mtime"),
+                                    },
+                                )
+                            )
+            sec = [
+                f"### Cleanup & Duplicate Analysis ({total_cand} candidate(s) · {_format_bytes_human(reclaimable)} potential savings)",
+                ("\n".join(rule_lines) if rule_lines else "No duplicate, temporary, cache, or stale large files were flagged in your scanned folders."),
+                f"*{scan.get('safety_notice', '')}*",
+            ]
+            sections.append("\n\n".join(sec))
+            suggested_actions.append({"label": "Review Cleanup & Duplicates", "action": "navigate", "view": "cleanup"})
+
+        if "apps" in intents:
+            apps_res = self.tools.execute_tool("list_installed_apps", {"limit": 10})
+            apps = apps_res.get("apps", [])
+            app_lines = []
+            for a in apps[:8]:
+                size_label = _format_bytes_human(a.get("estimated_size_bytes"))
+                pub = a.get("publisher") or "Unknown publisher"
+                ver = a.get("version") or "Unknown version"
+                uninst = "Uninstaller ready" if a.get("can_uninstall") else "System/Store managed"
+                app_lines.append(f"- **{a['name']}** ({size_label}) · {pub} · v{ver} · {uninst}")
+            sec = [
+                f"### Installed Applications ({apps_res.get('total_matching', len(apps))} detected)",
+                ("\n".join(app_lines) if app_lines else "No installed applications were returned in this environment."),
+                "*Note: Application sizes reflect Windows Registry `EstimatedSize` values when reported by the installer.*",
+            ]
+            sections.append("\n\n".join(sec))
+            suggested_actions.append({"label": "Open Applications Manager", "action": "navigate", "view": "computer"})
+
+        answer = "\n\n".join(sections)
+        return AIQueryResponse(
+            answer=answer,
+            citations=citations,
+            evidence_count=len(citations) or len(sections),
+            provider_used="local-operator",
+            suggested_actions=suggested_actions,
+            session_id=None,
+            citation_verification=CitationVerifier.verify(answer, citations).to_dict(),
+        )
 
     def answer_with_context(
         self,
@@ -89,6 +297,10 @@ class AIContextEngine:
                 all_selected = CollectionService().relevant_paths(collection, req.question)
                 if not all_selected:
                     return AIQueryResponse(answer="No matching indexed passages were found in this collection. Try a specific topic or select up to six files to summarize.", citations=[], evidence_count=0, provider_used="none")
+        if not all_selected and not req.collection_id:
+            operator_intents = self._detect_operator_intent(req.question)
+            if operator_intents:
+                return self._run_operator_query(req, operator_intents)
         if not all_selected and req.search_workspace and not req.collection_id:
             # Retrieval is restricted to registered locations; every result is
             # revalidated by read_file before any content reaches a provider.

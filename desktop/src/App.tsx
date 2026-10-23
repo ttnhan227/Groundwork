@@ -9,12 +9,9 @@ import { GlobalSearchModal } from "./components/search/GlobalSearchModal";
 import { ProjectsView } from "./components/projects/ProjectsView";
 import { ActivityTimelineView } from "./components/activity/ActivityTimelineView";
 import { ContextSessionsView } from "./components/sessions/ContextSessionsView";
-import { AIInvestigationView } from "./components/ai/AIInvestigationView";
 import { NotesView } from "./components/notes/NotesView";
 import { SettingsView } from "./components/settings/SettingsView";
-import { HomeView } from "./components/home/HomeView";
 import { ComputerView } from "./components/computer/ComputerView";
-import { FoldersView } from "./components/folders/FoldersView";
 import { AccountDialog } from "./components/account/AccountDialog";
 import { AccountView } from "./components/account/AccountView";
 import { AISettingsView } from "./components/settings/AISettingsView";
@@ -22,10 +19,13 @@ import { api } from "./services/api";
 import { SelectionProvider } from "./services/selection";
 import { AssistantView } from "./components/assistant/AssistantView";
 import { OrganizeView } from "./components/assistant/OrganizeView";
+import { CleanupView } from "./components/cleanup/CleanupView";
 import { CollectionsView } from "./components/collections/CollectionsView";
 import { FilePreviewView } from "./components/folders/FilePreviewView";
 import type { FileCollection } from "./services/api";
 import type { Project, SearchResultItem } from "./types/api";
+
+const FULL_WORKSPACE_TABS = new Set(["cleanup", "computer", "projects"]);
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("folders");
@@ -35,7 +35,7 @@ export const App: React.FC = () => {
   const mainScroll = React.useRef<HTMLElement>(null);
   useEffect(() => {
     mainScroll.current?.scrollTo({ top: 0 });
-    setExpandedTool(false);
+    setExpandedTool(FULL_WORKSPACE_TABS.has(activeTab));
   }, [activeTab]);
   const [accountDialog, setAccountDialog] = useState<
     "welcome" | "signin" | "link" | null
@@ -95,7 +95,6 @@ export const App: React.FC = () => {
     return () => window.removeEventListener("groundwork-preview", show);
   }, [activeTab]);
   const [focusedFile, setFocusedFile] = useState<SearchResultItem | null>(null);
-  const [sessionId, setSessionId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -135,13 +134,16 @@ export const App: React.FC = () => {
   }, [isSearchOpen, accountDialog]);
 
   const handleInvestigateProject = (project: Project) => {
+    setContextCollection(undefined);
+    setSelectedFiles([project.path]);
+    setResumedSummary("");
     setFocusedFile(null);
-    setSessionId(undefined);
     setContextQuestion(
       `Explain ${project.name}: its purpose, entry points, recent work, and current changes.`,
     );
     setSelectedProjectId(project.id);
-    setActiveTab("ai");
+    setQuestionRequest(Date.now());
+    setActiveTab("assistant");
   };
 
   const handleAskAIWithContext = (query: string, file: SearchResultItem) => {
@@ -149,7 +151,6 @@ export const App: React.FC = () => {
     setSelectedFiles([file.path]);
     setResumedSummary("");
     setFocusedFile(file);
-    setSessionId(undefined);
     setContextQuestion(
       `${query}  -  explain ${file.relative_path} at line ${file.line_number ?? 1}`,
     );
@@ -175,6 +176,8 @@ export const App: React.FC = () => {
         );
       case "organize":
         return <OrganizeView />;
+      case "cleanup":
+        return <CleanupView />;
       case "preview":
         return null;
       case "collections":
@@ -182,17 +185,8 @@ export const App: React.FC = () => {
           setContextCollection(collection); setSelectedFiles(paths); setFocusedFile(null);
           setContextQuestion(question); setResumedSummary(""); setActiveTab("assistant");
         }} />;
-      case "home":
-        return (
-          <HomeView
-            onNavigate={setActiveTab}
-            onSearch={() => setIsSearchOpen(true)}
-          />
-        );
       case "computer":
         return <ComputerView />;
-      case "folders":
-        return <FoldersView />;
       case "account":
         return (
           <AccountView
@@ -203,7 +197,7 @@ export const App: React.FC = () => {
           />
         );
       case "ai-settings":
-        return <AISettingsView onBack={() => setActiveTab("ai")} />;
+        return <AISettingsView onBack={() => setActiveTab("settings")} />;
       case "projects":
         return <ProjectsView onInvestigateProject={handleInvestigateProject} />;
       case "activity":
@@ -217,25 +211,12 @@ export const App: React.FC = () => {
               setSelectedFiles(session.files_inspected || []);
               setResumedSummary(session.summary || "");
               setFocusedFile(null);
-              setSessionId(session.id);
               setSelectedProjectId(session.project_id);
               setContextQuestion(
                 `Continue ${session.title}. Review the saved findings and remaining tasks against current files.`,
               );
               setActiveTab("assistant");
             }}
-          />
-        );
-      case "ai":
-        return (
-          <AIInvestigationView
-            onChooseFiles={() => setActiveTab("folders")}
-            onConfigure={() => setActiveTab("ai-settings")}
-            selectedProjectId={selectedProjectId}
-            initialQuestion={contextQuestion}
-            focusedPath={focusedFile?.path}
-            focusedLine={focusedFile && selectedFiles[0] === focusedFile.path ? focusedFile.line_number || 1 : 1}
-            sessionId={sessionId}
           />
         );
       case "notes":
@@ -270,15 +251,15 @@ export const App: React.FC = () => {
       setSelected={setSelectedFiles}
     >
       <div className="desktop-shell">
-        <DesktopCommandBar active={activeTab} onTool={(tab) => {setContextCollection(undefined); setActiveTab(tab === "home" || tab === "projects" ? "folders" : tab);}}
+        <DesktopCommandBar active={activeTab} onTool={(tab) => {setContextCollection(undefined); setActiveTab(tab === "home" ? "folders" : tab);}}
           onSearch={() => { setContentQuery(""); setIsSearchOpen(true); }} />
         <BackgroundTaskStatus active={activeTab} onNavigate={tab => {if(tab === 'assistant') setContextQuestion(''); setActiveTab(tab);}}/>
         <div className={`desktop-work-area ${readingFile ? "reader-work-area" : ""}`}>
-          <div className="desktop-explorer-host" hidden={readingFile}><ExplorerWorkspace active={!readingFile && ["folders", "home", "projects"].includes(activeTab)} /></div>
+          <div className="desktop-explorer-host" hidden={readingFile || (!readingFile && !["folders", "home", "preview"].includes(activeTab) && expandedTool)}><ExplorerWorkspace active={!readingFile && ["folders", "home"].includes(activeTab)} /></div>
           {readingFile && preview && <main className="desktop-reader" aria-label="File reader">
             <FilePreviewView key={preview.path} path={preview.path} line={preview.line} showAI={activeTab === "preview"} onBack={() => setActiveTab("folders")} onAsk={askFromReader} onPreviousFile={readerIndex > 0 ? () => changeReaderFile(-1) : undefined} onNextFile={readerIndex >= 0 && readerIndex < readerFiles.length - 1 ? () => changeReaderFile(1) : undefined}/>
           </main>}
-          {!["folders", "home", "projects", "preview"].includes(activeTab) && <aside className={`desktop-tool-panel ${expandedTool ? "is-expanded" : ""}`} aria-label="Tool panel">
+          {!["folders", "home", "preview"].includes(activeTab) && <aside className={`desktop-tool-panel ${expandedTool ? "is-expanded" : ""}`} aria-label="Tool panel">
             <ToolPanelHeader active={activeTab} expanded={expandedTool} toggle={() => setExpandedTool(value => !value)} canExpand={!readingFile} close={() => setActiveTab(readingFile ? "preview" : "folders")} />
             {readingFile && <button className="assistant-return-file" onClick={() => setActiveTab("preview")}>Close Assistant · Keep reading</button>}
             <main ref={mainScroll} className="desktop-tool-content">{renderActiveView()}</main>

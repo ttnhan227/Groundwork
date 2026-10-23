@@ -84,6 +84,36 @@ class AIToolManager:
                 "is_mutating": False,
             },
             {
+                "name": "analyze_storage",
+                "description": "Analyzes disk drives, workspace storage usage, category breakdown, largest files, and largest folders.",
+                "parameters": {"workspace_id": "string (optional)", "limit": "integer"},
+                "is_mutating": False,
+            },
+            {
+                "name": "find_duplicates",
+                "description": "Finds exact SHA-256 duplicate files and similar filenames across workspaces, calculating wasted disk space.",
+                "parameters": {"workspace_id": "string (optional)"},
+                "is_mutating": False,
+            },
+            {
+                "name": "scan_cleanup_candidates",
+                "description": "Scans workspaces using cleanup rules (duplicates, temp/log files, build caches, installers/archives, large stale files) to find reclaimable space.",
+                "parameters": {"workspace_id": "string (optional)", "stale_days": "integer"},
+                "is_mutating": False,
+            },
+            {
+                "name": "list_installed_apps",
+                "description": "Lists installed Windows applications, optionally filtering by name/publisher and sorting by estimated size.",
+                "parameters": {"query": "string (optional)", "limit": "integer"},
+                "is_mutating": False,
+            },
+            {
+                "name": "scan_app_leftovers",
+                "description": "Scans standard Windows app data and install directories for leftover files/folders and registry keys associated with an application.",
+                "parameters": {"app_name": "string", "publisher": "string (optional)", "install_location": "string (optional)"},
+                "is_mutating": False,
+            },
+            {
                 "name": "create_note",
                 "description": "Creates a new developer note linked to project or file.",
                 "parameters": {"title": "string", "content": "string", "project_id": "string (optional)", "file_path": "string (optional)"},
@@ -111,7 +141,7 @@ class AIToolManager:
             for name, description in tool["parameters"].items():
                 kind = "integer" if description.startswith("integer") else "string"
                 properties[name] = {"type": kind}
-                if "optional" not in description and name not in {"limit", "days"}:
+                if "optional" not in description and name not in {"limit", "days", "stale_days"}:
                     required.append(name)
             tool["parameters"] = {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
             if tool["name"] in MUTATING_TOOLS:
@@ -187,6 +217,47 @@ class AIToolManager:
         elif tool_name == "get_activity":
             activities = self.activity_service.list_activities(days=args.get("days", 2))
             return {"activities": [a.model_dump() for a in activities]}
+
+        elif tool_name == "analyze_storage":
+            from app.services.cleanup_service import CleanupService
+            return CleanupService().storage_overview(args.get("workspace_id"), args.get("limit", 10))
+
+        elif tool_name == "find_duplicates":
+            from app.services.duplicate_service import DuplicateService
+            return DuplicateService().find_duplicates(args.get("workspace_id"))
+
+        elif tool_name == "scan_cleanup_candidates":
+            from app.services.cleanup_service import CleanupService
+            return CleanupService().scan_cleanup_candidates(
+                workspace_id=args.get("workspace_id"),
+                stale_days=args.get("stale_days", 60),
+            )
+
+        elif tool_name == "list_installed_apps":
+            from app.services.installed_apps import list_apps
+            res = list_apps()
+            apps = list(res.get("apps", []))
+            q = (args.get("query") or "").strip().lower()
+            if q:
+                apps = [
+                    a for a in apps
+                    if q in a.get("name", "").lower() or q in a.get("publisher", "").lower()
+                ]
+            apps.sort(key=lambda a: (-(a.get("estimated_size_bytes") or -1), a.get("name", "").lower()))
+            limit = args.get("limit", 20)
+            return {
+                "supported": res.get("supported", False),
+                "total_matching": len(apps),
+                "apps": apps[:limit],
+            }
+
+        elif tool_name == "scan_app_leftovers":
+            from app.services.installed_apps import scan_app_leftovers
+            return scan_app_leftovers(
+                app_name=args["app_name"],
+                publisher=args.get("publisher", ""),
+                install_location=args.get("install_location", ""),
+            )
 
         elif tool_name == "create_note":
             note = self.notes_service.create_note(NoteCreate(

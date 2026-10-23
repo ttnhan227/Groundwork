@@ -6,7 +6,7 @@ import {
   ShieldCheck,
   Sparkles,
   FolderTree,
-  NotebookPen,
+  Trash2,
 } from "lucide-react";
 export function LandingPage({
   navigate,
@@ -18,7 +18,7 @@ export function LandingPage({
       <section className="product-showcase">
         <div className="product-first-glance">
           <p className="product-eyebrow">
-            Groundwork · Your local desktop workspace
+            Groundwork 1.0 · Local Windows workspace, storage & cleanup utility
           </p>
           <h1>
             Find your files.
@@ -26,8 +26,9 @@ export function LandingPage({
             <span>Understand what matters.</span>
           </h1>
           <p className="product-intro">
-            Find documents, read them, and ask about the details you need—
-            with answers you can trace back to the file.
+            Explore your folders, reclaim disk space from SHA-256 duplicates and
+            app leftovers, read documents, and ask AI questions—with answers you
+            can trace back to the file.
           </p>
           <div className="product-hero-actions">
             <button
@@ -50,22 +51,21 @@ export function LandingPage({
           </p>
           <figure className="product-workspace-shot">
             <a
-              href="/screenshots/workspace.png?v=20261008c"
+              href="/screenshots/cleanup.png"
               target="_blank"
               rel="noreferrer"
-              aria-label="Open full-size workspace screenshot"
+              aria-label="Open full-size storage and cleanup workspace screenshot"
             >
               <img
-                src="/screenshots/workspace.png?v=20261008c"
-                alt="Groundwork built-in reader showing an apartment lease renewal beside its cited AI answer"
-                width={1440}
-                height={900}
+                src="/screenshots/cleanup.png"
+                alt="Groundwork Storage Analyzer & Cleanup showing proportional folder space map, mounted drive capacity, and SHA-256 duplicate rules"
+                width={1280}
+                height={820}
                 fetchPriority="high"
               />
             </a>
             <figcaption>
-              Read a lease renewal with its AI answer beside it, without opening another app.
-              Actual interface with illustrative sample documents.
+              Inspect proportional folder sizes, mounted drive capacity, and SHA-256 duplicate rules in one local utility.
             </figcaption>
           </figure>
         </div>
@@ -75,29 +75,29 @@ export function LandingPage({
         aria-labelledby="ai-feature-title"
       >
         <div className="product-ai-copy">
-          <p className="product-eyebrow">More than finding a file</p>
+          <p className="product-eyebrow">Grounded AI operator & document reader</p>
           <h2 id="ai-feature-title">
             What changed?
             <br />
-            What do I need to do?
+            What is using my space?
           </h2>
           <p>
-            Ask about a receipt, document, spreadsheet, or folder. Read Office
-            documents and PDF text, or recognize written text in images and scanned
-            PDFs on Windows. Keep your files beside the answer.
+            Ask about a receipt, document, spreadsheet, folder, storage hotspot,
+            or installed program. Read Office documents and PDF text, recognize
+            written text in images and scanned PDFs on Windows, or let the local
+            operator inspect duplicate files and application footprints.
           </p>
           <ul>
             <li>
               <strong>Check the source.</strong> Follow references back to your
-              files. See whether the answer used document text, OCR, or file details only.
+              files. See whether the answer used document text, OCR, storage metrics, or file details only.
             </li>
             <li>
               <strong>Choose where AI runs.</strong> Use local excerpts, a local
               model, or an online provider.
             </li>
             <li>
-              <strong>Stay in control.</strong> Review proposed changes before
-              applying them.
+              <strong>Stay in control.</strong> Every cleanup, uninstaller launch, and file move requires your explicit review and confirmation.
             </li>
           </ul>
           <button className="utility-ai-link" onClick={() => navigate("/docs")}>
@@ -106,7 +106,7 @@ export function LandingPage({
           </button>
           <p className="product-ai-setup">
             Generated answers require a configured model or provider. Matching
-            excerpts work locally.
+            excerpts and deterministic storage tools work locally.
           </p>
         </div>
         <figure className="product-ai-shot">
@@ -139,7 +139,7 @@ export function LandingPage({
             {
               icon: FolderTree,
               title: "One desktop workspace",
-              text: "Keep the folder tree, file list, storage details, and tools together. Select a file and act on it without navigating through separate screens.",
+              text: "Keep the folder tree, file list, built-in reader, storage analyzer, and installed app tools together without switching between separate utilities.",
             },
             {
               icon: Search,
@@ -148,23 +148,23 @@ export function LandingPage({
             },
             {
               icon: HardDrive,
-              title: "Understand your storage",
-              text: "Sort by size, compare folders, and explore storage by type. Folder totals show logical bytes; individual files can show allocated size and hard links where available.",
+              title: "Storage map & SHA-256 cleanup",
+              text: "Explore proportional folder space maps, largest files, and mounted drives. Reclaim space from byte-verified SHA-256 duplicates, caches, temp logs, and stale downloads via the Windows Recycle Bin.",
+            },
+            {
+              icon: Trash2,
+              title: "Installed apps & leftover scanner",
+              text: "Browse Windows desktop and Store apps sorted by size, launch official uninstallers with confirmation, and scan AppData, ProgramData, and Registry keys for leftover footprints.",
             },
             {
               icon: Sparkles,
-              title: "AI grounded in your files",
-              text: "Ask about documents, spreadsheets, presentations, and recognized image text. Check source references and coverage labels. Unsupported formats provide file details only. Generative answers need a configured model.",
+              title: "AI grounded in your PC",
+              text: "Ask about documents, spreadsheets, recognized image text, disk usage, or installed software. Check source references and coverage labels. Unsupported formats provide file details only. Generative answers need a configured model.",
             },
             {
               icon: ShieldCheck,
               title: "Review before changes",
-              text: "Inspect duplicate candidates and preview organization plans before applying moves. Supported organization operations include history and undo.",
-            },
-            {
-              icon: NotebookPen,
-              title: "Keep useful context",
-              text: "Group related files in collections without moving originals. Save useful answers, notes, searches, and next steps. Your local file index stays on your computer.",
+              text: "Inspect duplicate candidates and preview organization plans before applying moves. Nothing is ever deleted or moved without explicit confirmation, and supported organization operations include history and undo.",
             },
           ].map((item) => (
             <article key={item.title}>
@@ -176,7 +176,7 @@ export function LandingPage({
         </div>
       </section>
       <section className="product-bottom-cta">
-        <h2>Ready to explore your files?</h2>
+        <h2>Ready to explore and clean up your PC?</h2>
         <p>
           The Windows installer includes the local engine. No Python, Docker, or
           database installation needed.

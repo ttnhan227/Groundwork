@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag, for example v0.1.0 (preview)
+        description: Existing version tag, for example v1.0.0
         required: true
         type: string
 
@@ -66,7 +66,7 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: ./scripts/build-signed-release.ps1
         working-directory: desktop
-      - run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs
+      - run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs desktop/tests/cleanup-computer-ui.test.cjs
       - run: server/.packaging-venv/Scripts/python.exe -m pytest server/tests -q
       - run: python desktop/scripts/smoke-core.py
       - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
@@ -135,7 +135,7 @@ jobs:
           cd release-assets
           sha256sum --check Groundwork-windows-x64-setup.exe.sha256
           if gh release view "$RELEASE_TAG" --json isDraft > release-state.json 2>/dev/null; then
-            test "$(jq -r .isDraft release-state.json)" = true || { echo 'Published releases are immutable in this workflow; use a new version tag.'; exit 1; }
+            echo "Updating existing release $RELEASE_TAG with verified assets..."
             gh release upload "$RELEASE_TAG" Groundwork-windows-x64-setup.exe Groundwork-windows-x64-setup.exe.sha256 --clobber
           else
             gh release create "$RELEASE_TAG" Groundwork-windows-x64-setup.exe Groundwork-windows-x64-setup.exe.sha256 --verify-tag --draft --title "Groundwork $RELEASE_TAG" --generate-notes

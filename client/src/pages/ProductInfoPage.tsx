@@ -18,7 +18,7 @@ export function ProductInfoPage({
     resources:
       "Guides, release information, and source code to help you get more from Groundwork.",
     about:
-      "A desktop workspace built around your local files, with search and AI tools close at hand.",
+      "A desktop workspace built around your local files, disk storage, installed applications, and grounded AI tools.",
     contributors:
       "Groundwork is an independent, open-source project created by Tran Trong Nhan.",
     contact:
@@ -38,7 +38,7 @@ export function ProductInfoPage({
           {[
             {
               title: "Getting started",
-              text: "Installation, adding locations, and your first search.",
+              text: "Installation, adding locations, storage cleanup, installed app management, and AI answers.",
               path: "/docs",
             },
             {
@@ -94,10 +94,12 @@ export function ProductInfoPage({
           <section>
             <h2 className="text-xl font-semibold">Why Groundwork exists</h2>
             <p className="mt-3 text-[var(--ink-secondary)] leading-relaxed">
-              Finding a file, understanding its contents, and deciding what to
-              do next often takes several tools. Groundwork brings the folder
-              tree, live search, storage details, notes, and Assistant into one
-              desktop workspace.
+              Finding a file, understanding its contents, reclaiming disk space,
+              and removing old programs often takes several separate utilities.
+              Groundwork brings the folder tree, built-in reader, proportional
+              storage map, SHA-256 duplicate cleanup, installed app uninstaller
+              with leftover scanning, and grounded Assistant into one calm
+              Windows desktop workspace.
             </p>
           </section>
           <section>

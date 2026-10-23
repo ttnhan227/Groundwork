@@ -278,8 +278,10 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                         {file.is_dir ? "/" : ""}
                       </span>
                       {!file.is_dir && (
-                        <div className="flex gap-2">
-                          <button
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="xs"
+                            variant="ghost"
                             onClick={() =>
                               api
                                 .openFile(
@@ -289,9 +291,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                             }
                           >
                             Open
-                          </button>
+                          </Button>
                           {selectedOverview.working_tree?.branch && (
-                            <button
+                            <Button
+                              size="xs"
+                              variant="secondary"
                               onClick={() =>
                                 api
                                   .getFileHistory(
@@ -303,7 +307,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                               }
                             >
                               History
-                            </button>
+                            </Button>
                           )}
                         </div>
                       )}
@@ -325,7 +329,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 {selectedOverview.working_tree.changed_files?.map((file) => (
                   <button
                     key={file.file}
-                    className="flex gap-3 text-xs font-mono w-full text-left hover:text-[var(--ink-blue)]"
+                    className="flex items-center gap-3 text-xs font-mono w-full text-left p-1 rounded hover:bg-[var(--surface-hover)] hover:text-[var(--ink-blue)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink-blue)] transition-colors cursor-pointer"
                     onClick={() =>
                       api
                         .getFileHistory(selectedOverview.id, file.file)
@@ -333,8 +337,8 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                         .catch((error) => setError(String(error)))
                     }
                   >
-                    <span>{file.status}</span>
-                    <span>{file.file}</span>
+                    <span className="font-bold text-[var(--ink-sepia)] w-5">{file.status}</span>
+                    <span className="truncate">{file.file}</span>
                   </button>
                 ))}
                 {fileHistory && (
@@ -347,7 +351,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                         {commit.hash.slice(0, 7)} · {commit.message}
                       </p>
                     ))}
-                    <pre className="text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto">
+                    <pre className="text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-xs)] border border-[var(--hairline)] leading-relaxed text-[var(--ink)]">
                       {fileHistory.diff || "No tracked changes against HEAD."}
                     </pre>
                   </div>

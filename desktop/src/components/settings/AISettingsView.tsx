@@ -68,7 +68,7 @@ export function AISettingsView({ onBack }: { onBack: () => void }) {
     <div className="gw-page max-w-3xl" style={{ alignSelf: "flex-start" }}>
       <Button variant="ghost" onClick={onBack} className="self-start">
         <ArrowLeft size={17} />
-        Back to Ask your files
+        Back to Settings
       </Button>
       <div>
         <h1 className="gw-title">How would you like answers?</h1>

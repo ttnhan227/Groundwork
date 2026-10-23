@@ -149,7 +149,7 @@ export const ActivityTimelineView: React.FC<ActivityTimelineViewProps> = ({
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`px-2.5 py-1 rounded-[var(--radius-xs)] text-xs transition-all font-mono font-semibold cursor-pointer ${
+                className={`px-2.5 py-1 rounded-[var(--radius-xs)] text-xs transition-all font-mono font-semibold cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink-blue)] ${
                   days === d
                     ? "bg-[var(--control-room)] text-white shadow-[var(--shadow-subtle)]"
                     : "text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--surface-hover)]"

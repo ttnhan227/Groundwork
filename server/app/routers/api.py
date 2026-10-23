@@ -95,6 +95,64 @@ class PathActionRequest(BaseModel):
     path: str
 
 
+class CleanupProposeRequest(BaseModel):
+    paths: list[str] = Field(min_length=1, max_length=200)
+    mode: str = Field(default="recycle", pattern="^(recycle|permanent)$")
+
+
+class CleanupExecuteRequest(BaseModel):
+    proposal: dict[str, Any]
+    confirmation_token: str = Field(min_length=1, max_length=256)
+
+
+class LeftoverScanRequest(BaseModel):
+    app_id: str = Field(default="", max_length=512)
+    app_name: str = Field(default="", max_length=256)
+    publisher: str = Field(default="", max_length=256)
+    install_location: str = Field(default="", max_length=1024)
+
+
+@system_router.get("/storage-overview")
+def get_storage_overview(workspace_id: str | None = None, limit: int = Query(default=12, ge=1, le=50)):
+    from app.services.cleanup_service import CleanupService
+    return CleanupService().storage_overview(workspace_id, limit)
+
+
+@system_router.get("/cleanup/scan")
+def scan_cleanup_candidates(
+    workspace_id: str | None = None,
+    stale_days: int = Query(default=60, ge=0, le=3650),
+    min_large_mb: int = Query(default=25, ge=1, le=102400),
+):
+    from app.services.cleanup_service import CleanupService
+    return CleanupService().scan_cleanup_candidates(
+        workspace_id=workspace_id,
+        stale_days=stale_days,
+        min_large_bytes=min_large_mb * 1024 * 1024,
+    )
+
+
+@system_router.post("/cleanup/propose")
+def propose_cleanup_action(req: CleanupProposeRequest):
+    from app.services.cleanup_service import CleanupService
+    try:
+        return CleanupService().propose_cleanup(req.paths, req.mode)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@system_router.post("/cleanup/execute")
+def execute_cleanup_action(req: CleanupExecuteRequest):
+    from app.services.cleanup_service import CleanupService
+    try:
+        return CleanupService().execute_cleanup(req.proposal, req.confirmation_token)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 
 @system_router.get("/duplicates")
 def get_duplicates(workspace_id: str | None = None):
@@ -209,6 +267,66 @@ def launch_installed_app(req: PathActionRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Windows couldn't launch this app.") from exc
+
+
+@system_router.post("/installed-apps/uninstall/propose")
+def propose_app_uninstall(req: PathActionRequest):
+    from app.services.installed_apps import propose_uninstall
+    try:
+        return propose_uninstall(req.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@system_router.post("/installed-apps/uninstall/execute")
+def execute_app_uninstall(req: CleanupExecuteRequest):
+    from app.services.installed_apps import execute_uninstall
+    try:
+        return execute_uninstall(req.proposal, req.confirmation_token)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@system_router.post("/installed-apps/leftovers")
+def scan_installed_app_leftovers(req: LeftoverScanRequest):
+    from app.services.installed_apps import scan_app_leftovers
+    try:
+        return scan_app_leftovers(
+            app_id=req.app_id,
+            app_name=req.app_name,
+            publisher=req.publisher,
+            install_location=req.install_location,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@system_router.post("/installed-apps/leftovers/propose")
+def propose_app_leftovers_cleanup(req: CleanupProposeRequest):
+    from app.services.installed_apps import propose_leftover_cleanup
+    try:
+        return propose_leftover_cleanup(req.paths, req.mode)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@system_router.post("/installed-apps/leftovers/execute")
+def execute_app_leftovers_cleanup(req: CleanupExecuteRequest):
+    from app.services.installed_apps import execute_leftover_cleanup
+    try:
+        return execute_leftover_cleanup(req.proposal, req.confirmation_token)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @system_router.post("/desktop-action")

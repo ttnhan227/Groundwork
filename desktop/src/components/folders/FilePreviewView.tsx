@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type FilePreview } from "../../services/api";
 import { Button } from "../ui";
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { formatBytes } from "./StorageCategoryStrip";
 import { LoadingState } from "../ui/LoadingState";
 
@@ -70,10 +71,10 @@ export function FilePreviewView({path, line = 1, showAI = true, onAsk, onBack, o
     {loading && <LoadingState title="Opening file" detail={path.split(/[\\/]/).pop()} skeleton/>}
     {error && <div role="alert" className="gw-notice">{error}<Button disabled={loading} onClick={() => setRevision(v => v + 1)}>Try again</Button>{page > 1 && <Button onClick={() => setPage(1)}>Return to first page</Button>}</div>}
     {preview && preview.path === path && preview.page === page && <>
-      <div className="reader-controls" role="toolbar" aria-label="Reading controls"><Button aria-label="Previous file" title="Previous file in the file list" disabled={!onPreviousFile || loading} onClick={onPreviousFile}>←</Button><Button aria-label="Next file" title="Next file in the file list" disabled={!onNextFile || loading} onClick={onNextFile}>→</Button>
-        <Button aria-label="Zoom out" disabled={preview.kind === "unsupported" || zoom <= 50} onClick={() => changeZoom(-25)}>−</Button><span className="reader-zoom-value">{fit ? "Fit" : `${zoom}%`}</span><Button aria-label="Zoom in" disabled={preview.kind === "unsupported" || zoom >= 250} onClick={() => changeZoom(25)}>+</Button><Button aria-pressed={fit} onClick={() => {setFit(true); setZoom(100);}}>Fit to view</Button>
+      <div className="reader-controls" role="toolbar" aria-label="Reading controls"><Button aria-label="Previous file" title="Previous file in the file list" disabled={!onPreviousFile || loading} onClick={onPreviousFile}><ChevronLeft size={16} /></Button><Button aria-label="Next file" title="Next file in the file list" disabled={!onNextFile || loading} onClick={onNextFile}><ChevronRight size={16} /></Button>
+        <Button aria-label="Zoom out" disabled={preview.kind === "unsupported" || zoom <= 50} onClick={() => changeZoom(-25)}><ZoomOut size={16} /></Button><span className="reader-zoom-value">{fit ? "Fit" : `${zoom}%`}</span><Button aria-label="Zoom in" disabled={preview.kind === "unsupported" || zoom >= 250} onClick={() => changeZoom(25)}><ZoomIn size={16} /></Button><Button aria-pressed={fit} onClick={() => {setFit(true); setZoom(100);}}>Fit to view</Button>
         {preview.pages > 1 && <div className="reader-page-controls"><Button disabled={loading || page <= 1} onClick={() => setPage(v => v - 1)}>Previous page</Button><span>{page} / {preview.pages}</span><Button disabled={loading || page >= preview.pages} onClick={() => setPage(v => v + 1)}>Next page</Button></div>}
-        {preview.kind === "text" && <button className="preview-line-toggle" aria-pressed={showLines} onClick={() => setShowLines(v => !v)}>Line numbers</button>}
+        {preview.kind === "text" && <Button variant={showLines ? "primary" : "secondary"} size="xs" aria-pressed={showLines} onClick={() => setShowLines(v => !v)}>Line numbers</Button>}
       </div>
       <div ref={canvas} tabIndex={0} role="region" aria-label="Reader content" className={`file-preview-content reader-canvas reader-kind-${preview.kind} ${fit ? "is-fit" : "is-zoomed"}`}><div className="workflow-section-title"><strong>{preview.kind === "text" ? "Document text" : preview.kind === "pdf" ? "PDF document" : "Image"}</strong><span>{preview.kind === "pdf" ? `Page ${page} of ${preview.pages}` : preview.kind === "text" ? `${preview.total_lines || preview.text.split("\n").length} lines` : preview.kind === "image" ? "Image" : "Unavailable"}</span></div>
       {preview.kind === "text" && <div className={`file-preview-text ${showLines ? "" : "document-reading-view"}`} style={{fontSize: `${14 * zoom / 100}px`}} aria-label="File text preview">{preview.text.split("\n").map((text, index) => <div key={index} className={line > 1 && preview.line_start + index === line ? "is-highlighted" : ""}>{showLines && <span>{preview.line_start + index}</span>}<code>{text || " "}</code></div>)}</div>}

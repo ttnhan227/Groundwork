@@ -417,15 +417,15 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                             const isDone = todo.startsWith("[x] ");
                             const cleanText = todo.replace(/^\[[ x]\]\s*/, "");
                             return (
-                              <div
+                              <label
                                 key={idx}
-                                onClick={() => handleToggleTodo(session, idx)}
                                 className="flex items-center gap-2 text-xs text-[var(--ink)] hover:text-[var(--ink-blue)] cursor-pointer select-none"
                               >
                                 <input
                                   type="checkbox"
                                   checked={isDone}
-                                  onChange={() => {}}
+                                  aria-label={`Toggle task: ${cleanText}`}
+                                  onChange={() => handleToggleTodo(session, idx)}
                                   className="rounded-[var(--radius-xs)] border-[var(--hairline-strong)] text-[var(--ink-blue)] focus:ring-0 cursor-pointer"
                                 />
                                 <span
@@ -437,7 +437,7 @@ export const ContextSessionsView: React.FC<ContextSessionsViewProps> = ({
                                 >
                                   {cleanText}
                                 </span>
-                              </div>
+                              </label>
                             );
                           })}
                         </div>

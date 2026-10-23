@@ -25,13 +25,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SERVER_DIR = REPO_ROOT / "server"
 sys.path.insert(0, str(SERVER_DIR))
 
-from app.core import config
-from app.database.local_db import reset_db
-from app.models.types import AIQueryRequest, WorkspaceCreate
-from app.services.ai.context_engine import AIContextEngine
-from app.services.indexer_service import IndexerService
-from app.services.search_engine import SearchEngine
-from app.services.workspace_service import WorkspaceService
+from app.core import config  # noqa: E402
+from app.database.local_db import reset_db  # noqa: E402
+from app.models.types import AIQueryRequest, WorkspaceCreate  # noqa: E402
+from app.services.ai.context_engine import AIContextEngine  # noqa: E402
+from app.services.indexer_service import IndexerService  # noqa: E402
+from app.services.search_engine import SearchEngine  # noqa: E402
+from app.services.workspace_service import WorkspaceService  # noqa: E402
 
 
 def run_golden_workflow():
@@ -101,7 +101,7 @@ def run_golden_workflow():
         for i, match in enumerate(search_res.results, start=1):
             print(f"        #{i}: {match.filename}:{match.line_number} (Score: {match.score:.3f})")
             print(f"             Snippet: {match.snippet[:60]}...")
-            assert "auth_service.py" in match.filename, "Expected auth_service.py as top match"
+        assert len(search_res.results) > 0 and "auth_service.py" in search_res.results[0].filename, "Expected auth_service.py as top match"
 
         # Step 5: Grounded AI Query & Citation Verification
         print("\n[5/6] Assembling AI context and verifying source citations...")
@@ -119,7 +119,7 @@ def run_golden_workflow():
         print(f"      Evidence count: {ai_res.evidence_count} sources retrieved")
         if ai_res.citation_verification:
             ver = ai_res.citation_verification
-            print(f"      Citation Verification Report:")
+            print("      Citation Verification Report:")
             print(f"        - Valid citations: {ver.get('valid_citations', 0)}")
             print(f"        - Invalid citations: {ver.get('invalid_citations', 0)}")
             print(f"        - Grounded: {ver.get('grounded')}")

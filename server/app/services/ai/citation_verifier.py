@@ -51,6 +51,8 @@ SAFE_REFUSAL_PHRASES = [
     "no matching",
     "no relevant",
     "insufficient details",
+    "insufficient context",
+    "cannot answer",
     "does not contain sufficient",
     "information is missing",
     "not found in",

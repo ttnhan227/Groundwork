@@ -1,8 +1,9 @@
+import { ShieldCheck, ShieldAlert } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { api, waitForJob, previewFile } from "../../services/api";
 import { useSelection } from "../../services/selection";
 import type { AIQueryResponse } from "../../types/api";
-import { Button, Card } from "../ui";
+import { Button, Card, InlineCitationChip } from "../ui";
 import { LoadingState } from "../ui/LoadingState";
 import { LocalAISetup } from "./LocalAISetup";
 
@@ -207,7 +208,6 @@ export function AssistantView({
           >
             Summarize
           </Button>
-          <details className="panel-options"><summary>More actions</summary><div>
           <Button
             disabled={busy || !providerReady || !selected.length || selected.length > 6 || (provider === "builtin" && !builtinReady)}
             onClick={() =>
@@ -216,10 +216,45 @@ export function AssistantView({
               )
             }
           >
-            Describe and suggest tags
+            Describe & tags
           </Button>
-          {selected.length > 1 && <Button disabled={busy || !providerReady || selected.length > 6 || (provider === "builtin" && !builtinReady)} onClick={() => ask("Compare the selected files. Explain agreements, differences, and conflicting dates or decisions. Cite each finding and say when the excerpts are insufficient.")}>Compare files</Button>}
-          </div></details>
+          {selected.length > 1 && (
+            <Button
+              disabled={busy || !providerReady || selected.length > 6 || (provider === "builtin" && !builtinReady)}
+              onClick={() =>
+                ask(
+                  "Compare the selected files. Explain agreements, differences, and conflicting dates or decisions. Cite each finding and say when the excerpts are insufficient.",
+                )
+              }
+            >
+              Compare files
+            </Button>
+          )}
+          {!selected.length && !collectionId && (
+            <>
+              <Button
+                size="xs"
+                disabled={busy || !providerReady || (provider === "builtin" && !builtinReady)}
+                onClick={() => ask("What is taking up the most disk space across my folders?")}
+              >
+                Analyze disk space
+              </Button>
+              <Button
+                size="xs"
+                disabled={busy || !providerReady || (provider === "builtin" && !builtinReady)}
+                onClick={() => ask("Find duplicate files and safe cleanup candidates.")}
+              >
+                Find duplicates & cleanup
+              </Button>
+              <Button
+                size="xs"
+                disabled={busy || !providerReady || (provider === "builtin" && !builtinReady)}
+                onClick={() => ask("List my installed applications sorted by size.")}
+              >
+                Inspect installed apps
+              </Button>
+            </>
+          )}
         </div>
         {busy && <div className="assistant-progress"><LoadingState title="Working on your question" detail={provider === "local" ? "Finding matching passages in your files…" : "Reading the evidence and preparing an answer. You can keep browsing."} skeleton elapsed/>{provider === "builtin" && <Button onClick={() => api.localAIAction("cancel-answer").catch(e => setError(e.message))}>Cancel local answer</Button>}</div>}
         <details className="assistant-file-scope"><summary>Files being used ({selected.length})</summary>
@@ -246,43 +281,58 @@ export function AssistantView({
           ))}
         </ul>
         </details>
-        <details className="assistant-settings"><summary>AI and privacy options</summary>
-        <div className="flex flex-wrap gap-2">
-        <Button onClick={() => navigate("folders")}>Choose files</Button>
-        {selected.length === 1 && <Button onClick={() => previewFile(selected[0])}>Preview selected file</Button>}
-        <details className="panel-options"><summary>More options</summary><div>
-          <Button disabled={!selected.length} onClick={() => navigate("organize")}>Organize selection</Button>
-          <Button onClick={() => setShowSetup(!showSetup)}>Set up built-in AI</Button>
-        </div></details>
-      </div>
+        <details className="assistant-settings">
+          <summary>AI and privacy options</summary>
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => navigate("folders")}>Choose files</Button>
+              {selected.length === 1 && (
+                <Button onClick={() => previewFile(selected[0])}>Preview selected file</Button>
+              )}
+              <Button disabled={!selected.length} onClick={() => navigate("organize")}>
+                Organize selection
+              </Button>
+              <Button onClick={() => setShowSetup(!showSetup)}>Set up built-in AI</Button>
+            </div>
 
-        <details className="text-sm text-[var(--ink-secondary)]"><summary>What AI can read</summary><p>
-          AI can read text, PDF, Word, Excel, PowerPoint, OpenDocument, and EPUB files.
-          On Windows it can recognize written text in images and up to five scanned PDF pages.
-          It uses bounded excerpts from up to six sources. Folder questions include a small sample of direct files.
-          Unsupported formats provide file details only. It does not interpret image scenes or transcribe audio/video.
-          Plain text is limited to 5 MB; documents and images to 32 MB. Answers and OCR may be mistaken; check the evidence labels.
-        </p></details>
-        <label className="block text-sm">
-          Answer with
-          <select
-            className="gw-input mt-1"
-            value={provider}
-            disabled={busy || !providerReady}
-            onChange={(e) => setProvider(e.target.value)}
-          >
-            <option value="builtin" disabled={!builtinReady}>Built-in AI {builtinReady ? "(this computer)" : "(model setup needed)"}</option>
-            {providers
-              .filter((p) => p.id !== "builtin")
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+            <div className="text-xs text-[var(--ink-secondary)] leading-relaxed bg-[var(--paper-subtle)] p-3 rounded-[var(--radius-xs)] border border-[var(--hairline)]">
+              <strong className="block text-[var(--ink)] mb-1">What AI can read:</strong>
+              AI can read text, PDF, Word, Excel, PowerPoint, OpenDocument, and EPUB files.
+              On Windows it can recognize written text in images and up to five scanned PDF pages.
+              It uses bounded excerpts from up to six sources. Folder questions include a small sample of direct files.
+              Unsupported formats provide file details only. It does not interpret image scenes or transcribe audio/video.
+              Plain text is limited to 5 MB; documents and images to 32 MB. Answers and OCR may be mistaken; check the evidence labels.
+            </div>
+
+            <label className="block text-sm">
+              Answer with
+              <select
+                aria-label="Answer provider"
+                className="gw-input mt-1"
+                value={provider}
+                disabled={busy || !providerReady}
+                onChange={(e) => setProvider(e.target.value)}
+              >
+                <option value="builtin" disabled={!builtinReady}>
+                  Built-in AI {builtinReady ? "(this computer)" : "(model setup needed)"}
                 </option>
-              ))}
-          </select>
-        </label>
+                {providers
+                  .filter((p) => p.id !== "builtin")
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
         </details>
-        {provider === "local" && <p className="gw-notice">Matching passages mode works now, offline. It finds evidence but does not generate an AI answer. Set up a local model or configure an online provider for summaries and comparisons.<Button onClick={() => setShowSetup(true)}>Enable AI answers</Button></p>}
+        {provider === "local" && (
+          <div className="gw-notice flex flex-wrap items-center justify-between gap-2">
+            <span>Matching passages mode works now, offline. It finds evidence but does not generate an AI answer. Set up a local model or configure an online provider for summaries and comparisons.</span>
+            <Button size="xs" onClick={() => setShowSetup(true)}>Enable AI answers</Button>
+          </div>
+        )}
 
         {providers.find((p) => p.id === provider)?.is_local === false && (
           <p className="gw-notice">
@@ -305,27 +355,116 @@ export function AssistantView({
           <span className="workflow-eyebrow">{error || !currentAnswer ? "PREVIOUS ANSWER" : "ANSWER READY"}</span>
           <p className="text-sm font-semibold">{answerQuestion}</p>
           <p className="text-xs text-[var(--ink-secondary)]">{answer.provider_used === "offline" ? "Retrieved passages · no generated answer" : `Answer provider: ${answer.provider_used}`} · {answer.evidence_count} sources read</p>
-          <AnswerText text={answer.answer} />
-          {answer.citations.length > 0 && <Button onClick={() => {setEditingQuestion(true); setSelected(answer.citations.map(source => source.path));}}>Use these sources for a follow-up</Button>}
-            <h3 className="font-medium">Evidence used</h3>
-          {answer.citations.map((source, i) => (
-            <div key={i}>
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  previewFile(source.path, source.line_start || 1)
-                }
-              >
-                 {source.filename} · {source.evidence_kind === "metadata" ? "File details only" : source.evidence_kind === "folder" ? "Folder listing" : source.evidence_kind === "ocr" ? "Recognized image text" : `text lines ${source.line_start}–${source.line_end}`}
-              </Button>
-              <details className="text-sm">
-                  <summary>{source.evidence_kind === "metadata" || source.evidence_kind === "folder" ? "View details used" : "Read excerpt"}</summary>
-                  {source.coverage && <p className="preview-help">{source.coverage}</p>}
-                  {source.file_details?.location && <p className="preview-help break-all">Location: {source.file_details.location}{source.file_details.size_bytes != null ? ` · ${source.file_details.size_bytes.toLocaleString()} bytes` : ""}</p>}
-                <pre className="whitespace-pre-wrap">{source.snippet}</pre>
-              </details>
+          <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--paper-subtle)] border border-[var(--hairline)] space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5">
+                {answer.citation_verification ? (
+                  answer.citation_verification.grounded ? (
+                    <span className="flex items-center gap-1 text-[var(--success)] font-semibold">
+                      <ShieldCheck size={14} /> Citation Verifier: 100% Grounded
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[var(--warning)] font-semibold">
+                      <ShieldAlert size={14} /> Citations: {answer.citation_verification.invalid_citations} unverified claim(s)
+                    </span>
+                  )
+                ) : (
+                  <span className="flex items-center gap-1 text-[var(--ink-blue)] font-semibold">
+                    <ShieldCheck size={14} /> Grounded Sources
+                  </span>
+                )}
+                {answer.citation_verification && (
+                  <span className="text-[var(--ink-muted)] text-[11px]">
+                    ({answer.citation_verification.valid_citations}/{answer.citation_verification.total_citations} verified)
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--paper)] border border-[var(--hairline)] text-[var(--ink-secondary)]" title="Hybrid lexical BM25 (SQLite FTS5) + dense vector (all-MiniLM-L6-v2 ONNX)">
+                  Hybrid: BM25 + ONNX 384d
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--paper)] border border-[var(--hairline)] text-[var(--ink-secondary)]" title="Code chunks split along Python AST function and class syntax boundaries">
+                  AST Semantic Chunks
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--paper)] border border-[var(--hairline)] text-[var(--success)]" title="Processed on CPU locally without cloud data egress">
+                  100% On-Device
+                </span>
+              </div>
             </div>
-          ))}
+            {answer.citation_verification?.unsupported_claims_warning && (
+              <p className="text-[11px] text-[var(--warning)] leading-snug">
+                Warning: Some generated statements could not be verified against the retrieved source chunks.
+              </p>
+            )}
+          </div>
+          <AnswerText text={answer.answer} />
+          {answer.suggested_actions && answer.suggested_actions.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {answer.suggested_actions.map((act, idx) => (
+                <Button
+                  key={idx}
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => {
+                    const view = typeof act.view === "string" ? act.view : "";
+                    if (act.action === "navigate" && view) navigate(view);
+                  }}
+                >
+                  {String(act.label || "Open tool")}
+                </Button>
+              ))}
+            </div>
+          )}
+          {answer.citations.length > 0 && <Button onClick={() => {setEditingQuestion(true); setSelected(answer.citations.map(source => source.path));}}>Use these sources for a follow-up</Button>}
+            <h3 className="font-serif font-bold text-sm text-[var(--ink)] mt-4">Evidence used</h3>
+          <div className="grid grid-cols-1 gap-2.5">
+            {answer.citations.map((source, i) => (
+              <div
+                key={i}
+                className="p-3 rounded-[var(--radius-sm)] bg-[var(--paper-subtle)] border border-[var(--hairline)] hover:border-[var(--ink-blue)] transition-all"
+              >
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <InlineCitationChip
+                      index={i + 1}
+                      citation={{
+                        file_path: source.path,
+                        line_start: source.line_start || 1,
+                        line_end: source.line_end || undefined,
+                        snippet: source.snippet,
+                      }}
+                      onOpenFile={(p, l) => previewFile(p, l || 1)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => previewFile(source.path, source.line_start || 1)}
+                      className="font-medium text-xs text-[var(--ink)] hover:text-[var(--ink-blue)] hover:underline truncate text-left cursor-pointer"
+                    >
+                      {source.filename} · {source.evidence_kind === "metadata" ? "File details only" : source.evidence_kind === "folder" ? "Folder listing" : source.evidence_kind === "ocr" ? "Recognized image text" : `Lines ${source.line_start}–${source.line_end}`}
+                    </button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => previewFile(source.path, source.line_start || 1)}
+                    title="Open in file reader"
+                  >
+                    Open
+                  </Button>
+                </div>
+                {source.snippet && (
+                  <pre className="text-xs font-mono text-[var(--ink-secondary)] bg-[var(--paper)] p-2 rounded-[var(--radius-xs)] border border-[var(--hairline-subtle)] whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
+                    {source.snippet}
+                  </pre>
+                )}
+                {source.file_details?.location && (
+                  <p className="text-xs font-mono text-[var(--ink-muted)] mt-1.5 truncate">
+                    Location: {source.file_details.location}{source.file_details.size_bytes != null ? ` · ${source.file_details.size_bytes.toLocaleString()} bytes` : ""}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
           <Button
             disabled={savingAnswer || saved}
             onClick={async () => {
