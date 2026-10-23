@@ -10,7 +10,6 @@ from app.services.notes_service import NotesService
 from app.services.project_service import ProjectService
 from app.services.saved_search_service import SavedSearchService
 from app.services.search_engine import SearchEngine
-from app.services.sync_service import SyncService
 from app.services.system_service import SystemService
 from app.services.watcher_service import WatcherService
 from app.services.workspace_service import WorkspaceService
@@ -26,7 +25,6 @@ __all__ = [
     "ProjectService",
     "SavedSearchService",
     "SearchEngine",
-    "SyncService",
     "SystemService",
     "WatcherService",
     "WorkspaceService",

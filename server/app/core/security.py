@@ -62,14 +62,28 @@ def command_argv(command: str) -> list[str]:
 
 
 def validate_workspace_path(path_str: str, allowed_roots: Sequence[str | Path]) -> Path:
-    """Ensures a path exists, resolves symlinks, and falls inside an allowed root."""
+    """Ensures a path exists, does not traverse symlinks/junctions, and falls inside an allowed root."""
     if not path_str or not str(path_str).strip():
         raise ValueError("Path cannot be empty.")
-    target = Path(path_str).resolve()
+    raw = Path(path_str)
+    if raw.is_symlink() or raw.is_junction():
+        raise PermissionError(f"Access denied: Path '{path_str}' is a symbolic link or junction.")
+    target = raw.resolve()
     for root in allowed_roots:
         resolved_root = Path(root).resolve()
         try:
             target.relative_to(resolved_root)
+            for parent in raw.parents:
+                try:
+                    resolved_parent = parent.resolve()
+                except OSError:
+                    break
+                if resolved_parent == resolved_root:
+                    break
+                if parent.is_symlink() or parent.is_junction():
+                    raise PermissionError(
+                        f"Access denied: Path '{path_str}' traverses a symbolic link or junction '{parent}'."
+                    )
             return target
         except ValueError:
             continue

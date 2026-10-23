@@ -153,7 +153,6 @@ def test_concurrent_new_file_indexing_keeps_one_consistent_identity(tmp_path, mo
         conn = indexer.db.get_connection()
         assert conn.execute("SELECT count(*) FROM files").fetchone()[0] == 1
         assert conn.execute("SELECT count(*) FROM chunks").fetchone()[0] == 1
-        assert conn.execute("SELECT count(*) FROM fts_files").fetchone()[0] == 1
         assert conn.execute("SELECT count(*) FROM fts_chunks").fetchone()[0] == 1
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
     finally:

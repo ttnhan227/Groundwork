@@ -54,7 +54,12 @@ class WatcherService:
 
         self._stop_event.clear()
         # Startup already scans these roots in the application lifespan.
-        self._watched_paths = {str(path) for path in self.workspace_service.get_allowed_roots() if path.exists()}
+        # Never watch entire drive roots (e.g. C:\) with recursive watchfiles.
+        self._watched_paths = {
+            str(path)
+            for path in self.workspace_service.get_allowed_roots()
+            if path.exists() and path.resolve().parent != path.resolve()
+        }
         self._thread = threading.Thread(
             target=self._watch_loop,
             name="GroundworkWatcherThread",
@@ -72,10 +77,12 @@ class WatcherService:
         logger.info("Workspace filesystem watcher stopped")
 
     def _watch_loop(self) -> None:
-        """Continuous watching loop over all active workspace roots."""
+        """Continuous watching loop over all active non-drive-root workspace roots."""
         while not self._stop_event.is_set():
             roots = self.workspace_service.get_allowed_roots()
-            existing_roots = [p for p in roots if p.exists()]
+            existing_roots = [
+                p for p in roots if p.exists() and p.resolve().parent != p.resolve()
+            ]
 
             if not existing_roots:
                 time.sleep(2.0)
@@ -102,7 +109,11 @@ class WatcherService:
                         self._watched_paths = registered_paths
                         if added_paths and not self._stop_event.is_set() and self.indexer_service.get_progress().status != IndexStatus.CANCELLED:
                             self.indexer_service.start_indexing()
-                    if set(existing_roots) != set(self.workspace_service.get_allowed_roots()):
+                    if set(existing_roots) != {
+                        p
+                        for p in self.workspace_service.get_allowed_roots()
+                        if p.exists() and p.resolve().parent != p.resolve()
+                    }:
                         break
                     if changes:
                         self._handle_changes(changes)

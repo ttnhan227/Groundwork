@@ -175,33 +175,28 @@ Open [http://localhost:1420](http://localhost:1420). This starts the browser app
 
 To develop the website separately, run `npm ci` and `npm run dev` from `client/`, then open the URL printed by Vite.
 
-### Native desktop development
+### Native desktop development (WinUI 3 / .NET 10)
 
-Install Rust and the Windows Tauri prerequisites: Microsoft C++ Build Tools and WebView2. Create the Python environment above, then run from the repository root:
+Prerequisites: .NET 10 SDK and Windows 10/11. Create the Python environment above, then run or open the solution from `desktop-winui`:
 
 ```powershell
-.\server\.venv\Scripts\Activate.ps1
-cd desktop
-npm ci
-npm run tauri -- dev
+# Open and build using dotnet CLI:
+cd desktop-winui
+dotnet build
+dotnet test tests/Groundwork.Engine.Tests
 ```
-
-Tauri starts the local engine for you. Stop any separately running local engine first.
 
 ---
 
-## 📦 Build a Windows installer
+## 📦 Build a Windows 1.0 release
 
-With the native development prerequisites installed, run from the repository root:
+Run the unified release build pipeline script from the repository root:
 
 ```powershell
-cd desktop
-npm ci
-npm run tauri -- build --bundles nsis
-python scripts/smoke-core.py
+.\scripts\build-windows-release.ps1
 ```
 
-The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. It bundles the local engine, Python, Git, and search model. Installed builds ignore development `.env` files. Startup diagnostics are written to `local-core.log` in the app's data directory.
+The self-contained release package is written to `dist/Groundwork/`. It includes `Groundwork.Desktop.exe`, `Groundwork.MftHelper.exe`, native WinUI 3 runtime DLLs, the local AI core sidecar, and cryptographic SHA256 `checksums.txt`.
 
 ---
 

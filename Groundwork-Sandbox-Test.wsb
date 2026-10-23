@@ -1,0 +1,14 @@
+<Configuration>
+  <VGpu>Default</VGpu>
+  <Networking>Default</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\Users\ttnha\Documents\projects\Groundwork\dist\Groundwork</HostFolder>
+      <SandboxFolder>C:\Groundwork</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -ExecutionPolicy Bypass -NoExit -Command "Write-Host '===================================================' -ForegroundColor Cyan; Write-Host '   GROUNDWORK 1.0 - CLEAN WINDOWS SANDBOX TEST     ' -ForegroundColor Cyan; Write-Host '===================================================' -ForegroundColor Cyan; Set-Location C:\Groundwork; Write-Host 'Launching Groundwork.Desktop.exe from mapped directory...'; Start-Process C:\Groundwork\Groundwork.Desktop.exe"</Command>
+  </LogonCommand>
+</Configuration>

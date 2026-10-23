@@ -19,6 +19,23 @@ from app.database.local_db import get_db
 from app.services.windows_files import stream_hashes
 from app.services.workspace_service import WorkspaceService
 
+# FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_OPEN | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+CLOUD_PLACEHOLDER_MASK = 0x00001000 | 0x00040000 | 0x00400000
+PREHASH_WINDOW_BYTES = 4096
+
+
+def _head_tail_prehash(path: Path, size_bytes: int) -> str:
+    """Computes a fast 4 KB head + 4 KB tail SHA-256 pre-hash to avoid reading whole non-matching files."""
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        if size_bytes <= PREHASH_WINDOW_BYTES * 2:
+            digest.update(f.read())
+        else:
+            digest.update(f.read(PREHASH_WINDOW_BYTES))
+            f.seek(size_bytes - PREHASH_WINDOW_BYTES)
+            digest.update(f.read(PREHASH_WINDOW_BYTES))
+    return digest.hexdigest()
+
 
 class DuplicateService:
     def __init__(self) -> None:
@@ -26,11 +43,11 @@ class DuplicateService:
         self.workspace_service = WorkspaceService()
 
     def find_duplicates(self, workspace_id: str | None = None) -> dict[str, Any]:
-        """Finds exact duplicates and similar names on demand using size filtering followed by SHA-256."""
+        """Finds exact duplicates and similar names on demand using size filtering, 4 KB head+tail pre-hash, and SHA-256."""
         conn = self.db.get_connection()
         allowed_roots = self.workspace_service.get_allowed_roots()
 
-        # Step 1: Identify file sizes with at least 2 entries (non-empty files only)
+        # Step 1 & 2: Identify files with colliding sizes using a SQL subquery (avoids SQLite bind parameter limits)
         clauses = ["kind = 'file'", "size_bytes > 0", "workspace_id IN (SELECT id FROM workspaces WHERE is_active=1)"]
         params: list[Any] = []
         if workspace_id:
@@ -38,17 +55,21 @@ class DuplicateService:
             params.append(workspace_id)
         where_sql = " AND ".join(clauses)
 
-        size_rows = conn.execute(
-            f"""SELECT size_bytes, count(*) as count
+        candidate_rows = conn.execute(
+            f"""SELECT path, name, size_bytes, mtime, extension, workspace_id
             FROM inventory
-            WHERE {where_sql}
-            GROUP BY size_bytes
-            HAVING count(*) > 1
-            ORDER BY size_bytes DESC""",
-            params,
+            WHERE {where_sql} AND size_bytes IN (
+                SELECT size_bytes
+                FROM inventory
+                WHERE {where_sql}
+                GROUP BY size_bytes
+                HAVING count(*) > 1
+            )
+            ORDER BY size_bytes DESC, path ASC""",
+            params + params,
         ).fetchall()
 
-        if not size_rows:
+        if not candidate_rows:
             return {
                 "exact_duplicates": [],
                 "similar_names": self._find_similar_names(conn, where_sql, params),
@@ -58,27 +79,17 @@ class DuplicateService:
                 "note": "No duplicate file sizes found in inventory.",
             }
 
-        # Step 2: Fetch files for colliding sizes and hash on demand
-        duplicate_sizes = [r["size_bytes"] for r in size_rows]
-        marks = ",".join("?" for _ in duplicate_sizes)
-
-        candidate_rows = conn.execute(
-            f"""SELECT path, name, size_bytes, mtime, extension, workspace_id
-            FROM inventory
-            WHERE {where_sql} AND size_bytes IN ({marks})
-            ORDER BY size_bytes DESC, path ASC""",
-            params + duplicate_sizes,
-        ).fetchall()
-
         # Group by size first
         candidates_by_size = defaultdict(list)
         for r in candidate_rows:
             candidates_by_size[r["size_bytes"]].append(r)
 
-        # Hash each candidate file and group by sha256
-        hash_groups = defaultdict(list)
+        # Stage 2: 4 KB head+tail pre-hash & cloud-placeholder guard
+        prehash_groups = defaultdict(list)
         seen_paths = set()
         for size_bytes, rows in candidates_by_size.items():
+            if len(rows) < 2:
+                continue
             for row in rows:
                 path = Path(row["path"])
                 try:
@@ -89,10 +100,28 @@ class DuplicateService:
                 if key in seen_paths or not any(resolved.is_relative_to(root) for root in allowed_roots):
                     continue
                 seen_paths.add(key)
-                if not path.is_file() or path.is_symlink() or any(parent.is_symlink() or parent.is_junction() for parent in path.parents):
+                if not path.is_file() or path.is_symlink() or path.is_junction() or any(parent.is_symlink() or parent.is_junction() for parent in path.parents):
                     continue
                 try:
                     before = path.stat()
+                    if before.st_size != size_bytes:
+                        continue
+                    attrs = getattr(before, "st_file_attributes", 0)
+                    if attrs & CLOUD_PLACEHOLDER_MASK:
+                        # Never read or hydrate cloud-only placeholder files (OneDrive / iCloud)
+                        continue
+                    pre_hash = _head_tail_prehash(path, size_bytes)
+                    prehash_groups[(size_bytes, pre_hash)].append((row, path, before))
+                except OSError:
+                    continue
+
+        # Stage 3: Full SHA-256 content + NTFS alternate stream verification only on pre-hash collisions
+        hash_groups = defaultdict(list)
+        for (size_bytes, _pre_hash), entries in prehash_groups.items():
+            if len(entries) < 2:
+                continue
+            for row, path, before in entries:
+                try:
                     digest = hashlib.sha256()
                     with path.open("rb") as f:
                         while chunk := f.read(1024 * 1024):
@@ -119,8 +148,15 @@ class DuplicateService:
         exact_duplicate_groups = []
         for (size_bytes, sha256, _streams), files in hash_groups.items():
             if len(files) > 1:
-                unique_files = len({file.pop("_identity") for file in files})
-                potential_waste = (unique_files - 1) * size_bytes
+                seen_identities = set()
+                for file in files:
+                    ident = file.pop("_identity")
+                    is_alias = ident[1] != 0 and ident in seen_identities
+                    if ident[1] != 0:
+                        seen_identities.add(ident)
+                    file["is_hard_link_alias"] = is_alias
+                unique_files = sum(1 for f in files if not f.get("is_hard_link_alias"))
+                potential_waste = max(0, (unique_files - 1) * size_bytes)
                 exact_duplicate_groups.append(
                     {
                         "sha256": sha256,

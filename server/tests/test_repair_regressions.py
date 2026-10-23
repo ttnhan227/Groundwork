@@ -165,28 +165,19 @@ def test_private_preferences_are_encrypted_and_not_public(tmp_path, monkeypatch)
     assert config.get_settings().openai_api_key == "private-test-key"
 
 
-def test_sync_does_not_drop_unacknowledged_queue(tmp_path, monkeypatch):
-    import httpx
-
+def test_local_notes_persistence_without_cloud_sync(tmp_path, monkeypatch):
     from app.core import config
-    from app.database.local_db import get_db, reset_db
+    from app.database.local_db import reset_db
     from app.models.types import NoteCreate
     from app.services.notes_service import NotesService
-    from app.services.sync_service import SyncService
+
     reset_db()
-    monkeypatch.setattr(config, "_settings", config.Settings(database_path=tmp_path / "state.db", data_dir=tmp_path, CLOUD_SYNC_ENABLED=True, CLOUD_SYNC_TOKEN="test-token"))
-    note = NotesService().create_note(NoteCreate(title="A note", content="User text", file_path="private/local/path.py"))
-    real_client = httpx.Client
-    def response(request):
-        import json
-        payload = json.loads(request.content)
-        assert "file_path" not in payload["items"][0]["payload"]
-        return httpx.Response(200, json={"status": "success", "processed_count": 0})
-    monkeypatch.setattr(httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(response)))
+    monkeypatch.setattr(config, "_settings", config.Settings(database_path=tmp_path / "state.db", data_dir=tmp_path))
     try:
-        result = SyncService().trigger_sync()
-        assert result["status"] == "error"
-        assert get_db().get_connection().execute("SELECT COUNT(*) FROM sync_queue").fetchone()[0] == 1
-        assert NotesService().get_note(note.id).content == "User text"
+        note = NotesService().create_note(NoteCreate(title="A note", content="User text", file_path="private/local/path.py"))
+        retrieved = NotesService().get_note(note.id)
+        assert retrieved is not None
+        assert retrieved.content == "User text"
+        assert retrieved.file_path == "private/local/path.py"
     finally:
         reset_db()

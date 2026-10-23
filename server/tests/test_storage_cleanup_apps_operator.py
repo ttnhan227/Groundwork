@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -309,3 +310,106 @@ def test_ai_operator_tools_and_api_endpoints(utility_env, monkeypatch):
     cl_http = client.get(f"/api/system/cleanup/scan?workspace_id={ws.id}")
     assert cl_http.status_code == 200
     assert cl_http.json()["total_candidates"] >= 2
+
+
+def test_recycle_mode_never_silently_falls_back_to_permanent_delete(utility_env, monkeypatch):
+    _, ws_root = utility_env
+    target = ws_root / "important_recoverable.txt"
+    target.write_bytes(b"Do not permanently delete me if Recycle Bin fails.")
+    WorkspaceService().create_workspace(WorkspaceCreate(name="SafeRecycleWS", path=str(ws_root)))
+
+    from app.services import cleanup_service
+
+    monkeypatch.setattr(cleanup_service, "_send_to_recycle_bin_windows", lambda _p: False)
+    svc = CleanupService()
+    prop = svc.propose_cleanup([str(target)], mode="recycle")
+    res = svc.execute_cleanup(prop["proposal"], prop["confirmation_token"])
+
+    assert res["status"] == "failed"
+    assert res["removed_count"] == 0
+    assert len(res["failed"]) == 1
+    assert "Recycle Bin" in res["failed"][0]["reason"]
+    assert target.exists()
+
+
+def test_protected_system_paths_and_symlinks_rejected(utility_env):
+    tmp_path, ws_root = utility_env
+    from app.services.cleanup_service import _is_protected_system_path
+
+    # Deep Windows system subdirectories must be blocked, not just top-level C:\Windows
+    assert _is_protected_system_path(Path(r"C:\Windows\System32\drivers\etc"), [Path("C:\\")]) is True
+    assert _is_protected_system_path(Path(r"C:\Windows\SysWOW64"), [Path("C:\\")]) is True
+    assert _is_protected_system_path(Path(r"C:\$Recycle.Bin\S-1-5-21"), [Path("C:\\")]) is True
+
+    # Symlinks/junctions inside a workspace must be rejected by validate_workspace_path
+    outside = tmp_path / "outside_secret.txt"
+    outside.write_text("secret")
+    link_path = ws_root / "symlink_to_secret.txt"
+    try:
+        link_path.symlink_to(outside)
+    except OSError:
+        pytest.skip("Symlink creation requires developer mode or elevated privileges on Windows")
+
+    WorkspaceService().create_workspace(WorkspaceCreate(name="LinkWS", path=str(ws_root)))
+    svc = CleanupService()
+    with pytest.raises(ValueError, match="None of the selected items can be removed"):
+        svc.propose_cleanup([str(link_path)], mode="permanent")
+
+
+def test_custom_install_location_leftover_cleanup_and_builtin_ai_preference(utility_env, monkeypatch):
+    tmp_path, _ = utility_env
+    custom_games = tmp_path / "CustomGames"
+    app_install_dir = custom_games / "SuperWidgetApp"
+    app_install_dir.mkdir(parents=True)
+    leftover_bin = app_install_dir / "widget.dll"
+    leftover_bin.write_bytes(b"W" * 4096)
+
+    scan = installed_apps.scan_app_leftovers(
+        app_name="SuperWidgetApp",
+        publisher="WidgetCorp",
+        install_location=str(app_install_dir),
+        search_roots=[],
+    )
+    assert scan["total_count"] == 1
+    assert scan["leftovers"][0]["path"] == str(app_install_dir.resolve())
+
+    # Propose & execute leftover cleanup using custom install_location
+    prop = installed_apps.propose_leftover_cleanup(
+        [str(app_install_dir)],
+        mode="permanent",
+        install_location=str(app_install_dir),
+    )
+    res = installed_apps.execute_leftover_cleanup(
+        prop["proposal"],
+        prop["confirmation_token"],
+        install_location=str(app_install_dir),
+    )
+    assert res["status"] == "completed"
+    assert res["removed_count"] == 1
+    assert not app_install_dir.exists()
+
+    # Verify PUT /api/system/preferences accepts 'builtin' provider
+    from app.services import preferences_service
+
+    monkeypatch.setattr(preferences_service, "_protect", lambda data, decrypt=False: data)
+    client = TestClient(app)
+    pref_res = client.put("/api/system/preferences", json={"ai_provider": "builtin"})
+    assert pref_res.status_code == 200
+    assert pref_res.json()["ai_provider"] == "builtin"
+
+
+def test_duplicate_service_skips_hard_links_and_cloud_placeholders(utility_env, monkeypatch):
+    _, ws_root = utility_env
+    file_a = ws_root / "original_data.bin"
+    file_b = ws_root / "hardlink_data.bin"
+    payload = b"Hardlink payload block\n" * 512
+    file_a.write_bytes(payload)
+    os.link(file_a, file_b)
+
+    ws = WorkspaceService().create_workspace(WorkspaceCreate(name="HardlinkWS", path=str(ws_root)))
+    svc = CleanupService()
+    scan = svc.scan_cleanup_candidates(workspace_id=ws.id)
+    rules_by_id = {r["id"]: r for r in scan["rules"]}
+    # Hard-linked siblings share physical allocation and must not be proposed as reclaimable duplicate waste
+    assert rules_by_id["exact_duplicates"]["candidate_count"] == 0
+    assert rules_by_id["exact_duplicates"]["reclaimable_bytes"] == 0

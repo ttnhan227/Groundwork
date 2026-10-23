@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Groundwork.Desktop/Groundwork.Desktop.csproj" />
+    <Project Path="src/Groundwork.Engine/Groundwork.Engine.csproj" />
+    <Project Path="src/Groundwork.MftHelper/Groundwork.MftHelper.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Groundwork.Engine.Tests/Groundwork.Engine.Tests.csproj" />
+  </Folder>
+</Solution>

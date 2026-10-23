@@ -82,7 +82,9 @@ PROTECTED_WINDOWS_NAMES = {
 
 
 def _is_protected_system_path(target: Path, allowed_roots: list[Path]) -> bool:
-    """Returns True if target is a drive root, workspace root, user profile root, or OS directory."""
+    """Returns True if target is a drive root, workspace root, user profile root, reparse point, or OS system directory."""
+    if target.is_symlink() or target.is_junction():
+        return True
     resolved = target.resolve()
     # Never delete drive root (e.g. C:\)
     if resolved.parent == resolved:
@@ -91,11 +93,23 @@ def _is_protected_system_path(target: Path, allowed_roots: list[Path]) -> bool:
     for root in allowed_roots:
         if resolved == root.resolve():
             return True
+    parts_lower = [p.lower() for p in resolved.parts]
     # Never delete top-level protected Windows directories
-    if len(resolved.parts) <= 2 and resolved.name.lower() in PROTECTED_WINDOWS_NAMES:
+    if len(parts_lower) <= 2 and resolved.name.lower() in PROTECTED_WINDOWS_NAMES:
+        return True
+    # Never delete anything inside C:\Windows, C:\Recovery, C:\$Recycle.Bin, or C:\System Volume Information
+    if len(parts_lower) >= 2 and parts_lower[1] in {
+        "windows",
+        "recovery",
+        "$recycle.bin",
+        "system volume information",
+    }:
+        return True
+    # Never delete system32 or syswow64 anywhere under a Windows directory
+    if any(p in {"system32", "syswow64", "winsxs"} for p in parts_lower):
         return True
     # Never delete C:\Users\<username> root
-    if len(resolved.parts) == 3 and resolved.parts[1].lower() == "users":
+    if len(parts_lower) == 3 and parts_lower[1] == "users":
         return True
     return False
 
@@ -483,6 +497,8 @@ class CleanupService:
         dup_report = DuplicateService().find_duplicates(workspace_id)
         duplicate_items: list[dict[str, Any]] = []
         for group in dup_report.get("exact_duplicates", []):
+            if int(group.get("potential_waste_bytes") or 0) <= 0:
+                continue
             files = group.get("files", [])
             if len(files) < 2:
                 continue
@@ -490,6 +506,8 @@ class CleanupService:
             sorted_files = sorted(files, key=lambda f: (f.get("mtime", 0), len(f.get("path", ""))))
             kept = sorted_files[0]
             for extra in sorted_files[1:]:
+                if extra.get("is_hard_link_alias"):
+                    continue
                 mtime = float(extra.get("mtime") or 0)
                 age_days = max(0, int((now - mtime) / 86400)) if mtime > 0 else 0
                 duplicate_items.append(
@@ -644,7 +662,7 @@ class CleanupService:
             "item_count": len(valid_items),
             "confirmation_token": token,
             "warning": (
-                "Selected items will be moved to the Windows Recycle Bin (or permanently removed if Recycle Bin is unavailable for that drive)."
+                "Selected items will be moved to the Windows Recycle Bin. If Recycle Bin is unavailable for an item, it will not be deleted unless you explicitly choose permanent deletion."
                 if mode == "recycle"
                 else "Selected items will be permanently deleted from disk and cannot be undone."
             ),
@@ -687,12 +705,9 @@ class CleanupService:
                 if mode == "recycle":
                     recycled = _send_to_recycle_bin_windows(target)
                     if not recycled:
-                        # Fallback to direct unlink/rmtree if Recycle Bin is unavailable (e.g. temp mount / non-Win32)
-                        if is_dir:
-                            shutil.rmtree(target)
-                        else:
-                            target.unlink()
-                        used_method = "permanent_fallback"
+                        raise RuntimeError(
+                            "Windows Recycle Bin could not accept this item. Choose permanent deletion explicitly if you want to remove it without Recycle Bin recovery."
+                        )
                 else:
                     if is_dir:
                         shutil.rmtree(target)

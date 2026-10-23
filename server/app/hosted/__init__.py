@@ -1,1 +1,0 @@
-"""Groundwork Cloud Application Package."""

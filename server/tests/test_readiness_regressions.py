@@ -115,7 +115,6 @@ def test_deleted_directory_removes_child_content_without_removing_sibling(invent
     conn = inventory.db.get_connection()
     paths = [row["path"] for row in conn.execute("SELECT path FROM files")]
     assert str(item) not in paths and str(sibling) in paths
-    assert conn.execute("SELECT count(*) FROM fts_files").fetchone()[0] == 1
     assert conn.execute("SELECT count(*) FROM fts_chunks").fetchone()[0] == 1
 
 

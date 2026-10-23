@@ -85,6 +85,14 @@ export const DownloadPage: React.FC = () => {
               <Download size={16} />
               Download installer
             </a>
+          ) : status === "error" ? (
+            <a
+              href={releasesUrl}
+              className="inline-flex items-center gap-2 rounded px-5 py-3 bg-[var(--control-room)] text-white text-sm font-semibold"
+            >
+              <Download size={16} />
+              View releases on GitHub
+            </a>
           ) : (
             <button
               disabled

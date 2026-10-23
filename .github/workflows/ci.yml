@@ -45,33 +45,7 @@ jobs:
         working-directory: server
         run: python eval/search_eval.py
 
-  # ──────────────────────────────────────────────
-  # 2. Cloud Sync Backend: Multi-Tenant Tests
-  # ──────────────────────────────────────────────
-  cloud-backend:
-    name: Cloud Backend (Pytest)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: server/requirements.txt
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r server/requirements.txt pytest
-
-      - name: Run Cloud Sync Tests
-        working-directory: server
-        run: pytest tests/hosted -v
-
-  # ──────────────────────────────────────────────
+    # ──────────────────────────────────────────────
   # 3. Desktop Application: Tauri & React Build
   # ──────────────────────────────────────────────
   desktop-client:
@@ -141,51 +115,28 @@ jobs:
           npx playwright install --with-deps chromium
           node --test tests/download-release-ui.test.mjs
 
-  windows-installer:
-    name: Windows desktop installer
+  windows-release:
+    name: Windows native desktop release
     runs-on: windows-latest
-    env:
-      DESKTOP_API_BASE_URL: ${{ vars.DESKTOP_API_BASE_URL || 'https://groundwork-api-597984371188.asia-southeast1.run.app' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - uses: dtolnay/rust-toolchain@stable
-      - run: npm ci
-        working-directory: desktop
-      - run: npm ci
-        working-directory: client
-      - run: python -m pip install -r server/requirements.txt
-      - run: npm run tauri -- build
-        working-directory: desktop
-      - run: python desktop/scripts/smoke-core.py
-      - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
-      - run: python desktop/scripts/smoke-storage.py
-      - run: python desktop/scripts/smoke-scale.py
-      - run: python desktop/scripts/smoke-sync.py
-      - name: Test generated Windows installer
+      - run: python -m pip install -r server/requirements.txt pytest
+      - name: Build Windows release bundle and execute tests
         shell: pwsh
-        run: |
-          $installer = Get-ChildItem -LiteralPath desktop/src-tauri/target/release/bundle/nsis -Filter '*-setup.exe'
-          if (@($installer).Count -ne 1) { throw 'Expected one Windows installer' }
-          ./desktop/scripts/smoke-installed-ci.ps1 -Installer $installer.FullName
-          if ($LASTEXITCODE) { throw 'Installed application checks failed' }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: windows-test-diagnostics
-          path: desktop/test-results/
+        run: ./scripts/build-windows-release.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: groundwork-windows-installer
-          path: desktop/src-tauri/target/release/bundle/
+          name: groundwork-windows-release
+          path: dist/Groundwork/
 
   deploy-backend:
-    needs: [local-core, cloud-backend, desktop-client, web-portal, windows-installer]
+    needs: [local-core, desktop-client, web-portal, windows-release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_AUTOMATION_ENABLED == 'true'
     uses: ./.github/workflows/deploy.yml
     permissions:
@@ -196,7 +147,7 @@ jobs:
     secrets: inherit
 
   deploy-website:
-    needs: [local-core, cloud-backend, desktop-client, web-portal, windows-installer]
+    needs: [local-core, desktop-client, web-portal, windows-release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_AUTOMATION_ENABLED == 'true'
     uses: ./.github/workflows/website.yml
     secrets: inherit

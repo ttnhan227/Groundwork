@@ -652,7 +652,7 @@ def scan_app_leftovers(
         except OSError:
             continue
 
-    # 3. Read-only Registry Leftover Inspection on Windows (HKCU\Software)
+    # 3. Read-only Registry Leftover Inspection on Windows (HKCU\Software and HKLM\Software)
     registry_leftovers: list[dict[str, Any]] = []
     if sys.platform == "win32" and search_roots is None:
         try:
@@ -661,28 +661,34 @@ def scan_app_leftovers(
             candidates_to_check = []
             if clean_pub and clean_name:
                 candidates_to_check.append((f"Software\\{clean_pub}\\{clean_name}", "high", f"Registry key matches Publisher '{clean_pub}' and App '{clean_name}'"))
+                candidates_to_check.append((f"Software\\WOW6432Node\\{clean_pub}\\{clean_name}", "high", f"32-bit registry key matches Publisher '{clean_pub}' and App '{clean_name}'"))
             if clean_name:
                 candidates_to_check.append((f"Software\\{clean_name}", "high", f"Registry key matches App '{clean_name}'"))
+                candidates_to_check.append((f"Software\\WOW6432Node\\{clean_name}", "high", f"32-bit registry key matches App '{clean_name}'"))
             if clean_pub and not is_shared_vendor:
                 candidates_to_check.append((f"Software\\{clean_pub}", "review_required", f"Vendor key matches Publisher '{clean_pub}' (shared across vendor apps)"))
+                candidates_to_check.append((f"Software\\WOW6432Node\\{clean_pub}", "review_required", f"32-bit vendor key matches Publisher '{clean_pub}' (shared across vendor apps)"))
 
             seen_reg = set()
-            for subkey, conf, ev in candidates_to_check:
-                norm_k = subkey.lower()
-                if norm_k in seen_reg:
-                    continue
-                try:
-                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey, 0, winreg.KEY_READ):
-                        seen_reg.add(norm_k)
-                        registry_leftovers.append(
-                            {
-                                "key": f"HKCU\\{subkey}",
-                                "confidence": conf,
-                                "evidence": ev,
-                            }
-                        )
-                except OSError:
-                    continue
+            for hive_label, hive_handle in [("HKCU", winreg.HKEY_CURRENT_USER), ("HKLM", winreg.HKEY_LOCAL_MACHINE)]:
+                for subkey, conf, ev in candidates_to_check:
+                    if hive_label == "HKCU" and "WOW6432Node" in subkey:
+                        continue
+                    norm_k = f"{hive_label}\\{subkey}".lower()
+                    if norm_k in seen_reg:
+                        continue
+                    try:
+                        with winreg.OpenKey(hive_handle, subkey, 0, winreg.KEY_READ):
+                            seen_reg.add(norm_k)
+                            registry_leftovers.append(
+                                {
+                                    "key": f"{hive_label}\\{subkey}",
+                                    "confidence": conf,
+                                    "evidence": ev,
+                                }
+                            )
+                    except OSError:
+                        continue
         except Exception:
             pass
 
@@ -712,10 +718,32 @@ def scan_app_leftovers(
     }
 
 
-def _leftover_allowed_roots(extra_roots: list[Path] | None = None) -> list[Path]:
+def _resolve_custom_install_root(install_location: str) -> Path | None:
+    if not install_location or not install_location.strip():
+        return None
+    try:
+        loc_path = Path(install_location.strip().strip('"'))
+        if loc_path.suffix.lower() in {".exe", ".dll"}:
+            loc_path = loc_path.parent
+        resolved = loc_path.resolve()
+        if resolved.exists() and len(resolved.parts) >= 3:
+            # Allow the parent directory as the boundary root so the install directory itself can be removed
+            return resolved.parent
+    except OSError:
+        return None
+    return None
+
+
+def _leftover_allowed_roots(
+    extra_roots: list[Path] | None = None,
+    install_location: str = "",
+) -> list[Path]:
     roots = [r for _, r in default_leftover_search_roots()]
     if extra_roots:
         roots.extend(extra_roots)
+    custom_root = _resolve_custom_install_root(install_location)
+    if custom_root is not None:
+        roots.append(custom_root)
     return roots
 
 
@@ -723,6 +751,7 @@ def propose_leftover_cleanup(
     paths: list[str],
     mode: str = "recycle",
     extra_roots: list[Path] | None = None,
+    install_location: str = "",
 ) -> dict[str, Any]:
     """Issues a confirmation token for removing selected application leftover files/folders."""
     from app.services.cleanup_service import CleanupService
@@ -730,7 +759,7 @@ def propose_leftover_cleanup(
     return CleanupService().propose_cleanup(
         paths=paths,
         mode=mode,
-        extra_allowed_roots=_leftover_allowed_roots(extra_roots),
+        extra_allowed_roots=_leftover_allowed_roots(extra_roots, install_location),
     )
 
 
@@ -738,6 +767,7 @@ def execute_leftover_cleanup(
     proposal: dict[str, Any],
     confirmation_token: str,
     extra_roots: list[Path] | None = None,
+    install_location: str = "",
 ) -> dict[str, Any]:
     """Executes token-confirmed removal of application leftover files/folders."""
     from app.services.cleanup_service import CleanupService
@@ -745,5 +775,5 @@ def execute_leftover_cleanup(
     return CleanupService().execute_cleanup(
         proposal=proposal,
         confirmation_token=confirmation_token,
-        extra_allowed_roots=_leftover_allowed_roots(extra_roots),
+        extra_allowed_roots=_leftover_allowed_roots(extra_roots, install_location),
     )

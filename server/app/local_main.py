@@ -27,7 +27,6 @@ from app.routers.api import (
     projects_router,
     saved_searches_router,
     search_router,
-    sync_router,
     system_router,
     workspaces_router,
 )
@@ -93,7 +92,7 @@ async def protect_local_api(request: Request, call_next):
     origin = request.headers.get("origin")
     if origin and origin not in settings.cors_origin_list:
         return JSONResponse({"detail": "Untrusted origin"}, status_code=403)
-    if settings.core_token and request.method != "OPTIONS":
+    if settings.core_token and request.method != "OPTIONS" and request.url.path != "/health":
         supplied = request.headers.get("authorization", "")
         if not secrets.compare_digest(supplied, f"Bearer {settings.core_token}"):
             return JSONResponse({"detail": "Local core authentication required"}, status_code=401)
@@ -112,7 +111,6 @@ app.include_router(context_router)
 app.include_router(notes_router)
 app.include_router(saved_searches_router)
 app.include_router(ai_router)
-app.include_router(sync_router)
 
 
 @app.get("/health", tags=["System"])

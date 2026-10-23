@@ -1,0 +1,624 @@
+<Window
+    x:Class="Groundwork.Desktop.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Groundwork.Desktop"
+    Title="Groundwork 1.0 — Windows Storage, Cleanup &amp; Application Utility">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Header Bar -->
+        <Border Grid.Row="0" Padding="20,12" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Background="{ThemeResource LayerFillColorDefaultBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Vertical" Spacing="2">
+                    <TextBlock Text="Groundwork 1.0" Style="{StaticResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+                    <TextBlock x:Name="HeaderSubtitleText" Text="Local-first Windows Storage Analyzer, Safe Cleanup, Uninstaller &amp; AI Operator" Opacity="0.72" FontSize="12" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Border Padding="10,4" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                        <TextBlock x:Name="SidecarStatusBadge" Text="Local Core: Ready (Offline-Capable)" FontSize="12" />
+                    </Border>
+                    <Button x:Name="QuickScanPrimaryDriveButton" Content="Scan Primary Drive" Style="{StaticResource AccentButtonStyle}" Click="OnQuickScanPrimaryDriveClick" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main NavigationView -->
+        <NavigationView
+            x:Name="MainNavView"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            OpenPaneLength="235"
+            SelectionChanged="OnNavigationSelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Drives &amp; Storage" Tag="Storage" IsSelected="True">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xEDA2;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Cleanup &amp; Duplicates" Tag="Cleanup">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Delete" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Installed Apps &amp; Leftovers" Tag="Apps">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="AllApps" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="AI Operator &amp; Assistant" Tag="Assistant">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Message" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemSeparator />
+                <NavigationViewItem Content="Search &amp; Saved Searches" Tag="Search">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Find" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="File Organization &amp; Undo" Tag="Organize">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Folder" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Projects, Notes &amp; AI Settings" Tag="WorkspaceTools">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Setting" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Grid Padding="24,18">
+                <!-- 1. DRIVES & STORAGE PANEL -->
+                <ScrollViewer x:Name="StoragePanel" Visibility="Visible" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Detected Drives &amp; Whole-Volume Storage Analysis" Style="{StaticResource TitleTextBlockStyle}" />
+                                <TextBlock Text="Drives are discovered automatically with zero manual folder setup. Scan any drive or folder using fast Win32 basic metadata or on-demand elevated NTFS MFT enumeration." Opacity="0.75" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                <Button Content="Refresh Drives" Click="OnRefreshDrivesClick" />
+                                <Button x:Name="ScanTargetFolderButton" Content="Scan Custom Path..." Click="OnScanCustomPathClick" />
+                                <Button x:Name="ElevatedMftScanButton" Content="Fast NTFS MFT Scan (Admin)" Click="OnElevatedMftScanClick" />
+                                <Button x:Name="CancelScanButton" Content="Cancel Scan" IsEnabled="False" Click="OnCancelScanClick" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Custom Path Input Box -->
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ScanPathTextBox" Header="Target Drive or Folder Path" PlaceholderText="e.g., C:\ or C:\Users\..." />
+                            <Button Grid.Column="1" Content="Run Fast Scan" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" Click="OnRunScanPathClick" />
+                        </Grid>
+
+                        <!-- Discovered Volumes List -->
+                        <Border Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Mounted Windows Volumes" FontWeight="SemiBold" FontSize="15" />
+                                <ListView x:Name="VolumesListView" SelectionMode="Single" SelectionChanged="OnVolumeSelectionChanged" MaxHeight="200">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="local:VolumeRowViewModel">
+                                            <Grid Padding="8,6" ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="220" />
+                                                    <ColumnDefinition Width="120" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="180" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind VolumeName}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{x:Bind FileSystemLabel}" Opacity="0.8" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                                                    <ProgressBar Value="{x:Bind UsedPercent}" Maximum="100" Height="8" />
+                                                    <TextBlock Text="{x:Bind CapacitySummary}" FontSize="12" Opacity="0.75" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="3" Text="{x:Bind MftBadge}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" Opacity="0.85" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Live Scan Summary Metrics -->
+                        <Border Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <StackPanel Spacing="8">
+                                <TextBlock x:Name="ScanSummaryHeaderText" Text="No active scan run yet. Select a volume above or click 'Run Fast Scan'." FontWeight="SemiBold" FontSize="15" />
+                                <ProgressBar x:Name="ScanActivityProgressBar" IsIndeterminate="False" Value="0" Maximum="100" Visibility="Collapsed" />
+                                <TextBlock x:Name="ScanMetricsDetailText" Text="Logical vs. Allocated bytes, scan throughput, and access-denied counts appear here in real time." Opacity="0.78" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Category Breakdown & Largest Folders / Largest Files -->
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Largest Folders (Bottom-Up Rollup)" FontWeight="SemiBold" FontSize="15" />
+                                    <ListView x:Name="LargestFoldersListView" SelectionMode="None" MaxHeight="320">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:FolderRowViewModel">
+                                                <Grid Padding="4,6" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="100" />
+                                                        <ColumnDefinition Width="95" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Opacity="0.68" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind FileCountLabel}" FontSize="12" Opacity="0.75" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Largest Individual Files (Logical vs. Allocated)" FontWeight="SemiBold" FontSize="15" />
+                                    <ListView x:Name="LargestFilesListView" SelectionMode="None" MaxHeight="320">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:FileRowViewModel">
+                                                <Grid Padding="4,6" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="110" />
+                                                        <ColumnDefinition Width="95" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Opacity="0.68" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind FormattedAllocated}" FontSize="11" Opacity="0.75" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Storage Categories -->
+                        <Border Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Storage Breakdown by Category" FontWeight="SemiBold" FontSize="15" />
+                                <ListView x:Name="CategoriesListView" SelectionMode="None" MaxHeight="220">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="local:CategoryRowViewModel">
+                                            <Grid Padding="4,4" ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="220" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="200" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind Label}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <ProgressBar Grid.Column="1" Value="{x:Bind SharePercent}" Maximum="100" Height="8" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{x:Bind SummaryText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 2. CLEANUP & DUPLICATES PANEL -->
+                <ScrollViewer x:Name="CleanupPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Rule-Based Cleanup &amp; 3-Stage SHA-256 Duplicate Finder" Style="{StaticResource TitleTextBlockStyle}" />
+                                <TextBlock Text="Identifies exact SHA-256 duplicates (skipping hard links and cloud-only placeholders), temporary/log files, build caches, and stale archives. Defaults to Windows Recycle Bin and never silently falls back to permanent deletion." Opacity="0.75" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                <Button Content="Analyze Scanned Target" Style="{StaticResource AccentButtonStyle}" Click="OnRunCleanupScanClick" />
+                                <ComboBox x:Name="CleanupModeComboBox" SelectedIndex="0" Width="210">
+                                    <ComboBoxItem Content="Move to Recycle Bin (Safe)" Tag="recycle" />
+                                    <ComboBoxItem Content="Permanent Delete" Tag="permanent" />
+                                </ComboBox>
+                                <Button x:Name="ReviewAndCleanButton" Content="Review &amp; Clean Selected..." Click="OnReviewAndCleanSelectedClick" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Padding="14" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <TextBlock x:Name="CleanupSummaryBannerText" Text="Run a drive/folder scan first or click 'Analyze Scanned Target' to evaluate cleanup rules and 3-stage duplicates." FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </Border>
+
+                        <Border Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Cleanup &amp; Duplicate Candidates" FontWeight="SemiBold" FontSize="15" />
+                                <ListView x:Name="CleanupCandidatesListView" SelectionMode="Multiple" MaxHeight="480">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="local:CleanupCandidateRowViewModel">
+                                            <Grid Padding="6,6" ColumnSpacing="14">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="190" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="100" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind RuleName}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind FullPath}" FontSize="11" Opacity="0.68" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Reason}" FontSize="11" Opacity="0.82" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{x:Bind Confidence}" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                <TextBlock Grid.Column="3" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 3. INSTALLED APPS & LEFTOVERS PANEL -->
+                <ScrollViewer x:Name="AppsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Installed Applications, Process-Monitored Uninstaller &amp; Leftover Scanner" Style="{StaticResource TitleTextBlockStyle}" />
+                                <TextBlock Text="Enumerates 64-bit, 32-bit (WOW6432Node), and per-user applications. Monitors uninstaller exit before scanning AppData, ProgramData, Program Files, custom InstallLocations, and read-only HKCU/HKLM registry keys." Opacity="0.75" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                <TextBox x:Name="AppSearchFilterBox" PlaceholderText="Filter apps by name or publisher..." Width="240" TextChanged="OnAppFilterTextChanged" />
+                                <Button Content="Refresh Apps" Click="OnRefreshInstalledAppsClick" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.25*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Installed Apps List -->
+                            <Border Grid.Column="0" Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="InstalledAppsCountText" Text="Installed Applications" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                            <Button Content="Scan Leftovers" Click="OnScanSelectedAppLeftoversClick" />
+                                            <Button Content="Uninstall &amp; Scan Leftovers..." Style="{StaticResource AccentButtonStyle}" Click="OnUninstallSelectedAppClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <ListView x:Name="InstalledAppsListView" SelectionMode="Single" MaxHeight="480" SelectionChanged="OnInstalledAppSelectionChanged">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:InstalledAppRowViewModel">
+                                                <Grid Padding="6,6" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="95" />
+                                                        <ColumnDefinition Width="95" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind Publisher}" FontSize="12" Opacity="0.72" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind Version}" FontSize="12" Opacity="0.75" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Leftover Inspection & Safe Removal -->
+                            <Border Grid.Column="1" Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="LeftoversTitleText" Text="Leftover Files &amp; Registry Traces" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Recycle Selected Leftovers..." Click="OnCleanSelectedLeftoversClick" />
+                                    </Grid>
+                                    <TextBlock x:Name="LeftoversSummaryText" Text="Select an installed application or enter an uninstalled app name below to inspect leftover folders and read-only HKCU/HKLM registry keys." FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="ManualLeftoverAppNameBox" PlaceholderText="App Name (e.g. HyperNotes)" />
+                                        <TextBox x:Name="ManualLeftoverPublisherBox" Grid.Column="1" PlaceholderText="Publisher (optional)" />
+                                        <Button Grid.Column="2" Content="Scan" Click="OnManualLeftoverScanClick" />
+                                    </Grid>
+
+                                    <ListView x:Name="LeftoversListView" SelectionMode="Multiple" MaxHeight="260">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:LeftoverItemRowViewModel">
+                                                <Grid Padding="4,6" ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="95" />
+                                                        <ColumnDefinition Width="85" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind FullPath}" FontSize="11" Opacity="0.68" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind Evidence}" FontSize="11" Opacity="0.82" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind Confidence}" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind FormattedSize}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+
+                                    <TextBlock Text="Read-Only Registry Leftover Keys (HKCU / HKLM — Inspect in Regedit)" FontWeight="SemiBold" FontSize="13" />
+                                    <ListView x:Name="RegistryLeftoversListView" SelectionMode="None" MaxHeight="130" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 4. AI OPERATOR & ASSISTANT PANEL -->
+                <ScrollViewer x:Name="AssistantPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Local-First AI Operator &amp; Grounded Storage Assistant" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock Text="Explains storage findings, duplicate groups, cleanup safety, and workspace files with verified citations. Works 100% offline via the deterministic local operator or on-device GGUF/Ollama models—no cloud key required." Opacity="0.75" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="What is taking up the most space?" Click="OnOperatorPromptPresetClick" Tag="What is taking up the most space and how can I free up space safely?" />
+                            <Button Content="Explain duplicate &amp; cleanup candidates" Click="OnOperatorPromptPresetClick" Tag="Summarize the duplicate files and cleanup candidates and explain which ones are safe to recycle." />
+                            <Button Content="Explain largest installed apps" Click="OnOperatorPromptPresetClick" Tag="Which installed applications use the most disk space?" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="AssistantQuestionBox" PlaceholderText="Ask about storage usage, duplicates, application leftovers, or workspace documents..." />
+                            <Button Grid.Column="1" Content="Ask Operator" Style="{StaticResource AccentButtonStyle}" Click="OnAskOperatorClick" />
+                        </Grid>
+
+                        <Border Padding="18" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock x:Name="AssistantProviderBadge" Text="Provider: Local Deterministic Operator (Offline)" FontSize="12" Opacity="0.75" />
+                                <TextBlock x:Name="AssistantAnswerTextBlock" Text="Ask a question above or click one of the quick prompts to analyze your scanned storage, duplicates, and applications." TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 5. SEARCH & SAVED SEARCHES PANEL -->
+                <ScrollViewer x:Name="SearchPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Hybrid Workspace Search &amp; Saved Searches" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock Text="Search across indexed workspace files using hybrid lexical (FTS5) + semantic (ONNX) or fast filename matching, and save recurring queries to SQLite." Opacity="0.75" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="SearchQueryTextBox" PlaceholderText="Search filenames, code symbols, or document content..." />
+                            <ComboBox x:Name="SearchModeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="Hybrid Search" Tag="hybrid" />
+                                <ComboBoxItem Content="Filename Only" Tag="filename" />
+                                <ComboBoxItem Content="Lexical (FTS5)" Tag="lexical" />
+                                <ComboBoxItem Content="Semantic (ONNX)" Tag="semantic" />
+                            </ComboBox>
+                            <Button Grid.Column="2" Content="Search" Style="{StaticResource AccentButtonStyle}" Click="OnExecuteSearchClick" />
+                            <Button Grid.Column="3" Content="Save Query" Click="OnSaveCurrentSearchClick" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Padding="14" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Saved Searches" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Delete" Click="OnDeleteSavedSearchClick" />
+                                    </Grid>
+                                    <ListView x:Name="SavedSearchesListView" SelectionMode="Single" SelectionChanged="OnSavedSearchSelected" MaxHeight="400">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:SavedSearchRowViewModel">
+                                                <StackPanel Padding="4,6">
+                                                    <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{x:Bind QueryText}" FontSize="12" Opacity="0.75" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Padding="14" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock x:Name="SearchResultsHeaderText" Text="Search Results" FontWeight="SemiBold" />
+                                    <ListView x:Name="SearchResultsListView" SelectionMode="Single" MaxHeight="420">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:SearchResultRowViewModel">
+                                                <StackPanel Padding="4,6" Spacing="2">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" />
+                                                        <TextBlock Grid.Column="1" Text="{x:Bind ScoreLabel}" FontSize="11" Opacity="0.7" />
+                                                    </Grid>
+                                                    <TextBlock Text="{x:Bind FullPath}" FontSize="11" Opacity="0.68" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Snippet}" FontSize="12" Opacity="0.88" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 6. FILE ORGANIZATION & UNDO PANEL -->
+                <ScrollViewer x:Name="OrganizePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Safe File Organization &amp; Stream-Preserving Undo" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock Text="Organizes folder contents by category, extension, or date while preserving NTFS alternate data streams, timestamps, and ACL security descriptors, with full one-click undo." Opacity="0.75" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="OrganizeFolderBox" PlaceholderText="Folder path to preview organization..." />
+                            <ComboBox x:Name="OrganizeRuleTypeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="By File Category" Tag="category" />
+                                <ComboBoxItem Content="By Modified Month" Tag="date" />
+                                <ComboBoxItem Content="By Extension" Tag="extension" />
+                            </ComboBox>
+                            <Button Grid.Column="2" Content="Preview Plan" Style="{StaticResource AccentButtonStyle}" Click="OnPreviewOrganizeClick" />
+                            <Button Grid.Column="3" Content="Refresh History" Click="OnRefreshOrganizationHistoryClick" />
+                        </Grid>
+
+                        <Border Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Organization Preview &amp; Undo History" FontWeight="SemiBold" />
+                                <TextBlock x:Name="OrganizationStatusText" Text="Select a folder above or inspect recent organization runs from the local core." Opacity="0.8" TextWrapping="Wrap" />
+                                <ListView x:Name="OrganizationHistoryListView" SelectionMode="None" MaxHeight="340" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 7. PROJECTS, NOTES & AI SETTINGS PANEL -->
+                <ScrollViewer x:Name="WorkspaceToolsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="18">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Local Notes, Projects &amp; On-Device AI Settings" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock Text="Manage local SQLite notes and configure on-device AI providers (Built-in GGUF, Local Excerpts, Ollama, or optional API keys protected with Windows DPAPI). Cloud Sync has been retired for 100% local-first operation." Opacity="0.75" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Local Notes -->
+                            <Border Grid.Column="0" Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Local Workspace Notes (SQLite Preserved)" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBox x:Name="NoteTitleBox" PlaceholderText="Note title..." />
+                                    <TextBox x:Name="NoteContentBox" PlaceholderText="Write a local note..." AcceptsReturn="True" Height="80" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Content="Save Note" Style="{StaticResource AccentButtonStyle}" Click="OnSaveNoteClick" />
+                                        <Button Content="Refresh Notes" Click="OnRefreshNotesClick" />
+                                    </StackPanel>
+                                    <ListView x:Name="NotesListView" SelectionMode="Single" MaxHeight="260">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:NoteRowViewModel">
+                                                <StackPanel Padding="4,6">
+                                                    <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{x:Bind Content}" FontSize="12" Opacity="0.8" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind UpdatedAt}" FontSize="10" Opacity="0.6" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- AI Provider & DPAPI Settings -->
+                            <Border Grid.Column="1" Padding="16" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="AI Provider &amp; Local Privacy Configuration" FontWeight="SemiBold" FontSize="15" />
+                                    <ComboBox x:Name="AiProviderComboBox" Header="Active AI Provider" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                        <ComboBoxItem Content="Built-in AI (On-Device Local GGUF / Operator)" Tag="builtin" />
+                                        <ComboBoxItem Content="Local Workspace Excerpts Only (Deterministic)" Tag="local" />
+                                        <ComboBoxItem Content="Ollama (Loopback Local LLM)" Tag="ollama" />
+                                        <ComboBoxItem Content="OpenAI (Optional Cloud Key)" Tag="openai" />
+                                        <ComboBoxItem Content="Google Gemini (Optional Cloud Key)" Tag="gemini" />
+                                    </ComboBox>
+                                    <TextBox x:Name="OllamaUrlBox" Header="Ollama Loopback URL" Text="http://127.0.0.1:11434" />
+                                    <Button Content="Save AI Preferences (DPAPI Protected)" Style="{StaticResource AccentButtonStyle}" Click="OnSaveAiPreferencesClick" />
+                                    <TextBlock x:Name="AiPreferencesStatusText" Text="Core storage scanning, duplicate detection, cleanup, and app uninstallation work 100% offline with no AI key." FontSize="12" Opacity="0.78" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </NavigationView>
+
+        <!-- Bottom Status Bar -->
+        <Border Grid.Row="2" Padding="20,8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Background="{ThemeResource LayerFillColorDefaultBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="FooterStatusText" Text="Ready. Automatic volume discovery active." FontSize="12" Opacity="0.82" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" x:Name="FooterEngineText" Text="Engine: Groundwork.Engine (.NET 10 Win32 + NTFS MFT)" FontSize="12" Opacity="0.7" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

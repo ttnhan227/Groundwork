@@ -27,6 +27,15 @@ desktop/test-results/
 desktop/src-tauri/gen/
 desktop/src-tauri/target/
 
+# .NET / Visual Studio / WinUI 3
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
 # Local databases & state
 *.sqlite
 *.sqlite3
@@ -52,3 +61,4 @@ server/git/
 # Disposable local validation fixtures and database migration backups
 /work/
 *.schema-v*.bak
+release-assets/

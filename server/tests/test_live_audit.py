@@ -26,7 +26,6 @@ from app.services.ai.tools import AIToolManager
 from app.services.git_service import GitService
 from app.services.indexer_service import IndexerService
 from app.services.search_engine import SearchEngine
-from app.services.sync_service import SyncService
 from app.services.workspace_service import WorkspaceService
 
 
@@ -170,17 +169,17 @@ def test_mutating_ai_tool_requires_confirmation(audit_db):
     assert confirmed.get("returncode") == 0 or "stdout" in confirmed or "output" in confirmed
 
 
-def test_cloud_sync_privacy_guarantee(audit_db):
-    """Verify that sync payload contains only metadata and notes, NEVER file contents."""
-    sync_svc = SyncService()
-    payload = sync_svc.get_sync_payload()
+def test_local_only_privacy_guarantee(audit_db):
+    """Verify that notes and saved searches remain fully functional in SQLite without cloud sync."""
+    from app.models.types import NoteCreate, SavedSearchCreate
+    from app.services.notes_service import NotesService
+    from app.services.saved_search_service import SavedSearchService
 
-    # The payload MUST NOT contain file chunks, file contents, or repository trees
-    assert "file_contents" not in payload
-    assert "chunks" not in payload
-    assert "files" not in payload
-    assert "source_code" not in payload
+    note = NotesService().create_note(NoteCreate(title="Offline Note", content="Secret text", tags=["local"]))
+    assert note.id
+    saved = SavedSearchService().create_saved_search(SavedSearchCreate(title="Local Query", query="storage"))
+    assert saved.id
 
-    # Only settings, notes, and saved_searches are allowed
-    allowed_keys = {"settings", "notes", "saved_searches"}
-    assert set(payload.keys()).issubset(allowed_keys)
+    conn = audit_db.get_connection()
+    assert conn.execute("SELECT count(*) FROM notes").fetchone()[0] == 1
+    assert conn.execute("SELECT count(*) FROM saved_searches").fetchone()[0] == 1

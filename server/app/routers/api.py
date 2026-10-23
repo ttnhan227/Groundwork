@@ -18,7 +18,6 @@ from app.models.types import (
     ContextSessionResponse,
     ContextSessionUpdate,
     IndexProgress,
-    InvestigationRequest,
     NoteCreate,
     NoteResponse,
     ProjectOverview,
@@ -32,7 +31,6 @@ from app.models.types import (
 )
 from app.services.activity_service import ActivityService
 from app.services.ai.context_engine import AIContextEngine
-from app.services.ai.investigation import InvestigationService
 from app.services.ai.tools import AIToolManager
 from app.services.collection_service import CollectionConflict, CollectionInput, CollectionService
 from app.services.context_service import ContextService
@@ -42,7 +40,6 @@ from app.services.notes_service import NotesService
 from app.services.project_service import ProjectService
 from app.services.saved_search_service import SavedSearchService
 from app.services.search_engine import SearchEngine
-from app.services.sync_service import SyncService
 from app.services.system_service import SystemService
 from app.services.workspace_service import WorkspaceService
 
@@ -98,11 +95,13 @@ class PathActionRequest(BaseModel):
 class CleanupProposeRequest(BaseModel):
     paths: list[str] = Field(min_length=1, max_length=200)
     mode: str = Field(default="recycle", pattern="^(recycle|permanent)$")
+    install_location: str = Field(default="", max_length=1024)
 
 
 class CleanupExecuteRequest(BaseModel):
     proposal: dict[str, Any]
     confirmation_token: str = Field(min_length=1, max_length=256)
+    install_location: str = Field(default="", max_length=1024)
 
 
 class LeftoverScanRequest(BaseModel):
@@ -311,7 +310,7 @@ def scan_installed_app_leftovers(req: LeftoverScanRequest):
 def propose_app_leftovers_cleanup(req: CleanupProposeRequest):
     from app.services.installed_apps import propose_leftover_cleanup
     try:
-        return propose_leftover_cleanup(req.paths, req.mode)
+        return propose_leftover_cleanup(req.paths, req.mode, install_location=req.install_location)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
@@ -322,7 +321,11 @@ def propose_app_leftovers_cleanup(req: CleanupProposeRequest):
 def execute_app_leftovers_cleanup(req: CleanupExecuteRequest):
     from app.services.installed_apps import execute_leftover_cleanup
     try:
-        return execute_leftover_cleanup(req.proposal, req.confirmation_token)
+        return execute_leftover_cleanup(
+            req.proposal,
+            req.confirmation_token,
+            install_location=req.install_location,
+        )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
@@ -729,34 +732,6 @@ class OrganizationRequest(BaseModel):
     categories: list[str] = Field(default_factory=list)
 
 
-class AssistantActionRequest(BaseModel):
-    instruction: str = Field(default="", max_length=2000)
-    paths: list[str] = Field(default_factory=list, max_length=6)
-    proposal: dict[str, Any] | None = None
-    confirmation_token: str | None = None
-
-
-@ai_router.post("/actions/propose")
-def propose_assistant_action(req: AssistantActionRequest):
-    from app.services.assistant_actions import propose
-    from app.services.assistant_jobs import AssistantJobs
-    try:
-        return AssistantJobs.start(lambda: propose(req.instruction, req.paths))
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@ai_router.post("/actions/execute")
-def execute_assistant_action(req: AssistantActionRequest):
-    from app.services.assistant_actions import execute
-    try:
-        if not req.proposal or not req.confirmation_token:
-            raise ValueError("Review and approve the proposed action first.")
-        return execute(req.proposal, req.confirmation_token)
-    except (ValueError, PermissionError, FileNotFoundError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
 @ai_router.get("/organization/history")
 def organization_history():
     from app.services.organization_service import OrganizationService
@@ -840,18 +815,6 @@ def query_ai(req: AIQueryRequest) -> AIQueryResponse:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@ai_router.post("/investigate")
-def run_investigation(req: InvestigationRequest) -> dict[str, Any]:
-    try:
-        return InvestigationService().run_investigation(req)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
 @ai_router.get("/tools")
 def list_ai_tools() -> list[dict[str, Any]]:
     return AIToolManager().get_tool_definitions()
@@ -885,16 +848,6 @@ def list_providers() -> list[dict[str, Any]]:
 sync_router = APIRouter(prefix="/api/sync", tags=["Sync"])
 
 
-@sync_router.get("/status")
-def get_sync_status() -> dict[str, Any]:
-    return SyncService().get_sync_status()
-
-
-@sync_router.post("/trigger")
-def trigger_sync() -> dict[str, Any]:
-    return SyncService().trigger_sync()
-
-
 class PreferencesUpdate(BaseModel):
     ai_provider: str | None = None
     ollama_base_url: str | None = None
@@ -915,7 +868,7 @@ def get_preferences():
 def update_preferences(req: PreferencesUpdate):
     from app.services.preferences_service import PreferencesService
     values = req.model_dump(exclude_unset=True)
-    if values.get("ai_provider") not in {None, "local", "ollama", "openai", "gemini"}:
+    if values.get("ai_provider") not in {None, "builtin", "local", "ollama", "openai", "gemini"}:
         raise HTTPException(status_code=422, detail="Unknown provider")
     if any((value is None and key not in {"openai_api_key", "gemini_api_key"}) or (value is not None and (not isinstance(value, str) or not value or len(value) > 4096)) for key, value in values.items()):
         raise HTTPException(status_code=422, detail="Invalid preferences")
@@ -923,70 +876,6 @@ def update_preferences(req: PreferencesUpdate):
         return PreferencesService().update(values)
     except (ValueError, RuntimeError, OSError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-class CloudLoginRequest(BaseModel):
-    url: str | None = None
-    email: str
-    password: str
-    create_account: bool = Field(default=False, alias="register")
-
-
-class GoogleStartRequest(BaseModel):
-    url: str | None = None
-    link: bool = False
-
-
-class GoogleSessionRequest(BaseModel):
-    session_id: str = Field(min_length=1, max_length=64)
-
-
-@sync_router.post("/google/start")
-def google_start(req: GoogleStartRequest):
-    from app.services.google_signin_service import start_google
-    try:
-        return start_google(req.url or get_settings().cloud_sync_url, req.link)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@sync_router.post("/google/poll")
-def google_poll(req: GoogleSessionRequest):
-    from app.services.google_signin_service import poll_google
-    return poll_google(req.session_id)
-
-
-@sync_router.post("/google/cancel")
-def google_cancel(req: GoogleSessionRequest):
-    from app.services.google_signin_service import cancel_google
-    return cancel_google(req.session_id)
-
-
-@sync_router.post("/login")
-def cloud_login(req: CloudLoginRequest):
-    import httpx
-
-    from app.services.preferences_service import PreferencesService, validate_url
-    try:
-        url = validate_url(req.url or get_settings().cloud_sync_url)
-        with httpx.Client(timeout=15) as client:
-            response = client.post(f"{url}/auth/{'register' if req.create_account else 'login'}", json={"email": req.email, "password": req.password})
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail="Cloud sign-in failed; check your credentials")
-            token = response.json()["access_token"]
-        PreferencesService().update({"cloud_sync_url": url, "cloud_sync_token": token, "cloud_sync_enabled": True})
-        return {"status": "authenticated"}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="Unable to sign in to cloud sync") from exc
-
-
-@sync_router.post("/logout")
-def cloud_logout():
-    from app.services.preferences_service import PreferencesService
-    PreferencesService().update({"cloud_sync_token": None, "cloud_sync_enabled": False})
-    return {"status": "local_only"}
 
 
 @system_router.post("/shutdown")

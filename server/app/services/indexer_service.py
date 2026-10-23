@@ -218,6 +218,10 @@ class IndexerService:
                         except (ValueError, OSError):
                             pass
                     file_paths = selected_files
+                elif ws_path.resolve().parent == ws_path.resolve():
+                    # Whole-drive roots are scanned for metadata inventory only;
+                    # do not automatically walk or embed every file on a drive root unless target_paths are specified.
+                    file_paths = []
                 else:
                     file_paths = self._discover_files(ws_path, ws.ignore_patterns)
 
@@ -227,6 +231,8 @@ class IndexerService:
                 content_files.append((ws, file_paths))
             for ws, file_paths in content_files:
                 ws_path = Path(ws.path)
+                if ws_path.resolve().parent == ws_path.resolve() and not target_paths:
+                    continue
                 with self._lock:
                     self._progress.current_workspace = ws.name
                     self._progress.phase = "projects"
@@ -282,26 +288,7 @@ class IndexerService:
                 self._progress.finished_at = finished_iso
                 self._progress.percent = 100.0 if final_status == IndexStatus.COMPLETED else self._progress.percent
 
-            # Record run in database
             first_ws = workspaces[0].id if workspaces else "unknown"
-            conn = self.db.get_connection()
-            with conn:
-                conn.execute("""
-                INSERT INTO indexing_runs (
-                    id, workspace_id, status, files_discovered, files_indexed,
-                    files_skipped, started_at, finished_at, error_log_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """, (
-                    run_id,
-                    first_ws,
-                    final_status.value,
-                    total_discovered,
-                    total_indexed,
-                    total_skipped,
-                    start_time.isoformat(),
-                    finished_iso,
-                    json.dumps(self._progress.errors[:50]),
-                ))
 
             # Record activity
             self.activity_service.record_activity(
@@ -439,23 +426,9 @@ class IndexerService:
 
             # 2. Clean previous chunks & FTS records for this file
             conn.execute("DELETE FROM chunks WHERE file_id = ?;", (file_id,))
-            conn.execute("DELETE FROM fts_files WHERE file_id = ?;", (file_id,))
             conn.execute("DELETE FROM fts_chunks WHERE file_id = ?;", (file_id,))
 
-            # 3. Insert FTS file record
-            conn.execute("""
-            INSERT INTO fts_files (file_id, filename, relative_path, symbols, content, project_name)
-            VALUES (?, ?, ?, ?, ?, ?);
-            """, (
-                file_id,
-                fpath.name,
-                rel_path,
-                symbols_text,
-                parse_result.content[:50000],  # Index up to first 50k chars in file FTS
-                proj_name,
-            ))
-
-            # 4. Insert chunks and chunk FTS records in batches
+            # 3. Insert chunks and chunk FTS records in batches
             if parse_result.chunks:
                 chunk_rows = []
                 fts_chunk_rows = []
@@ -503,7 +476,6 @@ class IndexerService:
             rows = conn.execute("SELECT id FROM files WHERE path = ? COLLATE NOCASE OR substr(path,1,?) = ? COLLATE NOCASE;", (file_path_str, len(prefix), prefix)).fetchall()
             for row in rows:
                 file_id = row["id"]
-                conn.execute("DELETE FROM fts_files WHERE file_id = ?;", (file_id,))
                 conn.execute("DELETE FROM fts_chunks WHERE file_id = ?;", (file_id,))
                 conn.execute("DELETE FROM chunks WHERE file_id = ?;", (file_id,))
                 conn.execute("DELETE FROM files WHERE id = ?;", (file_id,))

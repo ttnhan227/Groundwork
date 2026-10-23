@@ -1,1 +1,0 @@
-"""Cloud app models package."""
