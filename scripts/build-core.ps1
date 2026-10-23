@@ -42,6 +42,17 @@ if (!(Test-Path $configPath)) {
     Set-Content -Path $configPath -Value $defaultConfig -Encoding utf8
 }
 
+# Ensure models and git directories exist for PyInstaller staging
+$modelsDir = Join-Path $repoRoot "server\models"
+if (!(Test-Path $modelsDir)) {
+    New-Item -ItemType Directory -Path $modelsDir -Force | Out-Null
+}
+
+$gitDir = Join-Path $repoRoot "server\git"
+if (!(Test-Path $gitDir)) {
+    New-Item -ItemType Directory -Path $gitDir -Force | Out-Null
+}
+
 $buildWorkPath = Join-Path $buildDir ("run-" + [guid]::NewGuid().ToString("N"))
 Write-Host "Packaging groundwork-core into $DistDir\groundwork-core..." -ForegroundColor Cyan
 

@@ -42,7 +42,9 @@ Write-Host "  Python:   $pyVersion"
 if (-not $SkipTests) {
     Write-Host "`n[2/5] Running automated tests..." -ForegroundColor Yellow
 
-    Write-Host "  Executing native C# engine unit & benchmark tests..."
+    Write-Host "  Restoring and executing native C# engine unit & benchmark tests..."
+    & dotnet restore "$winuiDir/Groundwork.slnx"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to restore .NET packages." }
     & dotnet test "$winuiDir/Groundwork.slnx" -c $Configuration --no-restore --verbosity normal
     if ($LASTEXITCODE -ne 0) { throw "Native engine tests failed." }
 

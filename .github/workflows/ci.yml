@@ -16,72 +16,41 @@ concurrency:
 
 jobs:
   # ──────────────────────────────────────────────
-  # 1. Local Core: SQLite, FTS5, Hybrid Search & Eval
+  # 1. Windows Native 1.0 Release Build & Tests
   # ──────────────────────────────────────────────
-  local-core:
-    name: Local Core (Pytest + Search Eval)
-    runs-on: ubuntu-latest
+  windows-release:
+    name: Windows Native 1.0 Build & Automated Tests
+    runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: server/requirements.txt
 
-      - name: Install dependencies
+      - name: Install Python test & packaging dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r server/requirements.txt pytest
+          pip install -r server/requirements.txt pytest pyinstaller
 
-      - name: Run Local Core Unit & Integration Tests
-        working-directory: server
-        run: pytest tests/ -v
+      - name: Build Windows release bundle and execute all tests
+        shell: pwsh
+        run: ./scripts/build-windows-release.ps1
 
-      - name: Run Hybrid Search Evaluation Benchmark
-        working-directory: server
-        run: python eval/search_eval.py
-
-    # ──────────────────────────────────────────────
-  # 3. Desktop Application: Tauri & React Build
-  # ──────────────────────────────────────────────
-  desktop-client:
-    name: Desktop Client (TypeScript & Vite Build)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/upload-artifact@v4
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: desktop/package.json
-
-      - name: Install desktop dependencies
-        working-directory: desktop
-        run: npm ci
-
-      - name: Build desktop application bundle
-        working-directory: desktop
-        run: npm run build
-
-      - name: Install browser test dependencies
-        working-directory: client
-        run: npm ci && npx playwright install --with-deps chromium
-
-      - name: Verify desktop onboarding, reader, cleanup and computer workflows
-        run: node --test desktop/tests/onboarding-ui.test.cjs desktop/tests/reader-ui.test.cjs desktop/tests/cleanup-computer-ui.test.cjs
+          name: groundwork-windows-release
+          path: dist/Groundwork/
 
   # ──────────────────────────────────────────────
-  # 4. Web Portal: Marketing & Docs Website Build
+  # 2. Web Portal: Marketing & Docs Website Build
   # ──────────────────────────────────────────────
   web-portal:
-    name: Marketing & Docs Site (Vite Build)
+    name: Marketing & Docs Site (Vite Build & Tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -115,28 +84,11 @@ jobs:
           npx playwright install --with-deps chromium
           node --test tests/download-release-ui.test.mjs
 
-  windows-release:
-    name: Windows native desktop release
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install -r server/requirements.txt pytest
-      - name: Build Windows release bundle and execute tests
-        shell: pwsh
-        run: ./scripts/build-windows-release.ps1
-      - uses: actions/upload-artifact@v4
-        with:
-          name: groundwork-windows-release
-          path: dist/Groundwork/
-
+  # ──────────────────────────────────────────────
+  # 3. Optional Deployment Hooks
+  # ──────────────────────────────────────────────
   deploy-backend:
-    needs: [local-core, desktop-client, web-portal, windows-release]
+    needs: [web-portal, windows-release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_AUTOMATION_ENABLED == 'true'
     uses: ./.github/workflows/deploy.yml
     permissions:
@@ -147,7 +99,7 @@ jobs:
     secrets: inherit
 
   deploy-website:
-    needs: [local-core, desktop-client, web-portal, windows-release]
+    needs: [web-portal, windows-release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_AUTOMATION_ENABLED == 'true'
     uses: ./.github/workflows/website.yml
     secrets: inherit
