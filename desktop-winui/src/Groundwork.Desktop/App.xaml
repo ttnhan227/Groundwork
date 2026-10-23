@@ -7,6 +7,198 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- DARK THEME (Groundwork Control Room Palette) -->
+                <ResourceDictionary x:Key="Dark">
+                    <Color x:Key="GwPageBackgroundColor">#0B1020</Color>
+                    <SolidColorBrush x:Key="GwPageBackgroundBrush" Color="{StaticResource GwPageBackgroundColor}" />
+
+                    <Color x:Key="GwHeaderBackgroundColor">#142B45</Color>
+                    <SolidColorBrush x:Key="GwHeaderBackgroundBrush" Color="{StaticResource GwHeaderBackgroundColor}" />
+
+                    <Color x:Key="GwSidebarBackgroundColor">#0D1629</Color>
+                    <SolidColorBrush x:Key="GwSidebarBackgroundBrush" Color="{StaticResource GwSidebarBackgroundColor}" />
+
+                    <Color x:Key="GwCardBackgroundColor">#151E31</Color>
+                    <SolidColorBrush x:Key="GwCardBackgroundBrush" Color="{StaticResource GwCardBackgroundColor}" />
+
+                    <Color x:Key="GwCardBackgroundHoverColor">#1B2740</Color>
+                    <SolidColorBrush x:Key="GwCardBackgroundHoverBrush" Color="{StaticResource GwCardBackgroundHoverColor}" />
+
+                    <Color x:Key="GwCardBorderColor">#26334B</Color>
+                    <SolidColorBrush x:Key="GwCardBorderBrush" Color="{StaticResource GwCardBorderColor}" />
+
+                    <Color x:Key="GwCardBorderStrongColor">#3B4B68</Color>
+                    <SolidColorBrush x:Key="GwCardBorderStrongBrush" Color="{StaticResource GwCardBorderStrongColor}" />
+
+                    <!-- Groundwork Cobalt Accent -->
+                    <Color x:Key="GwAccentColor">#6F91FF</Color>
+                    <SolidColorBrush x:Key="GwAccentBrush" Color="{StaticResource GwAccentColor}" />
+
+                    <Color x:Key="GwAccentHoverColor">#91A9FF</Color>
+                    <SolidColorBrush x:Key="GwAccentHoverBrush" Color="{StaticResource GwAccentHoverColor}" />
+
+                    <!-- Status & Feature Colors -->
+                    <Color x:Key="GwSignalGreenColor">#B7EB35</Color>
+                    <SolidColorBrush x:Key="GwSignalGreenBrush" Color="{StaticResource GwSignalGreenColor}" />
+
+                    <Color x:Key="GwSignalGreenBgColor">#152B14</Color>
+                    <SolidColorBrush x:Key="GwSignalGreenBgBrush" Color="{StaticResource GwSignalGreenBgColor}" />
+
+                    <Color x:Key="GwTealColor">#2DD4BF</Color>
+                    <SolidColorBrush x:Key="GwTealBrush" Color="{StaticResource GwTealColor}" />
+
+                    <Color x:Key="GwTealBgColor">#0F3836</Color>
+                    <SolidColorBrush x:Key="GwTealBgBrush" Color="{StaticResource GwTealBgColor}" />
+
+                    <Color x:Key="GwPurpleColor">#C084FC</Color>
+                    <SolidColorBrush x:Key="GwPurpleBrush" Color="{StaticResource GwPurpleColor}" />
+
+                    <Color x:Key="GwPurpleBgColor">#2D1E4A</Color>
+                    <SolidColorBrush x:Key="GwPurpleBgBrush" Color="{StaticResource GwPurpleBgColor}" />
+
+                    <Color x:Key="GwAmberColor">#FCD34D</Color>
+                    <SolidColorBrush x:Key="GwAmberBrush" Color="{StaticResource GwAmberColor}" />
+
+                    <Color x:Key="GwAmberBgColor">#382405</Color>
+                    <SolidColorBrush x:Key="GwAmberBgBrush" Color="{StaticResource GwAmberBgColor}" />
+
+                    <Color x:Key="GwDangerColor">#F87171</Color>
+                    <SolidColorBrush x:Key="GwDangerBrush" Color="{StaticResource GwDangerColor}" />
+
+                    <!-- Typography Colors -->
+                    <Color x:Key="GwTextPrimaryColor">#F2F5FA</Color>
+                    <SolidColorBrush x:Key="GwTextPrimaryBrush" Color="{StaticResource GwTextPrimaryColor}" />
+
+                    <Color x:Key="GwTextSecondaryColor">#BDC7D8</Color>
+                    <SolidColorBrush x:Key="GwTextSecondaryBrush" Color="{StaticResource GwTextSecondaryColor}" />
+
+                    <Color x:Key="GwTextMutedColor">#8E9BB0</Color>
+                    <SolidColorBrush x:Key="GwTextMutedBrush" Color="{StaticResource GwTextMutedColor}" />
+                </ResourceDictionary>
+
+                <!-- LIGHT THEME (Groundwork Paper Palette) -->
+                <ResourceDictionary x:Key="Light">
+                    <Color x:Key="GwPageBackgroundColor">#F6F8FA</Color>
+                    <SolidColorBrush x:Key="GwPageBackgroundBrush" Color="{StaticResource GwPageBackgroundColor}" />
+
+                    <Color x:Key="GwHeaderBackgroundColor">#142B45</Color>
+                    <SolidColorBrush x:Key="GwHeaderBackgroundBrush" Color="{StaticResource GwHeaderBackgroundColor}" />
+
+                    <Color x:Key="GwSidebarBackgroundColor">#EEF2F7</Color>
+                    <SolidColorBrush x:Key="GwSidebarBackgroundBrush" Color="{StaticResource GwSidebarBackgroundColor}" />
+
+                    <Color x:Key="GwCardBackgroundColor">#FFFFFF</Color>
+                    <SolidColorBrush x:Key="GwCardBackgroundBrush" Color="{StaticResource GwCardBackgroundColor}" />
+
+                    <Color x:Key="GwCardBackgroundHoverColor">#F4F7FB</Color>
+                    <SolidColorBrush x:Key="GwCardBackgroundHoverBrush" Color="{StaticResource GwCardBackgroundHoverColor}" />
+
+                    <Color x:Key="GwCardBorderColor">#DFE5EC</Color>
+                    <SolidColorBrush x:Key="GwCardBorderBrush" Color="{StaticResource GwCardBorderColor}" />
+
+                    <Color x:Key="GwCardBorderStrongColor">#BAC8D8</Color>
+                    <SolidColorBrush x:Key="GwCardBorderStrongBrush" Color="{StaticResource GwCardBorderStrongColor}" />
+
+                    <!-- Groundwork Cobalt Accent -->
+                    <Color x:Key="GwAccentColor">#22569E</Color>
+                    <SolidColorBrush x:Key="GwAccentBrush" Color="{StaticResource GwAccentColor}" />
+
+                    <Color x:Key="GwAccentHoverColor">#18457F</Color>
+                    <SolidColorBrush x:Key="GwAccentHoverBrush" Color="{StaticResource GwAccentHoverColor}" />
+
+                    <!-- Status & Feature Colors -->
+                    <Color x:Key="GwSignalGreenColor">#2F6B4F</Color>
+                    <SolidColorBrush x:Key="GwSignalGreenBrush" Color="{StaticResource GwSignalGreenColor}" />
+
+                    <Color x:Key="GwSignalGreenBgColor">#F0F7F3</Color>
+                    <SolidColorBrush x:Key="GwSignalGreenBgBrush" Color="{StaticResource GwSignalGreenBgColor}" />
+
+                    <Color x:Key="GwTealColor">#0F766E</Color>
+                    <SolidColorBrush x:Key="GwTealBrush" Color="{StaticResource GwTealColor}" />
+
+                    <Color x:Key="GwTealBgColor">#E1F2F0</Color>
+                    <SolidColorBrush x:Key="GwTealBgBrush" Color="{StaticResource GwTealBgColor}" />
+
+                    <Color x:Key="GwPurpleColor">#614494</Color>
+                    <SolidColorBrush x:Key="GwPurpleBrush" Color="{StaticResource GwPurpleColor}" />
+
+                    <Color x:Key="GwPurpleBgColor">#EEE7FA</Color>
+                    <SolidColorBrush x:Key="GwPurpleBgBrush" Color="{StaticResource GwPurpleBgColor}" />
+
+                    <Color x:Key="GwAmberColor">#9A6717</Color>
+                    <SolidColorBrush x:Key="GwAmberBrush" Color="{StaticResource GwAmberColor}" />
+
+                    <Color x:Key="GwAmberBgColor">#FDF7EC</Color>
+                    <SolidColorBrush x:Key="GwAmberBgBrush" Color="{StaticResource GwAmberBgColor}" />
+
+                    <Color x:Key="GwDangerColor">#9E332B</Color>
+                    <SolidColorBrush x:Key="GwDangerBrush" Color="{StaticResource GwDangerColor}" />
+
+                    <!-- Typography Colors -->
+                    <Color x:Key="GwTextPrimaryColor">#112038</Color>
+                    <SolidColorBrush x:Key="GwTextPrimaryBrush" Color="{StaticResource GwTextPrimaryColor}" />
+
+                    <Color x:Key="GwTextSecondaryColor">#4A5360</Color>
+                    <SolidColorBrush x:Key="GwTextSecondaryBrush" Color="{StaticResource GwTextSecondaryColor}" />
+
+                    <Color x:Key="GwTextMutedColor">#6F746F</Color>
+                    <SolidColorBrush x:Key="GwTextMutedBrush" Color="{StaticResource GwTextMutedColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <!-- Reusable Typography Styles -->
+            <Style x:Key="GwPanelTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="20" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{ThemeResource GwTextPrimaryBrush}" />
+            </Style>
+
+            <Style x:Key="GwPanelSubtitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="LineHeight" Value="18" />
+                <Setter Property="Foreground" Value="{ThemeResource GwTextSecondaryBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="GwCardTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{ThemeResource GwTextPrimaryBrush}" />
+            </Style>
+
+            <!-- Groundwork Action Button Styles -->
+            <Style x:Key="GwPrimaryButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource GwAccentBrush}" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="14,7" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
+
+            <Style x:Key="GwSecondaryButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource GwCardBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource GwTextPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource GwCardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="FontWeight" Value="Medium" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="12,6" />
+            </Style>
+
+            <Style x:Key="GwDangerButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource GwDangerBrush}" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
