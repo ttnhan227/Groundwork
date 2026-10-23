@@ -135,6 +135,36 @@ Get-ChildItem -Path $distDir -File | ForEach-Object {
 }
 $hashes | Out-File -FilePath $checksumFile -Encoding utf8
 
+# Build Inno Setup installer if Inno Setup is available
+$issPath = Join-Path $repoRoot "installer\Groundwork.iss"
+$isccCandidates = @(
+    "ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    "C:\Program Files\Inno Setup 6\ISCC.exe"
+)
+$isccExe = $null
+foreach ($cand in $isccCandidates) {
+    if (Get-Command $cand -ErrorAction SilentlyContinue) { $isccExe = $cand; break }
+    if (Test-Path $cand) { $isccExe = $cand; break }
+}
+
+if ($isccExe -and (Test-Path $issPath)) {
+    Write-Host "  Compiling Windows setup installer via Inno Setup ($isccExe)..." -ForegroundColor Cyan
+    & $isccExe $issPath
+    if ($LASTEXITCODE -eq 0) {
+        $setupExe = Join-Path $repoRoot "dist\Groundwork-windows-x64-setup.exe"
+        if (Test-Path $setupExe) {
+            $setupHash = (Get-FileHash -Path $setupExe -Algorithm SHA256).Hash.ToLower()
+            $setupShaFile = Join-Path $repoRoot "dist\Groundwork-windows-x64-setup.exe.sha256"
+            "$setupHash  Groundwork-windows-x64-setup.exe" | Out-File -FilePath $setupShaFile -Encoding ascii
+            Write-Host "  Created setup installer: $setupExe" -ForegroundColor Green
+        }
+    } else {
+        Write-Warning "Inno Setup compiler returned non-zero exit code ($LASTEXITCODE)."
+    }
+}
+
 $sw.Stop()
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor Green

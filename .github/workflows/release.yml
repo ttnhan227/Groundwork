@@ -56,18 +56,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r server/requirements.txt pytest pyinstaller
 
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $innoDir = "C:\Program Files (x86)\Inno Setup 6"
+          if (Test-Path $innoDir) {
+            Add-Content -Path $env:GITHUB_PATH -Value $innoDir
+          }
+
       - name: Run Windows release build pipeline & automated tests
         shell: pwsh
         run: ./scripts/build-windows-release.ps1
 
-      - name: Package release ZIP and checksums
+      - name: Package release assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release-assets -Force | Out-Null
           $zipName = "Groundwork-$env:RELEASE_TAG-windows-x64.zip"
           Compress-Archive -Path "dist/Groundwork/*" -DestinationPath "release-assets/$zipName" -Force
           Copy-Item -Path "dist/Groundwork/checksums.txt" -Destination "release-assets/checksums.txt" -Force
-          Write-Host "Created release package: release-assets/$zipName"
+          if (Test-Path "dist/Groundwork-windows-x64-setup.exe") {
+            Copy-Item -Path "dist/Groundwork-windows-x64-setup.exe" -Destination "release-assets/Groundwork-windows-x64-setup.exe" -Force
+          }
+          if (Test-Path "dist/Groundwork-windows-x64-setup.exe.sha256") {
+            Copy-Item -Path "dist/Groundwork-windows-x64-setup.exe.sha256" -Destination "release-assets/Groundwork-windows-x64-setup.exe.sha256" -Force
+          }
+          Write-Host "Prepared all release packages in release-assets:"
+          Get-ChildItem -Path release-assets | Select-Object Name, Length | Format-Table -AutoSize
 
       - uses: actions/upload-artifact@v4
         with:
@@ -106,12 +122,12 @@ jobs:
           fi
 
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists. Uploading assets..."
-            gh release upload "$RELEASE_TAG" "$ZIP_NAME" checksums.txt --clobber
+            echo "Release $RELEASE_TAG already exists. Uploading all assets..."
+            gh release upload "$RELEASE_TAG" * --clobber
             gh release edit "$RELEASE_TAG" --draft=false --prerelease="$prerelease" --latest="$latest"
           else
             echo "Creating new release $RELEASE_TAG with automated changelog..."
-            gh release create "$RELEASE_TAG" "$ZIP_NAME" checksums.txt \
+            gh release create "$RELEASE_TAG" * \
               --title "Groundwork $RELEASE_TAG" \
               --generate-notes \
               --prerelease="$prerelease" \
