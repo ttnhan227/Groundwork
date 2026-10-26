@@ -1741,8 +1741,8 @@
 
                             <!-- Ollama Options -->
                             <StackPanel x:Name="SettingsOllamaPanel" Spacing="8" Visibility="Collapsed">
-                                <TextBox x:Name="SettingsOllamaUrlBox" Header="Ollama Loopback URL" Text="http://127.0.0.1:11434" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsOllamaModelBox" Header="Model Name (e.g. llama3.3:latest, deepseek-r1:latest, qwen2.5:latest)" Text="llama3.3:latest" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsOllamaUrlBox" Header="Base URL" Text="http://127.0.0.1:11434" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsOllamaModelBox" Header="Model" PlaceholderText="llama3.3:latest" Text="llama3.3:latest" Width="440" HorizontalAlignment="Left" />
                                 <StackPanel Spacing="6" Margin="0,4,0,0">
                                     <Button Content="Test &amp; Activate Ollama" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestOllamaClick" HorizontalAlignment="Left" />
                                     <TextBlock x:Name="SettingsOllamaStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
@@ -1751,23 +1751,21 @@
 
                             <!-- Gemini Options -->
                             <StackPanel x:Name="SettingsGeminiPanel" Spacing="8" Visibility="Collapsed">
-                                <PasswordBox x:Name="SettingsGeminiApiKeyBox" Header="Gemini API Key" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsGeminiModelBox" Header="Gemini Model (e.g. gemini-3.5-flash-lite, gemini-3.8-flash, gemini-flash-latest)" Text="gemini-3.5-flash-lite" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsGeminiEndpointBox" Header="Custom Base URL (Optional / Regional Proxy)" PlaceholderText="https://generativelanguage.googleapis.com" Width="440" HorizontalAlignment="Left" />
-                                <ToggleSwitch x:Name="GeminiGoogleSearchToggle" Header="Allow Gemini Google Search for current questions (sends the prompt and supplied context to Google)" IsOn="False" />
+                                <PasswordBox x:Name="SettingsGeminiApiKeyBox" Header="API Key" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsGeminiModelBox" Header="Model" Text="gemini-3.5-flash-lite" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsGeminiEndpointBox" Header="Base URL (optional)" PlaceholderText="https://generativelanguage.googleapis.com" Width="440" HorizontalAlignment="Left" />
+                                <ToggleSwitch x:Name="GeminiGoogleSearchToggle" Header="Web search (sends the prompt and system context to Google)" IsOn="False" />
                                 <StackPanel Spacing="6" Margin="0,4,0,0">
                                     <Button Content="Test &amp; Activate Gemini" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestGeminiClick" HorizontalAlignment="Left" />
                                     <TextBlock x:Name="SettingsGeminiStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
                                 </StackPanel>
                             </StackPanel>
 
-                            <ToggleSwitch x:Name="RememberAgentConversationToggle" Header="Remember the last five agent turns on this PC (stored locally; off by default)" IsOn="False" />
-
                             <!-- OpenAI Options -->
                             <StackPanel x:Name="SettingsOpenAiPanel" Spacing="8" Visibility="Collapsed">
-                                <PasswordBox x:Name="SettingsOpenAiApiKeyBox" Header="OpenAI API Key" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsOpenAiModelBox" Header="OpenAI Model (e.g. gpt-4o, o3-mini, gpt-4.5)" Text="gpt-4o" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsOpenAiEndpointBox" Header="Custom Base URL (Optional / Proxy)" PlaceholderText="https://api.openai.com/v1" Width="440" HorizontalAlignment="Left" />
+                                <PasswordBox x:Name="SettingsOpenAiApiKeyBox" Header="API Key" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsOpenAiModelBox" Header="Model" Text="gpt-4o" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsOpenAiEndpointBox" Header="Base URL (optional)" PlaceholderText="https://api.openai.com/v1" Width="440" HorizontalAlignment="Left" />
                                 <StackPanel Spacing="6" Margin="0,4,0,0">
                                     <Button Content="Test &amp; Activate OpenAI" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestOpenAiClick" HorizontalAlignment="Left" />
                                     <TextBlock x:Name="SettingsOpenAiStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
@@ -1776,15 +1774,17 @@
 
                             <!-- Mistral Options -->
                             <StackPanel x:Name="SettingsMistralPanel" Spacing="8" Visibility="Collapsed">
-                                <PasswordBox x:Name="SettingsMistralApiKeyBox" Header="Mistral API Key" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsMistralModelBox" Header="Mistral Model (e.g. mistral-medium-latest, mistral-large-latest, mistral-small-latest)" Text="mistral-medium-latest" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsMistralEndpointBox" Header="Custom Base URL (Optional)" PlaceholderText="https://api.mistral.ai/v1" Width="440" HorizontalAlignment="Left" />
-                                <ToggleSwitch x:Name="MistralWebSearchToggle" Header="Allow Mistral web search for current questions (sends the prompt and supplied context to Mistral)" IsOn="False" />
+                                <PasswordBox x:Name="SettingsMistralApiKeyBox" Header="API Key" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsMistralModelBox" Header="Model" Text="mistral-medium-latest" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsMistralEndpointBox" Header="Base URL (optional)" PlaceholderText="https://api.mistral.ai/v1" Width="440" HorizontalAlignment="Left" />
+                                <ToggleSwitch x:Name="MistralWebSearchToggle" Header="Web search (sends the prompt and system context to Mistral)" IsOn="False" />
                                 <StackPanel Spacing="6" Margin="0,4,0,0">
                                     <Button Content="Test &amp; Activate Mistral" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestMistralClick" HorizontalAlignment="Left" />
                                     <TextBlock x:Name="SettingsMistralStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
                                 </StackPanel>
                             </StackPanel>
+
+                            <ToggleSwitch x:Name="RememberAgentConversationToggle" Header="Remember the last five agent turns on this PC (stored locally; off by default)" IsOn="False" />
                         </StackPanel>
                     </Border>
 
