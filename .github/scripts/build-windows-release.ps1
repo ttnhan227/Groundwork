@@ -46,9 +46,10 @@ if (-not $SkipTests) {
 
 # 3. Publish Native WinUI 3 Desktop App
 Write-Host "`n[3/5] Publishing self-contained WinUI 3 Desktop App..." -ForegroundColor Yellow
-if (!(Test-Path $distDir)) {
-    New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+if (Test-Path $distDir) {
+    Remove-Item -Path $distDir -Recurse -Force
 }
+New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 
 $desktopProj = Join-Path $winuiDir "src\Groundwork.Desktop\Groundwork.Desktop.csproj"
 & dotnet publish $desktopProj -c $Configuration -p:Platform=$Platform -o $distDir
