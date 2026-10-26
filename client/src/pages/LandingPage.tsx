@@ -51,14 +51,14 @@ export function LandingPage({
           </p>
           <figure className="product-workspace-shot">
             <a
-              href="/screenshots/workspace.png?v=1.0.0"
+              href="/screenshots/workspace.png?v=demo"
               target="_blank"
               rel="noreferrer"
               aria-label="Open full-size storage and cleanup workspace screenshot"
             >
               <img
-                src="/screenshots/workspace.png?v=1.0.0"
-                alt="Groundwork Storage Analyzer &amp; Cleanup scanning a real folder and showing the largest folders with sizes, file counts, and last modified dates"
+                src="/screenshots/workspace.png?v=demo"
+                alt="Groundwork Storage Analyzer &amp; Cleanup showing the largest folders with sizes, file counts, and last modified dates"
                 width={1392}
                 height={893}
                 fetchPriority="high"
@@ -108,14 +108,14 @@ export function LandingPage({
         </div>
         <figure className="product-ai-shot">
           <a
-            href="/screenshots/assistant.png?v=1.0.0"
+            href="/screenshots/assistant.png?v=demo"
             target="_blank"
             rel="noreferrer"
             aria-label="Open full-size Agent screenshot"
           >
             <div className="product-ai-crop">
               <img
-                src="/screenshots/assistant.png?v=1.0.0"
+                src="/screenshots/assistant.png?v=demo"
                 alt="Groundwork Agent with ready-made questions for finding games, large files, build caches, and duplicates"
                 width={1392}
                 height={893}

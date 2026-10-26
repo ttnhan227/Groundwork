@@ -31,17 +31,11 @@
 
 ## 🖼️ Screenshots
 
-| Storage Analyzer | Storage Cleanup |
+| Storage Analyzer | Agent |
 | --- | --- |
-| ![Storage Analyzer scanning a folder](client/public/screenshots/workspace.png) | ![Storage Cleanup recommendations](client/public/screenshots/cleanup.png) |
+| ![Storage Analyzer showing the largest folders](client/public/screenshots/workspace.png) | ![Groundwork Agent](client/public/screenshots/assistant.png) |
 
-| Installed Apps | Hardware & Specs |
-| --- | --- |
-| ![Installed Apps and leftovers](client/public/screenshots/apps.png) | ![Hardware and system specifications](client/public/screenshots/computer.png) |
-
-| Agent | Settings |
-| --- | --- |
-| ![Groundwork Agent](client/public/screenshots/assistant.png) | ![Settings](client/public/screenshots/settings.png) |
+*Screenshots use a sample folder with made-up data.*
 
 ---
 
