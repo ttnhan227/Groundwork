@@ -1,0 +1,56 @@
+.env
+*.env
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+cloud/.venv/
+*.pyc
+*.log
+.coverage
+htmlcov/
+trivy-results.sarif
+
+# Node / Web / Desktop
+node_modules/
+dist/
+client/node_modules/
+client/.next/
+client/dist/
+client/.wrangler/
+client/test-results/
+client/playwright-report/
+
+
+
+
+
+
+# .NET / Visual Studio / WinUI 3
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local databases & state
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+.groundwork/
+local_data/
+
+tmp/
+postgres_data/
+minio_data/
+redis_data/
+Groundwork AI SaaS Application Specification.docx
+
+# Disposable local validation fixtures and database migration backups
+/work/
+*.schema-v*.bak
+release-assets/

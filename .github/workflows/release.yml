@@ -1,0 +1,144 @@
+name: Publish Windows desktop release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag, for example v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-desktop-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-test:
+    name: Build & Verify Native Windows Release
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify release tag and synchronize versions
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Use vMAJOR.MINOR.PATCH (e.g. v1.0.0)' }
+          git rev-parse --verify "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE) { throw 'The release tag does not exist' }
+          node .github/scripts/set-release-version.mjs $env:RELEASE_TAG
+          if ($LASTEXITCODE) { throw 'Version synchronization failed' }
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $innoDir = "C:\Program Files (x86)\Inno Setup 6"
+          if (Test-Path $innoDir) {
+            Add-Content -Path $env:GITHUB_PATH -Value $innoDir
+          }
+
+      - name: Run Windows release build pipeline & automated tests
+        shell: pwsh
+        run: ./.github/scripts/build-windows-release.ps1
+
+      - name: Package release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release-assets -Force | Out-Null
+          $zipName = "Groundwork-$env:RELEASE_TAG-windows-x64.zip"
+          Compress-Archive -Path "dist/Groundwork/*" -DestinationPath "release-assets/$zipName" -Force
+          Copy-Item -Path "dist/Groundwork/checksums.txt" -Destination "release-assets/checksums.txt" -Force
+          $setupNames = @(
+            "Groundwork-$env:RELEASE_TAG-windows-x64-setup.exe",
+            "Groundwork-windows-x64-setup.exe"
+          )
+          foreach ($setupName in $setupNames) {
+            if (Test-Path "dist/$setupName") {
+              Copy-Item -Path "dist/$setupName" -Destination "release-assets/$setupName" -Force
+            }
+            if (Test-Path "dist/$setupName.sha256") {
+              Copy-Item -Path "dist/$setupName.sha256" -Destination "release-assets/$setupName.sha256" -Force
+            }
+          }
+          Write-Host "Prepared all release packages in release-assets:"
+          Get-ChildItem -Path release-assets | Select-Object Name, Length | Format-Table -AutoSize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-windows-release
+          path: release-assets/
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release with Changelog
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-windows-release
+          path: release-assets
+
+      - name: Prepare human-readable release notes
+        run: |
+          node .github/scripts/extract-release-notes.mjs "$RELEASE_TAG" release-notes.md
+          echo "=== RELEASE NOTES PREVIEW ==="
+          cat release-notes.md
+
+      - name: Create or update GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+
+          latest=true
+          prerelease=false
+          if [[ "$RELEASE_TAG" == v0.* ]]; then
+            latest=false
+            prerelease=true
+          fi
+
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists. Uploading all assets and updating notes..."
+            gh release upload "$RELEASE_TAG" * --clobber
+            gh release edit "$RELEASE_TAG" \
+              --notes-file ../release-notes.md \
+              --draft=false \
+              --prerelease="$prerelease" \
+              --latest="$latest"
+          else
+            echo "Creating new release $RELEASE_TAG with human-readable notes..."
+            gh release create "$RELEASE_TAG" * \
+              --title "Groundwork $RELEASE_TAG" \
+              --notes-file ../release-notes.md \
+              --prerelease="$prerelease" \
+              --latest="$latest"
+          fi
+          echo "Successfully published Groundwork $RELEASE_TAG"

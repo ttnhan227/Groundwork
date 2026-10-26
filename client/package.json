@@ -1,0 +1,48 @@
+{
+  "name": "groundwork-client",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/write-deployment.mjs",
+    "preview": "vite preview",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\""
+  },
+  "dependencies": {
+    "lucide-react": "^1.31.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "rollup": "^4.62.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.55.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "eslint": "9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "glob": "^13.0.6",
+    "globals": "^16.4.0",
+    "prettier": "^3.9.6",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.46.1",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2",
+    "postcss": "8.5.28",
+    "sharp": "0.35.3"
+  },
+  "type": "module"
+}

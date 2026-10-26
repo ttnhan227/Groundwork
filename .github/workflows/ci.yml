@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Windows Native 1.0 Release Build & Tests
+  # ──────────────────────────────────────────────
+  windows-release:
+    name: Windows Native 1.0 Build & Automated Tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build Windows release bundle and execute all tests
+        shell: pwsh
+        run: ./.github/scripts/build-windows-release.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: groundwork-windows-release
+          path: dist/Groundwork/
+
+  # ──────────────────────────────────────────────
+  # 2. Web Portal: Marketing & Docs Website Build
+  # ──────────────────────────────────────────────
+  web-portal:
+    name: Marketing & Docs Site (Vite Build & Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build web application bundle
+        working-directory: client
+        run: npm run build
+
+      - name: Verify website lint, content and release resolution
+        working-directory: client
+        run: |
+          npm run lint
+          node --test tests/rendered-html.test.mjs
+          node --experimental-strip-types --test tests/releases.test.mjs
+
+      - name: Verify download and navigation interactions
+        working-directory: client
+        run: |
+          npx playwright install --with-deps chromium
+          node --test tests/download-release-ui.test.mjs
