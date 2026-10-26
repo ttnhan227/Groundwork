@@ -156,6 +156,7 @@
 
             <!-- Reusable Typography Styles -->
             <Style x:Key="GwPanelTitleStyle" TargetType="TextBlock">
+                <Setter Property="TextWrapping" Value="Wrap" />
                 <Setter Property="FontSize" Value="20" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{ThemeResource GwTextPrimaryBrush}" />

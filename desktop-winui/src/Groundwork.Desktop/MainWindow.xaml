@@ -406,15 +406,15 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Grid ColumnSpacing="12" VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <Border Width="42" Height="42" CornerRadius="8" Background="{ThemeResource GwTealBgBrush}" BorderBrush="{ThemeResource GwTealBrush}" BorderThickness="1">
                                     <SymbolIcon Symbol="Delete" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
-                                <StackPanel Spacing="2">
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                     <TextBlock Text="Storage Cleanup &amp; Recommendations" Style="{StaticResource GwPanelTitleStyle}" FontSize="18" />
                                     <TextBlock Text="Storage Sense recommendations: Instant, safe cleanup of temporary files, Recycle Bin, crash dumps, and caches." Style="{StaticResource GwPanelSubtitleStyle}" />
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <ComboBox x:Name="CleanupModeComboBox" SelectedIndex="0" Width="225" VerticalAlignment="Center">
                                     <ComboBoxItem Content="Move to Recycle Bin (Safe)" Tag="recycle" />
@@ -478,7 +478,7 @@
                                             </Grid.ColumnDefinitions>
 
                                             <!-- Checkbox to select/deselect category -->
-                                            <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                            <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
                                                       VerticalAlignment="Center" Margin="0,0,4,0" />
 
                                             <!-- Category Icon -->
@@ -546,7 +546,7 @@
                                                                     <ColumnDefinition Width="*" />
                                                                     <ColumnDefinition Width="Auto" />
                                                                 </Grid.ColumnDefinitions>
-                                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                                <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
                                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                                     <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="Medium"
                                                                                Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
@@ -599,15 +599,15 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Grid ColumnSpacing="12" VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Border Width="38" Height="38" CornerRadius="7" Background="{ThemeResource GwTealBgBrush}" BorderBrush="{ThemeResource GwTealBrush}" BorderThickness="1">
                                 <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <StackPanel Spacing="2">
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="Installed Applications, Uninstaller &amp; Leftovers" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
                                 <TextBlock Text="Two-step guided uninstall: monitors process exit code, then scans AppData, ProgramData and Registry for leftovers." Style="{StaticResource GwPanelSubtitleStyle}" />
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                             <TextBox x:Name="AppSearchFilterBox" PlaceholderText="Search applications or publishers..." MinWidth="180" MaxWidth="320" TextChanged="OnAppFilterTextChanged" VerticalAlignment="Center" />
                             <Button x:Name="RefreshAppsButton" Content="Refresh Apps" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshInstalledAppsClick" VerticalAlignment="Center" />
@@ -707,7 +707,7 @@
                                                         <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="75" />
                                                     </Grid.ColumnDefinitions>
-                                                    <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                    <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <TextBlock Text="{x:Bind Name}" FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Text="{x:Bind FullPath}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
@@ -742,15 +742,15 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Grid ColumnSpacing="12" VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwAccentBgBrush}" BorderBrush="{ThemeResource GwAccentBrush}" BorderThickness="1">
                                     <FontIcon Glyph="&#xE7F8;" FontSize="18" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
-                                <StackPanel Spacing="2">
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                     <TextBlock Text="Hardware Specifications &amp; Diagnostics" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
                                     <TextBlock Text="Comprehensive hardware inventory, live component topology, and signed driver status." Style="{StaticResource GwPanelSubtitleStyle}" />
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <ProgressBar x:Name="HardwareProgressBar" IsIndeterminate="True" Width="80" Height="4" Visibility="Collapsed" VerticalAlignment="Center" Foreground="{ThemeResource GwAccentBrush}" />
@@ -1131,15 +1131,15 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             
-                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Grid ColumnSpacing="12" VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwPurpleBgBrush}" BorderBrush="{ThemeResource GwPurpleBrush}" BorderThickness="1">
                                     <FontIcon Glyph="&#xE946;" FontSize="18" Foreground="{ThemeResource GwPurpleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
-                                <StackPanel Spacing="2">
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                     <TextBlock Text="Groundwork Agent" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
                                     <TextBlock Text="Natural language disk queries, game &amp; software locator, and storage diagnosis powered by on-device and cloud LLMs." Style="{StaticResource GwPanelSubtitleStyle}" />
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
 
                             <Border Grid.Column="1" Padding="10,6" CornerRadius="6" Background="{ThemeResource GwPurpleBgBrush}" BorderBrush="{ThemeResource GwPurpleBrush}" BorderThickness="1" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -1547,15 +1547,15 @@
             <ScrollViewer x:Name="OrganizePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="16">
                     <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Grid ColumnSpacing="12" VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwAmberBgBrush}" BorderBrush="{ThemeResource GwAmberBrush}" BorderThickness="1">
                                 <SymbolIcon Symbol="Folder" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <StackPanel Spacing="2">
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="Smart File Organizer &amp; Safe Undo" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
                                 <TextBlock Text="Cleanly sort and organize your files by category or date with one-click safe restore." Style="{StaticResource GwPanelSubtitleStyle}" />
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                     </Border>
 
                     <Border Padding="14,12" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
@@ -1601,15 +1601,15 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Grid ColumnSpacing="12" VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <Border Width="40" Height="40" CornerRadius="7" Background="{ThemeResource GwCardBackgroundHoverBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
                                     <SymbolIcon Symbol="Setting" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
-                                <StackPanel Spacing="2">
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                     <TextBlock Text="Preferences &amp; Engine Configuration" Style="{StaticResource GwPanelTitleStyle}" FontSize="17" />
                                     <TextBlock Text="Configure scan workers and exclusions, cleanup confirmation, privacy, and AI providers." Style="{StaticResource GwPanelSubtitleStyle}" />
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <TextBlock x:Name="SettingsSavedNoticeText" Text="" FontSize="12" Foreground="{ThemeResource GwSignalGreenBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
