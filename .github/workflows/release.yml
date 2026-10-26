@@ -67,18 +67,9 @@ jobs:
           $zipName = "Groundwork-$env:RELEASE_TAG-windows-x64.zip"
           Compress-Archive -Path "dist/Groundwork/*" -DestinationPath "release-assets/$zipName" -Force
           Copy-Item -Path "dist/Groundwork/checksums.txt" -Destination "release-assets/checksums.txt" -Force
-          $setupNames = @(
-            "Groundwork-$env:RELEASE_TAG-windows-x64-setup.exe",
-            "Groundwork-windows-x64-setup.exe"
-          )
-          foreach ($setupName in $setupNames) {
-            if (Test-Path "dist/$setupName") {
-              Copy-Item -Path "dist/$setupName" -Destination "release-assets/$setupName" -Force
-            }
-            if (Test-Path "dist/$setupName.sha256") {
-              Copy-Item -Path "dist/$setupName.sha256" -Destination "release-assets/$setupName.sha256" -Force
-            }
-          }
+          $setupName = "Groundwork-$env:RELEASE_TAG-windows-x64-setup.exe"
+          Copy-Item -Path "dist/$setupName" -Destination "release-assets/$setupName" -Force
+          Copy-Item -Path "dist/$setupName.sha256" -Destination "release-assets/$setupName.sha256" -Force
           Write-Host "Prepared all release packages in release-assets:"
           Get-ChildItem -Path release-assets | Select-Object Name, Length | Format-Table -AutoSize
 

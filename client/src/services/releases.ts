@@ -25,7 +25,7 @@ export function parseWindowsRelease(value: unknown): WindowsRelease | null {
 
   const isEligibleAsset = (name: string): boolean => {
     return (
-      name === "Groundwork-windows-x64-setup.exe" ||
+      /^Groundwork-v\d+\.\d+\.\d+-windows-x64-setup\.exe$/i.test(name) ||
       /^Groundwork-.*-windows-x64\.exe$/i.test(name) ||
       /^Groundwork-.*-windows-x64\.zip$/i.test(name) ||
       name === "Groundwork-windows-x64.zip"

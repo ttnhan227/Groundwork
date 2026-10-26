@@ -15,4 +15,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows CPU, memory, GPU-engine, and disk-I/O measurements, restart indicators, and device error reporting.
 - Safe cleanup: leftover inspection after uninstall, validated recursive-size proposals, and mandatory confirmation for permanent deletion.
 - Windows installer with a version-specific filename and an update or uninstall choice when Groundwork is already installed.
-- Portable ZIP, stable installer alias, and SHA-256 checksums published with each GitHub Release.
+- Portable ZIP and SHA-256 checksums published with each GitHub Release.

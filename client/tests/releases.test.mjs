@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {parseWindowsRelease, fetchWindowsRelease} from '../src/services/releases.ts';
 
-const fixture = () => ({draft:false, prerelease:false, tag_name:'v1.2.3', assets:[{name:'Groundwork-windows-x64-setup.exe',state:'uploaded',size:123456,digest:'sha256:'+'a'.repeat(64),browser_download_url:'https://github.com/ttnhan227/Groundwork/releases/download/v1.2.3/Groundwork-windows-x64-setup.exe'}]});
+const fixture = () => ({draft:false, prerelease:false, tag_name:'v1.2.3', assets:[{name:'Groundwork-v1.2.3-windows-x64-setup.exe',state:'uploaded',size:123456,digest:'sha256:'+'a'.repeat(64),browser_download_url:'https://github.com/ttnhan227/Groundwork/releases/download/v1.2.3/Groundwork-v1.2.3-windows-x64-setup.exe'}]});
 
 test('uses the published asset version, exact URL, size and digest', () => {
-  assert.deepEqual(parseWindowsRelease(fixture()), {version:'v1.2.3', url:fixture().assets[0].browser_download_url, bytes:123456, checksum:'a'.repeat(64), preview:false, filename:'Groundwork-windows-x64-setup.exe'});
+  assert.deepEqual(parseWindowsRelease(fixture()), {version:'v1.2.3', url:fixture().assets[0].browser_download_url, bytes:123456, checksum:'a'.repeat(64), preview:false, filename:'Groundwork-v1.2.3-windows-x64-setup.exe'});
 });
 
 test('matches Groundwork 1.0 exact release asset and extracts metadata', async (context) => {
@@ -66,17 +66,17 @@ test('detects portable zip release packages and prioritizes installers when both
     assets: [
       zipRelease.assets[0],
       {
-        name: 'Groundwork-windows-x64-setup.exe',
+        name: 'Groundwork-v1.2.3-windows-x64-setup.exe',
         state: 'uploaded',
         size: 123456,
         digest: 'sha256:' + 'c'.repeat(64),
-        browser_download_url: 'https://github.com/ttnhan227/Groundwork/releases/download/v1.0.0/Groundwork-windows-x64-setup.exe'
+        browser_download_url: 'https://github.com/ttnhan227/Groundwork/releases/download/v1.0.0/Groundwork-v1.2.3-windows-x64-setup.exe'
       }
     ]
   };
   const parsedDual = parseWindowsRelease(dualRelease);
   assert.ok(parsedDual);
-  assert.equal(parsedDual.filename, 'Groundwork-windows-x64-setup.exe');
+  assert.equal(parsedDual.filename, 'Groundwork-v1.2.3-windows-x64-setup.exe');
 });
 
 test('never offers draft, incomplete, or untrusted assets', () => {

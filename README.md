@@ -66,7 +66,7 @@ Download from the [GitHub Releases](https://github.com/ttnhan227/Groundwork/rele
 
 | Package | Format | Description |
 |---|---|---|
-| **`Groundwork-windows-x64-setup.exe`** | Setup Installer | Recommended installer; the same build is also available with a version-specific filename. |
+| **`Groundwork-vX.Y.Z-windows-x64-setup.exe`** | Setup Installer | Recommended installer. |
 | **`Groundwork-v1.0.0-windows-x64.zip`** | Portable Archive | Fully self-contained portable package. Extract and run `Groundwork.Desktop.exe`. |
 
 *No separate runtime installations (.NET SDK, Python, or VC++ runtimes) are required.*

@@ -14,4 +14,4 @@ The static website in `client/` owns marketing and documentation. It is hosted o
 
 - `.github/scripts/build-windows-release.ps1` runs the .NET tests, publishes the desktop app and MFT helper, builds the installer and portable ZIP contents, and writes checksums.
 - The `CI` workflow builds and tests the Windows app and the website on pushes and pull requests, then deploys and verifies the website on `main`.
-- The tag-triggered `Publish Windows desktop release` workflow builds the release and publishes the installer, stable installer alias, portable ZIP and checksums to GitHub Releases. See [RELEASE_AUTOMATION.md](RELEASE_AUTOMATION.md) for release steps.
+- The tag-triggered `Publish Windows desktop release` workflow builds the release and publishes the installer, portable ZIP and checksums to GitHub Releases. See [RELEASE_AUTOMATION.md](RELEASE_AUTOMATION.md) for release steps.

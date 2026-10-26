@@ -29,7 +29,7 @@ test('download page picks up newer releases without rebuilding and handles missi
     await page.setViewportSize({width:1280,height:900});
     let status=200;
     let version='v1.2.3';
-    await page.route('https://api.github.com/repos/ttnhan227/Groundwork/releases?per_page=100',route=>route.fulfill({status,contentType:'application/json',body:JSON.stringify([{draft:false,prerelease:false,tag_name:version,assets:[{name:'Groundwork-windows-x64-setup.exe',state:'uploaded',size:104857600,digest:'sha256:'+'a'.repeat(64),browser_download_url:`https://github.com/ttnhan227/Groundwork/releases/download/${version}/Groundwork-windows-x64-setup.exe`}]}])}));
+    await page.route('https://api.github.com/repos/ttnhan227/Groundwork/releases?per_page=100',route=>route.fulfill({status,contentType:'application/json',body:JSON.stringify([{draft:false,prerelease:false,tag_name:version,assets:[{name:'Groundwork-v1.2.3-windows-x64-setup.exe',state:'uploaded',size:104857600,digest:'sha256:'+'a'.repeat(64),browser_download_url:`https://github.com/ttnhan227/Groundwork/releases/download/${version}/Groundwork-v1.2.3-windows-x64-setup.exe`}]}])}));
     await page.goto('http://127.0.0.1:18556/download');
     await expect(page.getByText('Latest release: v1.2.3 · 100.0 MB')).toBeVisible();
     await expect(page.getByRole('link',{name:'Download installer',exact:true})).toHaveAttribute('href',/\/v1\.2\.3\//);

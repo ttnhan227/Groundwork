@@ -133,12 +133,7 @@ if ($isccExe -and (Test-Path $issPath)) {
             $setupHash = (Get-FileHash -Path $setupExe -Algorithm SHA256).Hash.ToLower()
             $setupShaFile = "$setupExe.sha256"
             "$setupHash  $setupFileName" | Out-File -FilePath $setupShaFile -Encoding ascii
-            $stableSetupExe = Join-Path $repoRoot "dist\Groundwork-windows-x64-setup.exe"
-            Copy-Item -Path $setupExe -Destination $stableSetupExe -Force
-            $stableSetupHash = (Get-FileHash -Path $stableSetupExe -Algorithm SHA256).Hash.ToLower()
-            "$stableSetupHash  Groundwork-windows-x64-setup.exe" | Out-File -FilePath "$stableSetupExe.sha256" -Encoding ascii
             Write-Host "  Created setup installer: $setupExe" -ForegroundColor Green
-            Write-Host "  Created stable installer alias: $stableSetupExe" -ForegroundColor Green
         }
     } else {
         Write-Warning "Inno Setup compiler returned non-zero exit code ($LASTEXITCODE)."
