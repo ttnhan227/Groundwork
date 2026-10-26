@@ -29,6 +29,22 @@
 
 ---
 
+## 🖼️ Screenshots
+
+| Storage Analyzer | Storage Cleanup |
+| --- | --- |
+| ![Storage Analyzer scanning a folder](client/public/screenshots/workspace.png) | ![Storage Cleanup recommendations](client/public/screenshots/cleanup.png) |
+
+| Installed Apps | Hardware & Specs |
+| --- | --- |
+| ![Installed Apps and leftovers](client/public/screenshots/apps.png) | ![Hardware and system specifications](client/public/screenshots/computer.png) |
+
+| Agent | Settings |
+| --- | --- |
+| ![Groundwork Agent](client/public/screenshots/assistant.png) | ![Settings](client/public/screenshots/settings.png) |
+
+---
+
 ## ⚡ Core Capabilities
 
 ### 1. 🗄️ Storage Analysis

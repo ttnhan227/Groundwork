@@ -66,7 +66,6 @@
 
                 <!-- Right Side Empty (Clean Minimal Design) -->
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock x:Name="SidecarStatusBadge" Visibility="Collapsed" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -1728,7 +1727,7 @@
                                     <FontIcon Glyph="&#xE946;" FontSize="15" Foreground="{ThemeResource GwPurpleBrush}" />
                                     <TextBlock Text="AI Agent Provider &amp; Model Integration" Style="{StaticResource GwCardTitleStyle}" />
                                 </StackPanel>
-                                <TextBlock Text="Connect a 100% free offline on-device LLM (Ollama) or a cloud API (Google Gemini, OpenAI, Mistral) to power the Groundwork Agent. Web search is optional and off by default; turn it on in the Gemini or Mistral section for questions that need current information." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                <TextBlock Text="Connect a 100% free offline on-device LLM (Ollama) or a cloud API (Google Gemini, OpenAI, Mistral) to power the Groundwork Agent. Web search is optional and off by default; turn it on in the Gemini or Mistral section for questions that need current information." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                             </StackPanel>
 
                             <ComboBox x:Name="SettingsAiProviderComboBox" Header="Active Intelligence Provider" Width="380" SelectionChanged="OnSettingsAiProviderSelectionChanged">

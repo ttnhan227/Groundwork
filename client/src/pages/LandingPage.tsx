@@ -51,21 +51,21 @@ export function LandingPage({
           </p>
           <figure className="product-workspace-shot">
             <a
-              href="/screenshots/cleanup.png?v=1.1.2"
+              href="/screenshots/workspace.png?v=1.0.0"
               target="_blank"
               rel="noreferrer"
               aria-label="Open full-size storage and cleanup workspace screenshot"
             >
               <img
-                src="/screenshots/cleanup.png?v=1.1.2"
-                alt="Groundwork Storage Analyzer &amp; Cleanup showing proportional folder space map, mounted drive capacity, and diagnostic rules"
-                width={1280}
-                height={820}
+                src="/screenshots/workspace.png?v=1.0.0"
+                alt="Groundwork Storage Analyzer &amp; Cleanup scanning a real folder and showing the largest folders with sizes, file counts, and last modified dates"
+                width={1392}
+                height={893}
                 fetchPriority="high"
               />
             </a>
             <figcaption>
-              Inspect proportional folder sizes, mounted drive capacity, live hardware topology, and instant diagnostics in one local utility.
+              See which folders take the most space, with sizes, file counts, and last modified dates, all scanned locally on your PC.
             </figcaption>
           </figure>
         </div>
@@ -84,7 +84,7 @@ export function LandingPage({
           <p>
             Ask about your hardware components, documents, spreadsheets, storage hotspots,
             or installed programs. Read Office documents and PDF text, recognize
-            written text in images, or connect 100% offline local LLMs (Ollama) as well as cloud providers (Gemini &amp; OpenAI).
+            written text in images, or connect 100% offline local LLMs (Ollama) as well as cloud providers (Gemini, OpenAI &amp; Mistral).
           </p>
           <ul>
             <li>
@@ -92,7 +92,7 @@ export function LandingPage({
               files and hardware metrics with verifiable evidence.
             </li>
             <li>
-              <strong>Choose where AI runs.</strong> Run entirely offline with on-device Ollama models or connect to Gemini/OpenAI cloud models.
+              <strong>Choose where AI runs.</strong> Run entirely offline with on-device Ollama models or connect to Gemini, OpenAI, or Mistral cloud models.
             </li>
             <li>
               <strong>Stay in control.</strong> Every cleanup, uninstaller launch, and file move requires your explicit review and confirmation.
@@ -108,23 +108,23 @@ export function LandingPage({
         </div>
         <figure className="product-ai-shot">
           <a
-            href="/screenshots/assistant.png?v=1.1.2"
+            href="/screenshots/assistant.png?v=1.0.0"
             target="_blank"
             rel="noreferrer"
             aria-label="Open full-size Agent screenshot"
           >
             <div className="product-ai-crop">
               <img
-                src="/screenshots/assistant.png?v=1.1.2"
-                alt="Groundwork Agent answering system queries with grounded reasoning and recommendations"
-                width={392}
-                height={529}
+                src="/screenshots/assistant.png?v=1.0.0"
+                alt="Groundwork Agent with ready-made questions for finding games, large files, build caches, and duplicates"
+                width={1392}
+                height={893}
                 loading="lazy"
               />
             </div>
           </a>
           <figcaption>
-            Groundwork Agent analyzing system context and providing structured recommendations. Click to enlarge.
+            The Agent starts from ready-made questions about your games, large files, caches, and duplicates. Click to enlarge.
           </figcaption>
         </figure>
       </section>
