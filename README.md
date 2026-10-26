@@ -81,6 +81,21 @@ Download from the [GitHub Releases](https://github.com/ttnhan227/Groundwork/rele
 - Visual Studio 2022 / Build Tools with the **Windows App SDK / WinUI 3** workload
 - [Inno Setup 6](https://jrsoftware.org/isdl.php) (optional, for compiling the setup installer)
 
+### Run for Development
+
+**Option 1: Visual Studio**
+1. Open `desktop-winui/Groundwork.slnx`.
+2. Set `Groundwork.Desktop` as the startup project and choose the **x64** platform.
+3. Press **F5** to run with the debugger.
+
+**Option 2: Command line**
+
+```powershell
+dotnet run --project desktop-winui/src/Groundwork.Desktop/Groundwork.Desktop.csproj -p:Platform=x64
+```
+
+If the app doesn't open from `dotnet run`, build it and start the executable under `desktop-winui/src/Groundwork.Desktop/bin/x64/Debug/` directly.
+
 ### Quick Build & Test
 
 ```powershell
