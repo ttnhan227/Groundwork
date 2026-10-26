@@ -297,6 +297,10 @@ public sealed partial class MainWindow : Window
         SettingsOpenAiApiKeyBox.Password = _settings.OpenAiApiKey;
         SettingsOpenAiModelBox.Text = _settings.OpenAiModel;
         SettingsOpenAiEndpointBox.Text = _settings.OpenAiEndpoint;
+        SettingsMistralApiKeyBox.Password = _settings.MistralApiKey;
+        SettingsMistralModelBox.Text = _settings.MistralModel;
+        SettingsMistralEndpointBox.Text = _settings.MistralEndpoint;
+        MistralWebSearchToggle.IsOn = _settings.MistralWebSearchEnabled;
 
         SelectComboBoxByTag(SettingsAiProviderComboBox, _settings.AiProvider);
         UpdateProviderPanelsVisibility(_settings.AiProvider);
@@ -2894,7 +2898,17 @@ public sealed partial class MainWindow : Window
 
     private string _lastAssistantAnswer = string.Empty;
 
-    private const string AgentSystemInstructions = "You are Groundwork Agent, a Windows system and storage assistant. Answer the user's actual question directly and use the supplied inventory as evidence. Retrieve relevant facts from the inventory before saying information is unavailable. Distinguish confirmed facts, conclusions, estimates, historical snapshots, and unknowns. Never invent hardware specs, performance/FPS, diagnostic results, official requirements, or compatibility. Treat physical disks and logical volumes separately; multiple drive letters may belong to one physical disk. Do not infer M.2 slot count or motherboard upgrade support from installed drives. For game compatibility, compare CPU, GPU/VRAM, RAM, OS, graphics capabilities, and fresh free space with official requirements only if an authoritative source was actually retrieved; otherwise say that requirements were not verified and do not give fabricated FPS. When Gemini Search is enabled and current game requirements or exact-model hardware specifications matter, search for the official publisher or manufacturer source and cite returned sources. If no authoritative source is returned, state that the fact remains unresolved. Use conversation history only to resolve follow-up references, never to override newer inventory. Gemini Search may be used only when explicitly enabled; never imply a search succeeded without grounding sources. Explain exactly which facts are known, missing, and how to verify them; avoid generic disclaimers.";
+    private const string AgentBaseInstructions = "You are Groundwork Agent, a Windows system and storage assistant. Answer the user's actual question directly and use the supplied inventory as evidence. Retrieve relevant facts from the inventory before saying information is unavailable. Distinguish confirmed facts, conclusions, estimates, historical snapshots, and unknowns. Never invent hardware specs, performance/FPS, diagnostic results, official requirements, or compatibility. Treat physical disks and logical volumes separately; multiple drive letters may belong to one physical disk. Do not infer M.2 slot count or motherboard upgrade support from installed drives. For game compatibility, compare CPU, GPU/VRAM, RAM, OS, graphics capabilities, and fresh free space with official requirements only if an authoritative source was actually retrieved; otherwise say that requirements were not verified and do not give fabricated FPS. Use conversation history only to resolve follow-up references, never to override newer inventory. Explain exactly which facts are known, missing, and how to verify them; avoid generic disclaimers.";
+
+    private static string BuildAgentInstructions(bool searchAvailable, bool canEnableSearch)
+    {
+        string search = searchAvailable
+            ? " Web search is enabled. When current game requirements or exact-model hardware specifications matter, search for the official publisher or manufacturer source and cite returned sources. If no authoritative source is returned, state that the fact remains unresolved. Never imply a search succeeded without returned sources."
+            : canEnableSearch
+                ? " Web search is turned off. When the question needs current game requirements or exact-model hardware specifications, do not answer them from memory. Briefly say that this needs web search and tell the user to turn on the search option for this provider in Settings > AI Agent Provider, then answer whatever the inventory alone can support."
+                : " This provider has no web search. When the question needs current game requirements or exact-model hardware specifications, do not answer them from memory. Say they cannot be verified here and suggest switching to a provider with search (Gemini or Mistral) or checking the publisher's page.";
+        return AgentBaseInstructions + search;
+    }
 
     private void OnResetAssistantQueryClick(object sender, RoutedEventArgs e)
     {
@@ -3160,6 +3174,10 @@ public sealed partial class MainWindow : Window
         {
             return !string.IsNullOrWhiteSpace(_settings.OpenAiApiKey);
         }
+        if (string.Equals(_settings.AiProvider, "mistral", StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.IsNullOrWhiteSpace(_settings.MistralApiKey);
+        }
         if (string.Equals(_settings.AiProvider, "ollama", StringComparison.OrdinalIgnoreCase))
         {
             return !string.IsNullOrWhiteSpace(_settings.OllamaUrl);
@@ -3233,6 +3251,26 @@ public sealed partial class MainWindow : Window
             {
                 _settings.OpenAiEndpoint = string.IsNullOrWhiteSpace(SettingsOpenAiEndpointBox.Text.Trim()) ? "https://api.openai.com/v1" : SettingsOpenAiEndpointBox.Text.Trim().TrimEnd('/');
             }
+            if (SettingsMistralApiKeyBox != null && !string.IsNullOrWhiteSpace(SettingsMistralApiKeyBox.Password))
+            {
+                _settings.MistralApiKey = SettingsMistralApiKeyBox.Password.Trim();
+                if (string.Equals(_settings.AiProvider, "none", StringComparison.OrdinalIgnoreCase))
+                {
+                    _settings.AiProvider = "mistral";
+                }
+            }
+            if (SettingsMistralModelBox != null && !string.IsNullOrWhiteSpace(SettingsMistralModelBox.Text))
+            {
+                _settings.MistralModel = SettingsMistralModelBox.Text.Trim();
+            }
+            if (SettingsMistralEndpointBox != null)
+            {
+                _settings.MistralEndpoint = string.IsNullOrWhiteSpace(SettingsMistralEndpointBox.Text.Trim()) ? "https://api.mistral.ai/v1" : SettingsMistralEndpointBox.Text.Trim().TrimEnd('/');
+            }
+            if (MistralWebSearchToggle != null)
+            {
+                _settings.MistralWebSearchEnabled = MistralWebSearchToggle.IsOn;
+            }
             if (SettingsOllamaUrlBox != null)
             {
                 _settings.OllamaUrl = SettingsOllamaUrlBox.Text.Trim();
@@ -3270,6 +3308,7 @@ public sealed partial class MainWindow : Window
                 "ollama" => $"Local Ollama ({_settings.OllamaModel})",
                 "gemini" => $"Google Gemini ({_settings.GeminiModel})",
                 "openai" => $"OpenAI ({_settings.OpenAiModel})",
+                "mistral" => $"Mistral ({_settings.MistralModel})",
                 _ => "AI Provider Connected"
             };
             AssistantProviderBadge.Text = badge;
@@ -3300,7 +3339,8 @@ public sealed partial class MainWindow : Window
 
     private void UpdateProviderPanelsVisibility(string? provider)
     {
-        if (SettingsOllamaPanel == null || SettingsGeminiPanel == null || SettingsOpenAiPanel == null) return;
+        if (SettingsOllamaPanel == null || SettingsGeminiPanel == null || SettingsOpenAiPanel == null || SettingsMistralPanel == null) return;
+        SettingsMistralPanel.Visibility = string.Equals(provider, "mistral", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         SettingsOllamaPanel.Visibility = string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         SettingsGeminiPanel.Visibility = string.Equals(provider, "gemini", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         SettingsOpenAiPanel.Visibility = string.Equals(provider, "openai", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
@@ -3407,7 +3447,7 @@ public sealed partial class MainWindow : Window
         {
             model = model,
             prompt = question,
-            system = AgentSystemInstructions + "\n\nSYSTEM CONTEXT:\n" + systemContext,
+            system = BuildAgentInstructions(searchAvailable: false, canEnableSearch: false) + "\n\nSYSTEM CONTEXT:\n" + systemContext,
             options = new { num_ctx = 8192 },
             stream = false
         };
@@ -3442,7 +3482,7 @@ public sealed partial class MainWindow : Window
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
         string url = $"{baseEndpoint}/v1beta/models/{model}:generateContent?key={apiKey}";
 
-        string combinedPrompt = AgentSystemInstructions + "\n\nSYSTEM CONTEXT:\n"
+        string combinedPrompt = BuildAgentInstructions(_settings.GeminiGoogleSearchEnabled, canEnableSearch: true) + "\n\nSYSTEM CONTEXT:\n"
             + systemContext
             + $"\n\nUSER QUESTION: {question}\n\nAnswer concisely and provide exact directory paths when referring to files or folders.";
 
@@ -3536,7 +3576,7 @@ public sealed partial class MainWindow : Window
             model = model,
             messages = new object[]
             {
-                new { role = "system", content = AgentSystemInstructions + "\n\nSYSTEM CONTEXT:\n" + systemContext },
+                new { role = "system", content = BuildAgentInstructions(searchAvailable: false, canEnableSearch: false) + "\n\nSYSTEM CONTEXT:\n" + systemContext },
                 new { role = "user", content = question }
             },
             temperature = 0.2
@@ -3561,6 +3601,120 @@ public sealed partial class MainWindow : Window
             }
         }
         throw new InvalidOperationException("No content returned in OpenAI response.");
+    }
+
+    private async Task<string> CallMistralAsync(string question, string systemContext, CancellationToken ct)
+    {
+        string apiKey = _settings.MistralApiKey.Trim();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException("Mistral API key is not configured. Please set your key in Settings.");
+        }
+        string model = string.IsNullOrWhiteSpace(_settings.MistralModel) ? "mistral-medium-latest" : _settings.MistralModel.Trim();
+        string baseEndpoint = string.IsNullOrWhiteSpace(_settings.MistralEndpoint) ? "https://api.mistral.ai/v1" : _settings.MistralEndpoint.Trim().TrimEnd('/');
+        bool searchEnabled = _settings.MistralWebSearchEnabled;
+        string instructions = BuildAgentInstructions(searchEnabled, canEnableSearch: true) + "\n\nSYSTEM CONTEXT:\n" + systemContext;
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+
+        // Mistral's web_search tool is only supported by the Conversations API, not Chat Completions.
+        if (!searchEnabled)
+        {
+            var chatPayload = new
+            {
+                model,
+                messages = new object[]
+                {
+                    new { role = "system", content = instructions },
+                    new { role = "user", content = question }
+                },
+                temperature = 0.2
+            };
+            var chatContent = new StringContent(JsonSerializer.Serialize(chatPayload), Encoding.UTF8, "application/json");
+            var chatResponse = await client.PostAsync($"{baseEndpoint}/chat/completions", chatContent, ct);
+            string chatJson = await chatResponse.Content.ReadAsStringAsync(ct);
+            if (!chatResponse.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"Mistral API error (HTTP {(int)chatResponse.StatusCode}): {chatJson}");
+            }
+            using var chatDoc = JsonDocument.Parse(chatJson);
+            if (chatDoc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0 &&
+                choices[0].TryGetProperty("message", out var message) && message.TryGetProperty("content", out var messageContent) &&
+                messageContent.ValueKind == JsonValueKind.String)
+            {
+                return messageContent.GetString() ?? "";
+            }
+            throw new InvalidOperationException("No content returned in Mistral response.");
+        }
+
+        var payload = new Dictionary<string, object>
+        {
+            ["model"] = model,
+            ["inputs"] = question,
+            ["instructions"] = instructions,
+            ["tools"] = new object[] { new { type = "web_search" } },
+            ["store"] = false,
+            ["completion_args"] = new { temperature = 0.2, max_tokens = 2048 }
+        };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await client.PostAsync($"{baseEndpoint}/conversations", content, ct);
+        string json = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Mistral API error (HTTP {(int)response.StatusCode}): {json}");
+        }
+
+        using var doc = JsonDocument.Parse(json);
+        var text = new StringBuilder();
+        var sources = new List<(string Title, string Uri)>();
+        if (doc.RootElement.TryGetProperty("outputs", out var outputs) && outputs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var entry in outputs.EnumerateArray())
+            {
+                if (!entry.TryGetProperty("type", out var entryType) || entryType.GetString() != "message.output" ||
+                    !entry.TryGetProperty("content", out var entryContent))
+                {
+                    continue;
+                }
+                if (entryContent.ValueKind == JsonValueKind.String)
+                {
+                    text.Append(entryContent.GetString());
+                    continue;
+                }
+                if (entryContent.ValueKind != JsonValueKind.Array) continue;
+                foreach (var chunk in entryContent.EnumerateArray())
+                {
+                    string chunkType = chunk.TryGetProperty("type", out var chunkTypeElement) ? chunkTypeElement.GetString() ?? "" : "";
+                    if (chunkType == "text" && chunk.TryGetProperty("text", out var textElement))
+                    {
+                        text.Append(textElement.GetString());
+                    }
+                    else if (chunkType == "tool_reference" && chunk.TryGetProperty("url", out var urlElement))
+                    {
+                        string uri = urlElement.GetString() ?? string.Empty;
+                        string title = chunk.TryGetProperty("title", out var titleElement) ? titleElement.GetString() ?? uri : uri;
+                        if (System.Uri.TryCreate(uri, UriKind.Absolute, out var parsedUri) && parsedUri.Scheme == Uri.UriSchemeHttps)
+                        {
+                            sources.Add((title, uri));
+                        }
+                    }
+                }
+            }
+        }
+        if (text.Length == 0)
+        {
+            throw new InvalidOperationException("No content returned in Mistral conversation response.");
+        }
+        if (sources.Count > 0)
+        {
+            text.Append("\n\nWeb search sources returned by Mistral:\n" + string.Join("\n", sources.Distinct().Select(source => $"- {source.Title}: {source.Uri}")));
+        }
+        else
+        {
+            text.Append("\n\nMistral web search was enabled, but the response contained no web sources; treat web-dependent claims as unverified.");
+        }
+        return text.ToString();
     }
 
     private void ExtractActionablePathsFromResponse(string answer, string question)
@@ -3709,6 +3863,9 @@ public sealed partial class MainWindow : Window
                 case "openai":
                     answer = await CallOpenAiAsync(question, systemContext, cts.Token);
                     break;
+                case "mistral":
+                    answer = await CallMistralAsync(question, systemContext, cts.Token);
+                    break;
                 default:
                     throw new InvalidOperationException($"Unsupported provider: {_settings.AiProvider}");
             }
@@ -3727,6 +3884,7 @@ public sealed partial class MainWindow : Window
                 "ollama" => _settings.OllamaModel,
                 "gemini" => _settings.GeminiModel,
                 "openai" => _settings.OpenAiModel,
+                "mistral" => _settings.MistralModel,
                 _ => "Generated"
             };
 
@@ -3742,6 +3900,10 @@ public sealed partial class MainWindow : Window
             var errSb = new StringBuilder();
             errSb.AppendLine($"The {_settings.AiProvider} provider encountered an error while processing your request:\n");
             errSb.AppendLine(ex.Message);
+            if (ex.Message.Contains("429", StringComparison.Ordinal))
+            {
+                errSb.AppendLine("\nYour provider reports that the API quota or rate limit was exceeded for your key. Check your plan and billing with the provider, wait for the limit to reset, or turn off the web search option in Settings.");
+            }
             errSb.AppendLine("\nPlease check your provider configuration (API Key, URL, or model name) in Settings.");
             _lastAssistantAnswer = errSb.ToString();
             RenderFormattedAgentResponse(_lastAssistantAnswer);
@@ -3991,6 +4153,10 @@ public sealed partial class MainWindow : Window
         _settings.OpenAiApiKey = SettingsOpenAiApiKeyBox.Password.Trim();
         _settings.OpenAiModel = string.IsNullOrWhiteSpace(SettingsOpenAiModelBox.Text.Trim()) ? "gpt-4o" : SettingsOpenAiModelBox.Text.Trim();
         _settings.OpenAiEndpoint = string.IsNullOrWhiteSpace(SettingsOpenAiEndpointBox.Text.Trim()) ? "https://api.openai.com/v1" : SettingsOpenAiEndpointBox.Text.Trim().TrimEnd('/');
+        _settings.MistralApiKey = SettingsMistralApiKeyBox.Password.Trim();
+        _settings.MistralModel = string.IsNullOrWhiteSpace(SettingsMistralModelBox.Text.Trim()) ? "mistral-medium-latest" : SettingsMistralModelBox.Text.Trim();
+        _settings.MistralEndpoint = string.IsNullOrWhiteSpace(SettingsMistralEndpointBox.Text.Trim()) ? "https://api.mistral.ai/v1" : SettingsMistralEndpointBox.Text.Trim().TrimEnd('/');
+        _settings.MistralWebSearchEnabled = MistralWebSearchToggle.IsOn;
 
         AppSettingsService.Save(_settings);
         UpdateAgentViewMode();
@@ -4193,6 +4359,58 @@ public sealed partial class MainWindow : Window
                 SettingsOpenAiStatusText.Text = $"✗ Verification error: {msg}";
             }
             SettingsOpenAiStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
+        }
+    }
+
+    private async void OnTestMistralClick(object sender, RoutedEventArgs e)
+    {
+        string key = SettingsMistralApiKeyBox?.Password?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            SettingsMistralStatusText.Text = "Please enter a Mistral API Key.";
+            SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 158, 11));
+            return;
+        }
+
+        string baseEndpoint = string.IsNullOrWhiteSpace(SettingsMistralEndpointBox?.Text?.Trim())
+            ? "https://api.mistral.ai/v1"
+            : SettingsMistralEndpointBox.Text.Trim().TrimEnd('/');
+        string model = string.IsNullOrWhiteSpace(SettingsMistralModelBox?.Text?.Trim()) ? "mistral-medium-latest" : SettingsMistralModelBox.Text.Trim();
+
+        SettingsMistralStatusText.Text = "Testing API Key and Endpoint...";
+        SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184));
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+            var resp = await client.GetAsync($"{baseEndpoint}/models");
+            if (resp.IsSuccessStatusCode)
+            {
+                _settings.MistralApiKey = key;
+                _settings.MistralModel = model;
+                _settings.MistralEndpoint = baseEndpoint;
+                _settings.MistralWebSearchEnabled = MistralWebSearchToggle.IsOn;
+                _settings.AiProvider = "mistral";
+                SelectComboBoxByTag(SettingsAiProviderComboBox, "mistral");
+                AppSettingsService.Save(_settings);
+                UpdateAgentViewMode();
+
+                SettingsMistralStatusText.Text = $"✓ Verified & Saved! Mistral ({model}) is now your active AI Provider.";
+                SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 34, 197, 94));
+            }
+            else
+            {
+                SettingsMistralStatusText.Text = $"✗ Invalid API Key (HTTP {(int)resp.StatusCode})";
+                SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
+            }
+        }
+        catch (Exception ex)
+        {
+            SettingsMistralStatusText.Text = ex is HttpRequestException || ex is System.Net.Sockets.SocketException
+                ? "✗ Network/DNS error: Cannot reach the Mistral host. Check your internet connection or custom URL."
+                : $"✗ Verification error: {ex.Message}";
+            SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
         }
     }
 

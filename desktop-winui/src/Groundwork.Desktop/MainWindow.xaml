@@ -1728,7 +1728,7 @@
                                     <FontIcon Glyph="&#xE946;" FontSize="15" Foreground="{ThemeResource GwPurpleBrush}" />
                                     <TextBlock Text="AI Agent Provider &amp; Model Integration" Style="{StaticResource GwCardTitleStyle}" />
                                 </StackPanel>
-                                <TextBlock Text="Connect a 100% free offline on-device LLM (Ollama) or a cloud API (Google Gemini, OpenAI) to power the Groundwork Agent." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                <TextBlock Text="Connect a 100% free offline on-device LLM (Ollama) or a cloud API (Google Gemini, OpenAI, Mistral) to power the Groundwork Agent. Web search is optional and off by default; turn it on in the Gemini or Mistral section for questions that need current information." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                             </StackPanel>
 
                             <ComboBox x:Name="SettingsAiProviderComboBox" Header="Active Intelligence Provider" Width="380" SelectionChanged="OnSettingsAiProviderSelectionChanged">
@@ -1736,6 +1736,7 @@
                                 <ComboBoxItem Content="Ollama (Local On-Device LLM - 100% Free &amp; Private)" Tag="ollama" />
                                 <ComboBoxItem Content="Google Gemini (Cloud API - Fast Reasoning)" Tag="gemini" />
                                 <ComboBoxItem Content="OpenAI (Cloud API - GPT-4o / GPT-4o-mini)" Tag="openai" />
+                                <ComboBoxItem Content="Mistral (Cloud API - Optional Web Search)" Tag="mistral" />
                             </ComboBox>
 
                             <!-- Ollama Options -->
@@ -1770,6 +1771,18 @@
                                 <StackPanel Spacing="6" Margin="0,4,0,0">
                                     <Button Content="Test &amp; Activate OpenAI" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestOpenAiClick" HorizontalAlignment="Left" />
                                     <TextBlock x:Name="SettingsOpenAiStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Mistral Options -->
+                            <StackPanel x:Name="SettingsMistralPanel" Spacing="8" Visibility="Collapsed">
+                                <PasswordBox x:Name="SettingsMistralApiKeyBox" Header="Mistral API Key" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsMistralModelBox" Header="Mistral Model (e.g. mistral-medium-latest, mistral-large-latest, mistral-small-latest)" Text="mistral-medium-latest" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsMistralEndpointBox" Header="Custom Base URL (Optional)" PlaceholderText="https://api.mistral.ai/v1" Width="440" HorizontalAlignment="Left" />
+                                <ToggleSwitch x:Name="MistralWebSearchToggle" Header="Allow Mistral web search for current questions (sends the prompt and supplied context to Mistral)" IsOn="False" />
+                                <StackPanel Spacing="6" Margin="0,4,0,0">
+                                    <Button Content="Test &amp; Activate Mistral" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestMistralClick" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="SettingsMistralStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>

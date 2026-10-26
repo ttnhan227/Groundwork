@@ -24,7 +24,7 @@
 2. **Hardware & System Diagnostics**: Real-time hardware topology, detailed processor specs, motherboard and BIOS firmware status, memory SPD modules, multi-GPU metrics, physical disk inventory, and WHQL signed drivers.
 3. **Application Uninstaller & Leftover Cleaner**: Confirmed vendor uninstalls with bounded `AppData` / `ProgramData` leftover detection and separately reviewed cleanup.
 4. **Cryptographic SHA-256 Duplicate Cleaner**: 3-stage duplicate file elimination with Recycle Bin safety guarantees and cloud placeholder protection.
-5. **Multi-Provider AI Agent**: 100% offline local LLMs via Ollama, Google Gemini, or OpenAI with grounded citations back to your local files.
+5. **Multi-Provider AI Agent**: 100% offline local LLMs via Ollama, Google Gemini, OpenAI, or Mistral (optional web search on Gemini and Mistral; if a question needs it and it is off, the agent tells you to enable it in Settings) with grounded citations back to your local files.
 6. **Power-User Settings Hub**: File size units, serial masking, configurable scan workers and exclusions, and cleanup confirmation safeguards.
 
 ---
@@ -51,7 +51,7 @@
 - **Safety Safeguards**: Protected Windows directories (`\Windows`, `\System32`, `\Boot`) are permanently blocked from deletion.
 
 ### 4. 🤖 Multi-Provider AI Agent & Document Reader
-- **Offline & Cloud Flexibility**: Connect a 100% free offline local model via Ollama (e.g. `llama3.2`, `mistral`, `qwen2.5`) or connect via Google Gemini or OpenAI.
+- **Offline & Cloud Flexibility**: Connect a 100% free offline local model via Ollama (e.g. `llama3.2`, `mistral`, `qwen2.5`) or connect via Google Gemini, OpenAI, or Mistral. Provider quotas and billing are your own.
 - **Test Connection Verification**: Live connection test buttons in Settings confirm provider health before enabling the Agent.
 - **Strict Evidence Citation**: AI answers cite line numbers, document excerpts, and storage metrics directly from your files.
 
