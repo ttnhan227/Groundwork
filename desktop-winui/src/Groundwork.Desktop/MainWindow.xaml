@@ -1775,7 +1775,7 @@
                             <!-- Mistral Options -->
                             <StackPanel x:Name="SettingsMistralPanel" Spacing="8" Visibility="Collapsed">
                                 <PasswordBox x:Name="SettingsMistralApiKeyBox" Header="API Key" Width="440" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SettingsMistralModelBox" Header="Model" Text="mistral-medium-latest" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsMistralModelBox" Header="Model" Text="ministral-8b-latest" Width="440" HorizontalAlignment="Left" />
                                 <TextBox x:Name="SettingsMistralEndpointBox" Header="Base URL (optional)" PlaceholderText="https://api.mistral.ai/v1" Width="440" HorizontalAlignment="Left" />
                                 <ToggleSwitch x:Name="MistralWebSearchToggle" Header="Web search (sends the prompt and system context to Mistral)" IsOn="False" />
                                 <StackPanel Spacing="6" Margin="0,4,0,0">

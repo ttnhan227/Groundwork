@@ -385,7 +385,7 @@ public sealed class AppSettingsModel
     public string OpenAiModel { get; set; } = "gpt-4o";
     public string OpenAiEndpoint { get; set; } = "https://api.openai.com/v1";
     public string MistralApiKey { get; set; } = "";
-    public string MistralModel { get; set; } = "mistral-medium-latest";
+    public string MistralModel { get; set; } = "ministral-8b-latest";
     public string MistralEndpoint { get; set; } = "https://api.mistral.ai/v1";
     public bool MistralWebSearchEnabled { get; set; }
     public string ExcludedExtensions { get; set; } = ".tmp,.bak,.log";

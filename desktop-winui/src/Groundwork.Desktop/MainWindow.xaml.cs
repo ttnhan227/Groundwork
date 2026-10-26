@@ -2900,6 +2900,12 @@ public sealed partial class MainWindow : Window
 
     private const string AgentBaseInstructions = "You are Groundwork Agent, a Windows system and storage assistant. Answer the user's actual question directly and use the supplied inventory as evidence. Retrieve relevant facts from the inventory before saying information is unavailable. Distinguish confirmed facts, conclusions, estimates, historical snapshots, and unknowns. Never invent hardware specs, performance/FPS, diagnostic results, official requirements, or compatibility. Treat physical disks and logical volumes separately; multiple drive letters may belong to one physical disk. Do not infer M.2 slot count or motherboard upgrade support from installed drives. For game compatibility, compare CPU, GPU/VRAM, RAM, OS, graphics capabilities, and fresh free space with official requirements only if an authoritative source was actually retrieved; otherwise say that requirements were not verified and do not give fabricated FPS. Use conversation history only to resolve follow-up references, never to override newer inventory. Explain exactly which facts are known, missing, and how to verify them; avoid generic disclaimers.";
 
+    private static readonly System.Text.RegularExpressions.Regex WebVerificationPattern = new(
+        @"\b(can|will|could|would|does|do|is|am)\b.{0,40}\b(run|play|handle|support|compatible|good enough|enough for)\b|system requirements|min(imum)? (spec|requirement)|recommended (spec|requirement)|\bspecs? (of|for)\b|\bcompatib|\bfps\b|\bbottleneck",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static bool RequiresWebVerification(string question) => WebVerificationPattern.IsMatch(question);
+
     private static string BuildAgentInstructions(bool searchAvailable, bool canEnableSearch)
     {
         string search = searchAvailable
@@ -3610,7 +3616,7 @@ public sealed partial class MainWindow : Window
         {
             throw new InvalidOperationException("Mistral API key is not configured. Please set your key in Settings.");
         }
-        string model = string.IsNullOrWhiteSpace(_settings.MistralModel) ? "mistral-medium-latest" : _settings.MistralModel.Trim();
+        string model = string.IsNullOrWhiteSpace(_settings.MistralModel) ? "ministral-8b-latest" : _settings.MistralModel.Trim();
         string baseEndpoint = string.IsNullOrWhiteSpace(_settings.MistralEndpoint) ? "https://api.mistral.ai/v1" : _settings.MistralEndpoint.Trim().TrimEnd('/');
         bool searchEnabled = _settings.MistralWebSearchEnabled;
         string instructions = BuildAgentInstructions(searchEnabled, canEnableSearch: true) + "\n\nSYSTEM CONTEXT:\n" + systemContext;
@@ -3852,6 +3858,24 @@ public sealed partial class MainWindow : Window
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
             string answer = string.Empty;
 
+            // Hard gate: small models ignore the prompt rule, so never call the model for requirement questions without web search.
+            bool searchActive = _settings.AiProvider.ToLowerInvariant() switch
+            {
+                "gemini" => _settings.GeminiGoogleSearchEnabled,
+                "mistral" => _settings.MistralWebSearchEnabled,
+                _ => false
+            };
+            bool providerCanSearch = _settings.AiProvider.Equals("gemini", StringComparison.OrdinalIgnoreCase)
+                || _settings.AiProvider.Equals("mistral", StringComparison.OrdinalIgnoreCase);
+            bool gated = !searchActive && RequiresWebVerification(question);
+
+            if (gated)
+            {
+                answer = providerCanSearch
+                    ? "**Web search is required for this question.**\n\nChecking whether your PC can run a game or app needs its official system requirements, and I won't answer those from memory because they could be wrong.\n\n**What to do:** open Settings > AI Agent Provider, turn on web search for your provider, then ask again."
+                    : "**Web search is required for this question, and this provider can't search.**\n\nChecking whether your PC can run a game or app needs its official system requirements, and I won't answer those from memory because they could be wrong.\n\n**What to do:** switch to Gemini or Mistral in Settings > AI Agent Provider and turn on web search, or check the publisher's or Steam page and compare it with your PC specs.";
+            }
+            else
             switch (_settings.AiProvider.ToLowerInvariant())
             {
                 case "ollama":
@@ -4154,7 +4178,7 @@ public sealed partial class MainWindow : Window
         _settings.OpenAiModel = string.IsNullOrWhiteSpace(SettingsOpenAiModelBox.Text.Trim()) ? "gpt-4o" : SettingsOpenAiModelBox.Text.Trim();
         _settings.OpenAiEndpoint = string.IsNullOrWhiteSpace(SettingsOpenAiEndpointBox.Text.Trim()) ? "https://api.openai.com/v1" : SettingsOpenAiEndpointBox.Text.Trim().TrimEnd('/');
         _settings.MistralApiKey = SettingsMistralApiKeyBox.Password.Trim();
-        _settings.MistralModel = string.IsNullOrWhiteSpace(SettingsMistralModelBox.Text.Trim()) ? "mistral-medium-latest" : SettingsMistralModelBox.Text.Trim();
+        _settings.MistralModel = string.IsNullOrWhiteSpace(SettingsMistralModelBox.Text.Trim()) ? "ministral-8b-latest" : SettingsMistralModelBox.Text.Trim();
         _settings.MistralEndpoint = string.IsNullOrWhiteSpace(SettingsMistralEndpointBox.Text.Trim()) ? "https://api.mistral.ai/v1" : SettingsMistralEndpointBox.Text.Trim().TrimEnd('/');
         _settings.MistralWebSearchEnabled = MistralWebSearchToggle.IsOn;
 
@@ -4375,7 +4399,7 @@ public sealed partial class MainWindow : Window
         string baseEndpoint = string.IsNullOrWhiteSpace(SettingsMistralEndpointBox?.Text?.Trim())
             ? "https://api.mistral.ai/v1"
             : SettingsMistralEndpointBox.Text.Trim().TrimEnd('/');
-        string model = string.IsNullOrWhiteSpace(SettingsMistralModelBox?.Text?.Trim()) ? "mistral-medium-latest" : SettingsMistralModelBox.Text.Trim();
+        string model = string.IsNullOrWhiteSpace(SettingsMistralModelBox?.Text?.Trim()) ? "ministral-8b-latest" : SettingsMistralModelBox.Text.Trim();
 
         SettingsMistralStatusText.Text = "Testing API Key and Endpoint...";
         SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184));
