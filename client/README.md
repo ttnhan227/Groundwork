@@ -1,6 +1,6 @@
 # Groundwork Client
 
-Standard Vite + React single-page application for Groundwork.
+Standard Vite + React landing page for Groundwork. It has no backend.
 
 ## Prerequisites
 
@@ -14,9 +14,6 @@ npm run dev
 npm run build
 ```
 
-Set `VITE_API_URL` before building when the API is not available at the
-same-origin `/api/v1` path.
-
 ## Commands
 
 - `npm run dev`: start local development
@@ -27,5 +24,4 @@ same-origin `/api/v1` path.
 
 ## Render
 
-The repository-level `render.yaml` configures this directory as a Render Static
-Site. Set `VITE_API_URL` in Render to the public backend URL ending in `/api/v1`.
+The site is hosted as a Render Static Site (build `npm run build`, publish `dist`). Render rebuilds it on every push to `main`.
