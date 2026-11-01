@@ -1179,9 +1179,9 @@
                                             <StackPanel Spacing="6">
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                     <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{ThemeResource GwAccentBrush}" />
-                                                    <TextBlock Text="Local Ollama" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                    <TextBlock Text="Ollama &amp; LM Studio" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                                                 </StackPanel>
-                                                <TextBlock Text="100% Free &amp; Private. Runs on-device via loopback (http://127.0.0.1:11434)." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="100% Free &amp; Private. Runs offline on-device via local loopback." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Border>
 
@@ -1190,9 +1190,9 @@
                                             <StackPanel Spacing="6">
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                     <FontIcon Glyph="&#xE9CE;" FontSize="16" Foreground="{ThemeResource GwTealBrush}" />
-                                                    <TextBlock Text="Google Gemini" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                    <TextBlock Text="Gemini, Claude &amp; Mistral" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                                                 </StackPanel>
-                                                <TextBlock Text="Generous free tier. Fast reasoning via Gemini API key from Google AI Studio." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="Fast cloud reasoning and optional web search with your own API key." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Border>
 
@@ -1201,9 +1201,9 @@
                                             <StackPanel Spacing="6">
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                     <FontIcon Glyph="&#xE72D;" FontSize="16" Foreground="{ThemeResource GwPurpleBrush}" />
-                                                    <TextBlock Text="OpenAI" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                                    <TextBlock Text="OpenAI, Groq &amp; DeepSeek" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                                                 </StackPanel>
-                                                <TextBlock Text="GPT-4o &amp; modern reasoning models with your standard OpenAI API key." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="GPT-4o or any OpenAI-compatible endpoint (Groq, DeepSeek, OpenRouter)." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Border>
                                     </Grid>
