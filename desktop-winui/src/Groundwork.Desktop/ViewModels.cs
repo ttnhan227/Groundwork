@@ -388,6 +388,12 @@ public sealed class AppSettingsModel
     public string MistralModel { get; set; } = "ministral-8b-latest";
     public string MistralEndpoint { get; set; } = "https://api.mistral.ai/v1";
     public bool MistralWebSearchEnabled { get; set; }
+    public string AnthropicApiKey { get; set; } = "";
+    public string AnthropicModel { get; set; } = "claude-3-5-sonnet-latest";
+    public string AnthropicEndpoint { get; set; } = "https://api.anthropic.com/v1";
+    public string CustomApiKey { get; set; } = "";
+    public string CustomModel { get; set; } = "llama-3.3-70b-versatile";
+    public string CustomEndpoint { get; set; } = "https://api.groq.com/openai/v1";
     public string ExcludedExtensions { get; set; } = ".tmp,.bak,.log";
     public string ExcludedPaths { get; set; } = @"$Recycle.Bin,System Volume Information";
 }

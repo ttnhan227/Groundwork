@@ -28,7 +28,7 @@ export function PrivacyPage() {
         ],
         [
           "Online AI shares selected excerpts",
-          "If you choose OpenAI or Google Gemini, your question and relevant file excerpts are sent to that provider when you ask. Its privacy policy and usage charges apply. The default passage-finding mode works offline. Ollama can provide local answers with a separately installed model.",
+          "If you choose a cloud AI provider (Google Gemini, OpenAI, Anthropic, Mistral, or an OpenAI-compatible API), your question and relevant file excerpts are sent to that provider when you ask. Its privacy policy and usage charges apply. The default passage-finding mode works offline. Ollama can provide local answers with a separately installed model.",
         ],
         [
           "Credentials stay on this device",

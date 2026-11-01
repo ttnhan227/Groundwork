@@ -84,7 +84,7 @@ export function LandingPage({
           <p>
             Ask about your hardware components, documents, spreadsheets, storage hotspots,
             or installed programs. Read Office documents and PDF text, recognize
-            written text in images, or connect 100% offline local LLMs (Ollama) as well as cloud providers (Gemini, OpenAI &amp; Mistral).
+            written text in images, or connect 100% offline local LLMs (Ollama, LM Studio) as well as cloud providers (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek).
           </p>
           <ul>
             <li>
@@ -92,7 +92,7 @@ export function LandingPage({
               files and hardware metrics with verifiable evidence.
             </li>
             <li>
-              <strong>Choose where AI runs.</strong> Run entirely offline with on-device Ollama models or connect to Gemini, OpenAI, or Mistral cloud models.
+              <strong>Choose where AI runs.</strong> Run entirely offline with on-device Ollama / LM Studio models or connect to Gemini, OpenAI, Anthropic, Mistral, Groq, or DeepSeek.
             </li>
             <li>
               <strong>Stay in control.</strong> Every cleanup, uninstaller launch, and file move requires your explicit review and confirmation.
@@ -161,7 +161,7 @@ export function LandingPage({
             {
               icon: Sparkles,
               title: "Multi-provider AI Agent",
-              text: "Connect free offline local LLMs (Ollama) or cloud models (Gemini, OpenAI) with live connection testing and grounded file citations.",
+              text: "Connect free offline local LLMs (Ollama, LM Studio) or cloud models (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek) with live connection testing and grounded file citations.",
             },
             {
               icon: ShieldCheck,

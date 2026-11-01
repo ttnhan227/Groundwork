@@ -301,6 +301,12 @@ public sealed partial class MainWindow : Window
         SettingsMistralModelBox.Text = _settings.MistralModel;
         SettingsMistralEndpointBox.Text = _settings.MistralEndpoint;
         MistralWebSearchToggle.IsOn = _settings.MistralWebSearchEnabled;
+        SettingsAnthropicApiKeyBox.Password = _settings.AnthropicApiKey;
+        SettingsAnthropicModelBox.Text = _settings.AnthropicModel;
+        SettingsAnthropicEndpointBox.Text = _settings.AnthropicEndpoint;
+        SettingsCustomApiKeyBox.Password = _settings.CustomApiKey;
+        SettingsCustomModelBox.Text = _settings.CustomModel;
+        SettingsCustomEndpointBox.Text = _settings.CustomEndpoint;
 
         SelectComboBoxByTag(SettingsAiProviderComboBox, _settings.AiProvider);
         UpdateProviderPanelsVisibility(_settings.AiProvider);
@@ -3184,6 +3190,14 @@ public sealed partial class MainWindow : Window
         {
             return !string.IsNullOrWhiteSpace(_settings.MistralApiKey);
         }
+        if (string.Equals(_settings.AiProvider, "anthropic", StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.IsNullOrWhiteSpace(_settings.AnthropicApiKey);
+        }
+        if (string.Equals(_settings.AiProvider, "custom", StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.IsNullOrWhiteSpace(_settings.CustomEndpoint) && !string.IsNullOrWhiteSpace(_settings.CustomModel);
+        }
         if (string.Equals(_settings.AiProvider, "ollama", StringComparison.OrdinalIgnoreCase))
         {
             return !string.IsNullOrWhiteSpace(_settings.OllamaUrl);
@@ -3277,6 +3291,34 @@ public sealed partial class MainWindow : Window
             {
                 _settings.MistralWebSearchEnabled = MistralWebSearchToggle.IsOn;
             }
+            if (SettingsAnthropicApiKeyBox != null && !string.IsNullOrWhiteSpace(SettingsAnthropicApiKeyBox.Password))
+            {
+                _settings.AnthropicApiKey = SettingsAnthropicApiKeyBox.Password.Trim();
+                if (string.Equals(_settings.AiProvider, "none", StringComparison.OrdinalIgnoreCase))
+                {
+                    _settings.AiProvider = "anthropic";
+                }
+            }
+            if (SettingsAnthropicModelBox != null && !string.IsNullOrWhiteSpace(SettingsAnthropicModelBox.Text))
+            {
+                _settings.AnthropicModel = SettingsAnthropicModelBox.Text.Trim();
+            }
+            if (SettingsAnthropicEndpointBox != null)
+            {
+                _settings.AnthropicEndpoint = string.IsNullOrWhiteSpace(SettingsAnthropicEndpointBox.Text.Trim()) ? "https://api.anthropic.com/v1" : SettingsAnthropicEndpointBox.Text.Trim().TrimEnd('/');
+            }
+            if (SettingsCustomApiKeyBox != null)
+            {
+                _settings.CustomApiKey = SettingsCustomApiKeyBox.Password.Trim();
+            }
+            if (SettingsCustomModelBox != null && !string.IsNullOrWhiteSpace(SettingsCustomModelBox.Text))
+            {
+                _settings.CustomModel = SettingsCustomModelBox.Text.Trim();
+            }
+            if (SettingsCustomEndpointBox != null && !string.IsNullOrWhiteSpace(SettingsCustomEndpointBox.Text))
+            {
+                _settings.CustomEndpoint = SettingsCustomEndpointBox.Text.Trim().TrimEnd('/');
+            }
             if (SettingsOllamaUrlBox != null)
             {
                 _settings.OllamaUrl = SettingsOllamaUrlBox.Text.Trim();
@@ -3314,7 +3356,9 @@ public sealed partial class MainWindow : Window
                 "ollama" => $"Local Ollama ({_settings.OllamaModel})",
                 "gemini" => $"Google Gemini ({_settings.GeminiModel})",
                 "openai" => $"OpenAI ({_settings.OpenAiModel})",
+                "anthropic" => $"Anthropic Claude ({_settings.AnthropicModel})",
                 "mistral" => $"Mistral ({_settings.MistralModel})",
+                "custom" => $"OpenAI-Compatible ({_settings.CustomModel})",
                 _ => "AI Provider Connected"
             };
             AssistantProviderBadge.Text = badge;
@@ -3350,6 +3394,10 @@ public sealed partial class MainWindow : Window
         SettingsOllamaPanel.Visibility = string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         SettingsGeminiPanel.Visibility = string.Equals(provider, "gemini", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         SettingsOpenAiPanel.Visibility = string.Equals(provider, "openai", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+        if (SettingsAnthropicPanel != null)
+            SettingsAnthropicPanel.Visibility = string.Equals(provider, "anthropic", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+        if (SettingsCustomPanel != null)
+            SettingsCustomPanel.Visibility = string.Equals(provider, "custom", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private string BuildAgentGroundingContext(string question, HardwareSystemReport? hardwareReport, IReadOnlyList<VolumeMetadata> currentVolumes, string? collectionWarning)
@@ -3607,6 +3655,105 @@ public sealed partial class MainWindow : Window
             }
         }
         throw new InvalidOperationException("No content returned in OpenAI response.");
+    }
+
+    private async Task<string> CallAnthropicAsync(string question, string systemContext, CancellationToken ct)
+    {
+        string apiKey = _settings.AnthropicApiKey.Trim();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException("Anthropic API key is not configured. Please set your key in Settings.");
+        }
+        string model = string.IsNullOrWhiteSpace(_settings.AnthropicModel) ? "claude-3-5-sonnet-latest" : _settings.AnthropicModel.Trim();
+        string baseEndpoint = string.IsNullOrWhiteSpace(_settings.AnthropicEndpoint) ? "https://api.anthropic.com/v1" : _settings.AnthropicEndpoint.Trim().TrimEnd('/');
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+        client.DefaultRequestHeaders.Add("x-api-key", apiKey);
+        client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+        var payload = new
+        {
+            model = model,
+            max_tokens = 2048,
+            temperature = 0.2,
+            system = BuildAgentInstructions(searchAvailable: false, canEnableSearch: false) + "\n\nSYSTEM CONTEXT:\n" + systemContext,
+            messages = new object[]
+            {
+                new { role = "user", content = question }
+            }
+        };
+
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await client.PostAsync($"{baseEndpoint}/messages", content, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Anthropic HTTP {(int)response.StatusCode}: {err}");
+        }
+
+        string jsonStr = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(jsonStr);
+        if (doc.RootElement.TryGetProperty("content", out var contentArr) && contentArr.ValueKind == JsonValueKind.Array && contentArr.GetArrayLength() > 0)
+        {
+            var sb = new StringBuilder();
+            foreach (var block in contentArr.EnumerateArray())
+            {
+                if (block.TryGetProperty("text", out var textEl))
+                {
+                    sb.Append(textEl.GetString());
+                }
+            }
+            if (sb.Length > 0) return sb.ToString();
+        }
+        throw new InvalidOperationException("No content returned in Anthropic response.");
+    }
+
+    private async Task<string> CallCustomAsync(string question, string systemContext, CancellationToken ct)
+    {
+        string baseEndpoint = string.IsNullOrWhiteSpace(_settings.CustomEndpoint) ? "https://api.groq.com/openai/v1" : _settings.CustomEndpoint.Trim().TrimEnd('/');
+        string model = string.IsNullOrWhiteSpace(_settings.CustomModel) ? "llama-3.3-70b-versatile" : _settings.CustomModel.Trim();
+        string apiKey = _settings.CustomApiKey.Trim();
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        }
+
+        var payload = new
+        {
+            model = model,
+            messages = new object[]
+            {
+                new { role = "system", content = BuildAgentInstructions(searchAvailable: false, canEnableSearch: false) + "\n\nSYSTEM CONTEXT:\n" + systemContext },
+                new { role = "user", content = question }
+            },
+            temperature = 0.2
+        };
+
+        string url = baseEndpoint.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
+            ? baseEndpoint
+            : $"{baseEndpoint}/chat/completions";
+
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await client.PostAsync(url, content, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"OpenAI-Compatible HTTP {(int)response.StatusCode}: {err}");
+        }
+
+        string jsonStr = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(jsonStr);
+        if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+        {
+            var firstChoice = choices[0];
+            if (firstChoice.TryGetProperty("message", out var msg) && msg.TryGetProperty("content", out var text))
+            {
+                return text.GetString() ?? "";
+            }
+        }
+        throw new InvalidOperationException("No content returned in OpenAI-Compatible response.");
     }
 
     private async Task<string> CallMistralAsync(string question, string systemContext, CancellationToken ct)
@@ -3887,8 +4034,14 @@ public sealed partial class MainWindow : Window
                 case "openai":
                     answer = await CallOpenAiAsync(question, systemContext, cts.Token);
                     break;
+                case "anthropic":
+                    answer = await CallAnthropicAsync(question, systemContext, cts.Token);
+                    break;
                 case "mistral":
                     answer = await CallMistralAsync(question, systemContext, cts.Token);
+                    break;
+                case "custom":
+                    answer = await CallCustomAsync(question, systemContext, cts.Token);
                     break;
                 default:
                     throw new InvalidOperationException($"Unsupported provider: {_settings.AiProvider}");
@@ -3908,7 +4061,9 @@ public sealed partial class MainWindow : Window
                 "ollama" => _settings.OllamaModel,
                 "gemini" => _settings.GeminiModel,
                 "openai" => _settings.OpenAiModel,
+                "anthropic" => _settings.AnthropicModel,
                 "mistral" => _settings.MistralModel,
+                "custom" => _settings.CustomModel,
                 _ => "Generated"
             };
 
@@ -4181,6 +4336,12 @@ public sealed partial class MainWindow : Window
         _settings.MistralModel = string.IsNullOrWhiteSpace(SettingsMistralModelBox.Text.Trim()) ? "ministral-8b-latest" : SettingsMistralModelBox.Text.Trim();
         _settings.MistralEndpoint = string.IsNullOrWhiteSpace(SettingsMistralEndpointBox.Text.Trim()) ? "https://api.mistral.ai/v1" : SettingsMistralEndpointBox.Text.Trim().TrimEnd('/');
         _settings.MistralWebSearchEnabled = MistralWebSearchToggle.IsOn;
+        _settings.AnthropicApiKey = SettingsAnthropicApiKeyBox.Password.Trim();
+        _settings.AnthropicModel = string.IsNullOrWhiteSpace(SettingsAnthropicModelBox.Text.Trim()) ? "claude-3-5-sonnet-latest" : SettingsAnthropicModelBox.Text.Trim();
+        _settings.AnthropicEndpoint = string.IsNullOrWhiteSpace(SettingsAnthropicEndpointBox.Text.Trim()) ? "https://api.anthropic.com/v1" : SettingsAnthropicEndpointBox.Text.Trim().TrimEnd('/');
+        _settings.CustomApiKey = SettingsCustomApiKeyBox.Password.Trim();
+        _settings.CustomModel = string.IsNullOrWhiteSpace(SettingsCustomModelBox.Text.Trim()) ? "llama-3.3-70b-versatile" : SettingsCustomModelBox.Text.Trim();
+        _settings.CustomEndpoint = string.IsNullOrWhiteSpace(SettingsCustomEndpointBox.Text.Trim()) ? "https://api.groq.com/openai/v1" : SettingsCustomEndpointBox.Text.Trim().TrimEnd('/');
 
         AppSettingsService.Save(_settings);
         UpdateAgentViewMode();
@@ -4435,6 +4596,110 @@ public sealed partial class MainWindow : Window
                 ? "✗ Network/DNS error: Cannot reach the Mistral host. Check your internet connection or custom URL."
                 : $"✗ Verification error: {ex.Message}";
             SettingsMistralStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
+        }
+    }
+
+    private async void OnTestAnthropicClick(object sender, RoutedEventArgs e)
+    {
+        string key = SettingsAnthropicApiKeyBox?.Password?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            SettingsAnthropicStatusText.Text = "Please enter an Anthropic API Key.";
+            SettingsAnthropicStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 158, 11));
+            return;
+        }
+
+        string baseEndpoint = string.IsNullOrWhiteSpace(SettingsAnthropicEndpointBox?.Text?.Trim())
+            ? "https://api.anthropic.com/v1"
+            : SettingsAnthropicEndpointBox.Text.Trim().TrimEnd('/');
+        string model = string.IsNullOrWhiteSpace(SettingsAnthropicModelBox?.Text?.Trim()) ? "claude-3-5-sonnet-latest" : SettingsAnthropicModelBox.Text.Trim();
+
+        SettingsAnthropicStatusText.Text = "Testing API Key and Endpoint...";
+        SettingsAnthropicStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184));
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.Add("x-api-key", key);
+            client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+            var pingPayload = new
+            {
+                model = model,
+                max_tokens = 16,
+                messages = new object[] { new { role = "user", content = "Ping" } }
+            };
+            var content = new StringContent(JsonSerializer.Serialize(pingPayload), Encoding.UTF8, "application/json");
+            var resp = await client.PostAsync($"{baseEndpoint}/messages", content);
+            if (resp.IsSuccessStatusCode)
+            {
+                _settings.AnthropicApiKey = key;
+                _settings.AnthropicModel = model;
+                _settings.AnthropicEndpoint = baseEndpoint;
+                _settings.AiProvider = "anthropic";
+                SelectComboBoxByTag(SettingsAiProviderComboBox, "anthropic");
+                AppSettingsService.Save(_settings);
+                UpdateAgentViewMode();
+
+                SettingsAnthropicStatusText.Text = $"✓ Verified & Saved! Anthropic Claude ({model}) is now your active AI Provider.";
+                SettingsAnthropicStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 34, 197, 94));
+            }
+            else
+            {
+                SettingsAnthropicStatusText.Text = $"✗ API Error (HTTP {(int)resp.StatusCode})";
+                SettingsAnthropicStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
+            }
+        }
+        catch (Exception ex)
+        {
+            SettingsAnthropicStatusText.Text = $"✗ Verification error: {ex.Message}";
+            SettingsAnthropicStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
+        }
+    }
+
+    private async void OnTestCustomClick(object sender, RoutedEventArgs e)
+    {
+        string baseEndpoint = string.IsNullOrWhiteSpace(SettingsCustomEndpointBox?.Text?.Trim())
+            ? "https://api.groq.com/openai/v1"
+            : SettingsCustomEndpointBox.Text.Trim().TrimEnd('/');
+        string model = string.IsNullOrWhiteSpace(SettingsCustomModelBox?.Text?.Trim())
+            ? "llama-3.3-70b-versatile"
+            : SettingsCustomModelBox.Text.Trim();
+        string key = SettingsCustomApiKeyBox?.Password?.Trim() ?? string.Empty;
+
+        SettingsCustomStatusText.Text = "Testing OpenAI-Compatible Endpoint...";
+        SettingsCustomStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184));
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+            }
+            var resp = await client.GetAsync($"{baseEndpoint}/models");
+            if (resp.IsSuccessStatusCode)
+            {
+                _settings.CustomApiKey = key;
+                _settings.CustomModel = model;
+                _settings.CustomEndpoint = baseEndpoint;
+                _settings.AiProvider = "custom";
+                SelectComboBoxByTag(SettingsAiProviderComboBox, "custom");
+                AppSettingsService.Save(_settings);
+                UpdateAgentViewMode();
+
+                SettingsCustomStatusText.Text = $"✓ Verified & Saved! OpenAI-Compatible ({model}) is now your active AI Provider.";
+                SettingsCustomStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 34, 197, 94));
+            }
+            else
+            {
+                SettingsCustomStatusText.Text = $"✗ Endpoint responded with HTTP {(int)resp.StatusCode}";
+                SettingsCustomStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
+            }
+        }
+        catch (Exception ex)
+        {
+            SettingsCustomStatusText.Text = $"✗ Verification error: {ex.Message}";
+            SettingsCustomStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68));
         }
     }
 

@@ -5,7 +5,7 @@ Groundwork is a native Windows desktop application. All analysis runs in-process
 - **`desktop-winui/src/Groundwork.Desktop`** — the WinUI 3 user interface.
 - **`desktop-winui/src/Groundwork.Engine`** — the C# engine for storage scanning, hardware and installed-app inspection, safety checks, and cleanup proposals. It is covered by the unit tests in `desktop-winui`.
 - **`desktop-winui/src/Groundwork.MftHelper`** — an elevated helper used for fast NTFS MFT scanning.
-- **AI providers** — the app calls Ollama (local, default `http://127.0.0.1:11434`), Google Gemini or OpenAI directly over HTTP, according to the user's settings.
+- **AI providers** — the app calls Ollama (local, default `http://127.0.0.1:11434`), Google Gemini, OpenAI, Anthropic Claude, Mistral, or any OpenAI-compatible API (Groq, DeepSeek, OpenRouter, LM Studio) directly over HTTP, according to the user's settings.
 - **`desktop-winui/installer`** — the Inno Setup script. It produces the versioned installer, detects an existing installation and offers update or uninstall.
 
 The static website in `client/` owns marketing and documentation. It is hosted on Render and reads the installer URL, version, size and checksum from the newest published GitHub release at runtime. It does not host a workspace backend and does not invent download artifacts.

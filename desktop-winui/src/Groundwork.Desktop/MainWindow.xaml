@@ -1727,15 +1727,17 @@
                                     <FontIcon Glyph="&#xE946;" FontSize="15" Foreground="{ThemeResource GwPurpleBrush}" />
                                     <TextBlock Text="AI Agent Provider &amp; Model Integration" Style="{StaticResource GwCardTitleStyle}" />
                                 </StackPanel>
-                                <TextBlock Text="Connect a 100% free offline on-device LLM (Ollama) or a cloud API (Google Gemini, OpenAI, Mistral) to power the Groundwork Agent. Web search is optional and off by default; turn it on in the Gemini or Mistral section for questions that need current information." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                <TextBlock Text="Connect a 100% free offline on-device LLM (Ollama, LM Studio) or a cloud API (Google Gemini, OpenAI, Anthropic Claude, Mistral, Groq, DeepSeek, OpenRouter) to power the Groundwork Agent. Web search is optional and off by default; turn it on in the Gemini or Mistral section for questions that need current information." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                             </StackPanel>
 
-                            <ComboBox x:Name="SettingsAiProviderComboBox" Header="Active Intelligence Provider" Width="380" SelectionChanged="OnSettingsAiProviderSelectionChanged">
+                            <ComboBox x:Name="SettingsAiProviderComboBox" Header="Active Intelligence Provider" Width="440" SelectionChanged="OnSettingsAiProviderSelectionChanged">
                                 <ComboBoxItem Content="None (Require Setup)" Tag="none" />
                                 <ComboBoxItem Content="Ollama (Local On-Device LLM - 100% Free &amp; Private)" Tag="ollama" />
                                 <ComboBoxItem Content="Google Gemini (Cloud API - Fast Reasoning)" Tag="gemini" />
                                 <ComboBoxItem Content="OpenAI (Cloud API - GPT-4o / GPT-4o-mini)" Tag="openai" />
+                                <ComboBoxItem Content="Anthropic Claude (Cloud API - Claude Sonnet / Haiku)" Tag="anthropic" />
                                 <ComboBoxItem Content="Mistral (Cloud API - Optional Web Search)" Tag="mistral" />
+                                <ComboBoxItem Content="OpenAI-Compatible (Groq / DeepSeek / OpenRouter / LM Studio)" Tag="custom" />
                             </ComboBox>
 
                             <!-- Ollama Options -->
@@ -1780,6 +1782,28 @@
                                 <StackPanel Spacing="6" Margin="0,4,0,0">
                                     <Button Content="Test &amp; Activate Mistral" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestMistralClick" HorizontalAlignment="Left" />
                                     <TextBlock x:Name="SettingsMistralStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Anthropic Options -->
+                            <StackPanel x:Name="SettingsAnthropicPanel" Spacing="8" Visibility="Collapsed">
+                                <PasswordBox x:Name="SettingsAnthropicApiKeyBox" Header="API Key" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsAnthropicModelBox" Header="Model" Text="claude-3-5-sonnet-latest" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsAnthropicEndpointBox" Header="Base URL (optional)" PlaceholderText="https://api.anthropic.com/v1" Width="440" HorizontalAlignment="Left" />
+                                <StackPanel Spacing="6" Margin="0,4,0,0">
+                                    <Button Content="Test &amp; Activate Anthropic" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestAnthropicClick" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="SettingsAnthropicStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- OpenAI-Compatible Custom Options -->
+                            <StackPanel x:Name="SettingsCustomPanel" Spacing="8" Visibility="Collapsed">
+                                <TextBox x:Name="SettingsCustomEndpointBox" Header="Base URL (Groq, DeepSeek, OpenRouter, LM Studio)" PlaceholderText="https://api.groq.com/openai/v1" Text="https://api.groq.com/openai/v1" Width="440" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SettingsCustomModelBox" Header="Model" PlaceholderText="llama-3.3-70b-versatile" Text="llama-3.3-70b-versatile" Width="440" HorizontalAlignment="Left" />
+                                <PasswordBox x:Name="SettingsCustomApiKeyBox" Header="API Key (optional for local LM Studio / vLLM)" Width="440" HorizontalAlignment="Left" />
+                                <StackPanel Spacing="6" Margin="0,4,0,0">
+                                    <Button Content="Test &amp; Activate Custom Provider" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnTestCustomClick" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="SettingsCustomStatusText" Text="" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
                                 </StackPanel>
                             </StackPanel>
 

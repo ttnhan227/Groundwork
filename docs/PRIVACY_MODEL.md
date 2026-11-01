@@ -4,7 +4,7 @@ Workspace discovery, parsing, indexing, FTS, local feature vectors, notes, sessi
 
 Groundwork Sync is optional. It transfers user-written note titles/content/tags, saved queries/filters, and permitted preferences. Notes may contain sensitive information that the user writes into them. Workspace paths attached to notes, source trees, indexed chunks, embeddings, and provider credentials are excluded from sync payloads.
 
-Cloud AI is a separate opt-in operation. Choosing OpenAI or Gemini and running a query sends the question, retrieved snippets, and cited file paths to that provider. Ollama endpoints are restricted to loopback. Local mode displays retrieved excerpts without a network request or language-model inference.
+Cloud AI is a separate opt-in operation. Choosing a cloud AI provider (Google Gemini, OpenAI, Anthropic, Mistral, or a custom OpenAI-compatible endpoint) and running a query sends the question, retrieved snippets, and cited file paths to that provider. Ollama endpoints are restricted to loopback. Local mode displays retrieved excerpts without a network request or language-model inference.
 
 The packaged local API uses a random per-launch bearer token on a dynamically selected loopback port. It rejects unknown browser origins and hosts. Native release startup does not attach to an arbitrary existing listener. Browser development uses an explicitly local development server.
 

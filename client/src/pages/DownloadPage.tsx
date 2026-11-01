@@ -73,7 +73,7 @@ export const DownloadPage: React.FC = () => {
             Includes the native desktop application, multi-drive storage analyzer with direct NTFS MFT reading,
             live hardware component topology inspector, SHA-256 duplicate remover,
             installed applications &amp; guided uninstaller with leftover scanner,
-            multi-provider AI Agent (offline Ollama, Gemini, OpenAI), and power-user settings hub.
+            multi-provider AI Agent (offline Ollama, LM Studio, Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek), and power-user settings hub.
             Local AI models are separate downloads. See release notes for
             changes and supported features.
           </p>
