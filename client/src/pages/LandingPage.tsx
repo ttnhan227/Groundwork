@@ -75,59 +75,47 @@ export function LandingPage({
         className="product-ai-feature"
         aria-labelledby="ai-feature-title"
       >
-        <div className="product-ai-copy">
-          <p className="product-eyebrow">Multi-provider AI operator &amp; document reader</p>
-          <h2 id="ai-feature-title">
-            What changed?
-            <br />
-            What is using my space?
-          </h2>
-          <p>
-            Ask about your hardware components, documents, spreadsheets, storage hotspots,
-            or installed programs. Read Office documents and PDF text, recognize
-            written text in images, or connect 100% offline local LLMs (Ollama, LM Studio) as well as cloud providers (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek).
-          </p>
-          <ul>
-            <li>
-              <strong>Check the source.</strong> Follow references back to your
-              files and hardware metrics with verifiable evidence.
-            </li>
-            <li>
-              <strong>Choose where AI runs.</strong> Run entirely offline with on-device Ollama / LM Studio models or connect to Gemini, OpenAI, Anthropic, Mistral, Groq, or DeepSeek.
-            </li>
-            <li>
-              <strong>Stay in control.</strong> Every cleanup, uninstaller launch, and file move requires your explicit review and confirmation.
-            </li>
-          </ul>
-          <button className="utility-ai-link" onClick={() => navigate("/docs")}>
-            Explore Agent &amp; Settings
-            <ArrowRight size={17} />
-          </button>
-          <p className="product-ai-setup">
-            Generated answers require a configured model or provider in Settings. Hardware topology and deterministic storage tools work 100% locally.
-          </p>
-        </div>
-        <figure className="product-ai-shot">
-          <a
-            href="/screenshots/assistant.png?v=demo"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open full-size Agent screenshot"
-          >
-            <div className="product-ai-crop">
-              <img
-                src="/screenshots/assistant.png?v=demo"
-                alt="Groundwork Agent with ready-made questions for finding games, large files, build caches, and duplicates"
-                width={1392}
-                height={893}
-                loading="lazy"
-              />
+        <div className="product-ai-card">
+          <div className="product-ai-header">
+            <p className="product-eyebrow">Multi-provider AI operator &amp; document reader</p>
+            <h2 id="ai-feature-title">
+              What changed? What is using my space?
+            </h2>
+            <p className="product-ai-summary">
+              Ask about your hardware components, documents, spreadsheets, storage hotspots,
+              or installed programs. Read Office documents and PDF text, recognize
+              written text in images, or connect 100% offline local LLMs (Ollama, LM Studio) as well as cloud providers (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek).
+            </p>
+          </div>
+
+          <div className="product-ai-pillars">
+            <div className="product-ai-pillar">
+              <span className="ai-pillar-num">01</span>
+              <h3>Check the source</h3>
+              <p>Follow references back to your files and hardware metrics with verifiable evidence and zero hallucinated metrics.</p>
             </div>
-          </a>
-          <figcaption>
-            The Agent starts from ready-made questions about your games, large files, caches, and duplicates. Click to enlarge.
-          </figcaption>
-        </figure>
+            <div className="product-ai-pillar">
+              <span className="ai-pillar-num">02</span>
+              <h3>Choose where AI runs</h3>
+              <p>Run entirely offline with on-device Ollama or LM Studio models, or connect to Gemini, OpenAI, Claude, Mistral, Groq, or DeepSeek.</p>
+            </div>
+            <div className="product-ai-pillar">
+              <span className="ai-pillar-num">03</span>
+              <h3>Stay in control</h3>
+              <p>Every cleanup recommendation, uninstaller launch, and file organization strictly requires your explicit review and confirmation.</p>
+            </div>
+          </div>
+
+          <div className="product-ai-footer">
+            <button className="utility-ai-link" onClick={() => navigate("/docs")}>
+              Explore Agent &amp; Settings
+              <ArrowRight size={17} />
+            </button>
+            <p className="product-ai-setup">
+              Generated answers require a configured model or provider in Settings. Hardware topology and deterministic storage tools work 100% locally.
+            </p>
+          </div>
+        </div>
       </section>
       <section className="product-benefits" aria-labelledby="benefits-title">
         <p className="product-eyebrow">Features &amp; benefits</p>
