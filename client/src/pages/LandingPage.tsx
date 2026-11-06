@@ -8,6 +8,7 @@ import {
   Trash2,
   Cpu,
   Sliders,
+  Folders,
 } from "lucide-react";
 export function LandingPage({
   navigate,
@@ -51,21 +52,21 @@ export function LandingPage({
           </p>
           <figure className="product-workspace-shot">
             <a
-              href="/screenshots/workspace.png?v=demo"
+              href="/groundwork-in-action.gif"
               target="_blank"
               rel="noreferrer"
-              aria-label="Open full-size storage and cleanup workspace screenshot"
+              aria-label="Open full-size animated demo of Groundwork in action"
             >
               <img
-                src="/screenshots/workspace.png?v=demo"
-                alt="Groundwork Storage Analyzer &amp; Cleanup showing the largest folders with sizes, file counts, and last modified dates"
-                width={1392}
-                height={893}
+                src="/groundwork-in-action.gif"
+                alt="Groundwork in action — Native Windows Storage Analyzer, Storage Sense Cleaner, and Hardware Diagnostics"
+                width={1000}
+                height={622}
                 fetchPriority="high"
               />
             </a>
             <figcaption>
-              See which folders take the most space, with sizes, file counts, and last modified dates, all scanned locally on your PC.
+              Groundwork in action: live proportional storage maps, Storage Sense recommendations, application leftovers, and instant hardware diagnostics.
             </figcaption>
           </figure>
         </div>
@@ -162,6 +163,11 @@ export function LandingPage({
               icon: Sparkles,
               title: "Multi-provider AI Agent",
               text: "Connect free offline local LLMs (Ollama, LM Studio) or cloud models (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek) with live connection testing and grounded file citations.",
+            },
+            {
+              icon: Folders,
+              title: "Smart file organizer & preview plan",
+              text: "Organize messy downloads and desktop directories into categorized folders with instant pre-execution preview plans and one-click undo.",
             },
             {
               icon: ShieldCheck,

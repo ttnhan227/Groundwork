@@ -31,23 +31,6 @@
 5. **Multi-Provider AI Agent**: 100% offline local LLMs via Ollama / LM Studio, Google Gemini, OpenAI, Anthropic Claude, Mistral, or OpenAI-compatible endpoints (Groq, DeepSeek, OpenRouter) with grounded citations back to your local files.
 6. **Power-User Settings Hub**: File size units, serial masking, configurable scan workers and exclusions, and cleanup confirmation safeguards.
 
----
-
-## 🖼️ Screenshots & Live Interface Tour
-
-| Storage Analyzer (Proportional Space & Tree) | Storage Sense Recommendations & Dynamic Cleanup |
-| :---: | :---: |
-| [![Storage Analyzer](client/public/screenshots/03-storage-scanned-tree.png)](client/public/screenshots/03-storage-scanned-tree.png) | [![Storage Cleanup](client/public/screenshots/04-cleanup-storage-sense.png)](client/public/screenshots/04-cleanup-storage-sense.png) |
-
-| Installed Applications & Guided Uninstaller | Hardware Topology & WHQL Driver Diagnostics |
-| :---: | :---: |
-| [![Installed Applications](client/public/screenshots/05-installed-apps.png)](client/public/screenshots/05-installed-apps.png) | [![Hardware Diagnostics](client/public/screenshots/06-hardware-diagnostics.png)](client/public/screenshots/06-hardware-diagnostics.png) |
-
-| Natural Language AI Agent | Smart File Organizer & Safe Undo Plan |
-| :---: | :---: |
-| [![Groundwork Agent](client/public/screenshots/07-ai-agent-assistant.png)](client/public/screenshots/07-ai-agent-assistant.png) | [![Smart File Organizer](client/public/screenshots/08-smart-file-organizer.png)](client/public/screenshots/08-smart-file-organizer.png) |
-
-*Captured directly from the running Groundwork WinUI 3 desktop application on Windows 11.*
 
 ---
 
