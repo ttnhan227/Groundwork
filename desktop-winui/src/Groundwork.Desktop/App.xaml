@@ -184,6 +184,8 @@
                 <Setter Property="CornerRadius" Value="6" />
                 <Setter Property="Padding" Value="14,7" />
                 <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="FocusVisualMargin" Value="-2" />
             </Style>
 
             <Style x:Key="GwSecondaryButtonStyle" TargetType="Button">
@@ -195,6 +197,8 @@
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="CornerRadius" Value="6" />
                 <Setter Property="Padding" Value="12,6" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="FocusVisualMargin" Value="-2" />
             </Style>
 
             <Style x:Key="GwDangerButtonStyle" TargetType="Button">
@@ -205,6 +209,8 @@
                 <Setter Property="CornerRadius" Value="6" />
                 <Setter Property="Padding" Value="12,6" />
                 <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="FocusVisualMargin" Value="-2" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

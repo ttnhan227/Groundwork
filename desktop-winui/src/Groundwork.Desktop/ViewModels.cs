@@ -88,6 +88,7 @@ public sealed class StorageTreeNodeViewModel : INotifyPropertyChanged
     public bool HasChildren => IsDirectory && (RecursiveFolderCount > 0 || RecursiveFileCount > 0);
     public Microsoft.UI.Xaml.Visibility HasChildrenVisibility => HasChildren ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     public string ExpanderGlyph => IsExpanded ? "\uE70D" : "\uE76C"; // ChevronDown / ChevronRight
+    public string ExpanderAutomationName => IsExpanded ? $"Collapse folder {Name}" : $"Expand folder {Name}";
     public string Glyph { get; set; } = string.Empty;
     public string GlyphColor { get; set; } = string.Empty;
     public string NodeGlyph => !string.IsNullOrEmpty(Glyph) ? Glyph : (IsDirectory ? "\uE8B7" : "\uE8A5");
@@ -167,9 +168,22 @@ public sealed class CategoryRowViewModel
     }
 }
 
-public sealed class CleanupCandidateRowViewModel
+public sealed class CleanupCandidateRowViewModel : INotifyPropertyChanged
 {
-    public bool IsSelected { get; set; } = true;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private bool _isSelected = true;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
     public string DisplayPath
@@ -334,9 +348,22 @@ public sealed class InstalledAppRowViewModel
     }
 }
 
-public sealed class LeftoverItemRowViewModel
+public sealed class LeftoverItemRowViewModel : INotifyPropertyChanged
 {
-    public bool IsSelected { get; set; }
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
     public string FullPath { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string LocationGroup { get; set; } = string.Empty;
@@ -362,6 +389,25 @@ public sealed class NoteRowViewModel
         this.Content = Content;
         this.UpdatedAt = UpdatedAt;
     }
+}
+
+public sealed class OrganizationPlanItemViewModel
+{
+    public string OriginalName { get; set; } = string.Empty;
+    public string FileName { get => OriginalName; set => OriginalName = value; }
+    public string SourcePath { get; set; } = string.Empty;
+    public string OriginalPath { get => SourcePath; set => SourcePath = value; }
+    public string TargetRelativeFolder { get; set; } = string.Empty;
+    public string TargetSubfolder { get => TargetRelativeFolder; set => TargetRelativeFolder = value; }
+    public string TargetPath { get; set; } = string.Empty;
+    public string FormattedSize { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public string CategoryBadge { get; set; } = string.Empty;
+    public string Category { get => CategoryBadge; set => CategoryBadge = value; }
+    public string Reason { get; set; } = string.Empty;
+    public string RuleBadge { get => Reason; set => Reason = value; }
+    public string Glyph { get; set; } = "\uE8A5";
+    public string GlyphColor { get; set; } = "#6F91FF";
 }
 
 public sealed class AppSettingsModel
@@ -429,6 +475,7 @@ public static class AppSettingsService
     public static void Save(AppSettingsModel settings)
     {
         _cached = settings;
+        ByteFormatter.InvalidateUnitCache();
         try
         {
             Directory.CreateDirectory(SettingsDir);
@@ -441,6 +488,13 @@ public static class AppSettingsService
 
 public static class ByteFormatter
 {
+    private static string? _cachedUnit;
+
+    public static void InvalidateUnitCache()
+    {
+        _cachedUnit = null;
+    }
+
     public static string FormatBytes(long? bytes)
     {
         if (bytes == null)
@@ -448,7 +502,7 @@ public static class ByteFormatter
             return "Unknown";
         }
         long b = Math.Max(0, bytes.Value);
-        string mode = AppSettingsService.Load().SizeUnit;
+        string mode = _cachedUnit ??= (AppSettingsService.Load().SizeUnit ?? "Auto");
         bool binary = string.Equals(mode, "Binary", StringComparison.OrdinalIgnoreCase);
         double radix = string.Equals(mode, "Decimal", StringComparison.OrdinalIgnoreCase) ? 1000.0 : 1024.0;
         string[] units = binary ? ["B", "KiB", "MiB", "GiB", "TiB"] : ["B", "KB", "MB", "GB", "TB"];

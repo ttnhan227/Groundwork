@@ -56,6 +56,9 @@
                         <NavigationViewItem Content="Agent" Tag="Agent">
                             <NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon>
                         </NavigationViewItem>
+                        <NavigationViewItem Content="Organize" Tag="Organize">
+                            <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
                     </NavigationView.MenuItems>
                     <NavigationView.FooterMenuItems>
                         <NavigationViewItem Content="Settings" Tag="Settings">
@@ -96,12 +99,12 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Drive:" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
-                        <ComboBox Grid.Column="1" x:Name="DrivesComboBox" HorizontalAlignment="Stretch" SelectionChanged="OnDrivesComboBoxSelectionChanged" VerticalAlignment="Center" ToolTipService.ToolTip="Select a drive or folder to scan" />
-                        <TextBox Grid.Column="2" x:Name="ScanPathTextBox" PlaceholderText="Folder or drive path..." HorizontalAlignment="Stretch" VerticalAlignment="Center" />
-                        <Button Grid.Column="3" Content="Browse..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" VerticalAlignment="Center" ToolTipService.ToolTip="Browse for a folder on your PC" />
-                        <Button Grid.Column="4" Content="Scan" Style="{StaticResource GwPrimaryButtonStyle}" Padding="18,6" Click="OnRunScanPathClick" VerticalAlignment="Center" ToolTipService.ToolTip="Scan selected drive or folder" />
-                        <Button Grid.Column="5" x:Name="CancelScanButton" Content="Cancel" IsEnabled="False" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCancelScanClick" VerticalAlignment="Center" />
-                        <Button Grid.Column="6" Content="Refresh" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshDrivesClick" ToolTipService.ToolTip="Re-detect mounted drives" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1" x:Name="DrivesComboBox" HorizontalAlignment="Stretch" SelectionChanged="OnDrivesComboBoxSelectionChanged" VerticalAlignment="Center" ToolTipService.ToolTip="Select a drive or folder to scan" AutomationProperties.Name="Select drive or storage source" />
+                        <TextBox Grid.Column="2" x:Name="ScanPathTextBox" PlaceholderText="Folder or drive path..." HorizontalAlignment="Stretch" VerticalAlignment="Center" AutomationProperties.Name="Target folder or drive path" KeyDown="OnScanPathTextBoxKeyDown" />
+                        <Button Grid.Column="3" Content="Browse..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" VerticalAlignment="Center" ToolTipService.ToolTip="Browse for a folder on your PC" AutomationProperties.Name="Browse for folder" />
+                        <Button Grid.Column="4" Content="Scan" Style="{StaticResource GwPrimaryButtonStyle}" Padding="18,6" Click="OnRunScanPathClick" VerticalAlignment="Center" ToolTipService.ToolTip="Scan selected drive or folder" AutomationProperties.Name="Run storage scan" />
+                        <Button Grid.Column="5" x:Name="CancelScanButton" Content="Cancel" IsEnabled="False" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCancelScanClick" VerticalAlignment="Center" ToolTipService.ToolTip="Cancel current scan operation" AutomationProperties.Name="Cancel storage scan" />
+                        <Button Grid.Column="6" Content="Refresh" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshDrivesClick" ToolTipService.ToolTip="Re-detect mounted drives" VerticalAlignment="Center" AutomationProperties.Name="Refresh drives list" />
                     </Grid>
                 </Border>
 
@@ -158,9 +161,9 @@
                                 <Button Grid.Column="0" x:Name="ViewTreeTabButton" Content="Tree (Folders &amp; Files)" Style="{StaticResource GwPrimaryButtonStyle}" Padding="12,5" FontSize="12" Click="OnViewTreeTabClick" />
                                 <Button Grid.Column="1" x:Name="ViewFileTabButton" Content="Largest Files (Flat)" Style="{StaticResource GwSecondaryButtonStyle}" Padding="12,5" FontSize="12" Click="OnViewFileTabClick" />
                                 <Border Grid.Column="2" Width="1" Height="16" Background="{ThemeResource GwCardBorderBrush}" Margin="2,0" />
-                                <TextBox Grid.Column="3" x:Name="TreeFilterTextBox" PlaceholderText="Filter by name, extension (e.g. *.mp4)..." HorizontalAlignment="Stretch" TextChanged="OnTreeFilterTextChanged" />
-                                <Button Grid.Column="4" Content="Clear" Style="{StaticResource GwSecondaryButtonStyle}" Padding="8,4" FontSize="11" Click="OnClearTreeFilterClick" />
-                                <Button Grid.Column="6" Content="Collapse All" Style="{StaticResource GwSecondaryButtonStyle}" Padding="8,4" FontSize="11" Click="OnCollapseAllTreeNodesClick" />
+                                <TextBox Grid.Column="3" x:Name="TreeFilterTextBox" PlaceholderText="Filter by name, extension (e.g. *.mp4)..." HorizontalAlignment="Stretch" TextChanged="OnTreeFilterTextChanged" AutomationProperties.Name="Filter scanned files and folders" />
+                                <Button Grid.Column="4" Content="Clear" Style="{StaticResource GwSecondaryButtonStyle}" Padding="8,4" FontSize="11" Click="OnClearTreeFilterClick" AutomationProperties.Name="Clear filter" />
+                                <Button Grid.Column="6" Content="Collapse All" Style="{StaticResource GwSecondaryButtonStyle}" Padding="8,4" FontSize="11" Click="OnCollapseAllTreeNodesClick" AutomationProperties.Name="Collapse all tree folders" />
                                 <TextBlock x:Name="ViewTabSummaryText" Visibility="Collapsed" />
                             </Grid>
                         </Border>
@@ -196,8 +199,23 @@
                                 </Grid>
                             </Border>
 
+                            <!-- Tree Empty State Placeholder -->
+                            <Border x:Name="TreeEmptyStateBorder" Grid.Row="1" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
+                                <StackPanel Spacing="14" HorizontalAlignment="Center" MaxWidth="460">
+                                    <Border Width="56" Height="56" CornerRadius="12" Background="{ThemeResource GwAccentBgBrush}" BorderBrush="{ThemeResource GwAccentBrush}" BorderThickness="1" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xEDA2;" FontSize="24" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="No Drive or Folder Scanned Yet" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Select a drive or folder from the toolbar above and click 'Scan' to visualize your disk usage, proportional folder tree, and space allocation." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" LineHeight="18" />
+                                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                        <Button Content="Scan Primary Drive" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnQuickScanPrimaryDriveClick" AutomationProperties.Name="Scan primary Windows drive" />
+                                        <Button Content="Browse Folder..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnScanCustomPathClick" AutomationProperties.Name="Browse folder to scan" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Virtualized Hierarchical Tree ListView -->
-                            <ListView x:Name="StorageTreeListView" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnStorageTreeSelectionChanged" KeyDown="OnStorageTreeKeyDown">
+                            <ListView x:Name="StorageTreeListView" Grid.Row="1" Visibility="Collapsed" SelectionMode="Single" SelectionChanged="OnStorageTreeSelectionChanged" KeyDown="OnStorageTreeKeyDown">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="12,0,12,0" />
@@ -235,7 +253,9 @@
                                                         Background="Transparent"
                                                         BorderThickness="0"
                                                         Visibility="{x:Bind HasChildrenVisibility}"
-                                                        Click="OnTreeNodeExpanderClick">
+                                                        Click="OnTreeNodeExpanderClick"
+                                                        AutomationProperties.Name="{x:Bind ExpanderAutomationName}"
+                                                        ToolTipService.ToolTip="{x:Bind ExpanderAutomationName}">
                                                         <FontIcon Glyph="{x:Bind ExpanderGlyph, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
                                                     </Button>
                                                 </Grid>
@@ -294,20 +314,31 @@
                                         <ColumnDefinition Width="110" />
                                         <ColumnDefinition Width="3*" MinWidth="160" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="File Name ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextPrimaryBrush}" PointerPressed="OnSortFileNameClick" />
-                                    <TextBlock Grid.Column="1" Text="Ext ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" PointerPressed="OnSortExtClick" />
+                                    <TextBlock x:Name="SortFileNameHeader" Text="File Name ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextPrimaryBrush}" PointerPressed="OnSortFileNameClick" ToolTipService.ToolTip="Click to sort by file name" AutomationProperties.Name="Sort by file name" />
+                                    <TextBlock Grid.Column="1" x:Name="SortExtHeader" Text="Ext ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" PointerPressed="OnSortExtClick" ToolTipService.ToolTip="Click to sort by extension" AutomationProperties.Name="Sort by extension" />
                                     <TextBlock Grid.Column="2" Text="Type" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                                     <TextBlock Grid.Column="3" Text="% of Total" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                                    <TextBlock Grid.Column="4" Text="Size ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" PointerPressed="OnSortSizeClick" />
+                                    <TextBlock Grid.Column="4" x:Name="SortSizeHeader" Text="Size ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" PointerPressed="OnSortSizeClick" ToolTipService.ToolTip="Click to sort by file size" AutomationProperties.Name="Sort by file size" />
                                     <TextBlock Grid.Column="5" Text="Allocated" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
                                     <TextBlock Grid.Column="6" Text="Attributes" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Center" />
-                                    <TextBlock Grid.Column="7" Text="Modified ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" PointerPressed="OnSortModifiedClick" />
+                                    <TextBlock Grid.Column="7" x:Name="SortModifiedHeader" Text="Modified ⬍" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" PointerPressed="OnSortModifiedClick" ToolTipService.ToolTip="Click to sort by modified date" AutomationProperties.Name="Sort by modified date" />
                                     <TextBlock Grid.Column="8" Text="Folder Path" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                                 </Grid>
                             </Border>
 
+                            <!-- File Empty State Placeholder -->
+                            <Border x:Name="FileEmptyStateBorder" Grid.Row="1" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
+                                <StackPanel Spacing="14" HorizontalAlignment="Center" MaxWidth="440">
+                                    <Border Width="56" Height="56" CornerRadius="12" Background="{ThemeResource GwAccentBgBrush}" BorderBrush="{ThemeResource GwAccentBrush}" BorderThickness="1" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8A5;" FontSize="24" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="No Files Scanned" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Run a scan on any drive or folder to identify the largest flat files taking up your storage space." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" LineHeight="18" />
+                                </StackPanel>
+                            </Border>
+
                             <!-- Virtualized File Table ListView -->
-                            <ListView x:Name="StorageFileListView" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnStorageFileSelectionChanged">
+                            <ListView x:Name="StorageFileListView" Grid.Row="1" Visibility="Collapsed" SelectionMode="Single" SelectionChanged="OnStorageFileSelectionChanged" KeyDown="OnStorageFileKeyDown">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="12,0,12,0" />
@@ -416,18 +447,18 @@
                                 </StackPanel>
                             </Grid>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                <ComboBox x:Name="CleanupModeComboBox" SelectedIndex="0" Width="225" VerticalAlignment="Center">
+                                <ComboBox x:Name="CleanupModeComboBox" SelectedIndex="0" Width="225" VerticalAlignment="Center" AutomationProperties.Name="Select cleanup deletion mode">
                                     <ComboBoxItem Content="Move to Recycle Bin (Safe)" Tag="recycle" />
                                     <ComboBoxItem Content="Permanent Delete" Tag="permanent" />
                                 </ComboBox>
-                                <Button x:Name="RescanDiagnosticsButton" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnPreloadCleanupClick" VerticalAlignment="Center" ToolTipService.ToolTip="Refresh storage recommendations">
+                                <Button x:Name="RescanDiagnosticsButton" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnPreloadCleanupClick" VerticalAlignment="Center" ToolTipService.ToolTip="Refresh storage recommendations" AutomationProperties.Name="Rescan storage diagnostics">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <SymbolIcon Symbol="Refresh" />
                                         <TextBlock Text="Rescan" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="AnalyzeCleanupButton" Visibility="Collapsed" Click="OnRunCleanupScanClick" />
-                                <Button x:Name="ReviewAndCleanButton" Content="Clean Selected Categories..." Style="{StaticResource GwPrimaryButtonStyle}" Padding="16,7" Click="OnReviewAndCleanSelectedClick" VerticalAlignment="Center" />
+                                <Button x:Name="ReviewAndCleanButton" Content="Clean Selected Categories..." Style="{StaticResource GwPrimaryButtonStyle}" Padding="16,7" Click="OnReviewAndCleanSelectedClick" VerticalAlignment="Center" AutomationProperties.Name="Clean selected categories" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -479,7 +510,8 @@
 
                                             <!-- Checkbox to select/deselect category -->
                                             <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
-                                                      VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                      VerticalAlignment="Center" Margin="0,0,4,0"
+                                                      AutomationProperties.Name="{x:Bind Title}" />
 
                                             <!-- Category Icon -->
                                             <Border Grid.Column="1" Width="38" Height="38" CornerRadius="8"
@@ -546,7 +578,7 @@
                                                                     <ColumnDefinition Width="*" />
                                                                     <ColumnDefinition Width="Auto" />
                                                                 </Grid.ColumnDefinitions>
-                                                                <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                                <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Name}" />
                                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                                     <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="Medium"
                                                                                Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
@@ -628,11 +660,37 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="InstalledAppsCountText" Text="Installed Applications" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource GwTextPrimaryBrush}" Margin="0,0,0,6" />
                             <ProgressBar Grid.Row="1" x:Name="AppsProgressBar" IsIndeterminate="True" Height="3" Visibility="Collapsed" Margin="0,0,0,8" CornerRadius="2" Foreground="{ThemeResource GwAccentBrush}" />
-                            <ListView x:Name="InstalledAppsListView" Grid.Row="2" SelectionMode="Single" SelectionChanged="OnInstalledAppSelectionChanged">
+                            
+                            <!-- Apps Column Header Bar -->
+                            <Border Grid.Row="2" Background="{ThemeResource GwCardBackgroundHoverBrush}" Padding="8,6" CornerRadius="4" Margin="0,0,0,4">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="90" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="1" Text="Application Name &amp; Publisher" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="2" Text="Version" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="3" Text="Estimated Size" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Apps Empty State Placeholder -->
+                            <Border x:Name="AppsEmptyStateBorder" Grid.Row="3" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                                <StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="320">
+                                    <FontIcon Glyph="&#xE71D;" FontSize="28" Foreground="{ThemeResource GwTextMutedBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="No Applications Found" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="No matching applications found. Clear search filter or click Refresh Apps." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <ListView x:Name="InstalledAppsListView" Grid.Row="3" SelectionMode="Single" SelectionChanged="OnInstalledAppSelectionChanged">
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="local:InstalledAppRowViewModel">
                                         <Border Padding="8,7" Margin="0,2" CornerRadius="5" Background="{ThemeResource GwCardBackgroundHoverBrush}">
@@ -685,7 +743,7 @@
                                         <TextBlock Text="Application Uninstaller" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                                         <TextBlock Text="Launches the official uninstaller and automatically identifies leftovers." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" Content="Uninstall Selected App..." Style="{StaticResource GwPrimaryButtonStyle}" Click="OnUninstallSelectedAppClick" VerticalAlignment="Center" />
+                                    <Button x:Name="UninstallSelectedAppButton" Grid.Column="1" Content="Uninstall Selected App..." IsEnabled="False" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnUninstallSelectedAppClick" VerticalAlignment="Center" AutomationProperties.Name="Uninstall selected application" ToolTipService.ToolTip="Select an application to launch uninstaller" />
                                 </Grid>
                             </Border>
 
@@ -696,6 +754,16 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <TextBlock x:Name="LeftoversSummaryText" Text="Select an application on the left to inspect leftover directories and registry entries." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" Margin="0,0,0,6" TextWrapping="Wrap" />
+                                
+                                <!-- Leftovers Empty State Placeholder -->
+                                <Border x:Name="LeftoversEmptyStateBorder" Grid.Row="1" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="20">
+                                    <StackPanel Spacing="8" HorizontalAlignment="Center" MaxWidth="280">
+                                        <FontIcon Glyph="&#xE73E;" FontSize="24" Foreground="{ThemeResource GwSignalGreenBrush}" HorizontalAlignment="Center" />
+                                        <TextBlock Text="No Leftover Traces Found" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" HorizontalAlignment="Center" />
+                                        <TextBlock Text="No residual files, caches, or registry entries were detected for this application." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
                                 <ListView x:Name="LeftoversListView" Grid.Row="1" SelectionMode="Multiple">
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="local:LeftoverItemRowViewModel">
@@ -707,7 +775,7 @@
                                                         <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="75" />
                                                     </Grid.ColumnDefinitions>
-                                                    <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                    <CheckBox MinWidth="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Name}" />
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <TextBlock Text="{x:Bind Name}" FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Text="{x:Bind FullPath}" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
@@ -722,7 +790,7 @@
                             </Grid>
 
                             <!-- Clean Selected Leftovers Button -->
-                            <Button Grid.Row="3" Margin="0,10,0,0" Content="Safe Clean Selected Leftovers (Recycle Bin)" Style="{StaticResource GwPrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="OnCleanSelectedLeftoversClick" />
+                            <Button x:Name="CleanSelectedLeftoversButton" Grid.Row="3" Margin="0,10,0,0" Content="Safe Clean Selected Leftovers (Recycle Bin)" IsEnabled="False" Style="{StaticResource GwPrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="OnCleanSelectedLeftoversClick" AutomationProperties.Name="Safe clean selected leftovers" ToolTipService.ToolTip="Select leftover items above to clean" />
                         </Grid>
                     </Border>
                 </Grid>
@@ -1087,6 +1155,24 @@
                                 <TextBlock x:Name="HardwareDriversCountText" Grid.Column="1" Text="0 drivers verified" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" />
                             </Grid>
 
+                            <!-- Drivers Column Header Bar -->
+                            <Border Background="{ThemeResource GwCardBackgroundHoverBrush}" Padding="8,5" CornerRadius="4" Margin="0,4,0,2">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="90" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Device Class" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="1" Text="Device Name" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="2" Text="Manufacturer" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="3" Text="Driver Version" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="4" Text="Driver Date" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" HorizontalAlignment="Right" />
+                                </Grid>
+                            </Border>
+
                             <ListView x:Name="HardwareDriversListView" SelectionMode="None" MaxHeight="280">
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="local:HardwareDriverRowViewModel">
@@ -1228,13 +1314,16 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox x:Name="AssistantQuestionBox" PlaceholderText="Ask the agent: e.g. Where is my Trails in the Sky game located? or Find all videos over 500 MB..." VerticalAlignment="Center" KeyDown="OnAssistantQuestionBoxKeyDown" />
-                                <Button x:Name="AssistantAnalyzeButton" Grid.Column="1" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnAskOperatorClick" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <SymbolIcon Symbol="Find" />
-                                        <TextBlock Text="Ask Agent" FontWeight="SemiBold" />
-                                    </StackPanel>
-                                </Button>
+                                <TextBox x:Name="AssistantQuestionBox" PlaceholderText="Ask the agent: e.g. Where is my Trails in the Sky game located? or Find all videos over 500 MB..." VerticalAlignment="Center" KeyDown="OnAssistantQuestionBoxKeyDown" AutomationProperties.Name="Groundwork Agent question input" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="AssistantCancelButton" Content="Cancel" Visibility="Collapsed" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCancelAssistantQueryClick" VerticalAlignment="Center" AutomationProperties.Name="Cancel active agent query" />
+                                    <Button x:Name="AssistantAnalyzeButton" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnAskOperatorClick" VerticalAlignment="Center" AutomationProperties.Name="Submit query to Groundwork Agent">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <SymbolIcon Symbol="Find" />
+                                            <TextBlock Text="Ask Agent" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                         </Border>
 
@@ -1566,14 +1655,14 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="OrganizeFolderBox" PlaceholderText="Folder path to preview organization..." VerticalAlignment="Center" />
-                            <ComboBox x:Name="OrganizeRuleTypeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                            <TextBox x:Name="OrganizeFolderBox" PlaceholderText="Folder path to preview organization..." VerticalAlignment="Center" AutomationProperties.Name="Target folder to preview organization" />
+                            <ComboBox x:Name="OrganizeRuleTypeComboBox" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch" VerticalAlignment="Center" AutomationProperties.Name="Organization grouping rule">
                                 <ComboBoxItem Content="By File Category" Tag="category" />
                                 <ComboBoxItem Content="By Modified Month" Tag="date" />
                                 <ComboBoxItem Content="By Extension" Tag="extension" />
                             </ComboBox>
-                            <Button Grid.Column="2" Content="Preview Plan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnPreviewOrganizeClick" VerticalAlignment="Center" />
-                            <Button Grid.Column="3" Content="Refresh History" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshOrganizationHistoryClick" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Content="Preview Plan" Style="{StaticResource GwPrimaryButtonStyle}" Click="OnPreviewOrganizeClick" VerticalAlignment="Center" AutomationProperties.Name="Generate organization plan preview" />
+                            <Button Grid.Column="3" Content="Refresh History" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnRefreshOrganizationHistoryClick" VerticalAlignment="Center" AutomationProperties.Name="Refresh organization undo history" />
                         </Grid>
                     </Border>
 
@@ -1581,7 +1670,48 @@
                         <StackPanel Spacing="10">
                             <TextBlock Text="Organization Preview &amp; Undo History" Style="{StaticResource GwCardTitleStyle}" />
                             <TextBlock x:Name="OrganizationStatusText" Text="Select a target folder above to preview organization rules and safe stream-preserving undo history." Style="{StaticResource GwPanelSubtitleStyle}" />
-                            <ListView x:Name="OrganizationHistoryListView" SelectionMode="None" MaxHeight="300" />
+                            
+                            <!-- Organize Empty State -->
+                            <Border x:Name="OrganizationEmptyStateBorder" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
+                                <StackPanel Spacing="12" HorizontalAlignment="Center" MaxWidth="380">
+                                    <Border Width="48" Height="48" CornerRadius="10" Background="{ThemeResource GwAmberBgBrush}" BorderBrush="{ThemeResource GwAmberBrush}" BorderThickness="1" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="20" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="No Preview Generated" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Enter a folder path above and click 'Preview Plan' to preview how files will be categorized and safely organized." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                            <ListView x:Name="OrganizationHistoryListView" ItemsSource="{x:Bind OrganizationPlanItems}" SelectionMode="None" MaxHeight="360" Visibility="Collapsed">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="local:OrganizationPlanItemViewModel">
+                                        <Border Padding="10,8" Margin="0,2" CornerRadius="6" Background="{ThemeResource GwCardBackgroundHoverBrush}">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="90" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="32" Height="32" CornerRadius="6" Background="{ThemeResource GwAmberBgBrush}" BorderBrush="{ThemeResource GwAmberBrush}" BorderThickness="1" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE8B7;" FontSize="14" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="Destination:" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                                        <TextBlock Text="{x:Bind TargetSubfolder}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Border Grid.Column="2" Padding="6,2" CornerRadius="4" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Category}" FontSize="10" FontWeight="Medium" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                                                </Border>
+                                                <TextBlock Grid.Column="3" Text="{x:Bind FormattedSize}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -1885,7 +2015,7 @@
                             </StackPanel>
                             <TextBlock Text="Choose a local drive to view storage space, discover large files, and clean up waste." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" Margin="44,0,0,0" />
                         </StackPanel>
-                        <Button Grid.Column="1" VerticalAlignment="Top" Padding="6" Background="Transparent" BorderThickness="0" Click="OnCloseDriveModalClick">
+                        <Button Grid.Column="1" VerticalAlignment="Top" Padding="6" Background="Transparent" BorderThickness="0" Click="OnCloseDriveModalClick" AutomationProperties.Name="Close drive selection dialog" ToolTipService.ToolTip="Close (Esc)">
                             <SymbolIcon Symbol="Cancel" Foreground="{ThemeResource GwTextMutedBrush}" />
                         </Button>
                     </Grid>
@@ -1929,7 +2059,7 @@
 
                                             <!-- Scan Action -->
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                <Button Content="Scan" Tag="{x:Bind RootPath}" Style="{StaticResource GwPrimaryButtonStyle}" Padding="18,6" Click="OnModalScanDriveClick" ToolTipService.ToolTip="Scan this drive with the Windows file enumerator" />
+                                                <Button Content="Scan" Tag="{x:Bind RootPath}" Style="{StaticResource GwPrimaryButtonStyle}" Padding="18,6" Click="OnModalScanDriveClick" ToolTipService.ToolTip="Scan this drive with the Windows file enumerator" AutomationProperties.Name="Scan drive" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>
@@ -1947,11 +2077,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Button Content="Scan All Drives" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalScanAllDrivesClick" ToolTipService.ToolTip="Scan and combine all storage drives on your PC into one view" />
-                                <Button Content="Browse Folder..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalBrowseCustomFolderClick" />
-                                <Button Content="Import CSV..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalOpenCsvClick" ToolTipService.ToolTip="Import a previously saved drive scan report" />
+                                <Button Content="Scan All Drives" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalScanAllDrivesClick" ToolTipService.ToolTip="Scan and combine all storage drives on your PC into one view" AutomationProperties.Name="Scan all drives" />
+                                <Button Content="Browse Folder..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalBrowseCustomFolderClick" AutomationProperties.Name="Browse custom folder to scan" />
+                                <Button Content="Import CSV..." Style="{StaticResource GwSecondaryButtonStyle}" Click="OnModalOpenCsvClick" ToolTipService.ToolTip="Import a previously saved drive scan report" AutomationProperties.Name="Import scan CSV report" />
                             </StackPanel>
-                            <Button Grid.Column="1" Content="Dismiss" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCloseDriveModalClick" />
+                            <Button Grid.Column="1" Content="Dismiss" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnCloseDriveModalClick" AutomationProperties.Name="Dismiss drive selection dialog" />
                         </Grid>
                     </Border>
                 </Grid>
@@ -2024,7 +2154,7 @@
                     <!-- Bottom Notice & Cancel Button -->
                     <Grid>
                         <TextBlock Text="Please wait while disk contents are indexed..." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" />
-                        <Button Content="Cancel Scan" Style="{StaticResource GwSecondaryButtonStyle}" HorizontalAlignment="Right" Click="OnCancelScanClick" />
+                        <Button Content="Cancel Scan" Style="{StaticResource GwSecondaryButtonStyle}" HorizontalAlignment="Right" Click="OnCancelScanClick" AutomationProperties.Name="Cancel active storage scan" />
                     </Grid>
                 </StackPanel>
             </Border>

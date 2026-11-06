@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window
     private readonly List<(string User, string Assistant)> _agentConversation = new();
 
     private CancellationTokenSource? _scanCts;
+    private CancellationTokenSource? _agentCts;
     private DriveScanResult? _lastScanResult;
     private Dictionary<int, List<ScannedEntry>>? _childrenByParentId;
     private DuplicateScanReport? _lastDuplicateReport;
@@ -38,6 +39,7 @@ public sealed partial class MainWindow : Window
     private int _leftoverScanGeneration;
     private AppSettingsModel _settings = new();
     private HardwareSystemReport? _lastHardwareReport;
+    private bool _isMockMode;
 
     public ObservableCollection<VolumeRowViewModel> Volumes { get; } = new();
     public ObservableCollection<StorageTreeNodeViewModel> StorageTreeNodes { get; } = new();
@@ -56,6 +58,7 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<GpuSpecsInfo> HardwareGpus { get; } = new();
     public ObservableCollection<NetworkAdapterSpecsInfo> HardwareNetworks { get; } = new();
     public ObservableCollection<HardwareDriverRowViewModel> HardwareDrivers { get; } = new();
+    public ObservableCollection<OrganizationPlanItemViewModel> OrganizationPlanItems { get; } = new();
     public ItemMetadataViewModel SelectedMetadata { get; } = new();
 
     public MainWindow()
@@ -78,6 +81,7 @@ public sealed partial class MainWindow : Window
         HardwareGpusListView.ItemsSource = HardwareGpus;
         HardwareNetworkListView.ItemsSource = HardwareNetworks;
         HardwareDriversListView.ItemsSource = HardwareDrivers;
+        OrganizationHistoryListView.ItemsSource = OrganizationPlanItems;
 
         InitializeStartupState();
     }
@@ -209,6 +213,91 @@ public sealed partial class MainWindow : Window
             {
                 StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
                 e.Handled = true;
+                return;
+            }
+        }
+
+        var ctrl = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+        bool isCtrl = (ctrl & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+
+        if (isCtrl)
+        {
+            switch (e.Key)
+            {
+                case Windows.System.VirtualKey.Number1:
+                    NavigateToTab("Storage");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number2:
+                    NavigateToTab("Cleanup");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number3:
+                    NavigateToTab("Apps");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number4:
+                    NavigateToTab("Hardware");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number5:
+                    NavigateToTab("Agent");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number6:
+                    NavigateToTab("Organize");
+                    e.Handled = true;
+                    return;
+                case (Windows.System.VirtualKey)188: // Comma
+                    NavigateToTab("Settings");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.F:
+                    if (StoragePanel.Visibility == Visibility.Visible)
+                    {
+                        TreeFilterTextBox.Focus(FocusState.Keyboard);
+                        e.Handled = true;
+                    }
+                    else if (AppsPanel.Visibility == Visibility.Visible)
+                    {
+                        AppSearchFilterBox.Focus(FocusState.Keyboard);
+                        e.Handled = true;
+                    }
+                    else if (AssistantPanel.Visibility == Visibility.Visible)
+                    {
+                        AssistantQuestionBox.Focus(FocusState.Keyboard);
+                        e.Handled = true;
+                    }
+                    return;
+            }
+        }
+
+        if (e.Key == Windows.System.VirtualKey.F5)
+        {
+            if (StoragePanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshDrivesClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (CleanupPanel.Visibility == Visibility.Visible)
+            {
+                OnPreloadCleanupClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (AppsPanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshInstalledAppsClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (HardwarePanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshHardwareClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (OrganizePanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshOrganizationHistoryClick(this, new RoutedEventArgs());
+                e.Handled = true;
             }
         }
     }
@@ -241,7 +330,37 @@ public sealed partial class MainWindow : Window
             // Pop up the drive selection modal immediately on every launch unless tab flag specified
             string[] cmdArgs = Environment.GetCommandLineArgs();
             string? startTab = cmdArgs.FirstOrDefault(a => a.StartsWith("--tab=", StringComparison.OrdinalIgnoreCase))?.Substring(6);
-            if (!string.IsNullOrEmpty(startTab))
+            string? autoScanPath = cmdArgs.FirstOrDefault(a => a.StartsWith("--scan=", StringComparison.OrdinalIgnoreCase))?.Substring(7);
+            string? autoOrganizePath = cmdArgs.FirstOrDefault(a => a.StartsWith("--organize=", StringComparison.OrdinalIgnoreCase))?.Substring(11);
+
+            bool isMock = cmdArgs.Any(a => string.Equals(a, "--mock", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--demo", StringComparison.OrdinalIgnoreCase));
+            if (isMock)
+            {
+                ApplyMockDataForScreenshots(startTab);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(autoScanPath))
+            {
+                StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+                NavigateToTab("Storage");
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    ScanPathTextBox.Text = autoScanPath;
+                    await RunStorageScanAsync(autoScanPath);
+                });
+            }
+            else if (!string.IsNullOrEmpty(autoOrganizePath))
+            {
+                StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+                NavigateToTab("Organize");
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    OrganizeFolderBox.Text = autoOrganizePath;
+                    OnPreviewOrganizeClick(this, new RoutedEventArgs());
+                });
+            }
+            else if (!string.IsNullOrEmpty(startTab))
             {
                 StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
                 DispatcherQueue.TryEnqueue(() => NavigateToTab(startTab));
@@ -387,6 +506,8 @@ public sealed partial class MainWindow : Window
         if (OrganizePanel != null) OrganizePanel.Visibility = string.Equals(tag, "Organize", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         if (SettingsPanel != null) SettingsPanel.Visibility = string.Equals(tag, "Settings", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
 
+        if (_isMockMode) return;
+
         if (string.Equals(tag, "Hardware", StringComparison.OrdinalIgnoreCase))
         {
             _ = LoadHardwareSpecsAsync();
@@ -519,6 +640,15 @@ public sealed partial class MainWindow : Window
         string primary = Volumes.FirstOrDefault()?.RootPath ?? Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
         ScanPathTextBox.Text = primary;
         await RunStorageScanAsync(primary);
+    }
+
+    private void OnScanPathTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Enter)
+        {
+            e.Handled = true;
+            OnRunScanPathClick(sender, e);
+        }
     }
 
     private async void OnRunScanPathClick(object sender, RoutedEventArgs e)
@@ -1010,7 +1140,20 @@ public sealed partial class MainWindow : Window
                 });
                 col++;
             }
-            summaryText = $"Top folders represent {barSegments.Sum(s => s.Percent):F1}% of {ByteFormatter.FormatBytes(result.TotalLogicalBytes)} disk space.";
+            long topBytes = result.TopLevelSpaceMap.Take(6).Sum(f => f.LogicalBytes);
+            long otherBytes = Math.Max(0, totalBytes - topBytes);
+            double otherPct = (double)otherBytes / totalBytes * 100.0;
+            if (otherPct >= 0.5)
+            {
+                barSegments.Add(new StorageBarSegmentViewModel
+                {
+                    Name = "Other Files & Folders",
+                    FormattedSize = ByteFormatter.FormatBytes(otherBytes),
+                    Percent = otherPct,
+                    ColorHex = isLightMode ? "#94A3B8" : "#64748B"
+                });
+            }
+            summaryText = $"Storage breakdown for {ByteFormatter.FormatBytes(result.TotalLogicalBytes)}: top 6 folders represent {((double)topBytes / totalBytes * 100.0):F1}% of disk space.";
         }
 
         // 2. Build fast lookup of children by parentId
@@ -1196,6 +1339,14 @@ public sealed partial class MainWindow : Window
             ScannedFiles.Add(file);
         }
 
+        bool hasTreeNodes = StorageTreeNodes.Count > 0;
+        TreeEmptyStateBorder.Visibility = hasTreeNodes ? Visibility.Collapsed : Visibility.Visible;
+        StorageTreeListView.Visibility = hasTreeNodes ? Visibility.Visible : Visibility.Collapsed;
+
+        bool hasFiles = ScannedFiles.Count > 0;
+        FileEmptyStateBorder.Visibility = hasFiles ? Visibility.Collapsed : Visibility.Visible;
+        StorageFileListView.Visibility = hasFiles ? Visibility.Visible : Visibility.Collapsed;
+
         UpdateViewCountSummary();
     }
 
@@ -1377,6 +1528,11 @@ public sealed partial class MainWindow : Window
 
         ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
         ViewFileTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
+
+        bool hasTreeNodes = StorageTreeNodes.Count > 0;
+        TreeEmptyStateBorder.Visibility = hasTreeNodes ? Visibility.Collapsed : Visibility.Visible;
+        StorageTreeListView.Visibility = hasTreeNodes ? Visibility.Visible : Visibility.Collapsed;
+
         UpdateViewCountSummary();
     }
 
@@ -1387,6 +1543,11 @@ public sealed partial class MainWindow : Window
 
         ViewTreeTabButton.Style = (Style)Application.Current.Resources["GwSecondaryButtonStyle"];
         ViewFileTabButton.Style = (Style)Application.Current.Resources["GwPrimaryButtonStyle"];
+
+        bool hasFiles = ScannedFiles.Count > 0;
+        FileEmptyStateBorder.Visibility = hasFiles ? Visibility.Collapsed : Visibility.Visible;
+        StorageFileListView.Visibility = hasFiles ? Visibility.Visible : Visibility.Collapsed;
+
         ViewTabSummaryText.Text = $"Largest Files (Flat): Showing {ScannedFiles.Count:N0} largest files across target • Double-click to open in Explorer";
     }
 
@@ -1537,6 +1698,15 @@ public sealed partial class MainWindow : Window
     private void OnFileRowDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is FileRowViewModel file)
+        {
+            OpenPathInExplorer(file.FullPath);
+            e.Handled = true;
+        }
+    }
+
+    private void OnStorageFileKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Enter && StorageFileListView.SelectedItem is FileRowViewModel file)
         {
             OpenPathInExplorer(file.FullPath);
             e.Handled = true;
@@ -1872,10 +2042,19 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void UpdateSortHeaderLabels(string active)
+    {
+        SortFileNameHeader.Text = active == "Name" ? (_sortNameAscending ? "File Name ▲" : "File Name ▼") : "File Name ⬍";
+        SortExtHeader.Text = active == "Ext" ? (_sortExtAscending ? "Ext ▲" : "Ext ▼") : "Ext ⬍";
+        SortSizeHeader.Text = active == "Size" ? (_sortSizeAscending ? "Size ▲" : "Size ▼") : "Size ⬍";
+        SortModifiedHeader.Text = active == "Modified" ? (_sortModifiedAscending ? "Modified ▲" : "Modified ▼") : "Modified ⬍";
+    }
+
     private bool _sortSizeAscending = false;
     private void OnSortSizeClick(object sender, PointerRoutedEventArgs e)
     {
         _sortSizeAscending = !_sortSizeAscending;
+        UpdateSortHeaderLabels("Size");
         var sorted = _sortSizeAscending
             ? ScannedFiles.OrderBy(f => f.SizeBytes).ToList()
             : ScannedFiles.OrderByDescending(f => f.SizeBytes).ToList();
@@ -1887,6 +2066,7 @@ public sealed partial class MainWindow : Window
     private void OnSortFileNameClick(object sender, PointerRoutedEventArgs e)
     {
         _sortNameAscending = !_sortNameAscending;
+        UpdateSortHeaderLabels("Name");
         var sorted = _sortNameAscending
             ? ScannedFiles.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList()
             : ScannedFiles.OrderByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -1898,6 +2078,7 @@ public sealed partial class MainWindow : Window
     private void OnSortExtClick(object sender, PointerRoutedEventArgs e)
     {
         _sortExtAscending = !_sortExtAscending;
+        UpdateSortHeaderLabels("Ext");
         var sorted = _sortExtAscending
             ? ScannedFiles.OrderBy(f => f.Extension, StringComparer.OrdinalIgnoreCase).ToList()
             : ScannedFiles.OrderByDescending(f => f.Extension, StringComparer.OrdinalIgnoreCase).ToList();
@@ -1909,6 +2090,7 @@ public sealed partial class MainWindow : Window
     private void OnSortModifiedClick(object sender, PointerRoutedEventArgs e)
     {
         _sortModifiedAscending = !_sortModifiedAscending;
+        UpdateSortHeaderLabels("Modified");
         var sorted = _sortModifiedAscending
             ? ScannedFiles.OrderBy(f => f.LastWriteUnixSeconds).ToList()
             : ScannedFiles.OrderByDescending(f => f.LastWriteUnixSeconds).ToList();
@@ -2261,6 +2443,14 @@ public sealed partial class MainWindow : Window
             }
             StorageSenseCategories.Add(dupCard);
 
+            WireCategoryCard(rbCard);
+            WireCategoryCard(tempCard);
+            WireCategoryCard(dumpCard);
+            WireCategoryCard(installerCard);
+            WireCategoryCard(dupCard);
+
+            UpdateCleanupSelectedTotals();
+
             CleanupSummaryBannerText.Text = $"Storage Sense Recommendations Ready: {ByteFormatter.FormatBytes(report.TotalReclaimableBytes)} reclaimable storage detected across Recycle Bin, temporary files, and duplicate candidates.";
         }
         catch (Exception ex)
@@ -2271,6 +2461,90 @@ public sealed partial class MainWindow : Window
         {
             CleanupProgressBar.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private void WireCategoryCard(StorageSenseCategoryCardViewModel cat)
+    {
+        cat.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(cat.IsSelected))
+            {
+                foreach (var item in cat.Items)
+                {
+                    item.IsSelected = cat.IsSelected;
+                }
+                UpdateCleanupSelectedTotals();
+            }
+        };
+
+        foreach (var item in cat.Items)
+        {
+            item.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(item.IsSelected))
+                {
+                    UpdateCleanupSelectedTotals();
+                }
+            };
+        }
+    }
+
+    private void UpdateCleanupSelectedTotals()
+    {
+        long totalSelectedBytes = 0;
+        int totalSelectedItems = 0;
+
+        foreach (var cat in StorageSenseCategories)
+        {
+            if (cat.CategoryId == "recycle_bin")
+            {
+                if (cat.IsSelected && cat.SizeBytes > 0)
+                {
+                    totalSelectedBytes += cat.SizeBytes;
+                    totalSelectedItems++;
+                }
+            }
+            else if (cat.IsSelected)
+            {
+                if (cat.Items.Count > 0)
+                {
+                    foreach (var item in cat.Items)
+                    {
+                        if (item.IsSelected)
+                        {
+                            totalSelectedBytes += item.SizeBytes;
+                            totalSelectedItems++;
+                        }
+                    }
+                }
+                else
+                {
+                    totalSelectedBytes += cat.SizeBytes;
+                    if (cat.SizeBytes > 0) totalSelectedItems++;
+                }
+            }
+            else
+            {
+                foreach (var item in cat.Items)
+                {
+                    if (item.IsSelected)
+                    {
+                        totalSelectedBytes += item.SizeBytes;
+                        totalSelectedItems++;
+                    }
+                }
+            }
+        }
+
+        CleanupTotalReclaimableText.Text = ByteFormatter.FormatBytes(totalSelectedBytes);
+        CleanupTotalReclaimableSubText.Text = totalSelectedBytes > 0
+            ? $"{totalSelectedItems} item(s) selected across recommendations ready for cleanup."
+            : "No recommendations currently selected for removal.";
+
+        ReviewAndCleanButton.IsEnabled = totalSelectedBytes > 0;
+        ReviewAndCleanButton.Content = totalSelectedBytes > 0
+            ? $"Clean Selected ({ByteFormatter.FormatBytes(totalSelectedBytes)})..."
+            : "Clean Selected Categories...";
     }
 
     private async void OnPreloadCleanupClick(object sender, RoutedEventArgs e)
@@ -2341,6 +2615,7 @@ public sealed partial class MainWindow : Window
                 item.IsSelected = cat.CategoryId != "installers";
             }
         }
+        UpdateCleanupSelectedTotals();
     }
 
     private void OnSelectAllCategoriesClick(object sender, RoutedEventArgs e)
@@ -2350,6 +2625,7 @@ public sealed partial class MainWindow : Window
             cat.IsSelected = true;
             foreach (var item in cat.Items) item.IsSelected = true;
         }
+        UpdateCleanupSelectedTotals();
     }
 
     private void OnSelectNoneCategoriesClick(object sender, RoutedEventArgs e)
@@ -2359,6 +2635,7 @@ public sealed partial class MainWindow : Window
             cat.IsSelected = false;
             foreach (var item in cat.Items) item.IsSelected = false;
         }
+        UpdateCleanupSelectedTotals();
     }
 
     private async void OnRunCleanupScanClick(object sender, RoutedEventArgs e)
@@ -2745,6 +3022,9 @@ public sealed partial class MainWindow : Window
         }
 
         InstalledAppsCountText.Text = $"Installed Applications ({InstalledApps.Count})";
+        bool hasApps = InstalledApps.Count > 0;
+        AppsEmptyStateBorder.Visibility = hasApps ? Visibility.Collapsed : Visibility.Visible;
+        InstalledAppsListView.Visibility = hasApps ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnAppFilterTextChanged(object sender, TextChangedEventArgs e)
@@ -2761,7 +3041,14 @@ public sealed partial class MainWindow : Window
     {
         if (InstalledAppsListView.SelectedItem is InstalledAppRowViewModel vm && vm.RawModel != null)
         {
+            UninstallSelectedAppButton.IsEnabled = vm.CanUninstall;
+            UninstallSelectedAppButton.Content = vm.CanUninstall ? $"Uninstall {vm.Name}..." : "Uninstaller Unavailable";
             await RunLeftoverScanAsync(vm.RawModel.Id, vm.RawModel.Name, vm.RawModel.Publisher, vm.RawModel.InstallLocation);
+        }
+        else
+        {
+            UninstallSelectedAppButton.IsEnabled = false;
+            UninstallSelectedAppButton.Content = "Uninstall Selected App...";
         }
     }
 
@@ -2808,7 +3095,7 @@ public sealed partial class MainWindow : Window
 
         foreach (var item in report.FileSystemLeftovers)
         {
-            LeftoverItems.Add(new LeftoverItemRowViewModel
+            var row = new LeftoverItemRowViewModel
             {
                 IsSelected = string.Equals(item.Confidence, "High", StringComparison.OrdinalIgnoreCase),
                 FullPath = item.FullPath,
@@ -2818,10 +3105,35 @@ public sealed partial class MainWindow : Window
                 Evidence = item.Evidence,
                 FormattedSize = ByteFormatter.FormatBytes(item.SizeBytes),
                 SizeBytes = item.SizeBytes
-            });
+            };
+            row.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(row.IsSelected))
+                {
+                    UpdateCleanLeftoversButtonState();
+                }
+            };
+            LeftoverItems.Add(row);
         }
 
-        LeftoversSummaryText.Text = $"Found {report.TotalCount} traces ({ByteFormatter.FormatBytes(report.TotalReclaimableBytes)} reclaimable) for {report.AppName}.";
+        bool hasItems = LeftoverItems.Count > 0;
+        LeftoversEmptyStateBorder.Visibility = hasItems ? Visibility.Collapsed : Visibility.Visible;
+        LeftoversListView.Visibility = hasItems ? Visibility.Visible : Visibility.Collapsed;
+        LeftoversSummaryText.Text = hasItems
+            ? $"Found {report.TotalCount} traces ({ByteFormatter.FormatBytes(report.TotalReclaimableBytes)} reclaimable) for {report.AppName}."
+            : $"No leftover traces found for {report.AppName}.";
+
+        UpdateCleanLeftoversButtonState();
+    }
+
+    private void UpdateCleanLeftoversButtonState()
+    {
+        var selected = LeftoverItems.Where(l => l.IsSelected).ToList();
+        long totalBytes = selected.Sum(l => l.SizeBytes);
+        CleanSelectedLeftoversButton.IsEnabled = selected.Count > 0;
+        CleanSelectedLeftoversButton.Content = selected.Count > 0
+            ? $"Safe Clean {selected.Count} Leftovers ({ByteFormatter.FormatBytes(totalBytes)})"
+            : "Safe Clean Selected Leftovers (Recycle Bin)";
     }
 
     private async void OnUninstallSelectedAppClick(object sender, RoutedEventArgs e)
@@ -3870,7 +4182,7 @@ public sealed partial class MainWindow : Window
         return text.ToString();
     }
 
-    private void ExtractActionablePathsFromResponse(string answer, string question)
+    private async Task ExtractActionablePathsFromResponseAsync(string answer, string question)
     {
         var foundPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -3909,7 +4221,7 @@ public sealed partial class MainWindow : Window
             long sizeBytes = 0;
             if (isDir)
             {
-                var metrics = CalculateDirectoryMetrics(path);
+                var metrics = await Task.Run(() => CalculateDirectoryMetrics(path));
                 sizeBytes = metrics.Bytes;
             }
             else if (File.Exists(path))
@@ -3942,6 +4254,11 @@ public sealed partial class MainWindow : Window
         }
 
         AssistantItemsCountLabel.Text = $"{AssistantKeyItems.Count} verified system item(s) referenced";
+    }
+
+    private void OnCancelAssistantQueryClick(object sender, RoutedEventArgs e)
+    {
+        _agentCts?.Cancel();
     }
 
     private async void OnAskOperatorClick(object sender, RoutedEventArgs e)
@@ -3981,6 +4298,7 @@ public sealed partial class MainWindow : Window
         RenderFormattedAgentResponse(_lastAssistantAnswer);
         AssistantItemsCountLabel.Text = "Contacting model...";
         AssistantAnalyzeButton.IsEnabled = false;
+        AssistantCancelButton.Visibility = Visibility.Visible;
 
         try
         {
@@ -4002,7 +4320,8 @@ public sealed partial class MainWindow : Window
 
             var currentVolumes = _driveDiscovery.DiscoverVolumes();
             string systemContext = BuildAgentGroundingContext(question, agentReport, currentVolumes, collectionWarning);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            _agentCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            var token = _agentCts.Token;
             string answer = string.Empty;
 
             // Hard gate: small models ignore the prompt rule, so never call the model for requirement questions without web search.
@@ -4026,22 +4345,22 @@ public sealed partial class MainWindow : Window
             switch (_settings.AiProvider.ToLowerInvariant())
             {
                 case "ollama":
-                    answer = await CallOllamaAsync(question, systemContext, cts.Token);
+                    answer = await CallOllamaAsync(question, systemContext, token);
                     break;
                 case "gemini":
-                    answer = await CallGeminiAsync(question, systemContext, cts.Token);
+                    answer = await CallGeminiAsync(question, systemContext, token);
                     break;
                 case "openai":
-                    answer = await CallOpenAiAsync(question, systemContext, cts.Token);
+                    answer = await CallOpenAiAsync(question, systemContext, token);
                     break;
                 case "anthropic":
-                    answer = await CallAnthropicAsync(question, systemContext, cts.Token);
+                    answer = await CallAnthropicAsync(question, systemContext, token);
                     break;
                 case "mistral":
-                    answer = await CallMistralAsync(question, systemContext, cts.Token);
+                    answer = await CallMistralAsync(question, systemContext, token);
                     break;
                 case "custom":
-                    answer = await CallCustomAsync(question, systemContext, cts.Token);
+                    answer = await CallCustomAsync(question, systemContext, token);
                     break;
                 default:
                     throw new InvalidOperationException($"Unsupported provider: {_settings.AiProvider}");
@@ -4067,7 +4386,7 @@ public sealed partial class MainWindow : Window
                 _ => "Generated"
             };
 
-            ExtractActionablePathsFromResponse(answer, question);
+            await ExtractActionablePathsFromResponseAsync(answer, question);
         }
         catch (Exception ex)
         {
@@ -4099,7 +4418,10 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
+            AssistantCancelButton.Visibility = Visibility.Collapsed;
             AssistantAnalyzeButton.IsEnabled = true;
+            _agentCts?.Dispose();
+            _agentCts = null;
         }
     }
 
@@ -4134,7 +4456,56 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        OrganizationStatusText.Text = $"Organization plan preview for '{path}' generated safely with stream-preserving undo tokens.";
+        OrganizationPlanItems.Clear();
+        string ruleType = (OrganizeRuleTypeComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "category";
+
+        try
+        {
+            var files = await Task.Run(() =>
+            {
+                var list = new List<OrganizationPlanItemViewModel>();
+                var di = new DirectoryInfo(path);
+                foreach (var file in di.EnumerateFiles("*", SearchOption.TopDirectoryOnly))
+                {
+                    string ext = file.Extension.ToLowerInvariant();
+                    string category = GetFileTypeDescription(ext);
+                    string targetSubfolder = ruleType switch
+                    {
+                        "date" => file.LastWriteTime.ToString("yyyy-MM (MMMM yyyy)"),
+                        "extension" => string.IsNullOrEmpty(ext) ? "No Extension" : ext.TrimStart('.').ToUpperInvariant(),
+                        _ => category
+                    };
+
+                    list.Add(new OrganizationPlanItemViewModel
+                    {
+                        FileName = file.Name,
+                        OriginalPath = file.FullName,
+                        TargetSubfolder = targetSubfolder,
+                        Category = category,
+                        SizeBytes = file.Length,
+                        FormattedSize = ByteFormatter.FormatBytes(file.Length),
+                        RuleBadge = ruleType.ToUpperInvariant()
+                    });
+                }
+                return list;
+            });
+
+            foreach (var item in files)
+            {
+                OrganizationPlanItems.Add(item);
+            }
+
+            bool hasItems = OrganizationPlanItems.Count > 0;
+            OrganizationEmptyStateBorder.Visibility = hasItems ? Visibility.Collapsed : Visibility.Visible;
+            OrganizationHistoryListView.Visibility = hasItems ? Visibility.Visible : Visibility.Collapsed;
+            OrganizationStatusText.Text = hasItems
+                ? $"Preview generated: {OrganizationPlanItems.Count:N0} files will be organized into {OrganizationPlanItems.Select(p => p.TargetSubfolder).Distinct().Count()} subfolders."
+                : $"Target folder contains 0 top-level files to organize.";
+        }
+        catch (Exception ex)
+        {
+            OrganizationStatusText.Text = $"Failed to preview organization: {ex.Message}";
+        }
     }
 
     private void OnRefreshOrganizationHistoryClick(object sender, RoutedEventArgs e)
@@ -4146,14 +4517,14 @@ public sealed partial class MainWindow : Window
     // 3.5 HARDWARE & SYSTEM SPECS
     // ==========================================
 
-    private async Task LoadHardwareSpecsAsync()
+    private async Task LoadHardwareSpecsAsync(bool force = false)
     {
         HardwareProgressBar.Visibility = Visibility.Visible;
         try
         {
             bool mask = _settings.MaskHardwareSerials;
             var report = _lastHardwareReport;
-            if (report == null || DateTime.UtcNow - report.ReportGeneratedUtc.ToUniversalTime() > TimeSpan.FromMinutes(5))
+            if (force || report == null || DateTime.UtcNow - report.ReportGeneratedUtc.ToUniversalTime() > TimeSpan.FromMinutes(5))
             {
                 report = await _hardwareEngine.GetHardwareReportAsync(maskSensitiveData: mask);
                 AgentLocalStateService.SaveInventory(report);
@@ -4264,7 +4635,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnRefreshHardwareClick(object sender, RoutedEventArgs e)
     {
-        await LoadHardwareSpecsAsync();
+        await LoadHardwareSpecsAsync(force: true);
     }
 
     private void OnCopyHardwareSummaryClick(object sender, RoutedEventArgs e)
@@ -4714,4 +5085,436 @@ public sealed partial class MainWindow : Window
         };
         await dialog.ShowAsync();
     }
+
+    private void ApplyMockDataForScreenshots(string? startTab)
+    {
+        _isMockMode = true;
+        // 1. Mock Volumes / Drives
+        Volumes.Clear();
+        DrivesComboBox.Items.Clear();
+        DrivesComboBox.Items.Add(new ComboBoxItem { Content = "💻 All Drives (Entire PC)", Tag = "__ALL_DRIVES__" });
+        Volumes.Add(new VolumeRowViewModel(
+            RootPath: @"C:\",
+            VolumeName: "Windows (C:)",
+            FileSystemLabel: "Windows System Drive",
+            CapacitySummary: "142.5 GB free of 250.0 GB",
+            UsedPercent: 43.0,
+            MftBadge: "NTFS volume"
+        ));
+        DrivesComboBox.Items.Add(new ComboBoxItem
+        {
+            Content = "💾 Windows (C:)  (142.5 GB free of 250.0 GB)",
+            Tag = @"C:\"
+        });
+        Volumes.Add(new VolumeRowViewModel(
+            RootPath: @"D:\",
+            VolumeName: "Data & Games (D:)",
+            FileSystemLabel: "Internal Storage",
+            CapacitySummary: "512.0 GB free of 1.0 TB",
+            UsedPercent: 48.8,
+            MftBadge: "NTFS volume"
+        ));
+        DrivesComboBox.Items.Add(new ComboBoxItem
+        {
+            Content = "💾 Data & Games (D:)  (512.0 GB free of 1.0 TB)",
+            Tag = @"D:\"
+        });
+        DrivesComboBox.SelectedIndex = 1;
+        ScanPathTextBox.Text = @"C:\Projects\Workspace";
+
+        // 2. Mock Storage Tree & Breakdown Bar
+        if (string.Equals(startTab, "StorageEmpty", StringComparison.OrdinalIgnoreCase))
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            NavigateToTab("Storage");
+            TreeEmptyStateBorder.Visibility = Visibility.Visible;
+            StorageTreeListView.Visibility = Visibility.Collapsed;
+            StorageFileListView.Visibility = Visibility.Collapsed;
+            StorageBarSegments.Clear();
+            StorageBreakdownBarGrid.Children.Clear();
+            StorageBreakdownSummaryText.Text = "No drive or folder scanned yet.";
+            return;
+        }
+
+        TreeEmptyStateBorder.Visibility = Visibility.Collapsed;
+        StorageTreeListView.Visibility = Visibility.Visible;
+
+        StorageBarSegments.Clear();
+        StorageBreakdownBarGrid.Children.Clear();
+        StorageBreakdownBarGrid.ColumnDefinitions.Clear();
+
+        var mockSegments = new (string Name, string Size, double Percent, string Color)[]
+        {
+            ("Games", "68.4 GB", 46.4, "#6366F1"),
+            ("Projects", "32.1 GB", 21.8, "#3B82F6"),
+            ("AppData", "18.6 GB", 12.6, "#8B5CF6"),
+            ("Documents", "12.4 GB", 8.4, "#F59E0B"),
+            ("Downloads", "8.2 GB", 5.6, "#EC4899"),
+            ("Media", "5.1 GB", 3.5, "#14B8A6"),
+            ("Other Files & Folders", "2.7 GB", 1.7, "#64748B")
+        };
+
+        int colIdx = 0;
+        foreach (var seg in mockSegments)
+        {
+            StorageBarSegments.Add(new StorageBarSegmentViewModel
+            {
+                Name = seg.Name,
+                FormattedSize = seg.Size,
+                Percent = seg.Percent,
+                ColorHex = seg.Color
+            });
+            StorageBreakdownBarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1, seg.Percent), GridUnitType.Star) });
+            var rect = new Border
+            {
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255,
+                    Convert.ToByte(seg.Color.Substring(1, 2), 16),
+                    Convert.ToByte(seg.Color.Substring(3, 2), 16),
+                    Convert.ToByte(seg.Color.Substring(5, 2), 16)))
+            };
+            Grid.SetColumn(rect, colIdx++);
+            StorageBreakdownBarGrid.Children.Add(rect);
+        }
+        StorageBreakdownSummaryText.Text = "Storage breakdown for 147.5 GB: top 6 folders represent 98.3% of disk space.";
+
+        StorageTreeNodes.Clear();
+        var mockTree = new (string Name, string Path, string Size, double Pct, int Files, int Folders)[]
+        {
+            ("Games", @"C:\Projects\Workspace\Games", "68.4 GB", 46.4, 1420, 48),
+            ("Projects", @"C:\Projects\Workspace\Projects", "32.1 GB", 21.8, 18920, 1240),
+            ("AppData", @"C:\Projects\Workspace\AppData", "18.6 GB", 12.6, 42100, 5120),
+            ("Documents", @"C:\Projects\Workspace\Documents", "12.4 GB", 8.4, 1240, 140),
+            ("Downloads", @"C:\Projects\Workspace\Downloads", "8.2 GB", 5.6, 84, 12),
+            ("Media", @"C:\Projects\Workspace\Media", "5.1 GB", 3.5, 32, 4)
+        };
+        int treeId = 1;
+        foreach (var t in mockTree)
+        {
+            StorageTreeNodes.Add(new StorageTreeNodeViewModel
+            {
+                Id = treeId++,
+                ParentId = 0,
+                Name = t.Name,
+                FullPath = t.Path,
+                IsDirectory = true,
+                SizeBytes = (long)(t.Pct * 147.5 * 1024 * 1024 * 10.24),
+                AllocatedBytes = (long)(t.Pct * 147.5 * 1024 * 1024 * 10.24),
+                FormattedSize = t.Size,
+                FormattedAllocated = t.Size,
+                PercentOfDrive = t.Pct / 100.0,
+                PercentLabel = $"{t.Pct:F1}%",
+                RecursiveFileCount = t.Files,
+                RecursiveFolderCount = t.Folders,
+                Attributes = "D",
+                LastModifiedFormatted = "2026-10-30 14:15",
+                DepthLevel = 0,
+                IsExpanded = false
+            });
+        }
+
+        ScannedFiles.Clear();
+        var mockFiles = new (string Name, string Path, string Size, long Bytes, string Cat)[]
+        {
+            ("UnrealEngine_5.4_Setup.iso", @"C:\Projects\Workspace\Games\UnrealEngine_5.4_Setup.iso", "28.4 GB", 28400000000L, "Archives"),
+            ("Dataset_Training_2026.parquet", @"C:\Projects\Workspace\Projects\Dataset_Training_2026.parquet", "14.2 GB", 14200000000L, "Documents"),
+            ("Showcase_B-Roll_4K.mp4", @"C:\Projects\Workspace\Media\Showcase_B-Roll_4K.mp4", "8.6 GB", 8600000000L, "Videos"),
+            ("Docker_Container_Base.vhdx", @"C:\Projects\Workspace\Projects\Docker_Container_Base.vhdx", "6.2 GB", 6200000000L, "Virtual Machines"),
+            ("Android_Studio_SDK.zip", @"C:\Projects\Workspace\Downloads\Android_Studio_SDK.zip", "4.1 GB", 4100000000L, "Archives")
+        };
+        foreach (var f in mockFiles)
+        {
+            ScannedFiles.Add(new FileRowViewModel
+            {
+                Name = f.Name,
+                FullPath = f.Path,
+                Folder = System.IO.Path.GetDirectoryName(f.Path) ?? "",
+                Extension = System.IO.Path.GetExtension(f.Name),
+                Category = f.Cat,
+                SizeBytes = f.Bytes,
+                AllocatedBytes = f.Bytes,
+                FormattedSize = f.Size,
+                LastModifiedFormatted = "2026-10-28 10:20"
+            });
+        }
+        FooterStatusText.Text = "Scan finished: 63,806 files, 6,564 folders in 0.48s (132,929 files/sec). Total: 147.5 GB. Free: 142.5 GB / Total: 250.0 GB (Used: 107.5 GB)";
+
+        // 3. Mock Storage Sense Cleanup
+        StorageSenseCategories.Clear();
+        var mockRbCard = new StorageSenseCategoryCardViewModel
+        {
+            CategoryId = "recycle_bin",
+            Title = "Windows Recycle Bin",
+            LocationDisplay = @"C:\$Recycle.Bin",
+            Description = "Contains files previously deleted from your computer. Safe to empty. 28 items in trash.",
+            FormattedSize = "4.2 GB",
+            SizeBytes = 4200000000L,
+            CountSummary = "28 items",
+            Glyph = "\uE74D",
+            GlyphColor = "#EF4444",
+            GlyphBg = "#FEF2F2",
+            IsSelected = true
+        };
+        StorageSenseCategories.Add(mockRbCard);
+
+        var mockTempCard = new StorageSenseCategoryCardViewModel
+        {
+            CategoryId = "temp_files",
+            Title = "Temporary App & Cache Files",
+            LocationDisplay = @"%TEMP% (C:\Users\Developer\AppData\Local\Temp)",
+            Description = "Temporary working files and caches left behind by closed applications that are safe to remove.",
+            FormattedSize = "2.8 GB",
+            SizeBytes = 2800000000L,
+            CountSummary = "312 temporary files",
+            Glyph = "\uE8B7",
+            GlyphColor = "#F59E0B",
+            GlyphBg = "#FFFBEB",
+            IsSelected = true
+        };
+        StorageSenseCategories.Add(mockTempCard);
+
+        var mockDumpCard = new StorageSenseCategoryCardViewModel
+        {
+            CategoryId = "crash_dumps",
+            Title = "System Crash Dumps & Error Reports",
+            LocationDisplay = @"%LOCALAPPDATA%\CrashDumps",
+            Description = "Diagnostic memory dump files saved when programs crash unexpectedly. Safe to clean once resolved.",
+            FormattedSize = "680.0 MB",
+            SizeBytes = 680000000L,
+            CountSummary = "4 dump files",
+            Glyph = "\uE7BA",
+            GlyphColor = "#DC2626",
+            GlyphBg = "#FEF2F2",
+            IsSelected = true
+        };
+        StorageSenseCategories.Add(mockDumpCard);
+
+        var mockInstallersCard = new StorageSenseCategoryCardViewModel
+        {
+            CategoryId = "downloads_installers",
+            Title = "Downloaded Setup Packages & Archives",
+            LocationDisplay = @"C:\Users\Developer\Downloads",
+            Description = "Installation files (.exe, .msi, .iso) and archives. Kept unchecked by default to protect your downloads.",
+            FormattedSize = "3.1 GB",
+            SizeBytes = 3100000000L,
+            CountSummary = "14 setup packages",
+            Glyph = "\uE896",
+            GlyphColor = "#10B981",
+            GlyphBg = "#ECFDF5",
+            IsSelected = false
+        };
+        StorageSenseCategories.Add(mockInstallersCard);
+
+        var mockDupesCard = new StorageSenseCategoryCardViewModel
+        {
+            CategoryId = "duplicates",
+            Title = "Identical Duplicate Files",
+            LocationDisplay = "User Folders & Scanned Targets",
+            Description = "Redundant files with identical SHA-256 hashes. The original file is always preserved safely.",
+            FormattedSize = "240.0 MB",
+            SizeBytes = 240000000L,
+            CountSummary = "12 duplicate clusters",
+            Glyph = "\uE8C8",
+            GlyphColor = "#8B5CF6",
+            GlyphBg = "#F5F3FF",
+            IsSelected = false
+        };
+        StorageSenseCategories.Add(mockDupesCard);
+
+        CleanupTotalReclaimableText.Text = "7.68 GB";
+        CleanupTotalReclaimableSubText.Text = "344 items selected across recommendations ready for cleanup.";
+        ReviewAndCleanButton.Content = "Clean Selected (7.68 GB)...";
+
+        // 4. Mock Installed Applications
+        InstalledApps.Clear();
+        var mockAppList = new (string Name, string Pub, string Ver, string Size, long Bytes)[]
+        {
+            ("Visual Studio Code", "Microsoft Corporation", "1.94.2", "480.0 MB", 480000000L),
+            ("Docker Desktop", "Docker Inc.", "4.34.0", "3.8 GB", 3800000000L),
+            ("Blender 4.2 LTS", "Blender Foundation", "4.2.1", "850.0 MB", 850000000L),
+            ("Discord", "Discord Inc.", "1.0.9160", "210.0 MB", 210000000L),
+            ("Figma Desktop", "Figma Inc.", "124.3.1", "320.0 MB", 320000000L),
+            ("Git for Windows", "The Git Development Community", "2.46.0", "310.0 MB", 310000000L),
+            ("Node.js (LTS)", "OpenJS Foundation", "22.11.0", "140.0 MB", 140000000L),
+            ("Postman", "Postman Inc.", "11.14.0", "490.0 MB", 490000000L),
+            ("Spotify Music", "Spotify AB", "1.2.45", "195.0 MB", 195000000L),
+            ("7-Zip 24.08 (x64)", "Igor Pavlov", "24.08", "5.8 MB", 5800000L)
+        };
+        foreach (var app in mockAppList)
+        {
+            var raw = new InstalledApplicationInfo(
+                Id: app.Name.ToLowerInvariant().Replace(" ", "-"),
+                Name: app.Name,
+                Publisher: app.Pub,
+                Version: app.Ver,
+                InstallDate: "2026-10-15",
+                InstallLocation: @"C:\Program Files\" + app.Name,
+                UninstallString: @"C:\Program Files\" + app.Name + @"\unins000.exe",
+                QuietUninstallString: "",
+                EstimatedSizeBytes: app.Bytes,
+                Source: "Registry",
+                CanUninstall: true,
+                IsSystemComponent: false
+            );
+            InstalledApps.Add(new InstalledAppRowViewModel(
+                Id: raw.Id,
+                Name: raw.Name,
+                Publisher: raw.Publisher,
+                Version: raw.Version,
+                InstallDate: raw.InstallDate,
+                InstallLocation: raw.InstallLocation,
+                FormattedSize: app.Size,
+                UninstallString: raw.UninstallString,
+                CanUninstall: true,
+                RawModel: raw
+            ));
+        }
+        InstalledAppsCountText.Text = "Installed Applications (10)";
+        AppsEmptyStateBorder.Visibility = Visibility.Collapsed;
+        InstalledAppsListView.Visibility = Visibility.Visible;
+        UninstallSelectedAppButton.IsEnabled = false;
+
+        // 5. Mock Hardware Specifications
+        HwCpuTitleText.Text = "AMD Ryzen 9 7950X 16-Core Processor";
+        HwCpuSubText.Text = "16 Cores • 32 Threads • 4500 MHz • x64";
+        HwGpuTitleText.Text = "NVIDIA GeForce RTX 4090";
+        HwGpuSubText.Text = "24.0 GB VRAM • 3840 x 2160 @ 144 Hz";
+        HwRamTitleText.Text = "64.0 GB DDR5";
+        HwRamSubText.Text = "6000 MHz • 2 of 4 slots (42% used)";
+        HwOsTitleText.Text = "Microsoft Windows 11 Pro 64-bit";
+        HwOsSubText.Text = "Build 26100 • Up 3d 14h 22m";
+
+        HwCpuModelVal.Text = "AMD Ryzen 9 7950X 16-Core Processor";
+        HwCpuCoresVal.Text = "16 Physical Cores, 32 Logical Processors";
+        HwCpuClockVal.Text = "4500 MHz";
+        HwCpuSocketVal.Text = "Socket AM5 (LGA 1718)";
+        HwCpuCacheVal.Text = "16384 KB L2, 65536 KB L3 • Firmware virtualization enabled";
+
+        HwMoboMfgVal.Text = "ASUSTeK COMPUTER INC.";
+        HwMoboModelVal.Text = "ROG CROSSHAIR X670E HERO (v1.02)";
+        HwMoboSerialVal.Text = "ROG-MB-SAMPLE-MOCK";
+        HwBiosVerVal.Text = "American Megatrends Inc. 2401 (2024-08-15)";
+        HwSecureBootVal.Text = "Active / Enabled (UEFI)";
+
+        HardwareDisks.Clear();
+        HardwareDisks.Add(new PhysicalDiskSpecsInfo
+        {
+            Model = "Samsung SSD 990 PRO 2TB (NVMe)",
+            MediaType = "Fixed hard disk media",
+            SizeBytes = 2000398934016L,
+            FormattedSize = "1.82 TB",
+            InterfaceType = "NVMe",
+            Status = "Healthy"
+        });
+        HardwareDisks.Add(new PhysicalDiskSpecsInfo
+        {
+            Model = "WD_BLACK SN850X 4TB (NVMe)",
+            MediaType = "Fixed hard disk media",
+            SizeBytes = 4000797868032L,
+            FormattedSize = "3.64 TB",
+            InterfaceType = "NVMe",
+            Status = "Healthy"
+        });
+
+        HardwareMemoryModules.Clear();
+        HardwareMemoryModules.Add(new MemoryModuleInfo
+        {
+            BankLocator = "DIMM 1",
+            CapacityBytes = 34359738368L,
+            FormattedCapacity = "32.0 GB",
+            SpeedMHz = 6000,
+            Manufacturer = "Corsair",
+            PartNumber = "CMK64GX5M2B6000C30",
+            MemoryType = "DDR5"
+        });
+        HardwareMemoryModules.Add(new MemoryModuleInfo
+        {
+            BankLocator = "DIMM 2",
+            CapacityBytes = 34359738368L,
+            FormattedCapacity = "32.0 GB",
+            SpeedMHz = 6000,
+            Manufacturer = "Corsair",
+            PartNumber = "CMK64GX5M2B6000C30",
+            MemoryType = "DDR5"
+        });
+
+        HardwareGpus.Clear();
+        HardwareGpus.Add(new GpuSpecsInfo
+        {
+            Name = "NVIDIA GeForce RTX 4090",
+            DedicatedMemoryBytes = 25769803776L,
+            FormattedDedicatedMemory = "24.0 GB",
+            DriverVersion = "32.0.15.6603",
+            ResolutionAndRefreshRate = "3840 x 2160 @ 144 Hz",
+            IsPrimary = true
+        });
+        HardwareGpus.Add(new GpuSpecsInfo
+        {
+            Name = "AMD Radeon Graphics",
+            DedicatedMemoryBytes = 0L,
+            FormattedDedicatedMemory = "Shared Memory",
+            DriverVersion = "31.0.21925.1001",
+            ResolutionAndRefreshRate = "Inactive",
+            IsPrimary = false
+        });
+
+        HardwareNetworks.Clear();
+        HardwareNetworks.Add(new NetworkAdapterSpecsInfo
+        {
+            Name = "Intel(R) Ethernet Controller I225-V",
+            Status = "Connected",
+            SpeedBitsPerSecond = 2500000000L,
+            FormattedSpeed = "2500 Mbps",
+            MacAddress = "00:1A:2B:3C:4D:5E"
+        });
+        HardwareNetworks.Add(new NetworkAdapterSpecsInfo
+        {
+            Name = "Intel(R) Wi-Fi 6E AX210 160MHz",
+            Status = "Connected",
+            SpeedBitsPerSecond = 2400000000L,
+            FormattedSpeed = "2400 Mbps",
+            MacAddress = "00:1A:2B:3C:4D:5F"
+        });
+        HardwareProgressBar.Visibility = Visibility.Collapsed;
+
+        // 6. Mock Organize
+        OrganizeFolderBox.Text = @"D:\Downloads";
+        OrganizationPlanItems.Clear();
+        var mockOrg = new (string Name, string Dest, string Cat, string Size, long Bytes)[]
+        {
+            ("Q3_Financial_Summary.pdf", "Documents\\", "Documents", "2.4 MB", 2400000L),
+            ("Project_Architecture.png", "Images\\", "Images", "14.2 MB", 14200000L),
+            ("Sprint_Review_Recording.mp4", "Videos\\", "Videos", "480.0 MB", 480000000L),
+            ("dotnet-sdk-10.0-win-x64.exe", "Applications\\", "Executables", "210.0 MB", 210000000L),
+            ("Backup_Database_2026.zip", "Archives\\", "Archives", "1.25 GB", 1250000000L),
+            ("dataset_train.parquet", "Documents\\", "Documents", "42.1 MB", 42100000L)
+        };
+        foreach (var org in mockOrg)
+        {
+            OrganizationPlanItems.Add(new OrganizationPlanItemViewModel
+            {
+                FileName = org.Name,
+                OriginalPath = System.IO.Path.Combine(@"D:\Downloads", org.Name),
+                TargetSubfolder = org.Dest,
+                Category = org.Cat,
+                SizeBytes = org.Bytes,
+                FormattedSize = org.Size,
+                RuleBadge = "CATEGORY"
+            });
+        }
+        OrganizationEmptyStateBorder.Visibility = Visibility.Collapsed;
+        OrganizationHistoryListView.Visibility = Visibility.Visible;
+        OrganizationStatusText.Text = "Preview generated: 6 files will be organized into 5 subfolders.";
+
+        // 7. Navigation tab switch
+        if (!string.IsNullOrEmpty(startTab))
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            NavigateToTab(startTab);
+        }
+        else
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Visible;
+        }
+    }
+
 }
