@@ -182,7 +182,10 @@
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="14,7" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="14,5,14,6" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="UseSystemFocusVisuals" Value="True" />
                 <Setter Property="FocusVisualMargin" Value="-2" />
@@ -196,7 +199,26 @@
                 <Setter Property="FontWeight" Value="Medium" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="12,5,12,6" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="FocusVisualMargin" Value="-2" />
+            </Style>
+
+            <Style x:Key="GwCompactButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource GwCardBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource GwTextPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource GwCardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="FontWeight" Value="Medium" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="CornerRadius" Value="5" />
+                <Setter Property="MinHeight" Value="28" />
+                <Setter Property="Padding" Value="10,3,10,4" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="UseSystemFocusVisuals" Value="True" />
                 <Setter Property="FocusVisualMargin" Value="-2" />
             </Style>
@@ -207,7 +229,10 @@
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="12,5,12,6" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="UseSystemFocusVisuals" Value="True" />
                 <Setter Property="FocusVisualMargin" Value="-2" />
