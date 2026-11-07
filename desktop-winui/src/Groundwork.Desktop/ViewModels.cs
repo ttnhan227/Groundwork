@@ -461,6 +461,11 @@ public static class AppSettingsService
                 var settings = JsonSerializer.Deserialize<AppSettingsModel>(json);
                 if (settings != null)
                 {
+                    settings.GeminiApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Unprotect(settings.GeminiApiKey);
+                    settings.OpenAiApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Unprotect(settings.OpenAiApiKey);
+                    settings.MistralApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Unprotect(settings.MistralApiKey);
+                    settings.AnthropicApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Unprotect(settings.AnthropicApiKey);
+                    settings.CustomApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Unprotect(settings.CustomApiKey);
                     _cached = settings;
                     return settings;
                 }
@@ -479,7 +484,14 @@ public static class AppSettingsService
         try
         {
             Directory.CreateDirectory(SettingsDir);
-            string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+            var diskCopy = JsonSerializer.Deserialize<AppSettingsModel>(JsonSerializer.Serialize(settings)) ?? new AppSettingsModel();
+            diskCopy.GeminiApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Protect(settings.GeminiApiKey);
+            diskCopy.OpenAiApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Protect(settings.OpenAiApiKey);
+            diskCopy.MistralApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Protect(settings.MistralApiKey);
+            diskCopy.AnthropicApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Protect(settings.AnthropicApiKey);
+            diskCopy.CustomApiKey = Groundwork.Engine.Services.DpapiSecretProtector.Protect(settings.CustomApiKey);
+
+            string json = JsonSerializer.Serialize(diskCopy, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
         }
         catch { }
@@ -676,3 +688,137 @@ public sealed class HardwareDriverRowViewModel
     public string SignedStatus { get; set; } = "WHQL Signed";
     public string ClassIconGlyph { get; set; } = "\uE770";
 }
+
+public sealed class PowerPlanRowViewModel
+{
+    public string SchemeGuid { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public string ActiveBadge => IsActive ? "Active Scheme" : "Available";
+    public string BadgeBackground => IsActive ? "#DCFCE7" : "#F1F5F9";
+    public string BadgeForeground => IsActive ? "#15803D" : "#475569";
+    public string Description { get; set; } = string.Empty;
+    public string TradeoffSummary { get; set; } = string.Empty;
+    public bool CanActivate => !IsActive;
+}
+
+public sealed class StartupItemRowViewModel
+{
+    public string EntryId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Publisher { get; set; } = string.Empty;
+    public string CommandOrTarget { get; set; } = string.Empty;
+    public string ScopeDisplay { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; }
+    public string StatusBadge => IsEnabled ? "Enabled" : "Disabled";
+    public string StatusBackground => IsEnabled ? "#DCFCE7" : "#F1F5F9";
+    public string StatusForeground => IsEnabled ? "#15803D" : "#64748B";
+    public string ImpactAssessment { get; set; } = string.Empty;
+    public string ImpactReason { get; set; } = string.Empty;
+    public bool CanModify { get; set; }
+    public string ToggleButtonText => IsEnabled ? "Disable (Reversible)" : "Enable";
+}
+
+public sealed class ConfigurableSettingRowViewModel
+{
+    public string SettingId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string CurrentStateDisplay { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; }
+    public string RegistryLocation { get; set; } = string.Empty;
+    public string Explanation { get; set; } = string.Empty;
+    public string RecommendationNote { get; set; } = string.Empty;
+    public bool CanToggle { get; set; }
+    public string ToggleButtonText => IsEnabled ? "Disable Setting" : "Enable Setting";
+}
+
+public sealed class NetworkAdapterRowViewModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string OperationalStatus { get; set; } = string.Empty;
+    public string SpeedDisplay { get; set; } = string.Empty;
+    public string IpSummary { get; set; } = string.Empty;
+    public string GatewaySummary { get; set; } = string.Empty;
+    public string DnsSummary { get; set; } = string.Empty;
+}
+
+public sealed class EventLogRowViewModel
+{
+    public string TimeDisplay { get; set; } = string.Empty;
+    public string LogName { get; set; } = string.Empty;
+    public string LevelDisplay { get; set; } = string.Empty;
+    public string ProviderName { get; set; } = string.Empty;
+    public int EventId { get; set; }
+    public string EventHeader => $"[{LogName} • {LevelDisplay}] {ProviderName} (Event ID {EventId})";
+    public string MessageSummary { get; set; } = string.Empty;
+    public string PlainEnglishExplanation { get; set; } = string.Empty;
+}
+
+public sealed class ServiceRowViewModel
+{
+    public string ServiceName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string StartType { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string HealthNote { get; set; } = string.Empty;
+    public bool IsAbnormal { get; set; }
+    public string StatusSummary => $"{Status} • Startup: {StartType} ({Category})";
+}
+
+public sealed class ProcessRowViewModel
+{
+    public int ProcessId { get; set; }
+    public string ProcessName { get; set; } = string.Empty;
+    public string WorkingSetDisplay { get; set; } = string.Empty;
+    public string PrivateMemoryDisplay { get; set; } = string.Empty;
+    public string CpuTimeDisplay { get; set; } = string.Empty;
+    public int ThreadCount { get; set; }
+    public string StatusDisplay { get; set; } = string.Empty;
+    public string SummaryLine => $"PID {ProcessId} • RAM: {WorkingSetDisplay} (Private: {PrivateMemoryDisplay}) • CPU Time: {CpuTimeDisplay} • Threads: {ThreadCount} • {StatusDisplay}";
+}
+
+public sealed class InvestigationFindingRowViewModel
+{
+    public string CategoryBadge { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+    public string EvidenceAndConfidence { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+}
+
+public sealed class InvestigationRecommendationRowViewModel
+{
+    public string RecommendationId { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Explanation { get; set; } = string.Empty;
+    public string SafetyBadge { get; set; } = string.Empty;
+    public string ActionButtonText { get; set; } = "Execute Action...";
+    public string TargetTab { get; set; } = "Optimize";
+    public string? AssociatedToolName { get; set; }
+    public IReadOnlyDictionary<string, string>? ToolArguments { get; set; }
+}
+
+public sealed class OverviewAdvisoryRowViewModel
+{
+    public string CategoryBadge { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+}
+
+public sealed class OperationHistoryRowViewModel
+{
+    public string ExecutionId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string TargetDescription { get; set; } = string.Empty;
+    public string StatusMessage { get; set; } = string.Empty;
+    public string VerificationSummary { get; set; } = string.Empty;
+    public string ExecutedAtDisplay { get; set; } = string.Empty;
+    public string StatusBadge { get; set; } = string.Empty;
+    public bool CanRollback { get; set; }
+    public Visibility RollbackButtonVisibility => CanRollback ? Visibility.Visible : Visibility.Collapsed;
+}
+

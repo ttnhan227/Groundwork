@@ -680,7 +680,15 @@ public sealed class HardwareSpecsEngineService
                     _ => "Available"
                 };
 
-                string formattedSpeed = speed > 0 ? $"{speed / 1_000_000.0:F0} Mbps" : "Auto-Negotiate";
+                bool hasValidLinkSpeed = connStatus == 2 && speed > 0 && speed <= 1_000_000_000_000L;
+                if (!hasValidLinkSpeed)
+                {
+                    speed = 0;
+                }
+
+                string formattedSpeed = hasValidLinkSpeed
+                    ? $"{speed / 1_000_000.0:F0} Mbps"
+                    : (connStatus == 2 ? "Auto-Negotiate" : "No Active Link");
 
                 if (mask && mac.Length > 6)
                 {
