@@ -27,6 +27,13 @@ public sealed partial class MainWindow : Window
     private readonly SafeCleanupService _cleanupService = new();
     private readonly InstalledAppsEngineService _installedAppsEngine = new();
     private readonly HardwareSpecsEngineService _hardwareEngine = new();
+    private readonly SafeOperationEngine _safeOperationEngine;
+    private readonly WindowsOptimizationService _optimizationService;
+    private readonly DiagnosticsAndTroubleshootingService _troubleshootingService;
+    private readonly FileOrganizerService _fileOrganizerService;
+    private readonly ToolRegistryService _toolRegistry;
+    private readonly InvestigationEngineService _investigationEngine;
+    private readonly AgentPlannerService _agentPlanner;
     private readonly List<(string User, string Assistant)> _agentConversation = new();
 
     private CancellationTokenSource? _scanCts;
@@ -39,6 +46,7 @@ public sealed partial class MainWindow : Window
     private int _leftoverScanGeneration;
     private AppSettingsModel _settings = new();
     private HardwareSystemReport? _lastHardwareReport;
+    private InvestigationReport? _lastInvestigationReport;
     private bool _isMockMode;
 
     public ObservableCollection<VolumeRowViewModel> Volumes { get; } = new();
@@ -59,10 +67,37 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<NetworkAdapterSpecsInfo> HardwareNetworks { get; } = new();
     public ObservableCollection<HardwareDriverRowViewModel> HardwareDrivers { get; } = new();
     public ObservableCollection<OrganizationPlanItemViewModel> OrganizationPlanItems { get; } = new();
+    public ObservableCollection<OperationHistoryRowViewModel> OperationHistoryRows { get; } = new();
+    public ObservableCollection<ProcessRowViewModel> OverviewTopProcesses { get; } = new();
+    public ObservableCollection<OverviewAdvisoryRowViewModel> OverviewAdvisories { get; } = new();
+    public ObservableCollection<PowerPlanRowViewModel> OptimizePowerPlans { get; } = new();
+    public ObservableCollection<StartupItemRowViewModel> OptimizeStartupItems { get; } = new();
+    public ObservableCollection<ConfigurableSettingRowViewModel> OptimizeSettings { get; } = new();
+    public ObservableCollection<InvestigationFindingRowViewModel> InvestigationConfirmedFindings { get; } = new();
+    public ObservableCollection<InvestigationFindingRowViewModel> InvestigationCauseFindings { get; } = new();
+    public ObservableCollection<InvestigationRecommendationRowViewModel> InvestigationRecommendations { get; } = new();
+    public ObservableCollection<NetworkAdapterRowViewModel> TroubleshootNetworkAdapters { get; } = new();
+    public ObservableCollection<EventLogRowViewModel> TroubleshootEventLogs { get; } = new();
+    public ObservableCollection<ServiceRowViewModel> TroubleshootServices { get; } = new();
     public ItemMetadataViewModel SelectedMetadata { get; } = new();
 
     public MainWindow()
     {
+        _safeOperationEngine = new SafeOperationEngine();
+        _optimizationService = new WindowsOptimizationService(_safeOperationEngine);
+        _troubleshootingService = new DiagnosticsAndTroubleshootingService(_safeOperationEngine);
+        _fileOrganizerService = new FileOrganizerService(_safeOperationEngine);
+        _toolRegistry = new ToolRegistryService(
+            _hardwareEngine,
+            _driveDiscovery,
+            _cleanupService,
+            _installedAppsEngine,
+            _optimizationService,
+            _troubleshootingService,
+            _fileOrganizerService);
+        _investigationEngine = new InvestigationEngineService(_toolRegistry);
+        _agentPlanner = new AgentPlannerService(_investigationEngine, _toolRegistry);
+
         this.InitializeComponent();
         SetAppIconAndTitle();
 
@@ -82,6 +117,18 @@ public sealed partial class MainWindow : Window
         HardwareNetworkListView.ItemsSource = HardwareNetworks;
         HardwareDriversListView.ItemsSource = HardwareDrivers;
         OrganizationHistoryListView.ItemsSource = OrganizationPlanItems;
+        OperationHistoryLedgerListView.ItemsSource = OperationHistoryRows;
+        OverviewTopProcessesListView.ItemsSource = OverviewTopProcesses;
+        OverviewAdvisoriesListView.ItemsSource = OverviewAdvisories;
+        OptimizePowerPlansListView.ItemsSource = OptimizePowerPlans;
+        OptimizeStartupItemsListView.ItemsSource = OptimizeStartupItems;
+        OptimizeSettingsListView.ItemsSource = OptimizeSettings;
+        InvestigationConfirmedListView.ItemsSource = InvestigationConfirmedFindings;
+        InvestigationCausesListView.ItemsSource = InvestigationCauseFindings;
+        InvestigationRecommendationsListView.ItemsSource = InvestigationRecommendations;
+        NetworkAdaptersListView.ItemsSource = TroubleshootNetworkAdapters;
+        EventLogListView.ItemsSource = TroubleshootEventLogs;
+        WindowsServicesListView.ItemsSource = TroubleshootServices;
 
         InitializeStartupState();
     }
@@ -142,7 +189,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            this.Title = "Groundwork — Storage & Cleanup";
+            this.Title = "Groundwork — Windows System Management & Diagnostics Toolkit";
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
             var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
@@ -225,27 +272,39 @@ public sealed partial class MainWindow : Window
             switch (e.Key)
             {
                 case Windows.System.VirtualKey.Number1:
-                    NavigateToTab("Storage");
+                    NavigateToTab("Overview");
                     e.Handled = true;
                     return;
                 case Windows.System.VirtualKey.Number2:
-                    NavigateToTab("Cleanup");
+                    NavigateToTab("Storage");
                     e.Handled = true;
                     return;
                 case Windows.System.VirtualKey.Number3:
-                    NavigateToTab("Apps");
-                    e.Handled = true;
-                    return;
-                case Windows.System.VirtualKey.Number4:
                     NavigateToTab("Hardware");
                     e.Handled = true;
                     return;
+                case Windows.System.VirtualKey.Number4:
+                    NavigateToTab("Optimize");
+                    e.Handled = true;
+                    return;
                 case Windows.System.VirtualKey.Number5:
-                    NavigateToTab("Agent");
+                    NavigateToTab("Troubleshoot");
                     e.Handled = true;
                     return;
                 case Windows.System.VirtualKey.Number6:
+                    NavigateToTab("Cleanup");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number7:
                     NavigateToTab("Organize");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number8:
+                    NavigateToTab("Apps");
+                    e.Handled = true;
+                    return;
+                case Windows.System.VirtualKey.Number9:
+                    NavigateToTab("Agent");
                     e.Handled = true;
                     return;
                 case (Windows.System.VirtualKey)188: // Comma
@@ -268,13 +327,23 @@ public sealed partial class MainWindow : Window
                         AssistantQuestionBox.Focus(FocusState.Keyboard);
                         e.Handled = true;
                     }
+                    else if (OverviewPanel.Visibility == Visibility.Visible)
+                    {
+                        OverviewAgentQueryBox.Focus(FocusState.Keyboard);
+                        e.Handled = true;
+                    }
                     return;
             }
         }
 
         if (e.Key == Windows.System.VirtualKey.F5)
         {
-            if (StoragePanel.Visibility == Visibility.Visible)
+            if (OverviewPanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshOverviewClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (StoragePanel.Visibility == Visibility.Visible)
             {
                 OnRefreshDrivesClick(this, new RoutedEventArgs());
                 e.Handled = true;
@@ -294,12 +363,27 @@ public sealed partial class MainWindow : Window
                 OnRefreshHardwareClick(this, new RoutedEventArgs());
                 e.Handled = true;
             }
+            else if (OptimizePanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshOptimizeClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (TroubleshootPanel.Visibility == Visibility.Visible)
+            {
+                OnRefreshTroubleshootClick(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
             else if (OrganizePanel.Visibility == Visibility.Visible)
             {
                 OnRefreshOrganizationHistoryClick(this, new RoutedEventArgs());
                 e.Handled = true;
             }
         }
+    }
+
+    private void OnOpenDriveModalClick(object sender, RoutedEventArgs e)
+    {
+        StartupDriveModalOverlay.Visibility = Visibility.Visible;
     }
 
     private void OnModalBackdropPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -327,16 +411,23 @@ public sealed partial class MainWindow : Window
             ApplyLoadedSettings();
             RefreshDrivesList();
             
-            // Pop up the drive selection modal immediately on every launch unless tab flag specified
             string[] cmdArgs = Environment.GetCommandLineArgs();
             string? startTab = cmdArgs.FirstOrDefault(a => a.StartsWith("--tab=", StringComparison.OrdinalIgnoreCase))?.Substring(6);
             string? autoScanPath = cmdArgs.FirstOrDefault(a => a.StartsWith("--scan=", StringComparison.OrdinalIgnoreCase))?.Substring(7);
             string? autoOrganizePath = cmdArgs.FirstOrDefault(a => a.StartsWith("--organize=", StringComparison.OrdinalIgnoreCase))?.Substring(11);
+            string? captureUiDir = cmdArgs.FirstOrDefault(a => a.StartsWith("--capture-ui=", StringComparison.OrdinalIgnoreCase))?.Substring(13);
 
             bool isMock = cmdArgs.Any(a => string.Equals(a, "--mock", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--demo", StringComparison.OrdinalIgnoreCase));
             if (isMock)
             {
                 ApplyMockDataForScreenshots(startTab);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(captureUiDir))
+            {
+                StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+                DispatcherQueue.TryEnqueue(async () => await RunUiVerificationCaptureAsync(captureUiDir));
                 return;
             }
 
@@ -367,7 +458,8 @@ public sealed partial class MainWindow : Window
             }
             else
             {
-                StartupDriveModalOverlay.Visibility = Visibility.Visible;
+                StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+                DispatcherQueue.TryEnqueue(() => NavigateToTab("Overview"));
             }
 
             // Pre-load installed apps in background so it never blocks startup or drive selection
@@ -498,29 +590,53 @@ public sealed partial class MainWindow : Window
             SaveSettingsFromUi();
         }
 
-        if (StoragePanel != null) StoragePanel.Visibility = string.Equals(tag, "Storage", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
-        if (CleanupPanel != null) CleanupPanel.Visibility = string.Equals(tag, "Cleanup", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
-        if (AppsPanel != null) AppsPanel.Visibility = string.Equals(tag, "Apps", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+        if (OverviewPanel != null) OverviewPanel.Visibility = string.Equals(tag, "Overview", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+        if (StoragePanel != null) StoragePanel.Visibility = (string.Equals(tag, "Storage", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Analyze", StringComparison.OrdinalIgnoreCase)) ? Visibility.Visible : Visibility.Collapsed;
+        if (CleanupPanel != null) CleanupPanel.Visibility = (string.Equals(tag, "Cleanup", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Maintenance", StringComparison.OrdinalIgnoreCase)) ? Visibility.Visible : Visibility.Collapsed;
+        if (AppsPanel != null) AppsPanel.Visibility = (string.Equals(tag, "Apps", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Applications", StringComparison.OrdinalIgnoreCase)) ? Visibility.Visible : Visibility.Collapsed;
         if (HardwarePanel != null) HardwarePanel.Visibility = string.Equals(tag, "Hardware", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+        if (OptimizePanel != null) OptimizePanel.Visibility = string.Equals(tag, "Optimize", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+        if (TroubleshootPanel != null) TroubleshootPanel.Visibility = string.Equals(tag, "Troubleshoot", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         if (AssistantPanel != null) AssistantPanel.Visibility = (string.Equals(tag, "Agent", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Assistant", StringComparison.OrdinalIgnoreCase)) ? Visibility.Visible : Visibility.Collapsed;
         if (OrganizePanel != null) OrganizePanel.Visibility = string.Equals(tag, "Organize", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         if (SettingsPanel != null) SettingsPanel.Visibility = string.Equals(tag, "Settings", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
 
         if (_isMockMode) return;
 
-        if (string.Equals(tag, "Hardware", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(tag, "Overview", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = LoadOverviewDashboardAsync();
+        }
+        else if (string.Equals(tag, "Hardware", StringComparison.OrdinalIgnoreCase))
         {
             _ = LoadHardwareSpecsAsync();
         }
-
-        if (string.Equals(tag, "Agent", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Assistant", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(tag, "Optimize", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = LoadOptimizeStateAsync();
+        }
+        else if (string.Equals(tag, "Troubleshoot", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = LoadTroubleshootStateAsync();
+        }
+        else if (string.Equals(tag, "Organize", StringComparison.OrdinalIgnoreCase))
+        {
+            RefreshOperationHistoryLedger();
+        }
+        else if (string.Equals(tag, "Agent", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Assistant", StringComparison.OrdinalIgnoreCase))
         {
             UpdateAgentViewMode();
         }
-
-        if (string.Equals(tag, "Cleanup", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(tag, "Cleanup", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Maintenance", StringComparison.OrdinalIgnoreCase))
         {
             _ = PreloadCleanupDiagnosticsAsync();
+        }
+        else if (string.Equals(tag, "Apps", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Applications", StringComparison.OrdinalIgnoreCase))
+        {
+            if (InstalledApps.Count == 0)
+            {
+                OnRefreshInstalledAppsClick(this, new RoutedEventArgs());
+            }
         }
     }
 
@@ -3302,7 +3418,7 @@ public sealed partial class MainWindow : Window
                 continue;
             }
 
-            if (line.StartsWith("## ") || line.StartsWith("### "))
+            if (line.StartsWith("## ") || line.StartsWith("### ") || line.StartsWith("#### "))
             {
                 var p = new Paragraph { Margin = new Thickness(0, 8, 0, 4) };
                 var bold = new Bold();
@@ -3461,23 +3577,31 @@ public sealed partial class MainWindow : Window
 
     private void NavigateToTab(string tag)
     {
-        string lookupTag = tag;
+        string panelTag = tag;
         if (string.Equals(tag, "Assistant", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Search", StringComparison.OrdinalIgnoreCase))
         {
-            lookupTag = "Agent";
+            panelTag = "Agent";
         }
+
+        string navTag = panelTag switch
+        {
+            "Hardware" or "Analyze" => "Storage",
+            "Organize" or "Maintenance" => "Cleanup",
+            "Applications" => "Apps",
+            _ => panelTag
+        };
 
         var target = TopCommandNav.MenuItems.OfType<NavigationViewItem>()
             .Concat(TopCommandNav.FooterMenuItems.OfType<NavigationViewItem>())
-            .FirstOrDefault(item => string.Equals(item.Tag as string, lookupTag, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(item => string.Equals(item.Tag as string, navTag, StringComparison.OrdinalIgnoreCase));
 
-        if (target != null)
+        if (target != null && !ReferenceEquals(TopCommandNav.SelectedItem, target))
         {
             TopCommandNav.SelectedItem = target;
         }
 
-        // Direct fallback to ensure panel switches even if navigation item is custom or in footer
-        SwitchToPanel(lookupTag);
+        // Direct fallback to ensure the exact requested sub-panel switches
+        SwitchToPanel(panelTag);
     }
 
     private static string NormalizeOrdinals(string text)
@@ -3658,11 +3782,11 @@ public sealed partial class MainWindow : Window
         if (AgentProviderSetupRequiredGrid == null || AgentActiveContentPanel == null) return;
 
         bool isConfigured = IsAiProviderConfigured();
+        AgentProviderSetupRequiredGrid.Visibility = Visibility.Collapsed;
+        AgentActiveContentPanel.Visibility = Visibility.Visible;
+
         if (isConfigured)
         {
-            AgentProviderSetupRequiredGrid.Visibility = Visibility.Collapsed;
-            AgentActiveContentPanel.Visibility = Visibility.Visible;
-
             string badge = _settings.AiProvider.ToLowerInvariant() switch
             {
                 "ollama" => $"Local Ollama ({_settings.OllamaModel})",
@@ -3677,9 +3801,7 @@ public sealed partial class MainWindow : Window
         }
         else
         {
-            AgentProviderSetupRequiredGrid.Visibility = Visibility.Visible;
-            AgentActiveContentPanel.Visibility = Visibility.Collapsed;
-            AssistantProviderBadge.Text = "Setup Required";
+            AssistantProviderBadge.Text = "Local Diagnostic Agent (Tool-Driven)";
         }
     }
 
@@ -4266,11 +4388,8 @@ public sealed partial class MainWindow : Window
         string question = AssistantQuestionBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
 
-        if (!IsAiProviderConfigured())
-        {
-            UpdateAgentViewMode();
-            return;
-        }
+        bool providerConfigured = IsAiProviderConfigured();
+        UpdateAgentViewMode();
 
         AssistantStandbyGrid.Visibility = Visibility.Collapsed;
         AssistantResultsGrid.Visibility = Visibility.Visible;
@@ -4280,35 +4399,88 @@ public sealed partial class MainWindow : Window
         AssistantRecommendations.Clear();
 
         AssistantTargetKpiIcon.Glyph = "\uE946";
-        AssistantTargetKpiTitle.Text = "AI Provider";
-        AssistantTargetKpiValue.Text = _settings.AiProvider.ToUpperInvariant();
-        AssistantTargetKpiSub.Text = "Running inference...";
+        AssistantTargetKpiTitle.Text = "Investigation Type";
+        AssistantTargetKpiValue.Text = "Planning...";
+        AssistantTargetKpiSub.Text = providerConfigured ? $"Engine: {_settings.AiProvider.ToUpperInvariant()}" : "Engine: Local Diagnostic Tools";
 
-        AssistantWasteKpiIcon.Glyph = "\uEDA2";
-        AssistantWasteKpiTitle.Text = "Active Target";
-        AssistantWasteKpiValue.Text = _lastScanResult != null ? _lastScanResult.RootPath : (Volumes.Count > 0 ? Volumes[0].RootPath : "C:\\");
-        AssistantWasteKpiSub.Text = _lastScanResult != null ? ByteFormatter.FormatBytes(_lastScanResult.TotalLogicalBytes) : "Drive ready";
+        AssistantWasteKpiIcon.Glyph = "\uE90F";
+        AssistantWasteKpiTitle.Text = "Executed Tools";
+        AssistantWasteKpiValue.Text = "Inspecting...";
+        AssistantWasteKpiSub.Text = "Querying ToolRegistryService";
 
-        AssistantAppKpiIcon.Glyph = "\uE71D";
-        AssistantAppKpiTitle.Text = "Applications";
-        AssistantAppKpiValue.Text = $"{_allInstalledApps.Count:N0} Apps";
-        AssistantAppKpiSub.Text = "Windows Registry";
+        AssistantAppKpiIcon.Glyph = "\uE72E";
+        AssistantAppKpiTitle.Text = "Findings & Safety";
+        AssistantAppKpiValue.Text = "Verifying...";
+        AssistantAppKpiSub.Text = "10-Step Safe Operation Engine";
 
-        _lastAssistantAnswer = "Analyzing system telemetry, storage, and runtime context...";
+        _lastAssistantAnswer = "Executing registered diagnostic tools and analyzing live system telemetry...";
         RenderFormattedAgentResponse(_lastAssistantAnswer);
-        AssistantItemsCountLabel.Text = "Contacting model...";
+        AssistantItemsCountLabel.Text = "Running investigation...";
         AssistantAnalyzeButton.IsEnabled = false;
         AssistantCancelButton.Visibility = Visibility.Visible;
 
         try
         {
+            _agentCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            var token = _agentCts.Token;
+
+            // Step 1: Always run the deterministic AgentPlanner & ToolRegistry investigation
+            var plannedTurn = await Task.Run(() => _agentPlanner.PlanAndInvestigateUserRequestAsync(question, token), token);
+            _lastInvestigationReport = plannedTurn.InvestigationReport;
+
+            AssistantTargetKpiValue.Text = $"{plannedTurn.SelectedInvestigationType}";
+            AssistantTargetKpiSub.Text = providerConfigured ? $"Completed • {_settings.AiProvider}" : "Completed • Local Tool Engine";
+
+            AssistantWasteKpiValue.Text = $"{plannedTurn.InvestigationReport.ExecutedTools.Count} Tool(s)";
+            AssistantWasteKpiSub.Text = string.Join(", ", plannedTurn.InvestigationReport.ExecutedTools);
+
+            AssistantAppKpiValue.Text = $"{plannedTurn.InvestigationReport.ConfirmedObservations.Count} Confirmed";
+            AssistantAppKpiSub.Text = $"{plannedTurn.InvestigationReport.RecommendedActions.Count} recommended action(s)";
+
+            _lastAgentPendingProposal = plannedTurn.PendingApprovalProposals.FirstOrDefault();
+            if (_lastAgentPendingProposal is not null)
+            {
+                AgentPendingApprovalBorder.Visibility = Visibility.Visible;
+                AgentPendingApprovalText.Text = _lastAgentPendingProposal.PrerequisitesMet
+                    ? $"{_lastAgentPendingProposal.DisplayName} ({_lastAgentPendingProposal.ReversibilityDisplay} • {_lastAgentPendingProposal.RiskDisplay}): {_lastAgentPendingProposal.ProposedChangeExplanation}"
+                    : $"{_lastAgentPendingProposal.DisplayName} ({_lastAgentPendingProposal.ReversibilityDisplay} • {_lastAgentPendingProposal.RiskDisplay}): {_lastAgentPendingProposal.ProposedChangeExplanation} [Prerequisite: {_lastAgentPendingProposal.PrerequisiteFailureReason}]";
+                ApprovePendingAgentProposalButton.IsEnabled = _lastAgentPendingProposal.PrerequisitesMet;
+            }
+            else
+            {
+                AgentPendingApprovalBorder.Visibility = Visibility.Collapsed;
+            }
+
+            foreach (var rec in plannedTurn.InvestigationReport.RecommendedActions)
+            {
+                AssistantRecommendations.Add(new AssistantRecommendationViewModel
+                {
+                    IconGlyph = "\uE945",
+                    IconColor = IsLightMode() ? "#2563EB" : "#6F91FF",
+                    Title = rec.Title,
+                    Description = $"{rec.Explanation} [{rec.SafetyBadge}]",
+                    ActionButtonText = "Open Troubleshoot / Optimize",
+                    ActionTag = plannedTurn.SelectedInvestigationType is InvestigationType.Startup or InvestigationType.Performance ? "Optimize" : "Troubleshoot"
+                });
+            }
+
+            // Immediately render the grounded deterministic investigation report so the user has instant telemetry feedback
+            _lastAssistantAnswer = plannedTurn.DeterministicMarkdownResponse;
+            RenderFormattedAgentResponse(_lastAssistantAnswer);
+            await ExtractActionablePathsFromResponseAsync(_lastAssistantAnswer, question);
+
+            if (!providerConfigured)
+            {
+                return;
+            }
+
             HardwareSystemReport? agentReport = _lastHardwareReport;
             string? collectionWarning = null;
             if (agentReport == null || DateTime.UtcNow - agentReport.ReportGeneratedUtc.ToUniversalTime() > TimeSpan.FromMinutes(5))
             {
                 try
                 {
-                    agentReport = await _hardwareEngine.GetHardwareReportAsync(maskSensitiveData: _settings.MaskHardwareSerials);
+                    agentReport = await _hardwareEngine.GetHardwareReportAsync(maskSensitiveData: _settings.MaskHardwareSerials, ct: token);
                     _lastHardwareReport = agentReport;
                     AgentLocalStateService.SaveInventory(agentReport);
                 }
@@ -4319,9 +4491,8 @@ public sealed partial class MainWindow : Window
             }
 
             var currentVolumes = _driveDiscovery.DiscoverVolumes();
-            string systemContext = BuildAgentGroundingContext(question, agentReport, currentVolumes, collectionWarning);
-            _agentCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-            var token = _agentCts.Token;
+            string systemContext = BuildAgentGroundingContext(question, agentReport, currentVolumes, collectionWarning)
+                + "\n\n" + plannedTurn.GroundedLlmEvidencePrompt;
             string answer = string.Empty;
 
             // Hard gate: small models ignore the prompt rule, so never call the model for requirement questions without web search.
@@ -4363,7 +4534,8 @@ public sealed partial class MainWindow : Window
                     answer = await CallCustomAsync(question, systemContext, token);
                     break;
                 default:
-                    throw new InvalidOperationException($"Unsupported provider: {_settings.AiProvider}");
+                    answer = plannedTurn.DeterministicMarkdownResponse;
+                    break;
             }
 
             _lastAssistantAnswer = answer;
@@ -4374,6 +4546,20 @@ public sealed partial class MainWindow : Window
                 AgentLocalStateService.SaveConversation(_agentConversation.Select(turn => new AgentConversationTurn(turn.User, turn.Assistant)));
             }
             RenderFormattedAgentResponse(answer);
+            _lastAgentPendingProposal = plannedTurn.PendingApprovalProposals.FirstOrDefault();
+            if (_lastAgentPendingProposal is not null)
+            {
+                AgentPendingApprovalBorder.Visibility = Visibility.Visible;
+                AgentPendingApprovalText.Text = _lastAgentPendingProposal.PrerequisitesMet
+                    ? $"{_lastAgentPendingProposal.DisplayName} ({_lastAgentPendingProposal.ReversibilityDisplay} • {_lastAgentPendingProposal.RiskDisplay}): {_lastAgentPendingProposal.ProposedChangeExplanation}"
+                    : $"{_lastAgentPendingProposal.DisplayName} ({_lastAgentPendingProposal.ReversibilityDisplay} • {_lastAgentPendingProposal.RiskDisplay}): {_lastAgentPendingProposal.ProposedChangeExplanation} [Prerequisite: {_lastAgentPendingProposal.PrerequisiteFailureReason}]";
+                ApprovePendingAgentProposalButton.IsEnabled = _lastAgentPendingProposal.PrerequisitesMet;
+            }
+            else
+            {
+                AgentPendingApprovalBorder.Visibility = Visibility.Collapsed;
+            }
+
             AssistantTargetKpiValue.Text = "Completed";
             AssistantTargetKpiSub.Text = _settings.AiProvider.ToLowerInvariant() switch
             {
@@ -4390,6 +4576,15 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (_lastInvestigationReport != null && !string.IsNullOrWhiteSpace(_lastAssistantAnswer) &&
+                !_lastAssistantAnswer.StartsWith("Executing registered diagnostic tools", StringComparison.OrdinalIgnoreCase))
+            {
+                AssistantTargetKpiSub.Text = "Completed • Local Tool Fallback";
+                _lastAssistantAnswer += $"\n\n*Note: Optional external AI provider ({_settings.AiProvider}) was unreachable ({ex.GetType().Name}), so the verified local Groundwork diagnostic investigation report is displayed above.*";
+                RenderFormattedAgentResponse(_lastAssistantAnswer);
+                return;
+            }
+
             AssistantTargetKpiIcon.Glyph = "\uE7BA";
             AssistantTargetKpiTitle.Text = "Provider Status";
             AssistantTargetKpiValue.Text = "Inference Failed";
@@ -4444,7 +4639,7 @@ public sealed partial class MainWindow : Window
     }
 
     // ==========================================
-    // 6. FILE ORGANIZATION
+    // 6. FILE ORGANIZATION & SAFE OPERATION LEDGER
     // ==========================================
 
     private async void OnPreviewOrganizeClick(object sender, RoutedEventArgs e)
@@ -4468,7 +4663,7 @@ public sealed partial class MainWindow : Window
                 foreach (var file in di.EnumerateFiles("*", SearchOption.TopDirectoryOnly))
                 {
                     string ext = file.Extension.ToLowerInvariant();
-                    string category = GetFileTypeDescription(ext);
+                    string category = FileOrganizerService.ClassifyExtension(ext) ?? GetFileTypeDescription(ext);
                     string targetSubfolder = ruleType switch
                     {
                         "date" => file.LastWriteTime.ToString("yyyy-MM (MMMM yyyy)"),
@@ -4501,6 +4696,7 @@ public sealed partial class MainWindow : Window
             OrganizationStatusText.Text = hasItems
                 ? $"Preview generated: {OrganizationPlanItems.Count:N0} files will be organized into {OrganizationPlanItems.Select(p => p.TargetSubfolder).Distinct().Count()} subfolders."
                 : $"Target folder contains 0 top-level files to organize.";
+            RefreshOperationHistoryLedger();
         }
         catch (Exception ex)
         {
@@ -4508,9 +4704,857 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnExecuteOrganizeClick(object sender, RoutedEventArgs e)
+    {
+        string path = OrganizeFolderBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        {
+            await ShowDialogAsync("Invalid Folder", "Please enter a valid folder path first.");
+            return;
+        }
+
+        var proposal = _fileOrganizerService.ProposeOrganizeFolder(path);
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Organize Folder", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        bool approved = await ConfirmSafeOperationProposalAsync(proposal);
+        if (!approved)
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        OrganizationStatusText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        FooterStatusText.Text = record.StatusMessage;
+        OnPreviewOrganizeClick(sender, e);
+        RefreshOperationHistoryLedger();
+    }
+
     private void OnRefreshOrganizationHistoryClick(object sender, RoutedEventArgs e)
     {
-        OrganizationStatusText.Text = "Organization undo history refreshed.";
+        RefreshOperationHistoryLedger();
+        OrganizationStatusText.Text = $"Operation history refreshed ({OperationHistoryRows.Count} record(s) in ledger).";
+    }
+
+    private void OnRefreshOperationHistoryClick(object sender, RoutedEventArgs e)
+    {
+        RefreshOperationHistoryLedger();
+    }
+
+    private void RefreshOperationHistoryLedger()
+    {
+        if (OperationHistoryLedgerListView == null) return;
+
+        var records = _safeOperationEngine.History.LoadRecords();
+        OperationHistoryRows.Clear();
+        foreach (var r in records)
+        {
+            OperationHistoryRows.Add(new OperationHistoryRowViewModel
+            {
+                ExecutionId = r.ExecutionId,
+                DisplayName = r.DisplayName,
+                Category = r.Category,
+                TargetDescription = r.TargetDescription,
+                StatusMessage = r.StatusMessage,
+                VerificationSummary = r.IsRolledBack
+                    ? $"Rolled back: {r.RollbackStatusMessage}"
+                    : $"Verification: {r.Verification.ObservedStateSummary}",
+                ExecutedAtDisplay = r.ExecutedAtDisplay,
+                StatusBadge = r.StatusBadge,
+                CanRollback = r.CanRollback && !r.IsRolledBack
+            });
+        }
+
+        if (OperationHistorySummaryText != null)
+        {
+            OperationHistorySummaryText.Text = records.Count == 0
+                ? "No modifying operations have been executed yet. All reversible changes appear here with one-click Undo."
+                : $"Showing {records.Count} recorded system operation(s). Reversible operations can be rolled back below.";
+        }
+    }
+
+    private async void OnRollbackOperationClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string executionId || string.IsNullOrWhiteSpace(executionId))
+        {
+            return;
+        }
+
+        var result = await _safeOperationEngine.RollbackOperationAsync(executionId);
+        FooterStatusText.Text = result.StatusMessage;
+        OrganizationStatusText.Text = result.StatusMessage;
+        RefreshOperationHistoryLedger();
+
+        if (OptimizePanel.Visibility == Visibility.Visible)
+        {
+            await LoadOptimizeStateAsync();
+        }
+        await ShowDialogAsync(result.Succeeded ? "Rollback Verified" : "Rollback Notice", $"{result.StatusMessage}\n\n{result.Verification.VerificationDetails}");
+    }
+
+    private async Task<bool> ConfirmSafeOperationProposalAsync(OperationProposal proposal)
+    {
+        if (!_settings.ConfirmBeforeDelete)
+        {
+            return true;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Operation Type: {proposal.OperationTypeId} ({proposal.Category})");
+        sb.AppendLine($"Target: {proposal.TargetDescription}");
+        sb.AppendLine($"Inspected Current State: {proposal.InspectedCurrentStateSummary}");
+        sb.AppendLine();
+        sb.AppendLine($"Proposed Change & Expected Effect:");
+        sb.AppendLine(proposal.ProposedChangeExplanation);
+        sb.AppendLine();
+        sb.AppendLine($"Safety Profile: {proposal.ReversibilityDisplay} • {proposal.RiskDisplay} • {proposal.ElevationRequirement}");
+        if (proposal.PotentialRisks.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Risks, Trade-Offs & Rollback Notes:");
+            foreach (var r in proposal.PotentialRisks)
+            {
+                sb.AppendLine($"• {r}");
+            }
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = $"Safe Operation Approval — {proposal.DisplayName}",
+            Content = sb.ToString(),
+            PrimaryButtonText = "Approve & Execute",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        return result == ContentDialogResult.Primary;
+    }
+
+    // ==========================================
+    // MODULE A: OVERVIEW DASHBOARD
+    // ==========================================
+
+    private async void OnRefreshOverviewClick(object sender, RoutedEventArgs e)
+    {
+        await LoadOverviewDashboardAsync(forceHardware: true);
+    }
+
+    private void OnOverviewOpenLedgerClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToTab("Organize");
+    }
+
+    private void OnOverviewAgentQueryBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Enter)
+        {
+            OnOverviewAskAgentClick(sender, new RoutedEventArgs());
+            e.Handled = true;
+        }
+    }
+
+    private void OnOverviewAskAgentClick(object sender, RoutedEventArgs e)
+    {
+        string query = OverviewAgentQueryBox.Text.Trim();
+        NavigateToTab("Agent");
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            AssistantQuestionBox.Text = query;
+            OnAskOperatorClick(sender, e);
+        }
+    }
+
+    private async Task LoadOverviewDashboardAsync(bool forceHardware = false)
+    {
+        try
+        {
+            var hw = _lastHardwareReport;
+            if (forceHardware || hw == null)
+            {
+                hw = await _hardwareEngine.GetHardwareReportAsync(maskSensitiveData: _settings.MaskHardwareSerials);
+                _lastHardwareReport = hw;
+            }
+
+            var drives = await Task.Run(() => _driveDiscovery.DiscoverVolumes());
+            var power = await Task.Run(() => _optimizationService.InspectPowerPlans());
+            var startups = await Task.Run(() => _optimizationService.InspectStartupItems());
+            var repair = await Task.Run(() => _troubleshootingService.InspectWindowsRepairAndHealthStatus());
+            var procs = await Task.Run(() => _troubleshootingService.InspectProcesses(10));
+            var nics = await Task.Run(() => _troubleshootingService.InspectNetworkInterfaces());
+
+            var cpuLoad = hw.LiveDiagnostics.CpuUtilizationPercent ?? 0.0;
+            OverviewCpuValueText.Text = $"{hw.Cpu.Name}";
+            OverviewCpuSubText.Text = $"Live CPU Load: {cpuLoad:F1}% • {hw.Cpu.PhysicalCores}C / {hw.Cpu.LogicalProcessors}T";
+
+            OverviewRamValueText.Text = $"{hw.Memory.FormattedUsed} / {hw.Memory.FormattedTotal} ({hw.Memory.UsedPercent:F0}%)";
+            OverviewRamSubText.Text = $"{hw.Memory.FormattedAvailable} available • {hw.Memory.PopulatedSlots}/{hw.Memory.TotalSlots} slots";
+
+            var primaryDrive = drives.FirstOrDefault();
+            OverviewStorageValueText.Text = primaryDrive != null
+                ? $"{primaryDrive.VolumeName}: {ByteFormatter.FormatBytes(primaryDrive.FreeBytes)} free ({primaryDrive.UsedPercent:F0}% used)"
+                : "No volumes detected";
+            OverviewStorageSubText.Text = $"{drives.Count} mounted volume(s) ready";
+
+            OverviewOsStatusText.Text = $"{hw.Os.Caption} (Build {hw.Os.BuildNumber})";
+            OverviewOsSubText.Text = $"Uptime: {hw.Os.FormattedUptime} • Reboot Pending: {(repair.RebootPending ? "Yes" : "No")}";
+
+            int enabledStartups = startups.Count(s => s.IsEnabled);
+            int highImpactStartups = startups.Count(s => s.IsEnabled && s.ImpactAssessment.Contains("High", StringComparison.OrdinalIgnoreCase));
+            OverviewStartupStatusText.Text = $"Power: {power.ActiveSchemeName}";
+            OverviewStartupSubText.Text = $"{enabledStartups} enabled startup item(s) ({highImpactStartups} high-impact)";
+
+            var upNic = nics.FirstOrDefault(n => string.Equals(n.OperationalStatus, "Up", StringComparison.OrdinalIgnoreCase));
+            OverviewNetworkValueText.Text = upNic != null ? $"Connected: {upNic.Name} ({upNic.SpeedDisplay})" : "No Active Adapter Up";
+            OverviewNetworkSubText.Text = $"Device Errors: {repair.DeviceManagerErrors.Count} • System Protection: {(repair.SystemProtectionLikelyAvailable ? "Enabled" : "Standard")}";
+
+            OverviewTopProcesses.Clear();
+            foreach (var p in procs.TopMemoryProcesses)
+            {
+                OverviewTopProcesses.Add(new ProcessRowViewModel
+                {
+                    ProcessId = p.ProcessId,
+                    ProcessName = p.ProcessName,
+                    WorkingSetDisplay = p.WorkingSetDisplay,
+                    PrivateMemoryDisplay = p.PrivateMemoryDisplay,
+                    CpuTimeDisplay = p.CpuTimeDisplay,
+                    ThreadCount = p.ThreadCount,
+                    StatusDisplay = p.StatusDisplay
+                });
+            }
+
+            OverviewAdvisories.Clear();
+            if (repair.RebootPending)
+            {
+                OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
+                {
+                    CategoryBadge = "[SERVICING]",
+                    Title = "Windows Update / Servicing Reboot Pending",
+                    Detail = $"Pending reboot indicators: {string.Join(", ", repair.RebootPendingReasons)}. Restarting Windows is recommended before running system repairs."
+                });
+            }
+            if (primaryDrive != null)
+            {
+                OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
+                {
+                    CategoryBadge = "[STORAGE]",
+                    Title = $"{primaryDrive.VolumeName} Capacity ({primaryDrive.UsedPercent:F0}% Used)",
+                    Detail = $"{ByteFormatter.FormatBytes(primaryDrive.FreeBytes)} free of {ByteFormatter.FormatBytes(primaryDrive.TotalBytes)}. Use Storage Cleanup or Storage Analyzer to inspect large folders."
+                });
+            }
+            OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
+            {
+                CategoryBadge = "[STARTUP]",
+                Title = $"{enabledStartups} Active Startup Entries ({highImpactStartups} High-Impact)",
+                Detail = $"Active Power Scheme: {power.ActiveSchemeName}. Review Registry Run keys, Startup folders, and Scheduled Logon Tasks in the Optimize tab."
+            });
+
+            var recentOps = _safeOperationEngine.History.LoadRecords().Take(3).ToList();
+            foreach (var op in recentOps)
+            {
+                OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
+                {
+                    CategoryBadge = $"[{op.StatusBadge.ToUpperInvariant()}]",
+                    Title = $"{op.DisplayName} ({op.ExecutedAtDisplay})",
+                    Detail = $"{op.TargetDescription} — {op.Verification.ObservedStateSummary}"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            FooterStatusText.Text = $"Overview refresh notice: {ex.Message}";
+        }
+    }
+
+    private async void OnQuickInvestigationLaunchClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string typeTag)
+        {
+            return;
+        }
+
+        NavigateToTab("Troubleshoot");
+        SelectComboBoxByTag(InvestigationTypeComboBox, typeTag);
+        if (Enum.TryParse<InvestigationType>(typeTag, ignoreCase: true, out var invType))
+        {
+            await ExecuteGuidedInvestigationAsync(invType, null);
+        }
+    }
+
+    // ==========================================
+    // MODULE C: OPTIMIZE (POWER, STARTUP & SETTINGS)
+    // ==========================================
+
+    private async void OnRefreshOptimizeClick(object sender, RoutedEventArgs e)
+    {
+        await LoadOptimizeStateAsync();
+    }
+
+    private async Task LoadOptimizeStateAsync()
+    {
+        try
+        {
+            var powerSnap = await Task.Run(() => _optimizationService.InspectPowerPlans());
+            var startupItems = await Task.Run(() => _optimizationService.InspectStartupItems());
+            var settingsList = await Task.Run(() => _optimizationService.InspectConfigurableSettings());
+
+            OptimizeActivePowerSummaryText.Text = $"Active Power Scheme: {powerSnap.ActiveSchemeName} ({powerSnap.ActiveSchemeGuid})";
+            OptimizePowerPlans.Clear();
+            foreach (var p in powerSnap.Plans)
+            {
+                OptimizePowerPlans.Add(new PowerPlanRowViewModel
+                {
+                    SchemeGuid = p.SchemeGuid,
+                    Name = p.Name,
+                    IsActive = p.IsActive,
+                    Description = p.Description,
+                    TradeoffSummary = $"Performance: {p.PerformanceTradeoff} | Energy: {p.EnergyTradeoff}"
+                });
+            }
+
+            OptimizeStartupSummaryText.Text = $"Discovered {startupItems.Count} startup entries ({startupItems.Count(s => s.IsEnabled)} Enabled). User-scoped entries can be reversibly toggled below.";
+            OptimizeStartupItems.Clear();
+            foreach (var s in startupItems)
+            {
+                OptimizeStartupItems.Add(new StartupItemRowViewModel
+                {
+                    EntryId = s.EntryId,
+                    Name = s.Name,
+                    Publisher = s.Publisher,
+                    CommandOrTarget = s.CommandOrTarget,
+                    ScopeDisplay = s.ScopeDisplay,
+                    IsEnabled = s.IsEnabled,
+                    ImpactAssessment = s.ImpactAssessment,
+                    ImpactReason = $"{s.ImpactAssessment}: {s.ImpactReason}",
+                    CanModify = !s.RequiresAdminToModify
+                });
+            }
+
+            OptimizeSettings.Clear();
+            foreach (var cfg in settingsList)
+            {
+                OptimizeSettings.Add(new ConfigurableSettingRowViewModel
+                {
+                    SettingId = cfg.SettingId,
+                    DisplayName = cfg.DisplayName,
+                    Category = cfg.Category,
+                    CurrentStateDisplay = cfg.CurrentStateDisplay,
+                    IsEnabled = cfg.IsEnabled,
+                    RegistryLocation = $"{cfg.RegistryPath}\\{cfg.ValueName}",
+                    Explanation = cfg.Explanation,
+                    RecommendationNote = cfg.RecommendationNote,
+                    CanToggle = cfg.ElevationRequirement == OperationElevationRequirement.StandardUser
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            OptimizeStatusBannerText.Text = $"Error loading optimization state: {ex.Message}";
+        }
+    }
+
+    private async void OnSwitchPowerPlanClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string schemeGuid || string.IsNullOrWhiteSpace(schemeGuid))
+        {
+            return;
+        }
+
+        var proposal = _optimizationService.ProposeSwitchPowerPlan(schemeGuid);
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Switch Power Plan", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        OptimizeStatusBannerText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        FooterStatusText.Text = record.StatusMessage;
+        await LoadOptimizeStateAsync();
+    }
+
+    private async void OnToggleStartupItemClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string entryId || string.IsNullOrWhiteSpace(entryId))
+        {
+            return;
+        }
+
+        var existing = OptimizeStartupItems.FirstOrDefault(i => string.Equals(i.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
+        bool targetEnable = existing == null || !existing.IsEnabled;
+
+        var proposal = _optimizationService.ProposeToggleStartupItem(entryId, targetEnable);
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Modify Startup Entry", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        OptimizeStatusBannerText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        FooterStatusText.Text = record.StatusMessage;
+        await LoadOptimizeStateAsync();
+    }
+
+    private async void OnToggleConfigurableSettingClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string settingId || string.IsNullOrWhiteSpace(settingId))
+        {
+            return;
+        }
+
+        var existing = OptimizeSettings.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+        bool targetEnable = existing == null || !existing.IsEnabled;
+
+        var proposal = _optimizationService.ProposeToggleSetting(settingId, targetEnable);
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Modify Windows Setting", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        OptimizeStatusBannerText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        FooterStatusText.Text = record.StatusMessage;
+        await LoadOptimizeStateAsync();
+    }
+
+    // ==========================================
+    // MODULE D: TROUBLESHOOT & INVESTIGATIONS
+    // ==========================================
+
+    private async void OnRefreshTroubleshootClick(object sender, RoutedEventArgs e)
+    {
+        await LoadTroubleshootStateAsync();
+    }
+
+    private async Task LoadTroubleshootStateAsync()
+    {
+        try
+        {
+            var nics = await Task.Run(() => _troubleshootingService.InspectNetworkInterfaces());
+            TroubleshootNetworkAdapters.Clear();
+            foreach (var n in nics)
+            {
+                TroubleshootNetworkAdapters.Add(new NetworkAdapterRowViewModel
+                {
+                    Name = n.Name,
+                    Description = $"{n.Name} — {n.Description}",
+                    OperationalStatus = n.OperationalStatus,
+                    SpeedDisplay = n.SpeedDisplay,
+                    IpSummary = $"IP: {n.IpSummary} | Gateway: {n.GatewaySummary}",
+                    GatewaySummary = n.GatewaySummary,
+                    DnsSummary = $"DNS: {n.DnsSummary} (DHCP: {(n.IsDhcpEnabled ? "Yes" : "Static")})"
+                });
+            }
+
+            await RefreshServicesAndRepairViewAsync();
+            await RefreshEventLogViewAsync();
+
+            if (_lastInvestigationReport == null)
+            {
+                await ExecuteGuidedInvestigationAsync(InvestigationType.Performance, null);
+            }
+        }
+        catch (Exception ex)
+        {
+            FooterStatusText.Text = $"Troubleshoot load error: {ex.Message}";
+        }
+    }
+
+    private async void OnRunInvestigationClick(object sender, RoutedEventArgs e)
+    {
+        string tag = (InvestigationTypeComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Performance";
+        if (!Enum.TryParse<InvestigationType>(tag, ignoreCase: true, out var invType))
+        {
+            invType = InvestigationType.Performance;
+        }
+
+        string customQuery = InvestigationQueryBox.Text.Trim();
+        await ExecuteGuidedInvestigationAsync(invType, string.IsNullOrWhiteSpace(customQuery) ? null : customQuery);
+    }
+
+    private async Task ExecuteGuidedInvestigationAsync(InvestigationType invType, string? customQuery)
+    {
+        try
+        {
+            RunInvestigationButton.IsEnabled = false;
+            InvestigationSummaryText.Text = $"Running {invType} Investigation across registered diagnostic tools...";
+            if (InvestigationToolsExecutedText != null)
+            {
+                InvestigationToolsExecutedText.Text = "Executing registered diagnostic tools...";
+            }
+
+            var report = await Task.Run(() => _investigationEngine.RunInvestigationAsync(invType, customQuery));
+            _lastInvestigationReport = report;
+
+            InvestigationSummaryText.Text = $"{report.Title} ({report.CompletedAtDisplay}): {report.ExecutiveSummary}";
+            if (InvestigationToolsExecutedText != null)
+            {
+                InvestigationToolsExecutedText.Text = $"Executed Registered Tools ({report.ExecutedTools.Count}): {string.Join(", ", report.ExecutedTools)}";
+            }
+
+            InvestigationConfirmedFindings.Clear();
+            foreach (var obs in report.ConfirmedObservations)
+            {
+                InvestigationConfirmedFindings.Add(new InvestigationFindingRowViewModel
+                {
+                    CategoryBadge = obs.CategoryBadge,
+                    Title = obs.Title,
+                    Detail = obs.Detail,
+                    EvidenceAndConfidence = $"Source: {obs.EvidenceSource} • {obs.ConfidenceLevel}",
+                    Severity = obs.Severity
+                });
+            }
+
+            InvestigationCauseFindings.Clear();
+            foreach (var cause in report.PotentialCauses.Concat(report.UnverifiedHypotheses))
+            {
+                InvestigationCauseFindings.Add(new InvestigationFindingRowViewModel
+                {
+                    CategoryBadge = $"[{cause.CategoryBadge}]",
+                    Title = cause.Title,
+                    Detail = cause.Detail,
+                    EvidenceAndConfidence = $"Evidence: {cause.EvidenceSource} • {cause.ConfidenceLevel}",
+                    Severity = cause.Severity
+                });
+            }
+
+            InvestigationRecommendations.Clear();
+            foreach (var rec in report.RecommendedActions)
+            {
+                bool hasDirectTool = !string.IsNullOrWhiteSpace(rec.AssociatedToolName);
+                string targetTab = invType switch
+                {
+                    InvestigationType.Storage => "Cleanup",
+                    InvestigationType.Startup or InvestigationType.Performance => "Optimize",
+                    _ => "Troubleshoot"
+                };
+
+                InvestigationRecommendations.Add(new InvestigationRecommendationRowViewModel
+                {
+                    RecommendationId = rec.RecommendationId,
+                    Title = rec.Title,
+                    Explanation = rec.Explanation,
+                    SafetyBadge = $"[{rec.SafetyBadge}]",
+                    ActionButtonText = hasDirectTool ? "Approve & Execute..." : $"Open {targetTab}",
+                    TargetTab = targetTab,
+                    AssociatedToolName = rec.AssociatedToolName,
+                    ToolArguments = rec.ToolArguments
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            InvestigationSummaryText.Text = $"Investigation error: {ex.Message}";
+        }
+        finally
+        {
+            RunInvestigationButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnInvestigationRecommendationActionClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string recId)
+        {
+            return;
+        }
+
+        var row = InvestigationRecommendations.FirstOrDefault(r => string.Equals(r.RecommendationId, recId, StringComparison.OrdinalIgnoreCase));
+        if (row == null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(row.AssociatedToolName))
+        {
+            var toolRes = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest(row.AssociatedToolName, row.ToolArguments));
+            if (toolRes.PendingProposal is { } proposal)
+            {
+                if (!proposal.PrerequisitesMet)
+                {
+                    await ShowDialogAsync("Cannot Execute Recommended Action", proposal.PrerequisiteFailureReason);
+                    return;
+                }
+
+                if (!await ConfirmSafeOperationProposalAsync(proposal))
+                {
+                    return;
+                }
+
+                var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+                InvestigationSummaryText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+                FooterStatusText.Text = record.StatusMessage;
+                RefreshOperationHistoryLedger();
+                return;
+            }
+        }
+
+        NavigateToTab(row.TargetTab);
+    }
+
+    private void OnCopyInvestigationMarkdownClick(object sender, RoutedEventArgs e)
+    {
+        if (_lastInvestigationReport == null) return;
+        string md = InvestigationEngineService.ExportToMarkdown(_lastInvestigationReport);
+        var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        dp.SetText(md);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+        FooterStatusText.Text = "Investigation report Markdown copied to clipboard.";
+    }
+
+    private async void OnExportInvestigationReportClick(object sender, RoutedEventArgs e)
+    {
+        if (_lastInvestigationReport == null)
+        {
+            await ShowDialogAsync("No Report Yet", "Run an investigation first before exporting.");
+            return;
+        }
+
+        try
+        {
+            string docsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string fileName = $"Groundwork_Investigation_{_lastInvestigationReport.InvestigationType}_{DateTime.Now:yyyyMMdd_HHmmss}.md";
+            string fullPath = Path.Combine(docsDir, fileName);
+            File.WriteAllText(fullPath, InvestigationEngineService.ExportToMarkdown(_lastInvestigationReport));
+            FooterStatusText.Text = $"Exported investigation report to {fullPath}";
+            await ShowDialogAsync("Investigation Report Exported", $"Saved Markdown report to:\n{fullPath}");
+        }
+        catch (Exception ex)
+        {
+            await ShowDialogAsync("Export Failed", ex.Message);
+        }
+    }
+
+    private async void OnRunNetworkDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            RunNetworkDiagnosticsButton.IsEnabled = false;
+            string host = NetworkPingTargetBox.Text.Trim();
+            NetworkDiagnosisSummaryText.Text = "Running gateway ping, external reachability check, and DNS resolution test...";
+
+            var report = await Task.Run(() => _troubleshootingService.RunNetworkTroubleshootingAsync(host));
+            NetworkDiagnosisSummaryText.Text = report.SummaryDiagnosis;
+
+            TroubleshootNetworkAdapters.Clear();
+            foreach (var n in report.ActiveInterfaces)
+            {
+                TroubleshootNetworkAdapters.Add(new NetworkAdapterRowViewModel
+                {
+                    Name = n.Name,
+                    Description = $"{n.Name} — {n.Description}",
+                    OperationalStatus = n.OperationalStatus,
+                    SpeedDisplay = n.SpeedDisplay,
+                    IpSummary = $"IP: {n.IpSummary} | Gateway: {n.GatewaySummary}",
+                    GatewaySummary = n.GatewaySummary,
+                    DnsSummary = $"DNS: {n.DnsSummary} (DHCP: {(n.IsDhcpEnabled ? "Yes" : "Static")})"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NetworkDiagnosisSummaryText.Text = $"Network diagnostic error: {ex.Message}";
+        }
+        finally
+        {
+            RunNetworkDiagnosticsButton.IsEnabled = true;
+        }
+    }
+
+    private OperationProposal? _lastAgentPendingProposal;
+
+    private async void OnApprovePendingAgentProposalClick(object sender, RoutedEventArgs e)
+    {
+        if (_lastAgentPendingProposal == null || !_lastAgentPendingProposal.PrerequisitesMet)
+        {
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(_lastAgentPendingProposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(_lastAgentPendingProposal.ConfirmationToken);
+        AgentPendingApprovalText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        ApprovePendingAgentProposalButton.IsEnabled = false;
+        FooterStatusText.Text = record.StatusMessage;
+        RefreshOperationHistoryLedger();
+    }
+
+    private async void OnFlushDnsCacheClick(object sender, RoutedEventArgs e)
+    {
+        var proposal = _troubleshootingService.ProposeFlushDnsCache();
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        NetworkDiagnosisSummaryText.Text = $"{record.StatusMessage} ({record.Verification.VerificationDetails})";
+        FooterStatusText.Text = record.StatusMessage;
+    }
+
+    private async void OnSwitchDnsProviderClick(object sender, RoutedEventArgs e)
+    {
+        string providerTag = (DnsProviderComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Cloudflare";
+        var proposal = _troubleshootingService.ProposeSwitchDnsProvider(providerTag);
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Switch DNS Provider", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        NetworkDiagnosisSummaryText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        FooterStatusText.Text = record.StatusMessage;
+        await LoadTroubleshootStateAsync();
+    }
+
+    private async void OnCreateRestorePointClick(object sender, RoutedEventArgs e)
+    {
+        var proposal = _troubleshootingService.ProposeCreateRestorePoint();
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Create System Restore Point", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        WindowsRepairSummaryText.Text = $"{record.StatusMessage} ({record.Verification.ObservedStateSummary})";
+        FooterStatusText.Text = record.StatusMessage;
+        await RefreshServicesAndRepairViewAsync();
+    }
+
+    private async void OnVerifyDismHealthClick(object sender, RoutedEventArgs e)
+    {
+        var proposal = _troubleshootingService.ProposeVerifySystemHealth();
+        if (!proposal.PrerequisitesMet)
+        {
+            await ShowDialogAsync("Cannot Run DISM Component Store Check", proposal.PrerequisiteFailureReason);
+            return;
+        }
+
+        if (!await ConfirmSafeOperationProposalAsync(proposal))
+        {
+            return;
+        }
+
+        var record = await _safeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken);
+        WindowsRepairSummaryText.Text = $"{record.StatusMessage}";
+        FooterStatusText.Text = record.StatusMessage;
+    }
+
+    private async void OnRefreshEventLogClick(object sender, RoutedEventArgs e)
+    {
+        await RefreshEventLogViewAsync();
+    }
+
+    private async Task RefreshEventLogViewAsync()
+    {
+        try
+        {
+            RefreshEventLogButton.IsEnabled = false;
+            var events = await Task.Run(() => _troubleshootingService.InspectRecentEventLogErrors(35));
+            TroubleshootEventLogs.Clear();
+            foreach (var evt in events)
+            {
+                TroubleshootEventLogs.Add(new EventLogRowViewModel
+                {
+                    TimeDisplay = evt.TimeDisplay,
+                    LogName = evt.LogName,
+                    LevelDisplay = evt.LevelDisplay,
+                    ProviderName = evt.ProviderName,
+                    EventId = evt.EventId,
+                    MessageSummary = evt.MessageSummary,
+                    PlainEnglishExplanation = evt.PlainEnglishExplanation
+                });
+            }
+            EventLogSummaryText.Text = $"Loaded {events.Count} recent Critical/Error/Warning event(s) from Windows System and Application logs.";
+        }
+        catch (Exception ex)
+        {
+            EventLogSummaryText.Text = $"Error reading Event Log: {ex.Message}";
+        }
+        finally
+        {
+            RefreshEventLogButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnRefreshServicesHealthClick(object sender, RoutedEventArgs e)
+    {
+        await RefreshServicesAndRepairViewAsync();
+    }
+
+    private async Task RefreshServicesAndRepairViewAsync()
+    {
+        try
+        {
+            RefreshServicesHealthButton.IsEnabled = false;
+            var services = await Task.Run(() => _troubleshootingService.InspectKeyWindowsServices());
+            var repair = await Task.Run(() => _troubleshootingService.InspectWindowsRepairAndHealthStatus());
+
+            TroubleshootServices.Clear();
+            foreach (var svc in services)
+            {
+                TroubleshootServices.Add(new ServiceRowViewModel
+                {
+                    ServiceName = svc.ServiceName,
+                    DisplayName = svc.DisplayName,
+                    Status = svc.Status,
+                    StartType = svc.StartType,
+                    Category = svc.Category,
+                    HealthNote = svc.HealthNote,
+                    IsAbnormal = svc.IsAbnormal
+                });
+            }
+
+            WindowsRepairSummaryText.Text =
+                $"Reboot Pending: {(repair.RebootPending ? "Yes (" + string.Join("; ", repair.RebootPendingReasons) + ")" : "No")} • " +
+                $"Device Manager Errors: {repair.DeviceManagerErrors.Count} • " +
+                $"System Protection: {(repair.SystemProtectionLikelyAvailable ? "Enabled" : "Standard")} • " +
+                $"{repair.SfcGuidance}";
+        }
+        catch (Exception ex)
+        {
+            WindowsRepairSummaryText.Text = $"Error auditing services: {ex.Message}";
+        }
+        finally
+        {
+            RefreshServicesHealthButton.IsEnabled = true;
+        }
     }
 
     // ==========================================
@@ -5601,14 +6645,159 @@ public sealed partial class MainWindow : Window
         AssistantCancelButton.Visibility = Visibility.Collapsed;
 
         // 8. Navigation tab switch
-        if (!string.IsNullOrEmpty(startTab))
+        if (string.Equals(startTab, "AgentStandby", StringComparison.OrdinalIgnoreCase))
+        {
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            NavigateToTab("Agent");
+            AssistantStandbyGrid.Visibility = Visibility.Visible;
+            AssistantResultsGrid.Visibility = Visibility.Collapsed;
+            AssistantQuestionBox.Text = string.Empty;
+        }
+        else if (!string.IsNullOrEmpty(startTab))
         {
             StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
             NavigateToTab(startTab);
         }
         else
         {
-            StartupDriveModalOverlay.Visibility = Visibility.Visible;
+            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
+            NavigateToTab("Overview");
+        }
+    }
+
+    private async Task CaptureCurrentViewToPngAsync(string filePath)
+    {
+        if (this.Content is not UIElement rootElement) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+        var rtb = new Microsoft.UI.Xaml.Media.Imaging.RenderTargetBitmap();
+        await rtb.RenderAsync(rootElement);
+        if (rtb.PixelWidth <= 0 || rtb.PixelHeight <= 0) return;
+
+        var pixelBuffer = await rtb.GetPixelsAsync();
+        byte[] pixels = System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.ToArray(pixelBuffer);
+
+        using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+        using var raStream = fileStream.AsRandomAccessStream();
+        var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, raStream);
+        encoder.SetPixelData(
+            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+            Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
+            (uint)rtb.PixelWidth,
+            (uint)rtb.PixelHeight,
+            96.0,
+            96.0,
+            pixels);
+        await encoder.FlushAsync();
+    }
+
+    private async Task RunUiVerificationCaptureAsync(string rawOutDir)
+    {
+        string outDir = rawOutDir.Trim().Trim('"');
+        try
+        {
+            Directory.CreateDirectory(outDir);
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), $"Starting UI capture at {DateTime.Now:O}\n");
+            await Task.Delay(1500);
+
+            // 1. Overview (Default landing page with live telemetry)
+            NavigateToTab("Overview");
+            await LoadOverviewDashboardAsync(forceHardware: true);
+            await Task.Delay(800);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "01_overview.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 01_overview.png\n");
+
+            // 2. Storage Analyzer (Live scan of workspace directory)
+            NavigateToTab("Storage");
+            string workspaceDir = AppContext.BaseDirectory;
+            ScanPathTextBox.Text = workspaceDir;
+            await RunStorageScanAsync(workspaceDir);
+            await Task.Delay(800);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "02_storage_analyzer.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 02_storage_analyzer.png\n");
+
+            // 3. Hardware & Specs
+            NavigateToTab("Hardware");
+            await LoadHardwareSpecsAsync(force: false);
+            await Task.Delay(800);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "03_hardware_specs.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 03_hardware_specs.png\n");
+
+            // 4. Optimize (Power Plans, Startup & Scheduled Tasks, 11 Windows Settings)
+            NavigateToTab("Optimize");
+            await LoadOptimizeStateAsync();
+            await Task.Delay(800);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "04_optimize.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 04_optimize.png\n");
+
+            // 5. Troubleshoot (Guided Investigations, Network & DNS, Event Logs, Services)
+            NavigateToTab("Troubleshoot");
+            await LoadTroubleshootStateAsync();
+            await Task.Delay(900);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "05_troubleshoot.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 05_troubleshoot.png\n");
+
+            // 6. Storage Cleanup
+            NavigateToTab("Cleanup");
+            await PreloadCleanupDiagnosticsAsync();
+            await Task.Delay(800);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "06_storage_cleanup.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 06_storage_cleanup.png\n");
+
+            // 7. Organize & Rollback History
+            NavigateToTab("Organize");
+            RefreshOperationHistoryLedger();
+            await Task.Delay(600);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "07_organize_history.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 07_organize_history.png\n");
+
+            // 8. Installed Apps
+            NavigateToTab("Apps");
+            for (int i = 0; i < 20 && InstalledApps.Count == 0; i++)
+            {
+                await Task.Delay(250);
+            }
+            await Task.Delay(500);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "08_installed_apps.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 08_installed_apps.png\n");
+
+            // 9. AI Assistant Standby (6 Suggested System Investigations)
+            NavigateToTab("Agent");
+            AssistantStandbyGrid.Visibility = Visibility.Visible;
+            AssistantResultsGrid.Visibility = Visibility.Collapsed;
+            await Task.Delay(600);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "09_agent_standby.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 09_agent_standby.png\n");
+
+            // 10. AI Assistant Active Investigation & Safe Operation Approval Gate
+            AssistantQuestionBox.Text = "Switch my DNS to Cloudflare.";
+            OnAskOperatorClick(this, new RoutedEventArgs());
+            for (int i = 0; i < 35 && AssistantTargetKpiValue.Text == "Planning..."; i++)
+            {
+                await Task.Delay(300);
+            }
+            await Task.Delay(600);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "10_agent_investigation.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 10_agent_investigation.png\n");
+
+            // 11. Settings
+            NavigateToTab("Settings");
+            await Task.Delay(600);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "11_settings.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 11_settings.png\n");
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                Directory.CreateDirectory(outDir);
+                File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), $"ERROR: {ex}\n");
+            }
+            catch { }
+        }
+        finally
+        {
+            this.Close();
         }
     }
 

@@ -1,13 +1,34 @@
-# Search and ranking
+# Groundwork — Storage Scanning, Filtering & Investigation Ranking
 
-Quick Find has file, project, and Git commit tabs. The file tab searches indexed content, filenames, paths, and code symbols, with project, file-category, and recent-modification filters. An empty query shows recently modified indexed files. Notes have a separate searchable view. Recent queries are stored locally.
+## 1. Parallel Win32 Storage Scanning (`Win32StorageScanner`)
 
-Lexical retrieval uses SQLite FTS5 and BM25, with lower SQLite ranks treated as better matches. Filename/path matching supplies a separate signal. Python symbols come from AST parsing; other supported languages use limited patterns rather than full parsers.
+Groundwork scans local NTFS/exFAT/FAT32 volumes without requiring administrator privileges by default:
+1. **Unbuffered Enumeration**: Uses `FindFirstFileExW` with `FindExInfoBasic` and `FIND_FIRST_EX_LARGE_FETCH` across a configurable worker pool (`StorageScanOptions.MaxWorkers`, defaulting to logical core count bounded between 2 and 16).
+2. **Reparse Point & Cloud Guardrails**:
+   - Skips directory reparse points (`FILE_ATTRIBUTE_REPARSE_POINT`) to eliminate infinite junction/symlink recursion and prevent double-counting.
+   - Identifies cloud placeholders (`FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`, `FILE_ATTRIBUTE_RECALL_ON_OPEN`, `FILE_ATTRIBUTE_OFFLINE`) so cloud-only files are neverhydrated during scans or duplicate hashing.
+3. **Bottom-Up $O(N)$ Directory Rollup**:
+   - Rather than recursively walking subtrees per folder ($O(N^2)$), files are accumulated into their immediate parent directory bucket first, and total sizes are rolled up bottom-up by directory depth descending in a single $O(N)$ pass.
 
-Packaged builds include the trained all-MiniLM-L6-v2 ONNX model and tokenizer, producing 384-dimensional embeddings entirely offline. Model identity is included in content hashes so switching models rebuilds incompatible vectors. Development checkouts without model files use deterministic token/subword hashing; this fallback is not trained semantic retrieval. The preparation script downloads model files only at build time and records their checksums and license.
+---
 
-Hybrid weights in the implementation are lexical 0.35, vector 0.30, filename 0.20, project 0.10, and recency 0.05. Scores are ranking signals, not confidence percentages. Recency decays with file age.
+## 2. Three-Stage Duplicate Detection (`DuplicateEngineService`)
 
-Vector search streams all eligible chunks, including older files, rather than limiting the scan to the newest 1,000. This exact scan can become slow on large workspaces; no latency guarantee is claimed. Lexical snippets start on a matching line. Citations cover the actual returned excerpt instead of an invented twenty-line range.
+To identify exact duplicate files safely without unnecessary disk I/O:
+1. **Stage 1 — Size Grouping**: Groups local non-placeholder files by exact byte length (`SizeBytes >= MinSizeBytes`). Unique sizes are immediately discarded.
+2. **Stage 2 — 4 KB Head + 4 KB Tail Pre-Hash**: Reads only the first 4,096 bytes and last 4,096 bytes (plus file length) via `SHA256`. Groups with distinct pre-hashes are discarded without reading the middle of large files.
+3. **Stage 3 — Full SHA-256 & Hard-Link Filtering**:
+   - Queries `GetFileInformationByHandle` to extract `(VolumeSerialNumber, FileIndexHigh, FileIndexLow)`. Files sharing the same NTFS `FileIndex` on the same volume are hard links to the same physical allocation and are excluded from duplicate deletion candidates.
+   - Computes full-stream `SHA256` with `FileOptions.SequentialScan` and marks the oldest/primary file in each group as `Keep (Original)` while ranking newer copies as reclaimable.
 
-Ignore rules apply to scans and incremental watcher updates. Content hashes detect changes even when size and modification time are preserved. Empty, oversized, deleted, and newly excluded files are removed from the index. Credentials and links are excluded. Nested Git ignore rules use Git-style matching with negations and anchors.
+---
+
+## 3. Investigation Evidence Ranking (`InvestigationEngineService`)
+
+When running a **Groundwork Investigation** (*Performance*, *Storage*, *Network*, *Windows Health*, *Startup*, *Hardware*, or *Custom*):
+1. **Deterministic Tool Selection (`AgentPlannerService`)**: Maps user symptoms and investigation categories to the minimal set of read-only diagnostic tools required to gather authoritative evidence.
+2. **Evidence Classification**:
+   - **Confirmed Observations**: Direct measurements exceeding objective thresholds (e.g., volume free space $< 10\%$, memory utilization $> 85\%$, pending Windows reboot flags present, active gateway ping timeout, or missing startup target executable).
+   - **Potential Contributing Factors**: Correlated findings that may explain the user's symptom (e.g., high number of enabled third-party startup items, power plan set to *Power Saver* during performance complaints, recent application crash events in Event Log).
+   - **Unverified Hypotheses**: Factors that cannot be confirmed without additional sensors or external hardware inspection (e.g., thermal throttling when CPU package temperature is not exposed by standard WMI, ISP upstream routing outages when local gateway responds normally).
+3. **Recommendation Prioritization**: Recommended actions are ordered by highest confirmed impact and lowest risk (`ReadOnly` / `Reversible` actions first).
