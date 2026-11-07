@@ -5505,7 +5505,102 @@ public sealed partial class MainWindow : Window
         OrganizationHistoryListView.Visibility = Visibility.Visible;
         OrganizationStatusText.Text = "Preview generated: 6 files will be organized into 5 subfolders.";
 
-        // 7. Navigation tab switch
+        // 7. Mock Agent Assistant
+        AgentProviderSetupRequiredGrid.Visibility = Visibility.Collapsed;
+        AgentActiveContentPanel.Visibility = Visibility.Visible;
+        AssistantProviderBadge.Text = "Mistral (ministral-8b-latest)";
+        AssistantStandbyGrid.Visibility = Visibility.Collapsed;
+        AssistantResultsGrid.Visibility = Visibility.Visible;
+        AssistantActiveQueryLabel.Text = "\"Find heavy developer build caches like node_modules, bin/obj, and venv\"";
+        AssistantQuestionBox.Text = "Find heavy developer build caches like node_modules, bin/obj, and venv";
+        
+        AssistantTargetKpiIcon.Glyph = "\uE7BE";
+        AssistantTargetKpiTitle.Text = "Matched Caches";
+        AssistantTargetKpiValue.Text = "12 Directories";
+        AssistantTargetKpiSub.Text = @"C:\Projects\Workspace";
+        
+        AssistantWasteKpiIcon.Glyph = "\uE74D";
+        AssistantWasteKpiTitle.Text = "Reclaimable Waste";
+        AssistantWasteKpiValue.Text = "18.4 GB";
+        AssistantWasteKpiSub.Text = "Ephemeral build artifacts";
+        
+        AssistantAppKpiIcon.Glyph = "\uE896";
+        AssistantAppKpiTitle.Text = "Safety Assessment";
+        AssistantAppKpiValue.Text = "Safe to Clean";
+        AssistantAppKpiSub.Text = "Regenerated via package managers";
+
+        RenderFormattedAgentResponse(
+            "Found **12 build cache directories** totaling **18.4 GB** across your development projects under `C:\\Projects\\Workspace`.\n\n" +
+            "• **Node.js (`node_modules`)**: 3 directories taking **8.6 GB** (largest: `C:\\Projects\\Workspace\\frontend\\web\\node_modules` at 4.2 GB).\n" +
+            "• **.NET (`bin` / `obj`)**: 6 build folders taking **6.4 GB** under `C:\\Projects\\Workspace\\backend\\src`.\n" +
+            "• **Python (`.venv`)**: 3 virtual environments taking **3.4 GB** under `analytics\\scripts`.\n\n" +
+            "All build caches are ephemeral artifacts and can be safely sent to the Windows Recycle Bin. Source code, git configuration, and environment manifests remain 100% untouched.");
+
+        AssistantRecommendations.Clear();
+        AssistantRecommendations.Add(new AssistantRecommendationViewModel
+        {
+            IconGlyph = "\uE74D",
+            IconColor = "#EF4444",
+            Title = "Recycle Ephemeral Build Caches (18.4 GB)",
+            Description = "Send 12 node_modules, bin/obj, and venv cache trees to Windows Recycle Bin. Safe to recreate anytime.",
+            ActionButtonText = "Recycle Caches (18.4 GB)",
+            ActionTag = "recycle_caches"
+        });
+
+        AssistantKeyItems.Clear();
+        AssistantKeyItems.Add(new AssistantItemRowViewModel
+        {
+            Glyph = "\uE8B7",
+            GlyphColor = "#3B82F6",
+            Name = "node_modules",
+            FullPath = @"C:\Projects\Workspace\frontend\web\node_modules",
+            FormattedSize = "4.2 GB",
+            Subtitle = "Node.js package cache (14,210 files)",
+            CategoryBadge = "NODE_MODULES",
+            BadgeBackground = "#EFF6FF",
+            BadgeForeground = "#1D4ED8"
+        });
+        AssistantKeyItems.Add(new AssistantItemRowViewModel
+        {
+            Glyph = "\uE8B7",
+            GlyphColor = "#3B82F6",
+            Name = "node_modules",
+            FullPath = @"C:\Projects\Workspace\api-gateway\node_modules",
+            FormattedSize = "2.8 GB",
+            Subtitle = "Node.js package cache (9,480 files)",
+            CategoryBadge = "NODE_MODULES",
+            BadgeBackground = "#EFF6FF",
+            BadgeForeground = "#1D4ED8"
+        });
+        AssistantKeyItems.Add(new AssistantItemRowViewModel
+        {
+            Glyph = "\uE7BE",
+            GlyphColor = "#10B981",
+            Name = "bin / obj",
+            FullPath = @"C:\Projects\Workspace\backend\src\Groundwork.Desktop\bin",
+            FormattedSize = "3.1 GB",
+            Subtitle = ".NET 10 compilation output",
+            CategoryBadge = "BUILD_CACHE",
+            BadgeBackground = "#ECFDF5",
+            BadgeForeground = "#047857"
+        });
+        AssistantKeyItems.Add(new AssistantItemRowViewModel
+        {
+            Glyph = "\uE7BE",
+            GlyphColor = "#F59E0B",
+            Name = ".venv",
+            FullPath = @"C:\Projects\Workspace\analytics\.venv",
+            FormattedSize = "2.1 GB",
+            Subtitle = "Python 3.12 virtual environment",
+            CategoryBadge = "PYTHON_VENV",
+            BadgeBackground = "#FEF3C7",
+            BadgeForeground = "#B45309"
+        });
+        AssistantItemsCountLabel.Text = "12 cache directories identified";
+        AssistantAnalyzeButton.IsEnabled = true;
+        AssistantCancelButton.Visibility = Visibility.Collapsed;
+
+        // 8. Navigation tab switch
         if (!string.IsNullOrEmpty(startTab))
         {
             StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
