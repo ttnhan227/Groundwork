@@ -777,7 +777,8 @@ public sealed class ProcessRowViewModel
     public string CpuTimeDisplay { get; set; } = string.Empty;
     public int ThreadCount { get; set; }
     public string StatusDisplay { get; set; } = string.Empty;
-    public string SummaryLine => $"PID {ProcessId} • RAM: {WorkingSetDisplay} (Private: {PrivateMemoryDisplay}) • CPU Time: {CpuTimeDisplay} • Threads: {ThreadCount} • {StatusDisplay}";
+    public double MemoryPercentOfTotal { get; set; } = 20.0;
+    public string SummaryLine => $"PID {ProcessId} • Threads: {ThreadCount}";
 }
 
 public sealed class InvestigationFindingRowViewModel
@@ -806,6 +807,8 @@ public sealed class OverviewAdvisoryRowViewModel
     public string CategoryBadge { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Detail { get; set; } = string.Empty;
+    public string IconGlyph { get; set; } = "\uE946";
+    public string AccentColorHex { get; set; } = "#2DD4BF";
 }
 
 public sealed class OperationHistoryRowViewModel
@@ -818,7 +821,10 @@ public sealed class OperationHistoryRowViewModel
     public string VerificationSummary { get; set; } = string.Empty;
     public string ExecutedAtDisplay { get; set; } = string.Empty;
     public string StatusBadge { get; set; } = string.Empty;
+    public string LedgerClassificationBadge { get; set; } = string.Empty;
+    public string ReversibilityNote { get; set; } = string.Empty;
     public bool CanRollback { get; set; }
     public Visibility RollbackButtonVisibility => CanRollback ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility PermanentNoticeVisibility => CanRollback ? Visibility.Collapsed : Visibility.Visible;
 }
 

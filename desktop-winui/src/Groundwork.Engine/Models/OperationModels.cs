@@ -146,6 +146,20 @@ public sealed record OperationExecutionRecord(
     public string StatusBadge => IsRolledBack
         ? "Rolled Back"
         : (Succeeded ? (Verification.IsVerified ? "Verified" : "Executed") : "Failed");
+
+    public string LedgerClassificationBadge => IsRolledBack
+        ? "Rolled Back"
+        : (Reversibility == OperationReversibility.Irreversible
+            ? "Permanent (Audit Only)"
+            : (CanRollback ? "Reversible (Undo Ready)" : "Audit Record"));
+
+    public string ReversibilityNote => Reversibility switch
+    {
+        OperationReversibility.Irreversible => "Permanent system change — cannot be rolled back; recorded for audit transparency.",
+        OperationReversibility.PartiallyReversible => "Partially reversible change.",
+        OperationReversibility.Reversible => IsRolledBack ? "Original state has been restored." : "Reversible: original pre-change state captured for one-click Undo.",
+        _ => "Read-only inspection record."
+    };
 }
 
 /// <summary>

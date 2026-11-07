@@ -130,6 +130,11 @@ public sealed partial class MainWindow : Window
         WindowsServicesListView.ItemsSource = TroubleshootServices;
 
         InitializeStartupState();
+
+        _liveTelemetryTimer = new DispatcherTimer();
+        _liveTelemetryTimer.Interval = TimeSpan.FromSeconds(2);
+        _liveTelemetryTimer.Tick += OnLiveTelemetryTick;
+        _liveTelemetryTimer.Start();
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
@@ -177,6 +182,35 @@ public sealed partial class MainWindow : Window
         }
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetSystemTimes(out System.Runtime.InteropServices.ComTypes.FILETIME lpIdleTime, out System.Runtime.InteropServices.ComTypes.FILETIME lpKernelTime, out System.Runtime.InteropServices.ComTypes.FILETIME lpUserTime);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private struct MEMORYSTATUSEX
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    private DispatcherTimer? _liveTelemetryTimer;
+    private bool _isLiveTelemetryBusy = false;
+    private bool _isLiveTelemetryEnabled = true;
+    private ulong _prevIdleTime = 0;
+    private ulong _prevKernelTime = 0;
+    private ulong _prevUserTime = 0;
 
     private const uint WM_SETICON = 0x0080;
     private const IntPtr ICON_SMALL = 0;
@@ -557,8 +591,12 @@ public sealed partial class MainWindow : Window
         return App.Current.RequestedTheme == ApplicationTheme.Light;
     }
 
+    private bool _isNavigatingProgrammatically;
+
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
+        if (_isNavigatingProgrammatically) return;
+
         string? tag = null;
         if (args.IsSettingsSelected)
         {
@@ -3612,6 +3650,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    public void NavigateToTabFromCli(string tag)
+    {
+        NavigateToTab(tag);
+    }
+
     private void NavigateToTab(string tag)
     {
         string panelTag = tag;
@@ -3632,9 +3675,17 @@ public sealed partial class MainWindow : Window
             .Concat(TopCommandNav.FooterMenuItems.OfType<NavigationViewItem>())
             .FirstOrDefault(item => string.Equals(item.Tag as string, navTag, StringComparison.OrdinalIgnoreCase));
 
-        if (target != null && !ReferenceEquals(TopCommandNav.SelectedItem, target))
+        _isNavigatingProgrammatically = true;
+        try
         {
-            TopCommandNav.SelectedItem = target;
+            if (target != null && !ReferenceEquals(TopCommandNav.SelectedItem, target))
+            {
+                TopCommandNav.SelectedItem = target;
+            }
+        }
+        finally
+        {
+            _isNavigatingProgrammatically = false;
         }
 
         // Direct fallback to ensure the exact requested sub-panel switches
@@ -4805,6 +4856,8 @@ public sealed partial class MainWindow : Window
                     : $"Verification: {r.Verification.ObservedStateSummary}",
                 ExecutedAtDisplay = r.ExecutedAtDisplay,
                 StatusBadge = r.StatusBadge,
+                LedgerClassificationBadge = r.LedgerClassificationBadge,
+                ReversibilityNote = r.ReversibilityNote,
                 CanRollback = r.CanRollback && !r.IsRolledBack
             });
         }
@@ -4812,8 +4865,8 @@ public sealed partial class MainWindow : Window
         if (OperationHistorySummaryText != null)
         {
             OperationHistorySummaryText.Text = records.Count == 0
-                ? "No modifying operations have been executed yet. All reversible changes appear here with one-click Undo."
-                : $"Showing {records.Count} recorded system operation(s). Reversible operations can be rolled back below.";
+                ? "No modifying operations have been executed yet. Modifying operations are audited here; reversible changes support one-click Undo."
+                : $"Showing {records.Count} audited system operation(s). Reversible actions can be rolled back; permanent deletions are recorded for auditability.";
         }
     }
 
@@ -4880,6 +4933,120 @@ public sealed partial class MainWindow : Window
     // MODULE A: OVERVIEW DASHBOARD
     // ==========================================
 
+    private void OnToggleLiveTelemetryClick(object sender, RoutedEventArgs e)
+    {
+        _isLiveTelemetryEnabled = !_isLiveTelemetryEnabled;
+        if (_isLiveTelemetryEnabled)
+        {
+            OverviewLiveTelemetryDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
+            OverviewLiveTelemetryText.Text = "Live: 2s (Active)";
+            ToolTipService.SetToolTip(OverviewLiveTelemetryButton, "Live 2-second background telemetry active (Click to pause)");
+        }
+        else
+        {
+            OverviewLiveTelemetryDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwTextMutedBrush"];
+            OverviewLiveTelemetryText.Text = "Paused (Manual)";
+            ToolTipService.SetToolTip(OverviewLiveTelemetryButton, "Live telemetry paused (Click to resume)");
+        }
+    }
+
+    private async void OnLiveTelemetryTick(object? sender, object e)
+    {
+        if (!_isLiveTelemetryEnabled) return;
+        if (OverviewPanel.Visibility != Visibility.Visible) return;
+        if (_isLiveTelemetryBusy) return;
+
+        _isLiveTelemetryBusy = true;
+        try
+        {
+            await UpdateLiveVitalsAsync();
+        }
+        catch { }
+        finally
+        {
+            _isLiveTelemetryBusy = false;
+        }
+    }
+
+    private async Task UpdateLiveVitalsAsync()
+    {
+        // 1. Instantaneous Win32 CPU utilization via GetSystemTimes
+        double? liveCpu = null;
+        if (GetSystemTimes(out var idle, out var kernel, out var user))
+        {
+            ulong idleTime = ((ulong)(uint)idle.dwHighDateTime << 32) | (uint)idle.dwLowDateTime;
+            ulong kernelTime = ((ulong)(uint)kernel.dwHighDateTime << 32) | (uint)kernel.dwLowDateTime;
+            ulong userTime = ((ulong)(uint)user.dwHighDateTime << 32) | (uint)user.dwLowDateTime;
+
+            if (_prevKernelTime > 0 && _prevUserTime > 0)
+            {
+                ulong deltaIdle = idleTime - _prevIdleTime;
+                ulong deltaKernel = kernelTime - _prevKernelTime;
+                ulong deltaUser = userTime - _prevUserTime;
+                ulong total = deltaKernel + deltaUser;
+                if (total > 0 && deltaIdle <= total)
+                {
+                    liveCpu = (1.0 - ((double)deltaIdle / (double)total)) * 100.0;
+                }
+            }
+            _prevIdleTime = idleTime;
+            _prevKernelTime = kernelTime;
+            _prevUserTime = userTime;
+        }
+
+        // 2. Instantaneous Win32 Memory via GlobalMemoryStatusEx
+        long totalRam = 0;
+        long availRam = 0;
+        var mem = new MEMORYSTATUSEX { dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(MEMORYSTATUSEX)) };
+        if (GlobalMemoryStatusEx(ref mem))
+        {
+            totalRam = (long)mem.ullTotalPhys;
+            availRam = (long)mem.ullAvailPhys;
+        }
+        long usedRam = Math.Max(0, totalRam - availRam);
+        double ramPct = totalRam > 0 ? ((double)usedRam / totalRam) * 100.0 : 0.0;
+
+        // 3. Fast Top Processes (Inspect 5)
+        var procs = await Task.Run(() => _troubleshootingService.InspectProcesses(5));
+
+        // 4. Update UI elements smoothly
+        if (liveCpu.HasValue)
+        {
+            var cpuVal = Math.Clamp(liveCpu.Value, 0.0, 100.0);
+            OverviewCpuPercentText.Text = $"{cpuVal:F0}%";
+            OverviewCpuProgressRing.Value = cpuVal;
+            OverviewCpuStatusBadgeText.Text = cpuVal >= 85 ? "High Load" : cpuVal >= 60 ? "Moderate" : "Normal";
+            OverviewCpuProgressBar.Value = cpuVal;
+        }
+
+        OverviewRamPercentText.Text = $"{ramPct:F0}%";
+        OverviewRamProgressRing.Value = ramPct;
+        OverviewRamProgressBar.Value = ramPct;
+        OverviewRamValueText.Text = $"{ByteFormatter.FormatBytes(usedRam)} / {ByteFormatter.FormatBytes(totalRam)}";
+
+        if (procs.TopMemoryProcesses.Count > 0)
+        {
+            long maxWorkingSet = procs.TopMemoryProcesses.Max(p => p.WorkingSetBytes);
+            if (maxWorkingSet <= 0) maxWorkingSet = 1;
+            OverviewTopProcesses.Clear();
+            foreach (var p in procs.TopMemoryProcesses)
+            {
+                double pct = Math.Clamp(((double)p.WorkingSetBytes / maxWorkingSet) * 100.0, 4.0, 100.0);
+                OverviewTopProcesses.Add(new ProcessRowViewModel
+                {
+                    ProcessId = p.ProcessId,
+                    ProcessName = p.ProcessName,
+                    WorkingSetDisplay = p.WorkingSetDisplay,
+                    PrivateMemoryDisplay = p.PrivateMemoryDisplay,
+                    CpuTimeDisplay = p.CpuTimeDisplay,
+                    ThreadCount = p.ThreadCount,
+                    StatusDisplay = p.StatusDisplay,
+                    MemoryPercentOfTotal = pct
+                });
+            }
+        }
+    }
+
     private async void OnRefreshOverviewClick(object sender, RoutedEventArgs e)
     {
         await LoadOverviewDashboardAsync(forceHardware: true);
@@ -4888,6 +5055,33 @@ public sealed partial class MainWindow : Window
     private void OnOverviewOpenLedgerClick(object sender, RoutedEventArgs e)
     {
         NavigateToTab("Organize");
+    }
+
+    private async void OnOverviewHeroCheckupClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToTab("Troubleshoot");
+        SelectComboBoxByTag(InvestigationTypeComboBox, "WindowsHealth");
+        await ExecuteGuidedInvestigationAsync(InvestigationType.WindowsHealth, null);
+    }
+
+    private void OnOverviewNavigateCleanClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToTab("Cleanup");
+    }
+
+    private void OnOverviewNavigateOptimizeClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToTab("Optimize");
+    }
+
+    private void OnOverviewNavigateTroubleshootClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToTab("Troubleshoot");
+    }
+
+    private void OnOverviewNavigateDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToTab("Hardware");
     }
 
     private void OnOverviewAgentQueryBoxKeyDown(object sender, KeyRoutedEventArgs e)
@@ -4928,34 +5122,206 @@ public sealed partial class MainWindow : Window
             var procs = await Task.Run(() => _troubleshootingService.InspectProcesses(10));
             var nics = await Task.Run(() => _troubleshootingService.InspectNetworkInterfaces());
 
-            var cpuLoad = hw.LiveDiagnostics.CpuUtilizationPercent ?? 0.0;
-            OverviewCpuValueText.Text = $"{hw.Cpu.Name}";
-            OverviewCpuSubText.Text = $"Live CPU Load: {cpuLoad:F1}% • {hw.Cpu.PhysicalCores}C / {hw.Cpu.LogicalProcessors}T";
-
-            OverviewRamValueText.Text = $"{hw.Memory.FormattedUsed} / {hw.Memory.FormattedTotal} ({hw.Memory.UsedPercent:F0}%)";
-            OverviewRamSubText.Text = $"{hw.Memory.FormattedAvailable} available • {hw.Memory.PopulatedSlots}/{hw.Memory.TotalSlots} slots";
-
             var primaryDrive = drives.FirstOrDefault();
-            OverviewStorageValueText.Text = primaryDrive != null
-                ? $"{primaryDrive.VolumeName}: {ByteFormatter.FormatBytes(primaryDrive.FreeBytes)} free ({primaryDrive.UsedPercent:F0}% used)"
-                : "No volumes detected";
-            OverviewStorageSubText.Text = $"{drives.Count} mounted volume(s) ready";
+            int enabledStartups = startups.Count(s => s.IsEnabled);
+            int highImpactStartups = startups.Count(s => s.IsEnabled && s.ImpactAssessment.Contains("High", StringComparison.OrdinalIgnoreCase));
+            var upNic = nics.FirstOrDefault(n => string.Equals(n.OperationalStatus, "Up", StringComparison.OrdinalIgnoreCase));
 
+            // 1. Calculate PC Health Score (0-100) & Status Dial
+            int healthScore = 100;
+            var issues = new List<string>();
+
+            if (repair.RebootPending)
+            {
+                healthScore -= 12;
+                issues.Add("Reboot pending for updates");
+            }
+            if (primaryDrive != null)
+            {
+                if (primaryDrive.UsedPercent >= 90)
+                {
+                    healthScore -= 20;
+                    issues.Add("Critical low storage on C: (<10% free)");
+                }
+                else if (primaryDrive.UsedPercent >= 80)
+                {
+                    healthScore -= 8;
+                    issues.Add("Storage warning (>80% used on C:)");
+                }
+            }
+            if (repair.DeviceManagerErrors.Count > 0)
+            {
+                healthScore -= Math.Min(15, repair.DeviceManagerErrors.Count * 5);
+                issues.Add($"{repair.DeviceManagerErrors.Count} device error(s)");
+            }
+            if (hw.LiveDiagnostics.CpuUtilizationPercent.HasValue && hw.LiveDiagnostics.CpuUtilizationPercent.Value >= 85)
+            {
+                healthScore -= 10;
+                issues.Add("High CPU load");
+            }
+            if (hw.Memory.UsedPercent >= 90)
+            {
+                healthScore -= 10;
+                issues.Add("High memory pressure");
+            }
+            healthScore = Math.Clamp(healthScore, 20, 100);
+
+            OverviewHealthScoreRing.Value = healthScore;
+            OverviewHealthScoreText.Text = healthScore.ToString();
+
+            if (healthScore >= 90)
+            {
+                OverviewHealthScoreRing.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
+                OverviewHeroBadgeBorder.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBgBrush"];
+                OverviewHeroBadgeText.Text = "OPTIMAL";
+                OverviewHeroBadgeText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
+                OverviewHeroTitleText.Text = "PC Status: Running Smoothly";
+                OverviewHeroSubtitleText.Text = "Windows telemetry active. Hardware sensors, memory, and storage are operating within healthy parameters.";
+                OverviewHeroRebootDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
+            }
+            else if (healthScore >= 75)
+            {
+                OverviewHealthScoreRing.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBrush"];
+                OverviewHeroBadgeBorder.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBgBrush"];
+                OverviewHeroBadgeText.Text = "GOOD";
+                OverviewHeroBadgeText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBrush"];
+                OverviewHeroTitleText.Text = "PC Status: Good with Minor Advisories";
+                OverviewHeroSubtitleText.Text = issues.Count > 0 ? $"Groundwork identified: {string.Join(" • ", issues)}." : "System operating normally with minor background tasks.";
+                OverviewHeroRebootDot.Fill = repair.RebootPending ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBrush"] : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
+            }
+            else
+            {
+                OverviewHealthScoreRing.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBrush"];
+                OverviewHeroBadgeBorder.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBgBrush"];
+                OverviewHeroBadgeText.Text = "ATTENTION";
+                OverviewHeroBadgeText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBrush"];
+                OverviewHeroTitleText.Text = "PC Status: Recommendations Available";
+                OverviewHeroSubtitleText.Text = $"Groundwork identified: {string.Join(" • ", issues)}. Review recommendations below.";
+                OverviewHeroRebootDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBrush"];
+            }
+
+            OverviewHeroUptimePillText.Text = $"Uptime: {hw.Os.FormattedUptime}";
+            OverviewHeroRebootPillText.Text = repair.RebootPending ? "⚠️ Reboot Required" : "🛡️ Servicing: Up to date";
+            OverviewHeroPowerPillText.Text = $"Power: {power.ActiveSchemeName}";
+
+            // 2. CPU Vitals Ring
+            var cpuLoad = hw.LiveDiagnostics.CpuUtilizationPercent ?? 0.0;
+            OverviewCpuPercentText.Text = $"{cpuLoad:F0}%";
+            OverviewCpuProgressRing.Value = Math.Clamp(cpuLoad, 0, 100);
+            OverviewCpuProgressBar.Value = Math.Clamp(cpuLoad, 0, 100);
+            OverviewCpuStatusBadgeText.Text = cpuLoad >= 85 ? "High Load" : cpuLoad >= 60 ? "Moderate" : "Normal";
+            OverviewCpuValueText.Text = $"{hw.Cpu.Name}";
+            OverviewCpuSubText.Text = $"{hw.Cpu.PhysicalCores} Cores • {hw.Cpu.LogicalProcessors} Threads • {cpuLoad:F1}% Load";
+
+            // 3. RAM Vitals Ring & DIMM Slot Geometry
+            var ramPercent = Math.Clamp(hw.Memory.UsedPercent, 0, 100);
+            OverviewRamPercentText.Text = $"{ramPercent:F0}%";
+            OverviewRamProgressRing.Value = ramPercent;
+            OverviewRamProgressBar.Value = ramPercent;
+            OverviewRamStatusBadgeText.Text = ramPercent >= 90 ? "High Usage" : ramPercent >= 75 ? "Elevated" : "Normal";
+            OverviewRamValueText.Text = $"{hw.Memory.FormattedUsed} / {hw.Memory.FormattedTotal}";
+            OverviewRamSubText.Text = $"{hw.Memory.FormattedAvailable} Free • {hw.Memory.PopulatedSlots}/{hw.Memory.TotalSlots} Slots Populated";
+
+            // Populate DIMM Slot visualizer (4 physical slots)
+            var modules = hw.Memory.Modules;
+            var slotBorders = new[] { OverviewSlot1Border, OverviewSlot2Border, OverviewSlot3Border, OverviewSlot4Border };
+            var slotTexts = new[] { OverviewSlot1Text, OverviewSlot2Text, OverviewSlot3Text, OverviewSlot4Text };
+            for (int i = 0; i < 4; i++)
+            {
+                if (i < modules.Count && modules[i].CapacityBytes > 0)
+                {
+                    slotTexts[i].Text = ByteFormatter.FormatBytes(modules[i].CapacityBytes);
+                    slotTexts[i].Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBrush"];
+                    slotBorders[i].Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBgBrush"];
+                    slotBorders[i].BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBrush"];
+                }
+                else if (i < hw.Memory.PopulatedSlots)
+                {
+                    slotTexts[i].Text = "In Use";
+                    slotTexts[i].Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBrush"];
+                    slotBorders[i].Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBgBrush"];
+                    slotBorders[i].BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAccentBrush"];
+                }
+                else
+                {
+                    slotTexts[i].Text = "Empty";
+                    slotTexts[i].Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwTextMutedBrush"];
+                    slotBorders[i].Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwCardBackgroundHoverBrush"];
+                    slotBorders[i].BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwCardBorderBrush"];
+                }
+            }
+
+            // 4. Storage Vitals Ring & Capacity Distribution Bar
+            if (primaryDrive != null)
+            {
+                var storagePercent = Math.Clamp(primaryDrive.UsedPercent, 0, 100);
+                OverviewStoragePercentText.Text = $"{storagePercent:F0}%";
+                OverviewStorageProgressRing.Value = storagePercent;
+                OverviewStorageProgressBar.Value = storagePercent;
+                OverviewStorageStatusBadgeText.Text = storagePercent >= 90 ? "Low Space" : storagePercent >= 75 ? "Moderate" : "Healthy";
+                OverviewStorageValueText.Text = $"{ByteFormatter.FormatBytes(primaryDrive.FreeBytes)} Free of {ByteFormatter.FormatBytes(primaryDrive.TotalBytes)}";
+                OverviewStorageSubText.Text = $"{primaryDrive.VolumeName} ({primaryDrive.FileSystem}) • {drives.Count} Volume(s) Ready";
+
+                double usedStar = Math.Max(1.0, storagePercent);
+                double freeStar = Math.Max(1.0, 100.0 - storagePercent);
+                OverviewStorageUsedCol.Width = new Microsoft.UI.Xaml.GridLength(usedStar, Microsoft.UI.Xaml.GridUnitType.Star);
+                OverviewStorageFreeCol.Width = new Microsoft.UI.Xaml.GridLength(freeStar, Microsoft.UI.Xaml.GridUnitType.Star);
+            }
+            else
+            {
+                OverviewStoragePercentText.Text = "--%";
+                OverviewStorageProgressRing.Value = 0;
+                OverviewStorageProgressBar.Value = 0;
+                OverviewStorageStatusBadgeText.Text = "None";
+                OverviewStorageValueText.Text = "No mounted volumes";
+                OverviewStorageSubText.Text = "Ready";
+                OverviewStorageUsedCol.Width = new Microsoft.UI.Xaml.GridLength(0, Microsoft.UI.Xaml.GridUnitType.Star);
+                OverviewStorageFreeCol.Width = new Microsoft.UI.Xaml.GridLength(100, Microsoft.UI.Xaml.GridUnitType.Star);
+            }
+
+            // 5. Live Network & Internet Topology Visualizer
+            if (upNic != null)
+            {
+                var primaryIp = upNic.IpAddresses.FirstOrDefault() ?? "Configured via DHCP";
+                OverviewTopologyLocalIpText.Text = $"{primaryIp} ({upNic.Name})";
+                OverviewTopologyLinkSpeedText.Text = $"{upNic.SpeedDisplay} Link • {upNic.OperationalStatus}";
+                OverviewTopologyGatewayText.Text = upNic.GatewayAddresses.Count > 0 ? string.Join(", ", upNic.GatewayAddresses) : "Default Gateway Active";
+                OverviewTopologyDnsText.Text = upNic.DnsServers.Count > 0 ? string.Join(" • ", upNic.DnsServers.Take(2)) : "System Default DNS";
+                OverviewTopologyInternetStatusText.Text = "Online • Verified Interface";
+            }
+            else
+            {
+                OverviewTopologyLocalIpText.Text = "No connected adapter";
+                OverviewTopologyLinkSpeedText.Text = "Disconnected";
+                OverviewTopologyGatewayText.Text = "N/A";
+                OverviewTopologyDnsText.Text = "N/A";
+                OverviewTopologyInternetStatusText.Text = "Offline";
+            }
+
+            // 6. System Foundation Strip
             OverviewOsStatusText.Text = $"{hw.Os.Caption} (Build {hw.Os.BuildNumber})";
             OverviewOsSubText.Text = $"Uptime: {hw.Os.FormattedUptime} • Reboot Pending: {(repair.RebootPending ? "Yes" : "No")}";
 
-            int enabledStartups = startups.Count(s => s.IsEnabled);
-            int highImpactStartups = startups.Count(s => s.IsEnabled && s.ImpactAssessment.Contains("High", StringComparison.OrdinalIgnoreCase));
             OverviewStartupStatusText.Text = $"Power: {power.ActiveSchemeName}";
             OverviewStartupSubText.Text = $"{enabledStartups} enabled startup item(s) ({highImpactStartups} high-impact)";
 
-            var upNic = nics.FirstOrDefault(n => string.Equals(n.OperationalStatus, "Up", StringComparison.OrdinalIgnoreCase));
             OverviewNetworkValueText.Text = upNic != null ? $"Connected: {upNic.Name} ({upNic.SpeedDisplay})" : "No Active Adapter Up";
-            OverviewNetworkSubText.Text = $"Device Errors: {repair.DeviceManagerErrors.Count} • System Protection: {(repair.SystemProtectionLikelyAvailable ? "Enabled" : "Standard")}";
+            OverviewNetworkSubText.Text = $"Device Errors: {repair.DeviceManagerErrors.Count} • Protection: {(repair.SystemProtectionLikelyAvailable ? "Enabled" : "Standard")}";
 
+            OverviewNetworkCardValueText.Text = upNic != null ? $"{upNic.Name} ({upNic.SpeedDisplay})" : "No Active Network Adapter";
+            OverviewNetworkCardSubText.Text = upNic != null ? $"DNS: {(upNic.DnsServers.Count > 0 ? upNic.DnsServers[0] : "Default")} • Servicing: {(repair.RebootPending ? "Pending Reboot" : "Normal")}" : "Disconnected from network";
+            OverviewNetworkStatusBadgeText.Text = upNic != null ? "Connected" : "Offline";
+
+            // 7. Top Memory Processes with Relative Horizontal Resource Bars
             OverviewTopProcesses.Clear();
+            long maxWorkingSet = procs.TopMemoryProcesses.Count > 0
+                ? procs.TopMemoryProcesses.Max(p => p.WorkingSetBytes)
+                : 1;
+            if (maxWorkingSet <= 0) maxWorkingSet = 1;
+
             foreach (var p in procs.TopMemoryProcesses)
             {
+                double pct = Math.Clamp(((double)p.WorkingSetBytes / maxWorkingSet) * 100.0, 4.0, 100.0);
                 OverviewTopProcesses.Add(new ProcessRowViewModel
                 {
                     ProcessId = p.ProcessId,
@@ -4964,34 +5330,43 @@ public sealed partial class MainWindow : Window
                     PrivateMemoryDisplay = p.PrivateMemoryDisplay,
                     CpuTimeDisplay = p.CpuTimeDisplay,
                     ThreadCount = p.ThreadCount,
-                    StatusDisplay = p.StatusDisplay
+                    StatusDisplay = p.StatusDisplay,
+                    MemoryPercentOfTotal = pct
                 });
             }
 
+            // 7. System Advisories
             OverviewAdvisories.Clear();
             if (repair.RebootPending)
             {
                 OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
                 {
-                    CategoryBadge = "[SERVICING]",
-                    Title = "Windows Update / Servicing Reboot Pending",
-                    Detail = $"Pending reboot indicators: {string.Join(", ", repair.RebootPendingReasons)}. Restarting Windows is recommended before running system repairs."
+                    CategoryBadge = "SERVICING",
+                    Title = "Windows Update Reboot Pending",
+                    Detail = $"Pending reboot indicators: {string.Join(", ", repair.RebootPendingReasons)}. Restarting Windows is recommended before running system repairs.",
+                    IconGlyph = "\uE7BA",
+                    AccentColorHex = "#F59E0B"
                 });
             }
             if (primaryDrive != null)
             {
+                bool lowStorage = primaryDrive.UsedPercent >= 85;
                 OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
                 {
-                    CategoryBadge = "[STORAGE]",
-                    Title = $"{primaryDrive.VolumeName} Capacity ({primaryDrive.UsedPercent:F0}% Used)",
-                    Detail = $"{ByteFormatter.FormatBytes(primaryDrive.FreeBytes)} free of {ByteFormatter.FormatBytes(primaryDrive.TotalBytes)}. Use Storage Cleanup or Storage Analyzer to inspect large folders."
+                    CategoryBadge = "STORAGE",
+                    Title = $"{primaryDrive.VolumeName} Drive ({primaryDrive.UsedPercent:F0}% Used)",
+                    Detail = $"{ByteFormatter.FormatBytes(primaryDrive.FreeBytes)} free of {ByteFormatter.FormatBytes(primaryDrive.TotalBytes)}. Use Storage Cleanup to reclaim temporary and cache files.",
+                    IconGlyph = lowStorage ? "\uE7BA" : "\uEDA2",
+                    AccentColorHex = lowStorage ? "#EF4444" : "#2DD4BF"
                 });
             }
             OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
             {
-                CategoryBadge = "[STARTUP]",
-                Title = $"{enabledStartups} Active Startup Entries ({highImpactStartups} High-Impact)",
-                Detail = $"Active Power Scheme: {power.ActiveSchemeName}. Review Registry Run keys, Startup folders, and Scheduled Logon Tasks in the Optimize tab."
+                CategoryBadge = "STARTUP",
+                Title = $"{enabledStartups} Startup Apps ({highImpactStartups} High-Impact)",
+                Detail = $"Active Power Scheme: {power.ActiveSchemeName}. Review Registry Run keys and scheduled logon tasks in the Optimize tab.",
+                IconGlyph = "\uE7C3",
+                AccentColorHex = "#6F91FF"
             });
 
             var recentOps = _safeOperationEngine.History.LoadRecords().Take(3).ToList();
@@ -4999,9 +5374,11 @@ public sealed partial class MainWindow : Window
             {
                 OverviewAdvisories.Add(new OverviewAdvisoryRowViewModel
                 {
-                    CategoryBadge = $"[{op.StatusBadge.ToUpperInvariant()}]",
+                    CategoryBadge = op.StatusBadge.ToUpperInvariant(),
                     Title = $"{op.DisplayName} ({op.ExecutedAtDisplay})",
-                    Detail = $"{op.TargetDescription} — {op.Verification.ObservedStateSummary}"
+                    Detail = $"{op.TargetDescription} — {op.Verification.ObservedStateSummary}",
+                    IconGlyph = op.IsRolledBack ? "\uE7A7" : "\uE73E",
+                    AccentColorHex = op.IsRolledBack ? "#C084FC" : "#2DD4BF"
                 });
             }
         }

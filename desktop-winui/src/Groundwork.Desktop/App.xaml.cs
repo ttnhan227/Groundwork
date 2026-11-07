@@ -46,8 +46,19 @@ public partial class App : Application
     {
         try
         {
-            _window = new MainWindow();
+            var mainWin = new MainWindow();
+            _window = mainWin;
             _window.Activate();
+
+            var cmdLineArgs = Environment.GetCommandLineArgs();
+            foreach (var a in cmdLineArgs)
+            {
+                if (a.StartsWith("--tab=", StringComparison.OrdinalIgnoreCase))
+                {
+                    string targetTab = a.Substring("--tab=".Length).Trim();
+                    mainWin.NavigateToTabFromCli(targetTab);
+                }
+            }
         }
         catch (Exception ex)
         {

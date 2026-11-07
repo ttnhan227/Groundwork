@@ -91,7 +91,7 @@ public sealed class InvestigationEngineService
             return InvestigationType.Storage;
         }
 
-        if (q.Contains("startup") || q.Contains("boot") || q.Contains("sign-in") || q.Contains("login"))
+        if (q.Contains("startup") || q.Contains("boot") || q.Contains("sign-in") || q.Contains("sign in") || q.Contains("login") || q.Contains("logon") || q.Contains("autostart"))
         {
             return InvestigationType.Startup;
         }
@@ -434,8 +434,7 @@ public sealed class InvestigationEngineService
         var recommendations = new List<InvestigationRecommendation>();
 
         var netCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_network_health"), ct).ConfigureAwait(false);
-        var svcCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_windows_services"), ct).ConfigureAwait(false);
-        toolResults.AddRange([netCall, svcCall]);
+        toolResults.Add(netCall);
 
         var netReport = await _toolRegistry.Troubleshooting.RunNetworkTroubleshootingAsync(null, ct).ConfigureAwait(false);
         var upAdapters = netReport.ActiveInterfaces.Where(i => string.Equals(i.OperationalStatus, "Up", StringComparison.OrdinalIgnoreCase)).ToList();
