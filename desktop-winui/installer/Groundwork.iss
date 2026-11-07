@@ -2,7 +2,7 @@
 ; Inno Setup 6
 
 #define MyAppName "Groundwork"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Groundwork Team"
 #define MyAppURL "https://github.com/ttnhan227/Groundwork"
 #define MyAppExeName "Groundwork.Desktop.exe"
