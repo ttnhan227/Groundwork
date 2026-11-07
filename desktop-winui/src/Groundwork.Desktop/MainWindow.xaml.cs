@@ -47,7 +47,6 @@ public sealed partial class MainWindow : Window
     private AppSettingsModel _settings = new();
     private HardwareSystemReport? _lastHardwareReport;
     private InvestigationReport? _lastInvestigationReport;
-    private bool _isMockMode;
 
     public ObservableCollection<VolumeRowViewModel> Volumes { get; } = new();
     public ObservableCollection<StorageTreeNodeViewModel> StorageTreeNodes { get; } = new();
@@ -417,13 +416,6 @@ public sealed partial class MainWindow : Window
             string? autoOrganizePath = cmdArgs.FirstOrDefault(a => a.StartsWith("--organize=", StringComparison.OrdinalIgnoreCase))?.Substring(11);
             string? captureUiDir = cmdArgs.FirstOrDefault(a => a.StartsWith("--capture-ui=", StringComparison.OrdinalIgnoreCase))?.Substring(13);
 
-            bool isMock = cmdArgs.Any(a => string.Equals(a, "--mock", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--demo", StringComparison.OrdinalIgnoreCase));
-            if (isMock)
-            {
-                ApplyMockDataForScreenshots(startTab);
-                return;
-            }
-
             if (!string.IsNullOrEmpty(captureUiDir))
             {
                 StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
@@ -601,7 +593,25 @@ public sealed partial class MainWindow : Window
         if (OrganizePanel != null) OrganizePanel.Visibility = string.Equals(tag, "Organize", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         if (SettingsPanel != null) SettingsPanel.Visibility = string.Equals(tag, "Settings", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
 
-        if (_isMockMode) return;
+        if (FooterStatusText != null)
+        {
+            FooterStatusText.Text = tag.ToLowerInvariant() switch
+            {
+                "overview" => "Overview: Live Windows telemetry active • 20 registered diagnostic & safe operation tools ready.",
+                "storage" or "analyze" => _lastScanResult != null
+                    ? $"Storage Analyzer: Scanned {_lastScanResult.RootPath} ({_lastScanResult.TotalFiles:N0} files, {_lastScanResult.TotalFolders:N0} folders)."
+                    : "Storage Analyzer: Select a volume or folder above and click Scan.",
+                "hardware" => "Hardware & Specs: Live WMI, SMBIOS, Registry, and signed driver inspection.",
+                "optimize" => "Optimize: Power scheme, startup entries, scheduled logon tasks, and reversible Windows settings.",
+                "troubleshoot" => "Troubleshoot: Guided multi-tool investigations, network/DNS diagnostics, Event Log errors, and services.",
+                "cleanup" or "maintenance" => "Maintenance: Safe storage cleanup, SHA-256 duplicate detection, and Recycle Bin protection.",
+                "organize" => "Maintenance: Smart File Organizer and Safe Operation Rollback Ledger.",
+                "apps" or "applications" => $"Applications: {_allInstalledApps.Count} installed programs discovered with leftover trace inspection.",
+                "agent" or "assistant" => "AI Assistant: Grounded system companion with 20 registered diagnostic & safe operation tools.",
+                "settings" => "Settings: Local-first configuration, DPAPI-encrypted API keys, and privacy controls.",
+                _ => "Ready."
+            };
+        }
 
         if (string.Equals(tag, "Overview", StringComparison.OrdinalIgnoreCase))
         {
@@ -3055,6 +3065,33 @@ public sealed partial class MainWindow : Window
                 }
             });
 
+            if (removedCount > 0)
+            {
+                _safeOperationEngine.History.RecordExecution(new OperationExecutionRecord(
+                    ExecutionId: $"op-cleanup-{Guid.NewGuid():N}",
+                    ProposalId: cleanupProposal?.Token ?? $"rb-{Guid.NewGuid():N}",
+                    OperationTypeId: "maintenance.storage_cleanup",
+                    DisplayName: $"Storage Cleanup ({modeLabel})",
+                    Category: "Maintenance",
+                    TargetDescription: $"{removedCount:N0} item(s) across selected Storage Sense categories",
+                    Succeeded: true,
+                    StatusMessage: $"Cleaned {removedCount:N0} item(s) ({ByteFormatter.FormatBytes(bytesReclaimed)} processed via {modeLabel}).",
+                    PreChangeStateJson: string.Empty,
+                    PostChangeStateSummary: $"Processed {removedCount:N0} item(s).",
+                    Reversibility: mode == "recycle" ? OperationReversibility.PartiallyReversible : OperationReversibility.Irreversible,
+                    RiskLevel: mode == "recycle" ? OperationRiskLevel.Low : OperationRiskLevel.Medium,
+                    Verification: new OperationVerificationResult(
+                        IsVerified: true,
+                        ObservedStateSummary: $"Processed {removedCount:N0} item(s) ({ByteFormatter.FormatBytes(bytesReclaimed)}); {failedReasons.Count} skipped/in-use.",
+                        VerificationDetails: $"Remove selected cleanup items via {modeLabel}.",
+                        VerifiedAtUtc: DateTimeOffset.UtcNow),
+                    CanRollback: false,
+                    IsRolledBack: false,
+                    RollbackStatusMessage: string.Empty,
+                    RolledBackAtUtc: null,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow));
+            }
+
             string tip = (mode == "recycle" && !cleanRecycleBin)
                 ? "\n\n💡 Tip: Since items were moved to the Recycle Bin, empty the Recycle Bin to reclaim physical drive space in File Explorer."
                 : "";
@@ -4538,14 +4575,18 @@ public sealed partial class MainWindow : Window
                     break;
             }
 
-            _lastAssistantAnswer = answer;
+            string combinedAnswer = string.Equals(answer, plannedTurn.DeterministicMarkdownResponse, StringComparison.Ordinal)
+                ? plannedTurn.DeterministicMarkdownResponse
+                : $"{plannedTurn.DeterministicMarkdownResponse}\n\n### AI Provider Synthesis ({_settings.AiProvider.ToUpperInvariant()})\n{answer}";
+
+            _lastAssistantAnswer = combinedAnswer;
             _agentConversation.Add((question.Length <= 800 ? question : question[..800], answer.Length <= 1800 ? answer : answer[..1800]));
             if (_agentConversation.Count > 5) _agentConversation.RemoveAt(0);
             if (_settings.RememberAgentConversation)
             {
                 AgentLocalStateService.SaveConversation(_agentConversation.Select(turn => new AgentConversationTurn(turn.User, turn.Assistant)));
             }
-            RenderFormattedAgentResponse(answer);
+            RenderFormattedAgentResponse(combinedAnswer);
             _lastAgentPendingProposal = plannedTurn.PendingApprovalProposals.FirstOrDefault();
             if (_lastAgentPendingProposal is not null)
             {
@@ -5020,12 +5061,13 @@ public sealed partial class MainWindow : Window
             OptimizeStartupItems.Clear();
             foreach (var s in startupItems)
             {
+                string displayCmd = _settings.MaskHardwareSerials ? SanitizePrivacyUser(s.CommandOrTarget) : s.CommandOrTarget;
                 OptimizeStartupItems.Add(new StartupItemRowViewModel
                 {
                     EntryId = s.EntryId,
                     Name = s.Name,
                     Publisher = s.Publisher,
-                    CommandOrTarget = s.CommandOrTarget,
+                    CommandOrTarget = displayCmd,
                     ScopeDisplay = s.ScopeDisplay,
                     IsEnabled = s.IsEnabled,
                     ImpactAssessment = s.ImpactAssessment,
@@ -6130,540 +6172,6 @@ public sealed partial class MainWindow : Window
         await dialog.ShowAsync();
     }
 
-    private void ApplyMockDataForScreenshots(string? startTab)
-    {
-        _isMockMode = true;
-        // 1. Mock Volumes / Drives
-        Volumes.Clear();
-        DrivesComboBox.Items.Clear();
-        DrivesComboBox.Items.Add(new ComboBoxItem { Content = "💻 All Drives (Entire PC)", Tag = "__ALL_DRIVES__" });
-        Volumes.Add(new VolumeRowViewModel(
-            RootPath: @"C:\",
-            VolumeName: "Windows (C:)",
-            FileSystemLabel: "Windows System Drive",
-            CapacitySummary: "142.5 GB free of 250.0 GB",
-            UsedPercent: 43.0,
-            MftBadge: "NTFS volume"
-        ));
-        DrivesComboBox.Items.Add(new ComboBoxItem
-        {
-            Content = "💾 Windows (C:)  (142.5 GB free of 250.0 GB)",
-            Tag = @"C:\"
-        });
-        Volumes.Add(new VolumeRowViewModel(
-            RootPath: @"D:\",
-            VolumeName: "Data & Games (D:)",
-            FileSystemLabel: "Internal Storage",
-            CapacitySummary: "512.0 GB free of 1.0 TB",
-            UsedPercent: 48.8,
-            MftBadge: "NTFS volume"
-        ));
-        DrivesComboBox.Items.Add(new ComboBoxItem
-        {
-            Content = "💾 Data & Games (D:)  (512.0 GB free of 1.0 TB)",
-            Tag = @"D:\"
-        });
-        DrivesComboBox.SelectedIndex = 1;
-        ScanPathTextBox.Text = @"C:\Projects\Workspace";
-
-        // 2. Mock Storage Tree & Breakdown Bar
-        if (string.Equals(startTab, "StorageEmpty", StringComparison.OrdinalIgnoreCase))
-        {
-            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
-            NavigateToTab("Storage");
-            TreeEmptyStateBorder.Visibility = Visibility.Visible;
-            StorageTreeListView.Visibility = Visibility.Collapsed;
-            StorageFileListView.Visibility = Visibility.Collapsed;
-            StorageBarSegments.Clear();
-            StorageBreakdownBarGrid.Children.Clear();
-            StorageBreakdownSummaryText.Text = "No drive or folder scanned yet.";
-            return;
-        }
-
-        TreeEmptyStateBorder.Visibility = Visibility.Collapsed;
-        StorageTreeListView.Visibility = Visibility.Visible;
-
-        StorageBarSegments.Clear();
-        StorageBreakdownBarGrid.Children.Clear();
-        StorageBreakdownBarGrid.ColumnDefinitions.Clear();
-
-        var mockSegments = new (string Name, string Size, double Percent, string Color)[]
-        {
-            ("Games", "68.4 GB", 46.4, "#6366F1"),
-            ("Projects", "32.1 GB", 21.8, "#3B82F6"),
-            ("AppData", "18.6 GB", 12.6, "#8B5CF6"),
-            ("Documents", "12.4 GB", 8.4, "#F59E0B"),
-            ("Downloads", "8.2 GB", 5.6, "#EC4899"),
-            ("Media", "5.1 GB", 3.5, "#14B8A6"),
-            ("Other Files & Folders", "2.7 GB", 1.7, "#64748B")
-        };
-
-        int colIdx = 0;
-        foreach (var seg in mockSegments)
-        {
-            StorageBarSegments.Add(new StorageBarSegmentViewModel
-            {
-                Name = seg.Name,
-                FormattedSize = seg.Size,
-                Percent = seg.Percent,
-                ColorHex = seg.Color
-            });
-            StorageBreakdownBarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1, seg.Percent), GridUnitType.Star) });
-            var rect = new Border
-            {
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255,
-                    Convert.ToByte(seg.Color.Substring(1, 2), 16),
-                    Convert.ToByte(seg.Color.Substring(3, 2), 16),
-                    Convert.ToByte(seg.Color.Substring(5, 2), 16)))
-            };
-            Grid.SetColumn(rect, colIdx++);
-            StorageBreakdownBarGrid.Children.Add(rect);
-        }
-        StorageBreakdownSummaryText.Text = "Storage breakdown for 147.5 GB: top 6 folders represent 98.3% of disk space.";
-
-        StorageTreeNodes.Clear();
-        var mockTree = new (string Name, string Path, string Size, double Pct, int Files, int Folders)[]
-        {
-            ("Games", @"C:\Projects\Workspace\Games", "68.4 GB", 46.4, 1420, 48),
-            ("Projects", @"C:\Projects\Workspace\Projects", "32.1 GB", 21.8, 18920, 1240),
-            ("AppData", @"C:\Projects\Workspace\AppData", "18.6 GB", 12.6, 42100, 5120),
-            ("Documents", @"C:\Projects\Workspace\Documents", "12.4 GB", 8.4, 1240, 140),
-            ("Downloads", @"C:\Projects\Workspace\Downloads", "8.2 GB", 5.6, 84, 12),
-            ("Media", @"C:\Projects\Workspace\Media", "5.1 GB", 3.5, 32, 4)
-        };
-        int treeId = 1;
-        foreach (var t in mockTree)
-        {
-            StorageTreeNodes.Add(new StorageTreeNodeViewModel
-            {
-                Id = treeId++,
-                ParentId = 0,
-                Name = t.Name,
-                FullPath = t.Path,
-                IsDirectory = true,
-                SizeBytes = (long)(t.Pct * 147.5 * 1024 * 1024 * 10.24),
-                AllocatedBytes = (long)(t.Pct * 147.5 * 1024 * 1024 * 10.24),
-                FormattedSize = t.Size,
-                FormattedAllocated = t.Size,
-                PercentOfDrive = t.Pct / 100.0,
-                PercentLabel = $"{t.Pct:F1}%",
-                RecursiveFileCount = t.Files,
-                RecursiveFolderCount = t.Folders,
-                Attributes = "D",
-                LastModifiedFormatted = "2026-10-30 14:15",
-                DepthLevel = 0,
-                IsExpanded = false
-            });
-        }
-
-        ScannedFiles.Clear();
-        var mockFiles = new (string Name, string Path, string Size, long Bytes, string Cat)[]
-        {
-            ("UnrealEngine_5.4_Setup.iso", @"C:\Projects\Workspace\Games\UnrealEngine_5.4_Setup.iso", "28.4 GB", 28400000000L, "Archives"),
-            ("Dataset_Training_2026.parquet", @"C:\Projects\Workspace\Projects\Dataset_Training_2026.parquet", "14.2 GB", 14200000000L, "Documents"),
-            ("Showcase_B-Roll_4K.mp4", @"C:\Projects\Workspace\Media\Showcase_B-Roll_4K.mp4", "8.6 GB", 8600000000L, "Videos"),
-            ("Docker_Container_Base.vhdx", @"C:\Projects\Workspace\Projects\Docker_Container_Base.vhdx", "6.2 GB", 6200000000L, "Virtual Machines"),
-            ("Android_Studio_SDK.zip", @"C:\Projects\Workspace\Downloads\Android_Studio_SDK.zip", "4.1 GB", 4100000000L, "Archives")
-        };
-        foreach (var f in mockFiles)
-        {
-            ScannedFiles.Add(new FileRowViewModel
-            {
-                Name = f.Name,
-                FullPath = f.Path,
-                Folder = System.IO.Path.GetDirectoryName(f.Path) ?? "",
-                Extension = System.IO.Path.GetExtension(f.Name),
-                Category = f.Cat,
-                SizeBytes = f.Bytes,
-                AllocatedBytes = f.Bytes,
-                FormattedSize = f.Size,
-                LastModifiedFormatted = "2026-10-28 10:20"
-            });
-        }
-        FooterStatusText.Text = "Scan finished: 63,806 files, 6,564 folders in 0.48s (132,929 files/sec). Total: 147.5 GB. Free: 142.5 GB / Total: 250.0 GB (Used: 107.5 GB)";
-
-        // 3. Mock Storage Sense Cleanup
-        StorageSenseCategories.Clear();
-        var mockRbCard = new StorageSenseCategoryCardViewModel
-        {
-            CategoryId = "recycle_bin",
-            Title = "Windows Recycle Bin",
-            LocationDisplay = @"C:\$Recycle.Bin",
-            Description = "Contains files previously deleted from your computer. Safe to empty. 28 items in trash.",
-            FormattedSize = "4.2 GB",
-            SizeBytes = 4200000000L,
-            CountSummary = "28 items",
-            Glyph = "\uE74D",
-            GlyphColor = "#EF4444",
-            GlyphBg = "#FEF2F2",
-            IsSelected = true
-        };
-        StorageSenseCategories.Add(mockRbCard);
-
-        var mockTempCard = new StorageSenseCategoryCardViewModel
-        {
-            CategoryId = "temp_files",
-            Title = "Temporary App & Cache Files",
-            LocationDisplay = @"%TEMP% (C:\Users\Developer\AppData\Local\Temp)",
-            Description = "Temporary working files and caches left behind by closed applications that are safe to remove.",
-            FormattedSize = "2.8 GB",
-            SizeBytes = 2800000000L,
-            CountSummary = "312 temporary files",
-            Glyph = "\uE8B7",
-            GlyphColor = "#F59E0B",
-            GlyphBg = "#FFFBEB",
-            IsSelected = true
-        };
-        StorageSenseCategories.Add(mockTempCard);
-
-        var mockDumpCard = new StorageSenseCategoryCardViewModel
-        {
-            CategoryId = "crash_dumps",
-            Title = "System Crash Dumps & Error Reports",
-            LocationDisplay = @"%LOCALAPPDATA%\CrashDumps",
-            Description = "Diagnostic memory dump files saved when programs crash unexpectedly. Safe to clean once resolved.",
-            FormattedSize = "680.0 MB",
-            SizeBytes = 680000000L,
-            CountSummary = "4 dump files",
-            Glyph = "\uE7BA",
-            GlyphColor = "#DC2626",
-            GlyphBg = "#FEF2F2",
-            IsSelected = true
-        };
-        StorageSenseCategories.Add(mockDumpCard);
-
-        var mockInstallersCard = new StorageSenseCategoryCardViewModel
-        {
-            CategoryId = "downloads_installers",
-            Title = "Downloaded Setup Packages & Archives",
-            LocationDisplay = @"C:\Users\Developer\Downloads",
-            Description = "Installation files (.exe, .msi, .iso) and archives. Kept unchecked by default to protect your downloads.",
-            FormattedSize = "3.1 GB",
-            SizeBytes = 3100000000L,
-            CountSummary = "14 setup packages",
-            Glyph = "\uE896",
-            GlyphColor = "#10B981",
-            GlyphBg = "#ECFDF5",
-            IsSelected = false
-        };
-        StorageSenseCategories.Add(mockInstallersCard);
-
-        var mockDupesCard = new StorageSenseCategoryCardViewModel
-        {
-            CategoryId = "duplicates",
-            Title = "Identical Duplicate Files",
-            LocationDisplay = "User Folders & Scanned Targets",
-            Description = "Redundant files with identical SHA-256 hashes. The original file is always preserved safely.",
-            FormattedSize = "240.0 MB",
-            SizeBytes = 240000000L,
-            CountSummary = "12 duplicate clusters",
-            Glyph = "\uE8C8",
-            GlyphColor = "#8B5CF6",
-            GlyphBg = "#F5F3FF",
-            IsSelected = false
-        };
-        StorageSenseCategories.Add(mockDupesCard);
-
-        CleanupTotalReclaimableText.Text = "7.68 GB";
-        CleanupTotalReclaimableSubText.Text = "344 items selected across recommendations ready for cleanup.";
-        ReviewAndCleanButton.Content = "Clean Selected (7.68 GB)...";
-
-        // 4. Mock Installed Applications
-        InstalledApps.Clear();
-        var mockAppList = new (string Name, string Pub, string Ver, string Size, long Bytes)[]
-        {
-            ("Visual Studio Code", "Microsoft Corporation", "1.94.2", "480.0 MB", 480000000L),
-            ("Docker Desktop", "Docker Inc.", "4.34.0", "3.8 GB", 3800000000L),
-            ("Blender 4.2 LTS", "Blender Foundation", "4.2.1", "850.0 MB", 850000000L),
-            ("Discord", "Discord Inc.", "1.0.9160", "210.0 MB", 210000000L),
-            ("Figma Desktop", "Figma Inc.", "124.3.1", "320.0 MB", 320000000L),
-            ("Git for Windows", "The Git Development Community", "2.46.0", "310.0 MB", 310000000L),
-            ("Node.js (LTS)", "OpenJS Foundation", "22.11.0", "140.0 MB", 140000000L),
-            ("Postman", "Postman Inc.", "11.14.0", "490.0 MB", 490000000L),
-            ("Spotify Music", "Spotify AB", "1.2.45", "195.0 MB", 195000000L),
-            ("7-Zip 24.08 (x64)", "Igor Pavlov", "24.08", "5.8 MB", 5800000L)
-        };
-        foreach (var app in mockAppList)
-        {
-            var raw = new InstalledApplicationInfo(
-                Id: app.Name.ToLowerInvariant().Replace(" ", "-"),
-                Name: app.Name,
-                Publisher: app.Pub,
-                Version: app.Ver,
-                InstallDate: "2026-10-15",
-                InstallLocation: @"C:\Program Files\" + app.Name,
-                UninstallString: @"C:\Program Files\" + app.Name + @"\unins000.exe",
-                QuietUninstallString: "",
-                EstimatedSizeBytes: app.Bytes,
-                Source: "Registry",
-                CanUninstall: true,
-                IsSystemComponent: false
-            );
-            InstalledApps.Add(new InstalledAppRowViewModel(
-                Id: raw.Id,
-                Name: raw.Name,
-                Publisher: raw.Publisher,
-                Version: raw.Version,
-                InstallDate: raw.InstallDate,
-                InstallLocation: raw.InstallLocation,
-                FormattedSize: app.Size,
-                UninstallString: raw.UninstallString,
-                CanUninstall: true,
-                RawModel: raw
-            ));
-        }
-        InstalledAppsCountText.Text = "Installed Applications (10)";
-        AppsEmptyStateBorder.Visibility = Visibility.Collapsed;
-        InstalledAppsListView.Visibility = Visibility.Visible;
-        UninstallSelectedAppButton.IsEnabled = false;
-
-        // 5. Mock Hardware Specifications
-        HwCpuTitleText.Text = "AMD Ryzen 9 7950X 16-Core Processor";
-        HwCpuSubText.Text = "16 Cores • 32 Threads • 4500 MHz • x64";
-        HwGpuTitleText.Text = "NVIDIA GeForce RTX 4090";
-        HwGpuSubText.Text = "24.0 GB VRAM • 3840 x 2160 @ 144 Hz";
-        HwRamTitleText.Text = "64.0 GB DDR5";
-        HwRamSubText.Text = "6000 MHz • 2 of 4 slots (42% used)";
-        HwOsTitleText.Text = "Microsoft Windows 11 Pro 64-bit";
-        HwOsSubText.Text = "Build 26100 • Up 3d 14h 22m";
-
-        HwCpuModelVal.Text = "AMD Ryzen 9 7950X 16-Core Processor";
-        HwCpuCoresVal.Text = "16 Physical Cores, 32 Logical Processors";
-        HwCpuClockVal.Text = "4500 MHz";
-        HwCpuSocketVal.Text = "Socket AM5 (LGA 1718)";
-        HwCpuCacheVal.Text = "16384 KB L2, 65536 KB L3 • Firmware virtualization enabled";
-
-        HwMoboMfgVal.Text = "ASUSTeK COMPUTER INC.";
-        HwMoboModelVal.Text = "ROG CROSSHAIR X670E HERO (v1.02)";
-        HwMoboSerialVal.Text = "ROG-MB-SAMPLE-MOCK";
-        HwBiosVerVal.Text = "American Megatrends Inc. 2401 (2024-08-15)";
-        HwSecureBootVal.Text = "Active / Enabled (UEFI)";
-
-        HardwareDisks.Clear();
-        HardwareDisks.Add(new PhysicalDiskSpecsInfo
-        {
-            Model = "Samsung SSD 990 PRO 2TB (NVMe)",
-            MediaType = "Fixed hard disk media",
-            SizeBytes = 2000398934016L,
-            FormattedSize = "1.82 TB",
-            InterfaceType = "NVMe",
-            Status = "Healthy"
-        });
-        HardwareDisks.Add(new PhysicalDiskSpecsInfo
-        {
-            Model = "WD_BLACK SN850X 4TB (NVMe)",
-            MediaType = "Fixed hard disk media",
-            SizeBytes = 4000797868032L,
-            FormattedSize = "3.64 TB",
-            InterfaceType = "NVMe",
-            Status = "Healthy"
-        });
-
-        HardwareMemoryModules.Clear();
-        HardwareMemoryModules.Add(new MemoryModuleInfo
-        {
-            BankLocator = "DIMM 1",
-            CapacityBytes = 34359738368L,
-            FormattedCapacity = "32.0 GB",
-            SpeedMHz = 6000,
-            Manufacturer = "Corsair",
-            PartNumber = "CMK64GX5M2B6000C30",
-            MemoryType = "DDR5"
-        });
-        HardwareMemoryModules.Add(new MemoryModuleInfo
-        {
-            BankLocator = "DIMM 2",
-            CapacityBytes = 34359738368L,
-            FormattedCapacity = "32.0 GB",
-            SpeedMHz = 6000,
-            Manufacturer = "Corsair",
-            PartNumber = "CMK64GX5M2B6000C30",
-            MemoryType = "DDR5"
-        });
-
-        HardwareGpus.Clear();
-        HardwareGpus.Add(new GpuSpecsInfo
-        {
-            Name = "NVIDIA GeForce RTX 4090",
-            DedicatedMemoryBytes = 25769803776L,
-            FormattedDedicatedMemory = "24.0 GB",
-            DriverVersion = "32.0.15.6603",
-            ResolutionAndRefreshRate = "3840 x 2160 @ 144 Hz",
-            IsPrimary = true
-        });
-        HardwareGpus.Add(new GpuSpecsInfo
-        {
-            Name = "AMD Radeon Graphics",
-            DedicatedMemoryBytes = 0L,
-            FormattedDedicatedMemory = "Shared Memory",
-            DriverVersion = "31.0.21925.1001",
-            ResolutionAndRefreshRate = "Inactive",
-            IsPrimary = false
-        });
-
-        HardwareNetworks.Clear();
-        HardwareNetworks.Add(new NetworkAdapterSpecsInfo
-        {
-            Name = "Intel(R) Ethernet Controller I225-V",
-            Status = "Connected",
-            SpeedBitsPerSecond = 2500000000L,
-            FormattedSpeed = "2500 Mbps",
-            MacAddress = "00:1A:2B:3C:4D:5E"
-        });
-        HardwareNetworks.Add(new NetworkAdapterSpecsInfo
-        {
-            Name = "Intel(R) Wi-Fi 6E AX210 160MHz",
-            Status = "Connected",
-            SpeedBitsPerSecond = 2400000000L,
-            FormattedSpeed = "2400 Mbps",
-            MacAddress = "00:1A:2B:3C:4D:5F"
-        });
-        HardwareProgressBar.Visibility = Visibility.Collapsed;
-
-        // 6. Mock Organize
-        OrganizeFolderBox.Text = @"D:\Downloads";
-        OrganizationPlanItems.Clear();
-        var mockOrg = new (string Name, string Dest, string Cat, string Size, long Bytes)[]
-        {
-            ("Q3_Financial_Summary.pdf", "Documents\\", "Documents", "2.4 MB", 2400000L),
-            ("Project_Architecture.png", "Images\\", "Images", "14.2 MB", 14200000L),
-            ("Sprint_Review_Recording.mp4", "Videos\\", "Videos", "480.0 MB", 480000000L),
-            ("dotnet-sdk-10.0-win-x64.exe", "Applications\\", "Executables", "210.0 MB", 210000000L),
-            ("Backup_Database_2026.zip", "Archives\\", "Archives", "1.25 GB", 1250000000L),
-            ("dataset_train.parquet", "Documents\\", "Documents", "42.1 MB", 42100000L)
-        };
-        foreach (var org in mockOrg)
-        {
-            OrganizationPlanItems.Add(new OrganizationPlanItemViewModel
-            {
-                FileName = org.Name,
-                OriginalPath = System.IO.Path.Combine(@"D:\Downloads", org.Name),
-                TargetSubfolder = org.Dest,
-                Category = org.Cat,
-                SizeBytes = org.Bytes,
-                FormattedSize = org.Size,
-                RuleBadge = "CATEGORY"
-            });
-        }
-        OrganizationEmptyStateBorder.Visibility = Visibility.Collapsed;
-        OrganizationHistoryListView.Visibility = Visibility.Visible;
-        OrganizationStatusText.Text = "Preview generated: 6 files will be organized into 5 subfolders.";
-
-        // 7. Mock Agent Assistant
-        AgentProviderSetupRequiredGrid.Visibility = Visibility.Collapsed;
-        AgentActiveContentPanel.Visibility = Visibility.Visible;
-        AssistantProviderBadge.Text = "Mistral (ministral-8b-latest)";
-        AssistantStandbyGrid.Visibility = Visibility.Collapsed;
-        AssistantResultsGrid.Visibility = Visibility.Visible;
-        AssistantActiveQueryLabel.Text = "\"Find heavy developer build caches like node_modules, bin/obj, and venv\"";
-        AssistantQuestionBox.Text = "Find heavy developer build caches like node_modules, bin/obj, and venv";
-        
-        AssistantTargetKpiIcon.Glyph = "\uE7BE";
-        AssistantTargetKpiTitle.Text = "Matched Caches";
-        AssistantTargetKpiValue.Text = "12 Directories";
-        AssistantTargetKpiSub.Text = @"C:\Projects\Workspace";
-        
-        AssistantWasteKpiIcon.Glyph = "\uE74D";
-        AssistantWasteKpiTitle.Text = "Reclaimable Waste";
-        AssistantWasteKpiValue.Text = "18.4 GB";
-        AssistantWasteKpiSub.Text = "Ephemeral build artifacts";
-        
-        AssistantAppKpiIcon.Glyph = "\uE896";
-        AssistantAppKpiTitle.Text = "Safety Assessment";
-        AssistantAppKpiValue.Text = "Safe to Clean";
-        AssistantAppKpiSub.Text = "Regenerated via package managers";
-
-        RenderFormattedAgentResponse(
-            "Found **12 build cache directories** totaling **18.4 GB** across your development projects under `C:\\Projects\\Workspace`.\n\n" +
-            "• **Node.js (`node_modules`)**: 3 directories taking **8.6 GB** (largest: `C:\\Projects\\Workspace\\frontend\\web\\node_modules` at 4.2 GB).\n" +
-            "• **.NET (`bin` / `obj`)**: 6 build folders taking **6.4 GB** under `C:\\Projects\\Workspace\\backend\\src`.\n" +
-            "• **Python (`.venv`)**: 3 virtual environments taking **3.4 GB** under `analytics\\scripts`.\n\n" +
-            "All build caches are ephemeral artifacts and can be safely sent to the Windows Recycle Bin. Source code, git configuration, and environment manifests remain 100% untouched.");
-
-        AssistantRecommendations.Clear();
-        AssistantRecommendations.Add(new AssistantRecommendationViewModel
-        {
-            IconGlyph = "\uE74D",
-            IconColor = "#EF4444",
-            Title = "Recycle Ephemeral Build Caches (18.4 GB)",
-            Description = "Send 12 node_modules, bin/obj, and venv cache trees to Windows Recycle Bin. Safe to recreate anytime.",
-            ActionButtonText = "Recycle Caches (18.4 GB)",
-            ActionTag = "recycle_caches"
-        });
-
-        AssistantKeyItems.Clear();
-        AssistantKeyItems.Add(new AssistantItemRowViewModel
-        {
-            Glyph = "\uE8B7",
-            GlyphColor = "#3B82F6",
-            Name = "node_modules",
-            FullPath = @"C:\Projects\Workspace\frontend\web\node_modules",
-            FormattedSize = "4.2 GB",
-            Subtitle = "Node.js package cache (14,210 files)",
-            CategoryBadge = "NODE_MODULES",
-            BadgeBackground = "#EFF6FF",
-            BadgeForeground = "#1D4ED8"
-        });
-        AssistantKeyItems.Add(new AssistantItemRowViewModel
-        {
-            Glyph = "\uE8B7",
-            GlyphColor = "#3B82F6",
-            Name = "node_modules",
-            FullPath = @"C:\Projects\Workspace\api-gateway\node_modules",
-            FormattedSize = "2.8 GB",
-            Subtitle = "Node.js package cache (9,480 files)",
-            CategoryBadge = "NODE_MODULES",
-            BadgeBackground = "#EFF6FF",
-            BadgeForeground = "#1D4ED8"
-        });
-        AssistantKeyItems.Add(new AssistantItemRowViewModel
-        {
-            Glyph = "\uE7BE",
-            GlyphColor = "#10B981",
-            Name = "bin / obj",
-            FullPath = @"C:\Projects\Workspace\backend\src\Groundwork.Desktop\bin",
-            FormattedSize = "3.1 GB",
-            Subtitle = ".NET 10 compilation output",
-            CategoryBadge = "BUILD_CACHE",
-            BadgeBackground = "#ECFDF5",
-            BadgeForeground = "#047857"
-        });
-        AssistantKeyItems.Add(new AssistantItemRowViewModel
-        {
-            Glyph = "\uE7BE",
-            GlyphColor = "#F59E0B",
-            Name = ".venv",
-            FullPath = @"C:\Projects\Workspace\analytics\.venv",
-            FormattedSize = "2.1 GB",
-            Subtitle = "Python 3.12 virtual environment",
-            CategoryBadge = "PYTHON_VENV",
-            BadgeBackground = "#FEF3C7",
-            BadgeForeground = "#B45309"
-        });
-        AssistantItemsCountLabel.Text = "12 cache directories identified";
-        AssistantAnalyzeButton.IsEnabled = true;
-        AssistantCancelButton.Visibility = Visibility.Collapsed;
-
-        // 8. Navigation tab switch
-        if (string.Equals(startTab, "AgentStandby", StringComparison.OrdinalIgnoreCase))
-        {
-            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
-            NavigateToTab("Agent");
-            AssistantStandbyGrid.Visibility = Visibility.Visible;
-            AssistantResultsGrid.Visibility = Visibility.Collapsed;
-            AssistantQuestionBox.Text = string.Empty;
-        }
-        else if (!string.IsNullOrEmpty(startTab))
-        {
-            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
-            NavigateToTab(startTab);
-        }
-        else
-        {
-            StartupDriveModalOverlay.Visibility = Visibility.Collapsed;
-            NavigateToTab("Overview");
-        }
-    }
 
     private async Task CaptureCurrentViewToPngAsync(string filePath)
     {

@@ -652,7 +652,7 @@ public sealed class SafeCleanupService
                         long size = file.Length;
                         tempBytes += size;
                         tempCount++;
-                        if (candidates.Count < 60 && size > 512)
+                        if (candidates.Count < 1000 && size > 0)
                         {
                             candidates.Add(new CleanupCandidateItem(
                                 FullPath: file.FullName,
@@ -735,7 +735,7 @@ public sealed class SafeCleanupService
                         {
                             installerBytes += size;
                             installerCount++;
-                            if (candidates.Count < 100)
+                            if (candidates.Count < 1000)
                             {
                                 candidates.Add(new CleanupCandidateItem(
                                     FullPath: file.FullName,

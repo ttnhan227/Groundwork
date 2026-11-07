@@ -293,12 +293,17 @@ public sealed class DiagnosticsAndTroubleshootingService
                 }
 
                 string desc = nic.Description ?? string.Empty;
+                string nicName = nic.Name ?? string.Empty;
                 if (desc.Contains("WAN Miniport", StringComparison.OrdinalIgnoreCase) ||
                     desc.Contains("LightWeight Filter", StringComparison.OrdinalIgnoreCase) ||
                     desc.Contains("QoS Packet Scheduler", StringComparison.OrdinalIgnoreCase) ||
                     desc.Contains("Native WiFi Filter", StringComparison.OrdinalIgnoreCase) ||
                     desc.Contains("Virtual WiFi Filter", StringComparison.OrdinalIgnoreCase) ||
-                    desc.Contains("Kernel Debug Network Adapter", StringComparison.OrdinalIgnoreCase))
+                    desc.Contains("Kernel Debug Network Adapter", StringComparison.OrdinalIgnoreCase) ||
+                    desc.Contains("Virtual Switch Extension", StringComparison.OrdinalIgnoreCase) ||
+                    desc.Contains("VMSwitch Extension", StringComparison.OrdinalIgnoreCase) ||
+                    nicName.Contains("Virtual Switch Extension", StringComparison.OrdinalIgnoreCase) ||
+                    nicName.Contains("VMSwitch Extension", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -329,7 +334,7 @@ public sealed class DiagnosticsAndTroubleshootingService
                 }
 
                 results.Add(new NetworkInterfaceDiagnostic(
-                    Name: nic.Name,
+                    Name: nicName,
                     Description: desc,
                     InterfaceType: nic.NetworkInterfaceType.ToString(),
                     OperationalStatus: nic.OperationalStatus.ToString(),
