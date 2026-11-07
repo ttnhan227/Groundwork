@@ -27,7 +27,7 @@
                     <Image Source="ms-appx:///Assets/icon.png" Width="26" Height="26" VerticalAlignment="Center" />
                     <TextBlock Text="Groundwork" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                     <Border Padding="6,2" CornerRadius="4" Background="#1E3A5F" BorderBrush="#2D5A8C" BorderThickness="1" VerticalAlignment="Center">
-                        <TextBlock Text="v2.0" FontSize="10" FontWeight="SemiBold" Foreground="#93C5FD" />
+                        <TextBlock Text="v1.1.0" FontSize="10" FontWeight="SemiBold" Foreground="#93C5FD" />
                     </Border>
                 </StackPanel>
 
