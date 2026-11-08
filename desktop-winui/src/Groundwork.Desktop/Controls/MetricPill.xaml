@@ -1,0 +1,28 @@
+<UserControl
+    x:Class="Groundwork.Desktop.Controls.MetricPill"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border
+        x:Name="PillBorder"
+        Padding="8,4"
+        CornerRadius="6"
+        Background="{ThemeResource GwCardBackgroundHoverBrush}"
+        BorderBrush="{ThemeResource GwCardBorderBrush}"
+        BorderThickness="1">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <FontIcon
+                x:Name="PillIcon"
+                FontSize="12"
+                Foreground="{ThemeResource GwAccentBrush}"
+                Glyph="&#xE946;"
+                VerticalAlignment="Center" />
+            <TextBlock
+                x:Name="PillLabel"
+                FontSize="11"
+                FontWeight="Medium"
+                Foreground="{ThemeResource GwTextPrimaryBrush}"
+                VerticalAlignment="Center" />
+        </StackPanel>
+    </Border>
+</UserControl>

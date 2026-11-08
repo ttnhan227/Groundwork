@@ -1,0 +1,79 @@
+<ContentDialog
+    x:Class="Groundwork.Desktop.Dialogs.SafeOperationGateDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Safe Operation Approval Gate"
+    PrimaryButtonText="Approve &amp; Execute"
+    CloseButtonText="Cancel"
+    DefaultButton="Close">
+
+    <Grid MinWidth="540" MaxWidth="620" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Operation Summary Header -->
+        <Border
+            Grid.Row="0"
+            Padding="14,12"
+            CornerRadius="8"
+            Background="{ThemeResource GwAccentBgBrush}"
+            BorderBrush="{ThemeResource GwAccentBrush}"
+            BorderThickness="1">
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="OperationTitleText" Text="Proposed System Change" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="OperationDescText" Text="Explanation of proposed change..." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- Details Grid -->
+        <Border
+            Grid.Row="1"
+            Padding="14,12"
+            CornerRadius="8"
+            Background="{ThemeResource GwCardBackgroundHoverBrush}"
+            BorderBrush="{ThemeResource GwCardBorderBrush}"
+            BorderThickness="1">
+            <StackPanel Spacing="8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Target:" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" x:Name="TargetText" Text="System State" FontSize="11" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Reversibility:" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" x:Name="ReversibilityText" Text="Reversible via Rollback Ledger" FontSize="11" Foreground="{ThemeResource GwSignalGreenBrush}" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Potential Risks:" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" x:Name="RisksText" Text="Low risk. Standard Windows operation." FontSize="11" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <TextBlock
+            Grid.Row="2"
+            Text="All modifications pass through the 10-step Safe Operation Lifecycle: pre-state capture, verification, and audit ledger entry."
+            FontSize="10"
+            Foreground="{ThemeResource GwTextMutedBrush}"
+            TextWrapping="Wrap" />
+    </Grid>
+</ContentDialog>
