@@ -125,7 +125,7 @@ test("semantic SPA navigation preserves client-side transitions, history, modifi
     await expect(page.getByRole("heading", { name: "Contributors", exact: true })).toBeVisible();
 
     await footerNav.getByRole("link", { name: "Privacy", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Your files. Your choice.", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your PC. Your control.", exact: true })).toBeVisible();
 
     // Still zero full page reloads
     assert.equal(await page.evaluate(() => window.__spaMarker), 42);
@@ -136,12 +136,12 @@ test("semantic SPA navigation preserves client-side transitions, history, modifi
     assert.equal(new URL(page.url()).pathname, "/contributors");
 
     await page.goForward();
-    await expect(page.getByRole("heading", { name: "Your files. Your choice.", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your PC. Your control.", exact: true })).toBeVisible();
     assert.equal(new URL(page.url()).pathname, "/privacy");
 
     // Return home via wordmark link without reload
     await page.getByRole("link", { name: "Groundwork home", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Find your files\./ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Understand your PC\./ })).toBeVisible();
     assert.equal(await page.evaluate(() => window.__spaMarker), 42);
 
     // Ctrl/Meta-click opens a new tab without navigating the current tab
@@ -172,9 +172,9 @@ test("semantic SPA navigation preserves client-side transitions, history, modifi
     await expect(page.getByRole("heading", { name: "Download Groundwork", exact: true })).toBeVisible();
 
     await page.goto(`${baseUrl}/docs/ai`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Ask your files", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "AI System Assistant", exact: true })).toBeVisible();
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Ask your files", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "AI System Assistant", exact: true })).toBeVisible();
 
     // Desktop & mobile overflow check
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });

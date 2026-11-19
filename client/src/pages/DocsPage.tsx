@@ -7,158 +7,142 @@ const guides: Record<
 > = {
   "getting-started": {
     title: "Start here",
-    intro: "From installation to storage cleanup and your first search, in a few minutes.",
+    intro:
+      "From installation to storage scans, hardware diagnostics, tweaks, and AI troubleshooting in minutes.",
     steps: [
       [
         "Install and open Groundwork",
-        "Download the Windows installer from the Download page. Open it and follow the installation steps. Groundwork includes what it needs to analyze storage, inspect apps, and search your files.",
+        "Download the Windows installer from the Download page. Open it and follow the setup steps. Groundwork ships as a native .NET 10 WinUI 3 application with no Python, Docker, or external database required.",
       ],
       [
-        "Sign in, or continue locally",
-        "The welcome window offers Google sign-in, email sign-in, or Continue locally. An account is optional. Local use keeps your notes and saved searches on this computer.",
+        "No account needed",
+        "Groundwork runs 100% locally on your PC without accounts, sign-in prompts, or cloud sync. Hardware scans, storage analysis, optimization state, and Operation History stay on this computer.",
       ],
       [
-        "Choose a folder or drive",
-        "Click Choose folder in the workspace toolbar. Pick your Downloads, Documents, a project folder, or a drive. The folder tree and file table fill as scanning starts. Your original files stay in place.",
+        "Inspect Overview & Hardware",
+        "Open Overview for an instant snapshot of CPU, memory, drives, GPU, network state, startup items, and pending reboots. Open Analyze to inspect CPU/RAM SPD modules, BIOS/Secure Boot, GPUs, disks, signed drivers, and live processes.",
       ],
       [
-        "Analyze storage, duplicates, and apps",
-        "Open Cleanup to inspect proportional folder hotspots, mounted drive capacity, and SHA-256 exact duplicate files. Open Computer to browse installed Windows apps by size, launch official uninstallers, or scan AppData and ProgramData for leftover files.",
+        "Scan storage, duplicates & apps",
+        "Run parallel Win32 folder and drive scans in Storage Analyzer, inspect Space-Hog Forensics and SHA-256 duplicates, or open Applications to browse installed Win32 apps, leftovers, Microsoft Store bloatware, and winget tools.",
       ],
       [
-        "Find something & ask AI",
-        "Type in the file list to find names, or click Find (Ctrl + K) to search names and document text. Open Assistant alongside your files to ask questions about documents, disk space, duplicate candidates, or installed applications.",
+        "Optimize, repair & ask AI",
+        "Apply reversible Windows 11/10 tweaks, run guided network/SFC/DISM troubleshooting investigations, or open AI Assistant to ask natural-language questions backed by 27 typed system inspection and proposal tools.",
       ],
     ],
   },
   cleanup: {
     title: "Storage, duplicates & apps",
     intro:
-      "Inspect disk hotspots, remove verified duplicates, and clean up application leftovers safely.",
+      "Inspect disk hotspots, remove verified SHA-256 duplicates, uninstall apps with leftover cleanup, and debloat Store packages safely.",
     steps: [
       [
         "Proportional space map & hotspots",
-        "Open Cleanup to view a visual breakdown of your largest folders, largest files, and mounted Windows drives. Click any folder or file to reveal it in Explorer or preview it in the built-in reader.",
+        "Open Storage Analyzer to scan drives or folders across 2–16 parallel threads, view a proportional treemap and category breakdown, inspect the largest files, reveal paths in File Explorer, or export results to CSV.",
       ],
       [
-        "Deterministic SHA-256 duplicate & cleanup rules",
-        "Groundwork identifies byte-for-byte identical duplicate files using SHA-256 hashing while always preserving the oldest original copy. Additional rules surface temporary logs, build caches, empty files, and stale downloads.",
+        "Space-Hog Forensics & SHA-256 duplicates",
+        "Surface GPU shader caches, browser caches, developer build caches, and WSL/Docker .vhdx virtual disks. Duplicate Finder runs a 3-stage pipeline (file size, 4 KB head/tail pre-hash, then full SHA-256) with hard-link and cloud placeholder protection while preserving the oldest copy.",
       ],
       [
-        "Installed apps & guided uninstaller",
-        "Open Computer to inspect installed Win32 and Store applications with estimated sizes, publishers, and install dates. When an app registers an uninstaller, Groundwork shows the exact command and requires your confirmation before launching it.",
-      ],
-      [
-        "Post-uninstall leftover scanner",
-        "Scan an installed or recently uninstalled app to detect leftover folders in AppData (Roaming, Local, LocalLow) and ProgramData. Registry keys under HKCU/HKLM are shown as read-only evidence and are never auto-deleted.",
+        "Installed apps, leftovers & winget",
+        "Open Applications to inspect Win32 desktop programs and Microsoft Store packages, launch official uninstallers with explicit confirmation, scan AppData and ProgramData for leftover folders, read read-only Registry evidence, or batch-install tools with winget.",
       ],
       [
         "Explicit confirmation & Recycle Bin recovery",
-        "No file or folder is ever deleted automatically or by AI. Every cleanup action uses a one-time confirmation token and defaults to sending items to the Windows Recycle Bin.",
+        "No file or folder is ever deleted automatically or silently by AI. Every modifying operation uses a single-use approval token in the 10-step Safe Operation Engine and routes file deletions to the Windows Recycle Bin.",
       ],
     ],
   },
-  search: {
-    title: "Find your files",
+  tweaks: {
+    title: "Tweaks, diagnostics & repair",
     intro:
-      "Search the folders you've chosen, without moving or uploading them.",
+      "Tune Windows performance safely, run guided investigations, and verify system health before and after changes.",
     steps: [
       [
-        "Search by name or content",
-        "Start with part of a filename or path. Switch to content search for a phrase in a supported readable file. A format icon identifies the file type; it does not mean Groundwork can read its contents.",
+        "Windows 11/10 tweaks & presets",
+        "Inspect and reversibly toggle Game Mode, transparency effects, HAGS status, power plans, hibernation, and startup entries — or apply curated presets such as Clean Win11 & Debloat and Gaming & Raw Mouse.",
       ],
       [
-        "Open a result",
-        "Choose a result to open the file, show its folder, or ask a question using that file as a source.",
+        "Guided Investigations & Event Logs",
+        "Run structured investigations across Performance, Storage, Network, Windows Health, Startup, Hardware, or custom user queries, inspect System and Application Event Log errors, and export reports as Markdown, JSON, or plain text.",
       ],
       [
-        "Add or remove folders",
-        "Use Choose folder to add a location. Select a location in the workspace tree to manage or remove it. Removing a folder from Groundwork doesn't delete your original files.",
+        "Network, Runtime Health & Repair Toolkit",
+        "Verify IPv4/IPv6/gateway/DNS state, run ICMP ping, DNS, and TCP checks, audit .NET/MSVC/VCLibs runtimes, check pending Component-Based Servicing reboots, and run 6 guided repair workflows including SFC and DISM.",
       ],
       [
-        "If a file is missing",
-        "Check that its folder is included and review any scan errors. You can browse discovered files while preparation continues. If needed, open Settings → Troubleshooting → Refresh all files.",
+        "Operation History & rollback",
+        "Every executed modification records its prior state, verification outcome, and one-click rollback support in Operation History.",
       ],
     ],
   },
   ai: {
-    title: "Ask your files",
+    title: "AI System Assistant",
     intro:
-      "Find relevant passages, inspect PC storage and apps, or get a written answer with sources you can check.",
+      "Diagnose PC slowdowns, disk usage, network issues, and installed software with live Windows telemetry and confirmation-gated proposals.",
     steps: [
       [
-        "Start without setup",
-        "Ask your files can find matching passages and run read-only storage, duplicate, and installed-app inspections on this computer without an account or API key. This mode retrieves sources and live metrics; it doesn't generate an AI-written answer.",
+        "All core utilities work without AI",
+        "Storage scanning, hardware topology, duplicate removal, tweaks, repair workflows, and guided investigations all run deterministically on this computer without configuring an AI model or API key.",
       ],
       [
-        "Choose written answers",
-        "Assistant offers built-in local answers through llama.cpp. Download a model in the app or import a compatible GGUF file. Models are separate from the installer. External providers remain optional; online providers require internet and may charge for usage.",
+        "Choose local Ollama or cloud providers",
+        "Open Settings to configure Ollama (Local) at http://127.0.0.1:11434 for offline answers, or connect Google Gemini, OpenAI, Mistral AI, Anthropic, or Custom (OpenAI API) for OpenAI-compatible endpoints such as Groq, LM Studio, or DeepSeek. If you use Ollama, install and manage models directly in Ollama.",
       ],
       [
-        "Ask about everyday files",
-        "Double-click a file or press Enter to open the built-in reader. Zoom, fit the view, and move between pages or files. Ask a question to open AI beside the document. AI reads text, PDFs, Word, Excel, PowerPoint, OpenDocument, and EPUB. On Windows, it can recognize written text in images and up to five scanned PDF pages. OCR can contain errors and does not interpret image scenes. Unsupported formats provide file details only.",
+        "27 typed telemetry & proposal tools",
+        "Rather than guessing or running unrestricted shell commands, the assistant queries typed read-only tools for hardware/OS specs, drives, folder scans, space hogs, processes, startup entries, power plans, network health, event logs, services, runtimes, and installed apps.",
       ],
       [
-        "Understand a folder, disk space, or apps",
-        "Use Ask about folder to include its direct file listing and a small sample of nearby documents, or use the quick prompts in Assistant to analyze disk space, find duplicates, or list installed apps. Group related files with Collections without moving originals.",
+        "Confirmation-gated changes only",
+        "Modifying AI tools (propose_*) can only stage reviewable proposals — such as switching power plans, toggling startup items or settings, flushing or switching DNS, cleaning verified caches, creating a restore point, or running repair workflows — behind your single-use approval token.",
       ],
       [
         "Know what gets shared",
-        "Online AI receives your question and the names, excerpts, recognized text, or file details used as evidence. Folder questions also share a bounded listing. Local answers and OCR stay on this computer. Review the provider and coverage notices before relying on an answer.",
-      ],
-      [
-        "Check the sources",
-        "Source labels distinguish document text, recognized image text, file details, and folder listings. Use the links to open the evidence in the reader. Long documents are only partially read; plain text is limited to 5 MB and documents/images to 32 MB. Save useful findings for later. Names and sizes alone cannot prove that a file is safe to delete.",
+        "Groundwork never indexes or uploads your file contents or documents to AI. When you send a message to a cloud provider, only your prompt, %USERPROFILE%-sanitized system context, and approved diagnostic tool outputs are sent to that provider. API keys are encrypted at rest with Windows DPAPI.",
       ],
     ],
   },
   organize: {
-    title: "Preview file organization",
-    intro: "Review proposed changes before organizing your files. Scanning never moves or renames your files.",
-    steps: [
-      ["Choose files and a method", "Select files in Files, then open Organize. Group by file type or last modified date without AI. Content suggestions use supported excerpts and require a local model or your configured provider."],
-      ["Review the proposed changes", "Choose a destination inside an added folder. Preview changes shows current and proposed locations. Edit suggestions, exclude files, or leave them unchanged when evidence is insufficient. The preview creates no folders or links."],
-      ["Apply the reviewed plan", "Apply changes approves the exact displayed plan. Groundwork rechecks files and destinations and never silently overwrites a file. Cancel stops remaining work; already completed changes remain in history."],
-      ["Check results or undo", "Change history reports completed, skipped, and failed files. Review undo to restore original locations where possible. Changed files, occupied destinations, and interrupted copies require review."],
-    ],
-  },
-  sync: {
-    title: "Your account and sync",
-    intro: "An optional way to keep notes and saved searches across computers.",
+    title: "Tidy Folder organization",
+    intro:
+      "Preview every proposed move before organizing cluttered folders. Scanning never moves or renames your files.",
     steps: [
       [
-        "Sign in any time",
-        "Choose Account in the app, then Sign in. Use Google or your email and password. You can create an email account from the same window.",
+        "Pick a folder in Maintenance",
+        "Open Smart File Organizer in Maintenance and select a cluttered directory such as Downloads or Desktop. Groundwork groups files locally by category and file extension without needing AI or cloud access.",
       ],
       [
-        "Sync when you're ready",
-        "Choose Sync now in Account. Note content, saved searches, and supported preferences are copied to your account. Files, code repositories, the search index, and AI keys are excluded.",
+        "Review the proposed plan",
+        "Groundwork builds a complete preview plan showing current paths and destination subfolders before creating directories or moving files.",
       ],
       [
-        "Keep working offline",
-        "Your folders and notes are available locally even without internet. When you're connected again, use Sync now to send your saved changes.",
+        "Apply the reviewed plan",
+        "Applying the exact displayed plan runs through the Safe Operation Engine with collision-safe checks so existing files are never silently overwritten.",
       ],
       [
-        "Sign out safely",
-        "Signing out stops account sync. It doesn't remove folders or delete notes saved on this computer.",
+        "Undo from Operation History",
+        "Every completed organization batch is recorded in Operation History so you can restore files back to their original locations with one click.",
       ],
     ],
   },
   privacy: {
     title: "Your privacy",
-    intro: "Understand what stays here and what you choose to share.",
+    intro: "Understand what stays on your PC and what leaves it only when you ask.",
     steps: [
       [
-        "On your computer",
-        "Groundwork searches and prepares your selected folders locally. Workspace files and the search index are not uploaded to Groundwork's account service.",
+        "100% local utilities, zero accounts",
+        "Storage scans, duplicate hashes, hardware diagnostics, Windows tweaks, repair checks, and Operation History remain strictly on this computer. Groundwork has no user accounts, login service, or cloud sync.",
       ],
       [
-        "With an account",
-        "Email sign-in stores your email and a protected password hash. Google sign-in uses your Google identity and email to authenticate. Sync stores the notes and saved searches you choose to synchronize.",
+        "DPAPI-protected API keys",
+        "Optional cloud AI keys are encrypted at rest using Windows DPAPI (ProtectedData scoped to your Windows user) inside %APPDATA%\\Groundwork\\settings.json.",
       ],
       [
-        "With online AI",
-        "If you select an online AI service, questions and relevant file excerpts are sent to that provider when you ask. You supply your own key. Search and indexing remain local.",
+        "Sanitized AI system context",
+        "File contents are never read, indexed, or uploaded by Groundwork. When you talk to a configured cloud AI provider, only your conversation, sanitized telemetry (%USERPROFILE%-masked paths), and diagnostic tool results are sent to that endpoint.",
       ],
     ],
   },

@@ -139,11 +139,11 @@ test("Render CSP and security headers allow all real website routes and self-hos
     );
 
     const routes = [
-      { path: "/", heading: /Find your files\./ },
+      { path: "/", heading: /Understand your PC\./ },
       { path: "/download", heading: /Download Groundwork/ },
       { path: "/docs", heading: /Start here/ },
       { path: "/changelog", heading: /What's new/ },
-      { path: "/privacy", heading: /Your files\. Your choice\./ },
+      { path: "/privacy", heading: /Your PC\. Your control\./ },
       { path: "/about", heading: /About Groundwork/ },
       { path: "/resources", heading: /Resources/ },
       { path: "/contributors", heading: /Contributors/ },

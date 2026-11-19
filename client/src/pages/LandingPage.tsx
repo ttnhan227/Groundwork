@@ -1,7 +1,7 @@
 import {
   Download,
   ArrowRight,
-  Search,
+  Wrench,
   HardDrive,
   ShieldCheck,
   Sparkles,
@@ -22,16 +22,18 @@ export function LandingPage({
       <section className="product-showcase">
         <div className="product-first-glance">
           <p className="product-eyebrow">
-            Groundwork 1.1 · High-speed storage analyzer, hardware topology &amp; cleanup utility
+            Groundwork 2.0 · Native Windows storage, diagnostics &amp; maintenance toolkit
           </p>
           <h1>
-            Find your files.
+            Understand your PC.
             <br />
-            <span>Understand what matters.</span>
+            <span>Optimize with confidence.</span>
           </h1>
           <p className="product-intro">
-            High-speed multi-drive storage analysis, live hardware component topology,
-            safe SHA-256 duplicate removal, app uninstallation with leftover cleanup, and local AI assistance in one native Windows app.
+            High-speed multi-drive storage analysis, live hardware diagnostics,
+            safe SHA-256 duplicate removal, Windows 11/10 power tweaks &amp;
+            repair workflows, app uninstallation, and optional local or cloud AI
+            in one native Windows app.
           </p>
           <div className="product-hero-actions">
             <AppLink to="/download" navigate={navigate} className="site-primary">
@@ -55,14 +57,16 @@ export function LandingPage({
       >
         <div className="product-ai-card">
           <div className="product-ai-header">
-            <p className="product-eyebrow">Multi-provider AI operator &amp; document reader</p>
+            <p className="product-eyebrow">Telemetry-grounded AI System Assistant</p>
             <h2 id="ai-feature-title">
               What changed? What is using my space?
             </h2>
             <p className="product-ai-summary">
-              Ask about your hardware components, documents, spreadsheets, storage hotspots,
-              or installed programs. Read Office documents and PDF text, recognize
-              written text in images, or connect 100% offline local LLMs (Ollama, LM Studio) as well as cloud providers (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek).
+              Ask about your hardware components, storage hotspots, space hogs,
+              installed programs, startup items, network health, or Windows event logs.
+              Use 100% offline local models via Ollama, or connect cloud providers
+              (Gemini, OpenAI, Anthropic, Mistral) and Custom OpenAI-compatible
+              endpoints such as Groq, LM Studio, or DeepSeek.
             </p>
           </div>
 
@@ -70,17 +74,17 @@ export function LandingPage({
             <div className="product-ai-pillar">
               <span className="ai-pillar-num">01</span>
               <h3>Check the source</h3>
-              <p>Follow references back to your files and hardware metrics with verifiable evidence and zero hallucinated metrics.</p>
+              <p>Ground every answer in live Windows telemetry from typed inspection tools — hardware specs, folder scans, processes, and event logs with zero fabricated metrics.</p>
             </div>
             <div className="product-ai-pillar">
               <span className="ai-pillar-num">02</span>
               <h3>Choose where AI runs</h3>
-              <p>Run entirely offline with on-device Ollama or LM Studio models, or connect to Gemini, OpenAI, Claude, Mistral, Groq, or DeepSeek.</p>
+              <p>Inspect hardware, storage, and diagnostics offline without AI, run local Ollama models, or connect Gemini, OpenAI, Claude, Mistral, or Custom OpenAI API endpoints.</p>
             </div>
             <div className="product-ai-pillar">
               <span className="ai-pillar-num">03</span>
               <h3>Stay in control</h3>
-              <p>Every cleanup recommendation, uninstaller launch, and file organization strictly requires your explicit review and confirmation.</p>
+              <p>Every AI-proposed change — power plans, startup toggles, safe cleanups, DNS switches, and repairs — requires your single-use confirmation token.</p>
             </div>
           </div>
 
@@ -90,7 +94,7 @@ export function LandingPage({
               <ArrowRight size={17} />
             </AppLink>
             <p className="product-ai-setup">
-              Generated answers require a configured model or provider in Settings. Hardware topology and deterministic storage tools work 100% locally.
+              AI replies require an Ollama server or configured provider in Settings. Storage scans, hardware inspection, tweaks, and cleanup tools work 100% locally without AI.
             </p>
           </div>
         </div>
@@ -103,42 +107,42 @@ export function LandingPage({
             {
               icon: Cpu,
               title: "Hardware & component topology",
-              text: "Inspect live processor specs, motherboard and BIOS firmware, RAM SPD module timings, multi-GPU dedicated VRAM, and signed WHQL drivers with zero hardcoded metrics.",
+              text: "Inspect live processor specs, motherboard and BIOS firmware, RAM SPD module timings, multi-GPU dedicated VRAM, and signed drivers with zero fabricated sensors.",
             },
             {
               icon: HardDrive,
               title: "High-speed storage analyzer",
-              text: "Multi-drive parallel scanning traversing over 150,000 files/sec, interactive proportional space maps, and direct NTFS MFT raw index elevation.",
+              text: "Multi-threaded Win32 directory scanning with interactive proportional space maps, flat largest-files views, Space-Hog Forensics (caches, WSL & Docker VHDX), and CSV export.",
             },
             {
-              icon: Search,
-              title: "Find files and matching text",
-              text: "Find files by name or path as they are discovered. Search inside supported readable formats after indexing. Filter by file type or scope.",
+              icon: Wrench,
+              title: "Windows tweaks & repair toolkit",
+              text: "Apply Win11/10 optimization presets, audit runtime health, test DNS/TCP network connectivity, inspect Event Logs, and run guided SFC and DISM repair workflows.",
             },
             {
               icon: Sliders,
               title: "Power-user engine settings",
-              text: "Tune parallel scanner threads (2-16), switch between customizable byte notations, toggle serial masking for safe screenshots, and configure restore point creation.",
+              text: "Tune parallel storage scan threads (2-16), configure folder exclusion rules, protect optional AI API keys with Windows DPAPI encryption, and review full operation history.",
             },
             {
               icon: Trash2,
-              title: "App uninstaller & leftover cleaner",
-              text: "Browse Windows desktop and Store apps sorted by size, launch official uninstallers, and scan AppData, ProgramData, and Registry keys for leftover footprints.",
+              title: "App uninstaller & bloatware cleaner",
+              text: "Browse Win32 desktop and Store apps, launch official uninstallers, scan AppData, ProgramData, and Registry leftovers, and remove built-in bloatware or install packages with winget.",
             },
             {
               icon: Sparkles,
-              title: "Multi-provider AI Agent",
-              text: "Connect free offline local LLMs (Ollama, LM Studio) or cloud models (Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek) with live connection testing and grounded file citations.",
+              title: "Multi-provider AI System Assistant",
+              text: "Connect local Ollama models or cloud providers (Gemini, OpenAI, Anthropic, Mistral, and Custom OpenAI-compatible APIs) backed by 27 typed system inspection and proposal tools.",
             },
             {
               icon: Folders,
               title: "Smart file organizer & preview plan",
-              text: "Organize messy downloads and desktop directories into categorized folders with instant pre-execution preview plans and one-click undo.",
+              text: "Categorize cluttered Downloads and Desktop directories by file type with an interactive pre-execution move plan and one-click undo in Operation History.",
             },
             {
               icon: ShieldCheck,
-              title: "Recycle Bin safety guaranteed",
-              text: "Inspect duplicate candidates and preview organization plans before applying moves. Deletions strictly use Windows Recycle Bin with System Restore safeguards.",
+              title: "10-step Safe Operation Engine",
+              text: "Every modification validates prerequisites, captures original state, requires a single-use approval token, sends deletions to the Recycle Bin, and records rollback metadata.",
             },
           ].map((item) => (
             <article key={item.title}>

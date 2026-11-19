@@ -6,37 +6,38 @@ export function PrivacyPage() {
       <ShieldCheck size={34} className="text-[var(--ink-blue)]" />
       <div>
         <h1 className="text-4xl font-semibold tracking-tight">
-          Your files. Your choice.
+          Your PC. Your control.
         </h1>
         <p className="mt-5 text-lg text-[var(--ink-secondary)] leading-relaxed">
-          Groundwork searches your selected folders on your computer. Signing in
-          and using online AI are optional.
+          Groundwork inspects storage, hardware, and system settings locally on
+          your computer. There are no accounts or cloud sync, and AI is strictly
+          optional.
         </p>
       </div>
       {[
         [
-          "Files and search stay local",
-          "Your original files, code repositories, Git history, and search index stay on this device. Groundwork's account service doesn't receive them. You choose which folders the app can search.",
+          "Diagnostics and storage scans stay local",
+          "Folder scans, SHA-256 duplicate hashes, hardware telemetry, Windows tweak backups, and Operation History remain 100% on your PC. Groundwork does not have an account backend or cloud sync service.",
         ],
         [
-          "An account is optional",
-          "Email sign-in uses your email and a protected password hash. Google sign-in uses your Google account identity and verified email to create or connect your Groundwork account. It doesn't request access to your Google Drive or Gmail.",
+          "File contents are never indexed or uploaded",
+          "Groundwork scans filesystem metadata and selected cleanup/duplicate candidates locally. It does not read, index, OCR, or upload the contents of your documents, spreadsheets, or images.",
         ],
         [
-          "Sync includes your notes",
-          "When you sign in and sync, the content of your notes, saved searches, and supported preferences is stored with your account. These may contain personal information you write into them. Workspace files and AI keys are excluded.",
+          "Optional AI with sanitized system context",
+          "If you configure a cloud AI provider (Google Gemini, OpenAI, Anthropic, Mistral, or a Custom OpenAI-compatible API), your prompts, %USERPROFILE%-sanitized system context, and approved diagnostic tool outputs are sent to that provider when you chat. Its privacy policy and usage charges apply. For 100% offline AI, use local Ollama.",
         ],
         [
-          "Online AI shares selected excerpts",
-          "If you choose a cloud AI provider (Google Gemini, OpenAI, Anthropic, Mistral, or an OpenAI-compatible API), your question and relevant file excerpts are sent to that provider when you ask. Its privacy policy and usage charges apply. The default passage-finding mode works offline. Ollama can provide local answers with a separately installed model.",
+          "API keys are encrypted with Windows DPAPI",
+          "Optional provider API keys are encrypted at rest using Windows Data Protection API (CurrentUser scope) inside your local app settings file and never leave your machine except as authentication to your chosen provider.",
         ],
         [
-          "Credentials stay on this device",
-          "API keys and account credentials are kept in private app preferences protected by your Windows account. They aren't included in sync. Signing out stops account sync without deleting your local work.",
+          "No telemetry or usage tracking",
+          "Groundwork sends zero analytics, crash telemetry, or behavioral tracking. Network calls only occur if you configure a cloud AI provider or check GitHub releases.",
         ],
         [
-          "No activity tracking",
-          "Groundwork doesn't send analytics about which files you open, what you search for, or the projects you work on. Account services still process sign-in and sync requests to provide those features.",
+          "Reversible operations and Recycle Bin safety",
+          "AI tools cannot run arbitrary shell commands or delete files silently. Modifying actions require a single-use approval token, route deletions to the Windows Recycle Bin, and log rollback data locally.",
         ],
       ].map(([title, text]) => (
         <section key={title}>

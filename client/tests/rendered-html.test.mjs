@@ -30,27 +30,35 @@ test("builds the Groundwork static website shell", async () => {
   assert.match(html, /\/assets\/index-/);
 });
 
-test("describes filename browsing separately from readable content", async () => {
+test("describes local-first system diagnostics and zero legacy document-reader claims", async () => {
   const page = await readSourceTree();
-  assert.match(page, /Find files by name or path as they are discovered/);
-  assert.match(page, /supported readable formats/);
-  assert.match(page, /No\s+account needed/);
+  assert.match(page, /Understand your PC\./);
+  assert.match(page, /No account needed/);
+  assert.match(page, /27 typed system inspection and proposal tools/);
+  assert.match(page, /Windows DPAPI/);
+  assert.doesNotMatch(page, /llama\.cpp/i);
+  assert.doesNotMatch(page, /\bGGUF\b/);
+  assert.doesNotMatch(page, /Google sign-in/i);
+  assert.doesNotMatch(page, /Continue locally/);
+  assert.doesNotMatch(page, /built-in reader/i);
+  assert.doesNotMatch(page, /direct NTFS MFT/i);
+  assert.doesNotMatch(page, /recognized image text/i);
 });
 
-test("download uses release metadata and discloses separate model downloads", async () => {
+test("download uses release metadata and states local vs optional AI behavior accurately", async () => {
   const page = await readSourceTree();
   assert.match(page, /fetchWindowsRelease/);
-  assert.match(page, /Local AI models are separate downloads/);
+  assert.match(page, /Ollama models are managed separately/);
   assert.doesNotMatch(page, /Groundwork-Setup-1\.0\.0-x64\.msi/);
   assert.match(page, /Windows 10 or 11/);
 });
 
-test("organization documentation requires preview and reports partial coverage", async () => {
+test("organization and operation documentation requires preview and Recycle Bin safety", async () => {
   const page = await readSourceTree();
   assert.match(page, /Scanning never moves or renames your files/);
-  assert.match(page, /exact displayed plan/);
-  assert.match(page, /Long documents are only partially read/);
-  assert.match(page, /built-in local answers through llama\.cpp/);
+  assert.match(page, /Applying the exact displayed plan/);
+  assert.match(page, /10-step Safe Operation Engine/);
+  assert.match(page, /Windows Recycle Bin/);
 });
 
 test("hero demo preloads static WebP poster and uses WebM/MP4 with reduced-motion control", async () => {

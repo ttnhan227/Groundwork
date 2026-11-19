@@ -42,12 +42,13 @@ export const DownloadPage: React.FC = () => {
           </p>
           <h1 className="text-4xl font-serif font-bold">Download Groundwork</h1>
           <p className="text-[var(--ink-secondary)]">
-            Find your files, reclaim disk space, manage installed apps, and ask
-            grounded questions in one local workspace.
+            Inspect hardware and system health, reclaim disk space, apply
+            Windows tweaks, manage installed apps, and ask an optional AI
+            assistant grounded in live telemetry.
           </p>
           <p className="text-sm text-[var(--ink-muted)]">
-            For Windows 10 or 11 (64-bit). No separate tools or database to
-            install.
+            For Windows 10 or 11 (64-bit). No separate runtime, Python, or
+            external database to install.
           </p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--hairline)] rounded-lg p-8 space-y-5">
@@ -70,12 +71,15 @@ export const DownloadPage: React.FC = () => {
             </p>
           )}
           <p className="text-sm text-[var(--ink-secondary)]">
-            Includes the native desktop application, multi-drive storage analyzer with direct NTFS MFT reading,
-            live hardware component topology inspector, SHA-256 duplicate remover,
-            installed applications &amp; guided uninstaller with leftover scanner,
-            multi-provider AI Agent (offline Ollama, LM Studio, Gemini, OpenAI, Anthropic, Mistral, Groq, DeepSeek), and power-user settings hub.
-            Local AI models are separate downloads. See release notes for
-            changes and supported features.
+            Includes the native WinUI 3 desktop application, multi-threaded
+            Win32 storage analyzer and Space-Hog Forensics, live hardware and
+            driver diagnostics, SHA-256 duplicate finder, Windows 11/10 power
+            tweaks and repair workflows, installed app uninstaller and bloatware
+            cleaner, and the telemetry-grounded AI Assistant (Ollama local
+            models, Gemini, OpenAI, Anthropic, Mistral, and Custom
+            OpenAI-compatible endpoints such as Groq, LM Studio, or DeepSeek).
+            If you choose local Ollama AI, Ollama models are managed separately.
+            See release notes for changes and supported features.
           </p>
           {release ? (
             <a
@@ -142,23 +146,25 @@ export const DownloadPage: React.FC = () => {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">After downloading</h2>
           <ol className="list-decimal pl-5 space-y-3 text-[var(--ink-secondary)]">
-            <li>Open the installer and follow the steps.</li>
+            <li>Open the installer and follow the setup steps.</li>
             <li>
-              Launch Groundwork. Sign in or choose{" "}
-              <strong>Continue locally</strong>.
+              Launch Groundwork. Everything opens locally with{" "}
+              <strong>no account or sign-in required</strong>.
             </li>
             <li>
-              Click <strong>Choose folder</strong> in the workspace toolbar.
-              Your files stay on your computer.
+              Use Overview, Analyze, Optimize, Troubleshoot, Maintenance, or
+              Applications directly — or optionally configure a local Ollama or
+              cloud AI provider in <strong>Settings</strong>.
             </li>
           </ol>
         </section>
         <div className="flex gap-3 text-sm text-[var(--ink-secondary)]">
           <ShieldCheck className="shrink-0 text-[var(--ink-blue)]" />
           <p>
-            Indexing runs locally. Optional cloud AI receives selected questions
-            and retrieved excerpts only when you choose that provider. Optional
-            sync transfers notes and saved searches.
+            All scans, diagnostics, and cleanup history stay 100% local on this
+            PC. Optional cloud AI receives only your prompt and sanitized system
+            telemetry context when you ask a question. Optional API keys are
+            encrypted with Windows DPAPI.
           </p>
         </div>
       </div>

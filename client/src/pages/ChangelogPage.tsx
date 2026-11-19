@@ -42,8 +42,8 @@ export function ChangelogPage() {
         </h2>
         <p className="text-[var(--ink-secondary)]">
           Release notes and previous versions are available on GitHub. To update
-          the desktop app, download and run the latest installer. Your saved
-          work stays on this computer.
+          the desktop app, download and run the latest installer. Your local
+          settings and Operation History stay on this computer.
         </p>
         {release && (
           <a className="site-primary" href={release.url}>

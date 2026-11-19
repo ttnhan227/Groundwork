@@ -18,7 +18,7 @@ export function ProductInfoPage({
     resources:
       "Guides, release information, and source code to help you get more from Groundwork.",
     about:
-      "A desktop workspace built around your local files, disk storage, installed applications, and grounded AI tools.",
+      "A native Windows toolkit built around storage forensics, hardware diagnostics, reversible optimization, and safe AI assistance.",
     contributors:
       "Groundwork is an independent, open-source project created by Tran Trong Nhan.",
     contact:
@@ -38,7 +38,7 @@ export function ProductInfoPage({
           {[
             {
               title: "Getting started",
-              text: "Installation, adding locations, storage cleanup, installed app management, and AI answers.",
+              text: "Installation, storage forensics, hardware diagnostics, tweaks, repairs, and AI Assistant setup.",
               path: "/docs",
             },
             {
@@ -53,7 +53,7 @@ export function ProductInfoPage({
             },
             {
               title: "Privacy",
-              text: "How local data, optional sync, and AI providers are handled.",
+              text: "How 100% local diagnostics, DPAPI key storage, and optional AI providers work.",
               path: "/privacy",
             },
           ].map((item) => (
@@ -94,21 +94,21 @@ export function ProductInfoPage({
           <section>
             <h2 className="text-xl font-semibold">Why Groundwork exists</h2>
             <p className="mt-3 text-[var(--ink-secondary)] leading-relaxed">
-              Finding a file, understanding its contents, reclaiming disk space,
-              and removing old programs often takes several separate utilities.
-              Groundwork brings the folder tree, built-in reader, proportional
-              storage map, SHA-256 duplicate cleanup, installed app uninstaller
-              with leftover scanning, and grounded Assistant into one calm
-              Windows desktop workspace.
+              Understanding why a Windows PC is running slow or out of space
+              usually means juggling half a dozen utilities. Groundwork brings
+              proportional disk analysis, Space-Hog Forensics, hardware and
+              driver diagnostics, SHA-256 duplicate cleanup, Windows tweaks and
+              repairs, app uninstallation, and a telemetry-grounded AI Assistant
+              into one native WinUI 3 app.
             </p>
           </section>
           <section>
             <h2 className="text-xl font-semibold">Local by default</h2>
             <p className="mt-3 text-[var(--ink-secondary)] leading-relaxed">
-              Your file index stays on your computer. Browsing, search, and
-              local notes work without an account. You can choose a local AI
-              model or an online provider, and enable account sync for notes and
-              saved searches.
+              All diagnostics, storage scans, tweak backups, and operation
+              history stay on this computer with no account or cloud sync.
+              Every modifying action passes through the 10-step Safe Operation
+              Engine with Recycle Bin protection and one-click rollback.
             </p>
           </section>
           <section className="border border-[var(--hairline)] bg-[var(--surface)] rounded-xl p-6">
