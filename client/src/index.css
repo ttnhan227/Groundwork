@@ -521,7 +521,7 @@ html[data-theme="dark"] {
   line-height: 1.7;
 }
 .product-roadmap-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   min-block-size: 24px;

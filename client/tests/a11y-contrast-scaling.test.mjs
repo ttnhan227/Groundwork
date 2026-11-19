@@ -151,6 +151,14 @@ test("landing page meets WCAG contrast, focus visibility, touch targets, root re
       assert.ok(box && box.height >= 24, `${sel} height ${box?.height} < 24`);
     }
 
+    // Bottom CTA roadmap link sits cleanly below primary CTA without overlapping
+    const bottomCtaBox = await page.locator(".product-bottom-cta .site-primary").boundingBox();
+    const roadmapBox = await page.locator(".product-roadmap-link").boundingBox();
+    assert.ok(
+      bottomCtaBox && roadmapBox && roadmapBox.y >= bottomCtaBox.y + bottomCtaBox.height,
+      `Expected .product-roadmap-link (y=${roadmapBox?.y}) below .site-primary (bottom=${bottomCtaBox ? bottomCtaBox.y + bottomCtaBox.height : "n/a"})`,
+    );
+
     // Root font-size scaling (16px -> 32px / 200%) scales rem-based headings & body copy
     const beforeSizes = await page.evaluate(() => ({
       h1: parseFloat(getComputedStyle(document.querySelector(".product-first-glance h1")).fontSize),
