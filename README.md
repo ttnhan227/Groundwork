@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="client/public/groundwork-in-action.gif" alt="Groundwork in action — Native Windows Storage Analyzer, Storage Sense Cleaner and Hardware Diagnostics" width="100%" />
+  <img src="client/public/groundwork-in-action.gif" alt="Groundwork in action — PC Overview, Storage & Cache Forensics, Windows 11 Power Tweaks, 1-Click Repair Toolkit, Power Plans, Hardware Specs, and Tidy Folder" width="100%" />
 </p>
 
 ---

@@ -42,6 +42,13 @@ export function setReleaseVersion(root, tag) {
     fs.writeFileSync(issFile, issText.replace(/#define MyAppVersion "[^"]+"/, `#define MyAppVersion "${version}"`));
   }
 
+  // 6. Update desktop-winui/src/Groundwork.Desktop/Views/SettingsPage.xaml if present
+  const settingsXaml = path.join(root, 'desktop-winui/src/Groundwork.Desktop/Views/SettingsPage.xaml');
+  if (fs.existsSync(settingsXaml)) {
+    const xamlText = fs.readFileSync(settingsXaml, 'utf8');
+    fs.writeFileSync(settingsXaml, xamlText.replace(/Text="Groundwork v[^"]+"/, `Text="Groundwork v${version}"`));
+  }
+
   return version;
 }
 

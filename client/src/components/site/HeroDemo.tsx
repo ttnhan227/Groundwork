@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 
 const HERO_DEMO_ALT =
-  "Groundwork in action — Native Windows Storage Analyzer, Storage Sense Cleaner, and Hardware Diagnostics";
+  "Groundwork for Windows walkthrough — PC Overview, Junk & Cache Forensics, Windows 11 Power Tweaks, 1-Click Repair Toolkit, Power Plans, Hardware Specs, and Tidy Folder";
 
 function getInitialReducedMotion(): boolean {
   if (
@@ -140,9 +140,9 @@ export function HeroDemo() {
           <span>{isPlaying ? "Pause demo" : "Play demo"}</span>
         </button>
         <figcaption id="hero-demo-caption">
-          Groundwork in action: live proportional storage maps, Storage Sense
-          recommendations, application leftovers, and instant hardware
-          diagnostics.
+          Groundwork in action: PC Overview, storage &amp; cache forensics,
+          Windows 11 power tweaks, 1-click repair workflows, hardware topology,
+          and preview-first Tidy Folder cleanup.
         </figcaption>
       </div>
     </figure>

@@ -6,9 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2026-11-18
+## [1.1.0] - 2026-11-19
 
-### Product Evolution — Dedicated Windows Power Utility, Repair Toolkit & Store Debloater
+### Product Evolution — Intelligent Windows System Companion, Power Tweaks, Repair Toolkit & Store Debloater
 
 - **Windows 11 Power Tweaks & Batch Presets (`WindowsOptimizationService`)**:
   - Added reversible tweaks for Classic Windows 10 Full Right-Click Menu, disabling Bing web search in Start Menu, blocking Windows Start/Lock Screen ads & tips, Taskbar right-click **End Task**, showing seconds in taskbar clock, hiding Widgets/Copilot taskbar clutter, and disabling Mouse Acceleration (1:1 Raw Pointer).
@@ -22,15 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added multi-select batch setup for curated runtimes & clean utilities (`VC++ x64/x86`, `.NET 10 Desktop`, `7-Zip`, `Everything Search`, `PowerToys`, `WizTree`, `VLC`) via official `winget`.
 - **Deep Storage Space-Hog Forensics & Actionable UI (`StorageHotspotAnalyzerService`)**:
   - Added parallel detection of GPU shader/OTA caches, multi-profile browser caches, developer caches, and protected WSL/Docker virtual disks, plus audit-logged Recycle Bin cleanup (`ProposeEmptyRecycleBin`) and actionable duplicate/leftover Recycle Bin cleanup.
-- **UI/UX Redesign (`Groundwork.Desktop`)**:
-  - Responsive left `NavigationView` shell with Light (`Paper & Ink Blue`) / Dark (`Control Room`) theme toggle, truthful Windows 11/10 & pressure-weighted health scoring on Overview, off-UI-thread `SafeOperationEngine` execution, and promoted task-first default views.
-
----
-
-## [1.1.0] - 2026-11-07
-
-### Product Evolution — Intelligent Windows System Companion
-
 - **Safe Operation Engine & Local Operation History (`SafeOperationEngine`, `PolicyEngine`, `OperationHistoryService`)**:
   - Implemented the 10-step Safe Operation lifecycle (Inspect → Validate prerequisites → Capture original state → Explain proposed change → Display risks/effects → Request approval via single-use time-bounded token → Execute → Verify resulting state → Record result → Provide one-click rollback).
 - **Tool Registry & System-Aware Agent Planner (`ToolRegistryService`, `AgentPlannerService`)**:
@@ -39,17 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Signature Feature — Groundwork Guided Investigations (`InvestigationEngineService`)**:
   - Added multi-tool guided investigations for *Performance*, *Storage*, *Network*, *Windows Health*, *Startup*, *Hardware*, and *Custom Symptoms*.
   - Strictly separates **Confirmed Observations** (live telemetry) from **Potential Contributing Factors** and **Unverified Hypotheses**, with Markdown/Text/JSON report export.
-- **Optimize Module (`WindowsOptimizationService`)**:
+- **Optimize & Troubleshoot Modules (`WindowsOptimizationService`, `DiagnosticsAndTroubleshootingService`)**:
   - Power Plan inspection, tradeoff explanation, verified switching (`powercfg`), and rollback.
   - Startup entry discovery across `HKCU`/`HKLM`/`WOW6432Node` `Run` keys and Startup folders with publisher verification, impact assessment, and reversible enable/disable.
-  - Transparent Windows Performance, Gaming & Privacy settings inspection and reversible configuration.
-- **Troubleshoot Module (`DiagnosticsAndTroubleshootingService`)**:
-  - Network Troubleshooter (adapter IP/Gateway/DNS inspection, ICMP Ping, DNS lookup, well-known DNS provider guidance, and DNS cache flush).
-  - Windows Event Log Investigator (`wevtutil` XML query of `System` and `Application` logs with plain-English explanations).
-  - Core Windows Services & System Repair auditing (`Win32_Service`, CBS/Windows Update pending reboot flags, PnP Device Manager error codes, and `SFC`/`DISM` guidance).
-- **Reversible File Organizer (`FileOrganizerService`) & DPAPI Credential Protection (`DpapiSecretProtector`)**:
-  - Completed Smart File Organizer execution and one-click verified Undo.
-  - Encrypted stored AI API keys at rest using Windows DPAPI (`crypt32.dll` `CryptProtectData`).
+  - Network Troubleshooter (adapter IP/Gateway/DNS inspection, ICMP Ping, DNS lookup, well-known DNS provider guidance, and DNS cache flush), Windows Event Log Investigator (`wevtutil` XML query of `System` and `Application` logs with plain-English explanations), and Core Windows Services & System Repair auditing.
+- **Reversible File Organizer (`FileOrganizerService`), DPAPI Credential Protection (`DpapiSecretProtector`) & UI/UX Redesign (`Groundwork.Desktop`)**:
+  - Completed Smart File Organizer execution and one-click verified Undo, plus encrypted stored AI API keys at rest using Windows DPAPI (`crypt32.dll` `CryptProtectData`).
+  - Responsive left `NavigationView` shell with Light (`Paper & Ink Blue`) / Dark (`Control Room`) theme toggle, truthful Windows 11/10 & pressure-weighted health scoring on Overview, off-UI-thread `SafeOperationEngine` execution, and promoted task-first default views.
 
 ---
 

@@ -381,7 +381,7 @@ public sealed partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(outDir);
-            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), $"Starting Groundwork v2.0 UI capture at {DateTime.Now:O}\n");
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), $"Starting Groundwork v1.1.0 UI capture at {DateTime.Now:O}\n");
             await Task.Delay(1500);
 
             // 1. Overview Dashboard
