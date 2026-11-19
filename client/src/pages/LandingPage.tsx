@@ -10,6 +10,8 @@ import {
   Sliders,
   Folders,
 } from "lucide-react";
+import { HeroDemo } from "../components/site/HeroDemo";
+import { AppLink } from "../components/common/AppLink";
 export function LandingPage({
   navigate,
 }: {
@@ -32,43 +34,19 @@ export function LandingPage({
             safe SHA-256 duplicate removal, app uninstallation with leftover cleanup, and local AI assistance in one native Windows app.
           </p>
           <div className="product-hero-actions">
-            <button
-              className="site-primary"
-              onClick={() => navigate("/download")}
-            >
+            <AppLink to="/download" navigate={navigate} className="site-primary">
               <Download size={18} />
               Download for Windows
-            </button>
-            <button
-              className="site-secondary"
-              onClick={() => navigate("/docs")}
-            >
+            </AppLink>
+            <AppLink to="/docs" navigate={navigate} className="site-secondary">
               See how it works
               <ArrowRight size={17} />
-            </button>
+            </AppLink>
           </div>
           <p className="product-hero-note">
             Windows 10 / 11 · 100% Offline Capable · No account needed
           </p>
-          <figure className="product-workspace-shot">
-            <a
-              href="/groundwork-in-action.gif"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Open full-size animated demo of Groundwork in action"
-            >
-              <img
-                src="/groundwork-in-action.gif"
-                alt="Groundwork in action — Native Windows Storage Analyzer, Storage Sense Cleaner, and Hardware Diagnostics"
-                width={1000}
-                height={622}
-                fetchPriority="high"
-              />
-            </a>
-            <figcaption>
-              Groundwork in action: live proportional storage maps, Storage Sense recommendations, application leftovers, and instant hardware diagnostics.
-            </figcaption>
-          </figure>
+          <HeroDemo />
         </div>
       </section>
       <section
@@ -107,10 +85,10 @@ export function LandingPage({
           </div>
 
           <div className="product-ai-footer">
-            <button className="utility-ai-link" onClick={() => navigate("/docs")}>
+            <AppLink to="/docs" navigate={navigate} className="utility-ai-link">
               Explore Agent &amp; Settings
               <ArrowRight size={17} />
-            </button>
+            </AppLink>
             <p className="product-ai-setup">
               Generated answers require a configured model or provider in Settings. Hardware topology and deterministic storage tools work 100% locally.
             </p>
@@ -177,16 +155,17 @@ export function LandingPage({
           The Windows installer includes the native desktop engine. No Python, Docker, or
           external database installation needed.
         </p>
-        <button className="site-primary" onClick={() => navigate("/download")}>
+        <AppLink to="/download" navigate={navigate} className="site-primary">
           <Download size={18} />
           Get Groundwork for Windows
-        </button>
-        <button
+        </AppLink>
+        <AppLink
+          to="/about"
+          navigate={navigate}
           className="product-roadmap-link"
-          onClick={() => navigate("/about")}
         >
           macOS roadmap
-        </button>
+        </AppLink>
       </section>
     </>
   );

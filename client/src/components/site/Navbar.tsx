@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { BrandMark } from "../common/BrandMark";
+import { AppLink } from "../common/AppLink";
+
 export function Navbar({
   currentRoute,
   navigate,
@@ -20,38 +22,44 @@ export function Navbar({
   return (
     <header className="product-navbar">
       <div className="product-nav-inner">
-        <button
-          onClick={() => navigate("/")}
+        <AppLink
+          to="/"
+          navigate={navigate}
+          onClick={() => setExpanded(false)}
           className="product-wordmark"
           aria-label="Groundwork home"
         >
           <BrandMark size={28} />
           <span>Groundwork</span>
-        </button>
+        </AppLink>
         <button
+          type="button"
           className="product-mobile-menu"
           aria-label={expanded ? "Close menu" : "Open menu"}
           aria-expanded={expanded}
+          aria-controls="primary-navigation-list"
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? <X size={22} /> : <Menu size={22} />}
         </button>
         <nav
-          aria-label="Main navigation"
+          aria-label="Main"
           className={`product-nav-links ${expanded ? "is-open" : ""}`}
         >
-          {links.map((link) => (
-            <button
-              key={link.path}
-              aria-current={currentRoute === link.path ? "page" : undefined}
-              onClick={() => {
-                navigate(link.path);
-                setExpanded(false);
-              }}
-            >
-              {link.label}
-            </button>
-          ))}
+          <ul id="primary-navigation-list" className="product-nav-list">
+            {links.map((link) => (
+              <li key={link.path}>
+                <AppLink
+                  to={link.path}
+                  navigate={navigate}
+                  aria-current={currentRoute === link.path ? "page" : undefined}
+                  onClick={() => setExpanded(false)}
+                >
+                  {link.label}
+                </AppLink>
+              </li>
+            ))}
+          </ul>
         </nav>
       </div>
     </header>

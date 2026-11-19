@@ -1,31 +1,63 @@
 import { useEffect, useState } from "react";
 import { Navbar } from "./components/site/Navbar";
 import { Footer } from "./components/site/Footer";
+import { AppLink } from "./components/common/AppLink";
 import { LandingPage } from "./pages/LandingPage";
 import { DownloadPage } from "./pages/DownloadPage";
 import { DocsPage } from "./pages/DocsPage";
 import { ChangelogPage } from "./pages/ChangelogPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
-
 import { ProductInfoPage } from "./pages/ProductInfoPage";
 
+const ROUTE_TITLES: Record<string, string> = {
+  "/": "Groundwork — Windows storage analyzer, duplicate cleaner and hardware inspector",
+  "/download": "Downloads — Groundwork",
+  "/docs": "Documentation — Groundwork",
+  "/changelog": "Changelog — Groundwork",
+  "/privacy": "Privacy — Groundwork",
+  "/resources": "Resources — Groundwork",
+  "/about": "About — Groundwork",
+  "/contributors": "Contributors — Groundwork",
+  "/contact": "Support & Contact — Groundwork",
+};
+
+function normalizePath(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed || "/";
+}
+
+function getTitleForPath(path: string): string {
+  if (path.startsWith("/docs")) return ROUTE_TITLES["/docs"];
+  return ROUTE_TITLES[path] ?? ROUTE_TITLES["/"];
+}
+
 export default function App() {
-  const [currentPath, setCurrentPath] = useState<string>(() => {
-    return window.location.pathname || "/";
-  });
+  const [currentPath, setCurrentPath] = useState<string>(() =>
+    normalizePath(window.location.pathname || "/"),
+  );
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname || "/");
+      setCurrentPath(normalizePath(window.location.pathname || "/"));
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    document.title = getTitleForPath(currentPath);
+  }, [currentPath]);
+
   const navigate = (path: string) => {
-    window.history.pushState({}, "", path);
-    setCurrentPath(path);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const target = normalizePath(path);
+    if (target !== currentPath) {
+      window.history.pushState({}, "", target);
+      setCurrentPath(target);
+    }
+    const reducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
   };
 
   const renderCurrentPage = () => {
@@ -62,11 +94,14 @@ export default function App() {
       </a>
       <div className="product-announcement">
         Groundwork for macOS is in development.{" "}
-        <button onClick={() => navigate("/about")}>View the roadmap</button>
+        <AppLink to="/about" navigate={navigate}>
+          View the roadmap
+        </AppLink>
       </div>
       <Navbar currentRoute={currentPath} navigate={navigate} />
       <main
         id="main-content"
+        tabIndex={-1}
         className={currentPath === "/" ? "product-home" : "product-inner"}
       >
         {renderCurrentPage()}

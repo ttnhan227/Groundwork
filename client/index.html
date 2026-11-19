@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="description" content="See where your disk space goes, find duplicate files, and inspect your hardware. Cleanup only uses the Recycle Bin. Optional local or cloud AI assistant." />
     <link rel="canonical" href="https://groundwork-client.onrender.com/" />
     <meta property="og:type" content="website" />
@@ -18,9 +19,13 @@
     <meta name="twitter:description" content="A native Windows app for disk usage, duplicate cleanup and hardware info. Scans run locally and cleanup only uses the Recycle Bin." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      rel="preload"
+      as="image"
+      href="/groundwork-in-action-poster.webp"
+      type="image/webp"
+      fetchpriority="high"
+    />
     <title>Groundwork — Windows storage analyzer, duplicate cleaner and hardware inspector</title>
   </head>
   <body>
