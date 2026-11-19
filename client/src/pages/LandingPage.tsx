@@ -22,7 +22,7 @@ export function LandingPage({
       <section className="product-showcase">
         <div className="product-first-glance">
           <p className="product-eyebrow">
-            Groundwork 2.0 · Native Windows storage, diagnostics &amp; maintenance toolkit
+            Groundwork for Windows · Storage, diagnostics &amp; maintenance toolkit
           </p>
           <h1>
             Understand your PC.
