@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>AI-Assisted Windows System Management, Diagnostics, Optimization, Troubleshooting &amp; Maintenance Toolkit</strong>
+  <strong>Native Windows Utility, System Tweaker, Repair Toolkit &amp; Local-First Storage Forensics</strong>
 </p>
 
 <p align="center">
@@ -27,13 +27,24 @@
 
 **Groundwork** is a native Windows system companion built with **C#, .NET 10, and WinUI 3** that helps users understand their computers, investigate problems, optimize Windows, and perform safe maintenance through a unified desktop application:
 
-1. **Overview & Guided Investigations**: Live hardware, OS, storage, network, startup, and servicing snapshot with one-click **Groundwork Investigations** (*Performance*, *Storage*, *Network*, *Windows Health*, *Startup*, *Hardware*, and *Custom Symptoms*) that strictly separate **Confirmed Observations** from **Potential Contributing Factors** and **Unverified Hypotheses**.
-2. **Analyze (Storage & Hardware/Process Diagnostics)**: Multi-worker Win32 `FindFirstFileExW` directory walker, bottom-up $O(N)$ folder size rollups, WMI/SMBIOS hardware & driver topology, and live CPU/RAM process inspection.
-3. **Optimize (Power, Startup & Transparent Configuration)**: Inspect and switch Windows power plans (`powercfg`), manage `HKCU`/`HKLM` `Run` keys and Startup folders with publisher verification and reversible toggles, and configure Windows Game Mode, Game DVR, Visual Transparency, and privacy settings with full recovery state.
-4. **Troubleshoot (Network, Event Log & Windows Repair)**: Active network adapter IP/Gateway/DNS inspection, ICMP Ping, DNS lookup, well-known DNS provider guidance, Windows `System` and `Application` Event Log error explanations, and core Windows Services / `SFC` / `DISM` health checks.
-5. **Maintenance (Safe Cleanup, Duplicates, File Organizer & Rollback Ledger)**: Token-gated Recycle Bin cleanup (`SHFileOperationW`), 3-stage SHA-256 duplicate finder, reversible Smart File Organizer, and a persistent **Safe Operation History & Rollback Ledger**.
-6. **Applications**: Fast Win32 Registry enumeration of installed applications, monitored uninstaller execution, and bounded leftover file/registry cleanup.
-7. **System-Aware AI Assistant**: Backed by `ToolRegistryService` and `AgentPlannerService` — works deterministically offline using local diagnostic tools, or connects to local `Ollama` / `LM Studio` and cloud providers (`Gemini`, `OpenAI`, `Anthropic Claude`, `Mistral`, `Custom`) with DPAPI-encrypted API keys.
+1. **Overview & Quick Action Center**: Real-time Windows 10/11 hardware, disk, startup, network, and pending-reboot snapshot with honest health scoring, live issue advisories, and direct launchers into tweaks, repairs, and debloating.
+2. **Storage (Space Map, Junk Cleaner, Tidy Folder & Duplicate Finder)**:
+   - Parallel Win32 `FindFirstFileExW` directory walker with interactive folder-tree expansion and largest-files Recycle Bin actions.
+   - Deep **Space-Hog Forensics** (`StorageHotspotAnalyzerService`) separating safe regenerable caches (NVIDIA `DXCache`/`GLCache`/`ota-artifacts`, `D3DSCache`, multi-profile Chromium/Firefox browser caches, NuGet/npm/Bun/pip/VS Code caches) from protected WSL/Docker `.vhdx` disks.
+   - 3-stage SHA-256 duplicate finder (with NTFS hard-link & cloud-placeholder protection) and reversible **Tidy Folder** organizer with 1-click Undo.
+3. **Tweaks & Boot (Windows 11 Power Tweaks, Presets, Power Mode & Startup)**:
+   - Reversible hidden Windows 11/10 tweaks: **Classic Windows 10 Right-Click Menu**, **Disable Bing Web Search in Start Menu**, **Block Windows Ads/Tips/Lock Screen Promos**, **Taskbar Right-Click End Task**, **Hide Widgets/Copilot**, **Show Seconds in Clock**, and **Disable Mouse Acceleration (Raw 1:1 Pointer)** — individually or via **1-Click Presets** (*Clean Win11 & Debloat*, *Gaming & Raw Mouse*) with **Restart File Explorer**.
+   - Power Plan switcher with **Ultimate Performance** scheme unlock and Administrator-gated **Hibernation (`hiberfil.sys`)** toggle to reclaim SSD space.
+   - Multi-scope Startup entry inspector (`HKCU`/`HKLM`/Startup folders/Scheduled Tasks) with broken-target filtering and reversible toggles.
+4. **Repair & Health (1-Click Repair Toolkit, Runtime Health, Network & Event Logs)**:
+   - Token-gated repair workflows: **Rebuild Icon & Thumbnail Cache + Restart Explorer**, **Full Network & Winsock Reset**, **Clear Stuck Print Spooler**, **Reset Stuck Windows Update Cache**, **DISM `WinSxS` Component Cleanup**, and **`sfc /scannow`**.
+   - **App & Game Runtime Health** audit for Visual C++ 2015–2022 (`x64`/`x86`), `.NET Desktop Runtime`, and `Edge WebView2 Runtime`.
+   - Active network diagnostics (`ipconfig`/Ping/DNS/1-click Cloudflare/Google/Quad9/DHCP DNS switcher), Hardware/SMBIOS specs, Event Log error explanations, and structured **Groundwork Investigations**.
+5. **Apps & Debloat (Store UWP Bloatware, Win32 Uninstaller & `winget` Batch Setup)**:
+   - Preinstalled Microsoft Store (`Appx`) bloatware scanner with strict protection blocking removal of core Windows Store, terminal, and UI frameworks.
+   - Win32 installed-software manager with native icon extraction, uninstaller launch, and Recycle Bin leftover cleanup.
+   - Curated **Essential Runtimes & Clean Utilities (`winget`)** batch installer (VC++ x64/x86, `.NET 10 Desktop`, `7-Zip`, `Everything`, `PowerToys`, `WizTree`, `VLC`).
+6. **Optional System-Aware AI Assistant**: Backed by `ToolRegistryService` (`27` typed local tools) and `AgentPlannerService` — works offline deterministically or connects to local `Ollama` and cloud LLMs (`Gemini`, `OpenAI`, `Anthropic`, `Mistral`, `Custom`) using DPAPI-encrypted credentials.
 
 ---
 
@@ -66,8 +77,8 @@ dotnet test desktop-winui/Groundwork.slnx -c Release
 
 ### Build & Run the WinUI 3 Desktop Application
 ```powershell
-dotnet build desktop-winui/Groundwork.slnx -c Release
-dotnet run --project desktop-winui/src/Groundwork.Desktop/Groundwork.Desktop.csproj -c Release
+dotnet build desktop-winui/src/Groundwork.Desktop/Groundwork.Desktop.csproj -c Release
+dotnet run --project desktop-winui/src/Groundwork.Desktop/Groundwork.Desktop.csproj -c Release --no-build
 ```
 
 ---

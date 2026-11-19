@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-11-18
+
+### Product Evolution — Dedicated Windows Power Utility, Repair Toolkit & Store Debloater
+
+- **Windows 11 Power Tweaks & Batch Presets (`WindowsOptimizationService`)**:
+  - Added reversible tweaks for Classic Windows 10 Full Right-Click Menu, disabling Bing web search in Start Menu, blocking Windows Start/Lock Screen ads & tips, Taskbar right-click **End Task**, showing seconds in taskbar clock, hiding Widgets/Copilot taskbar clutter, and disabling Mouse Acceleration (1:1 Raw Pointer).
+  - Added 1-click **Clean Win11 & Debloat** and **Gaming & Raw Mouse** batch presets with full grouped pre-change state capture and 1-click Undo.
+  - Added **Ultimate Performance** hidden power scheme unlock (`powercfg /duplicatescheme` with duplicate cleanup on rollback) and Administrator-gated **Hibernation (`hiberfil.sys`)** toggle.
+- **1-Click Windows Repair Toolkit & Runtime Health (`WindowsRepairAndDebloatService`)**:
+  - Added 6 gated repair workflows: Icon/Thumbnail Cache Rebuild + Explorer Restart, Full Network & Winsock Reset, Clear Stuck Print Spooler Queue, Reset Windows Update Cache, `WinSxS` DISM Component Store Cleanup, and `sfc /scannow`.
+  - Added read-only runtime health checks for Visual C++ 2015–2022 (`x64`/`x86`), `.NET Desktop Runtime`, and `Microsoft Edge WebView2 Runtime`.
+- **Store Bloatware (UWP) & `winget` Batch Setup**:
+  - Added Microsoft Store (`Appx`) package inspector with protected core package blocking (`Microsoft.WindowsStore`, `DesktopAppInstaller`, UI/VCLibs frameworks) and safe current-user bloatware removal.
+  - Added multi-select batch setup for curated runtimes & clean utilities (`VC++ x64/x86`, `.NET 10 Desktop`, `7-Zip`, `Everything Search`, `PowerToys`, `WizTree`, `VLC`) via official `winget`.
+- **Deep Storage Space-Hog Forensics & Actionable UI (`StorageHotspotAnalyzerService`)**:
+  - Added parallel detection of GPU shader/OTA caches, multi-profile browser caches, developer caches, and protected WSL/Docker virtual disks, plus audit-logged Recycle Bin cleanup (`ProposeEmptyRecycleBin`) and actionable duplicate/leftover Recycle Bin cleanup.
+- **UI/UX Redesign (`Groundwork.Desktop`)**:
+  - Responsive left `NavigationView` shell with Light (`Paper & Ink Blue`) / Dark (`Control Room`) theme toggle, truthful Windows 11/10 & pressure-weighted health scoring on Overview, off-UI-thread `SafeOperationEngine` execution, and promoted task-first default views.
+
+---
+
 ## [1.1.0] - 2026-11-07
 
 ### Product Evolution — Intelligent Windows System Companion

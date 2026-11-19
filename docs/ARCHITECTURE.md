@@ -13,10 +13,10 @@ flowchart TD
     History["OperationHistoryService & AgentLocalStateService"]
 
     subgraph Engine ["Groundwork.Engine (System Services)"]
-        Storage["Win32StorageScanner / DuplicateEngineService"]
+        Storage["Win32StorageScanner / StorageHotspotAnalyzerService / DuplicateEngineService"]
         Hardware["HardwareSpecsEngineService / ProcessInspector"]
-        Optimize["WindowsOptimizationService (Power / Startup / Settings)"]
-        Trouble["DiagnosticsAndTroubleshootingService (Network / EventLog / Services / Health)"]
+        Optimize["WindowsOptimizationService (Power / Startup / Tweaks & Presets)"]
+        Trouble["DiagnosticsAndTroubleshootingService / WindowsRepairAndDebloatService"]
         Maint["SafeCleanupService / FileOrganizerService / InstalledAppsEngineService"]
     end
 
@@ -66,7 +66,8 @@ All system modifications follow the **10-Step Safe Operation Lifecycle**:
   - `RecommendedActions`: Actionable proposals linked to the Safe Operation Engine.
 - **`AgentPlannerService`**: Maps natural-language user requests to registered tools and investigations, executes read-only tools automatically, gates any modifying tool behind user approval, and enriches LLM prompts with structured tool evidence.
 
-### 2.4 Optimization, Troubleshooting & Maintenance Services
-- **`WindowsOptimizationService`**: Power plan inspection and switching (`powercfg`), Startup entry discovery and reversible toggling (`HKCU\...\Run`, `HKLM\...\Run`, Startup folders, and backup ledger), and Windows performance/privacy configuration (Game Mode, Visual Transparency, HAGS status).
-- **`DiagnosticsAndTroubleshootingService`**: Active process resource inspection, network interface/IP/Gateway/DNS inspection, ICMP Ping, DNS lookup, TCP connectivity checks, Windows Event Log (`System` & `Application`) error analysis, Windows Services health inspection, and Windows Repair/Update status checks.
-- **`FileOrganizerService`**: Categorizes cluttered folders into structured subfolders and executes reversible moves with full undo support via `OperationHistoryService`.
+### 2.4 Optimization, Troubleshooting, Repair & Debloat Services
+- **`WindowsOptimizationService`**: Power plan inspection, switching, Ultimate Performance unlock (`powercfg`), and `hiberfil.sys` Hibernation toggle; Startup entry discovery across `HKCU`/`HKLM`/Startup folders/Tasks with reversible toggling; and hidden Windows 11/privacy/gaming registry tweaks + atomic batch presets (`Clean Windows 11`, `Gaming & Raw Mouse`).
+- **`DiagnosticsAndTroubleshootingService`**: Active process resource inspection, network interface/IP/Gateway/DNS inspection, ICMP Ping, DNS lookup, TCP connectivity checks, reversible DNS provider switching, Windows Event Log (`System` & `Application`) error analysis, Windows Services health inspection, and `DISM` health checks.
+- **`WindowsRepairAndDebloatService`**: 1-click gated repair workflows (Explorer icon cache, Winsock/IP reset, Print Spooler queue, Windows Update cache, `WinSxS` cleanup, `sfc /scannow`), runtime health checks (`VC++`, `.NET Desktop`, `WebView2`), protected Microsoft Store (`Appx`) bloatware removal, and curated `winget` single/batch package setup.
+- **`StorageHotspotAnalyzerService` & `FileOrganizerService`**: Deep GPU/OTA/browser/dev cache & `.vhdx` space-hog analysis, audit-logged Recycle Bin operations, and reversible file organization via `OperationHistoryService`.

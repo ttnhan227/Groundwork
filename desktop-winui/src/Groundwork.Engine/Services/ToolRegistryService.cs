@@ -27,6 +27,8 @@ public sealed class ToolRegistryService
     private readonly WindowsOptimizationService _optimizationService;
     private readonly DiagnosticsAndTroubleshootingService _troubleshootingService;
     private readonly FileOrganizerService _fileOrganizerService;
+    private readonly StorageHotspotAnalyzerService _storageHotspotService;
+    private readonly WindowsRepairAndDebloatService _repairAndDebloatService;
 
     private readonly Dictionary<string, (AgentToolDefinition Definition, Func<IReadOnlyDictionary<string, string>, CancellationToken, Task<AgentToolCallResult>> Handler)> _tools
         = new(StringComparer.OrdinalIgnoreCase);
@@ -38,11 +40,15 @@ public sealed class ToolRegistryService
         InstalledAppsEngineService? installedAppsService = null,
         WindowsOptimizationService? optimizationService = null,
         DiagnosticsAndTroubleshootingService? troubleshootingService = null,
-        FileOrganizerService? fileOrganizerService = null)
+        FileOrganizerService? fileOrganizerService = null,
+        StorageHotspotAnalyzerService? storageHotspotService = null,
+        WindowsRepairAndDebloatService? repairAndDebloatService = null)
     {
         var sharedSafeOps = optimizationService?.SafeOperations
             ?? troubleshootingService?.SafeOperations
             ?? fileOrganizerService?.SafeOperations
+            ?? storageHotspotService?.SafeOperations
+            ?? repairAndDebloatService?.SafeOperations
             ?? new SafeOperationEngine();
 
         _hardwareService = hardwareService ?? new HardwareSpecsEngineService();
@@ -52,6 +58,8 @@ public sealed class ToolRegistryService
         _optimizationService = optimizationService ?? new WindowsOptimizationService(sharedSafeOps);
         _troubleshootingService = troubleshootingService ?? new DiagnosticsAndTroubleshootingService(sharedSafeOps);
         _fileOrganizerService = fileOrganizerService ?? new FileOrganizerService(sharedSafeOps);
+        _storageHotspotService = storageHotspotService ?? new StorageHotspotAnalyzerService(sharedSafeOps);
+        _repairAndDebloatService = repairAndDebloatService ?? new WindowsRepairAndDebloatService(sharedSafeOps, _installedAppsService);
 
         RegisterDefaultTools();
     }
@@ -64,6 +72,8 @@ public sealed class ToolRegistryService
     public DriveDiscoveryService Drives => _driveDiscoveryService;
     public SafeCleanupService Cleanup => _cleanupService;
     public InstalledAppsEngineService InstalledApps => _installedAppsService;
+    public StorageHotspotAnalyzerService StorageHotspots => _storageHotspotService;
+    public WindowsRepairAndDebloatService RepairAndDebloat => _repairAndDebloatService;
 
     public IReadOnlyList<AgentToolDefinition> GetRegisteredTools() =>
         _tools.Values.Select(v => v.Definition).OrderBy(d => d.Category).ThenBy(d => d.Name).ToList();
@@ -779,6 +789,275 @@ public sealed class ToolRegistryService
                     SummaryText: proposal.PrerequisitesMet
                         ? $"Prepared DISM verification proposal: {proposal.ProposedChangeExplanation}"
                         : $"Cannot run DISM verification in non-elevated session: {proposal.PrerequisiteFailureReason}",
+                    StructuredDataJson: JsonSerializer.Serialize(proposal, JsonOptions),
+                    PendingProposal: proposal,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow));
+            });
+
+        // 21. Read-Only Tool: inspect_space_hogs
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "inspect_space_hogs",
+                DisplayName: "Inspect Disk Space Hogs (Docker/WSL, GPU, Dev & AppData)",
+                Category: "Analyze / Storage",
+                Description: "Quickly inspects common Windows space hogs including Docker/WSL virtual disks, NVIDIA DXCache and OTA artifacts, Direct3D shader caches, NuGet/npm/bun/pip/VS Code caches, CBS logs, and heavy AppData/User Profile folders.",
+                Parameters:
+                [
+                    new AgentToolParameter("min_mb", "integer", false, "Minimum entry size in MB to include (default 100).")
+                ],
+                RequiredPermissions: OperationElevationRequirement.StandardUser,
+                IsModifying: false,
+                Reversibility: OperationReversibility.ReadOnly,
+                RiskLevel: OperationRiskLevel.None,
+                Preconditions: "None.",
+                ExpectedOutputDescription: "SpaceHogReport listing exact paths, sizes, impact notes, and whether each entry is safe to clean.",
+                PotentialRisks: []),
+            async (args, ct) =>
+            {
+                var minMb = args.TryGetValue("min_mb", out var s) && int.TryParse(s, out var parsed) && parsed >= 0 ? parsed : 100;
+                var report = await _storageHotspotService.InspectSpaceHogsAsync(minMb * 1024L * 1024L, ct).ConfigureAwait(false);
+                var topList = report.Entries.Count > 0
+                    ? string.Join(" | ", report.Entries.Take(8).Select(e => $"{e.Title}: {StorageHotspotAnalyzerService.FormatGbOrMb(e.SizeBytes)}"))
+                    : "No major space hogs above threshold.";
+                return new AgentToolCallResult(
+                    ToolName: "inspect_space_hogs",
+                    Succeeded: true,
+                    IsModifyingProposal: false,
+                    SummaryText: $"Identified {report.Entries.Count} space hog(s) totaling {StorageHotspotAnalyzerService.FormatGbOrMb(report.TotalIdentifiedBytes)} ({StorageHotspotAnalyzerService.FormatGbOrMb(report.SafeReclaimableBytes)} safe-cleanable): {topList}",
+                    StructuredDataJson: JsonSerializer.Serialize(report, JsonOptions),
+                    PendingProposal: null,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow);
+            });
+
+        // 22. Read-Only Tool: scan_folder_storage
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "scan_folder_storage",
+                DisplayName: "Scan Folder or Drive Space Hotspots (Win32)",
+                Category: "Analyze / Storage",
+                Description: "Runs Groundwork's parallel Win32 FindFirstFileExW scanner on a drive or folder path (e.g., C:\\, C:\\Users\\name\\AppData) to find the largest subfolders, largest single files, and any protected/unaccounted drive delta.",
+                Parameters:
+                [
+                    new AgentToolParameter("path", "string", false, "Directory or drive root to scan (defaults to user profile folder)."),
+                    new AgentToolParameter("min_file_mb", "integer", false, "Minimum file size in MB for largest files list (default 50)."),
+                    new AgentToolParameter("top_n", "integer", false, "Maximum folders/files to return (default 15).")
+                ],
+                RequiredPermissions: OperationElevationRequirement.StandardUser,
+                IsModifying: false,
+                Reversibility: OperationReversibility.ReadOnly,
+                RiskLevel: OperationRiskLevel.None,
+                Preconditions: "Target directory must exist.",
+                ExpectedOutputDescription: "StorageHotspotReport with top root folders, top nested subfolders, largest files, and protected-space delta.",
+                PotentialRisks: []),
+            async (args, ct) =>
+            {
+                args.TryGetValue("path", out var path);
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                }
+                if (!Directory.Exists(path))
+                {
+                    return new AgentToolCallResult(
+                        ToolName: "scan_folder_storage",
+                        Succeeded: false,
+                        IsModifyingProposal: false,
+                        SummaryText: $"Directory does not exist: {path}",
+                        StructuredDataJson: "{}",
+                        PendingProposal: null,
+                        ExecutedAtUtc: DateTimeOffset.UtcNow);
+                }
+
+                var minFileMb = args.TryGetValue("min_file_mb", out var ms) && int.TryParse(ms, out var pm) && pm >= 0 ? pm : 50;
+                var topN = args.TryGetValue("top_n", out var ts) && int.TryParse(ts, out var pt) && pt > 0 ? Math.Min(pt, 50) : 15;
+                var report = await _storageHotspotService.ScanFolderHotspotsAsync(path, topN, minFileMb * 1024L * 1024L, ct).ConfigureAwait(false);
+                var topFolders = string.Join(" | ", report.TopRootFolders.Take(6).Select(f => $"{f.Name}: {StorageHotspotAnalyzerService.FormatGbOrMb(f.LogicalBytes)}"));
+                var deltaNote = report.UnaccountedProtectedBytes > 0
+                    ? $" | Protected/unreadable volume delta: ~{StorageHotspotAnalyzerService.FormatGbOrMb(report.UnaccountedProtectedBytes)} (e.g., System Restore/Shadow Copies or WindowsApps)"
+                    : string.Empty;
+                return new AgentToolCallResult(
+                    ToolName: "scan_folder_storage",
+                    Succeeded: true,
+                    IsModifyingProposal: false,
+                    SummaryText: $"Scanned {report.RootPath}: {StorageHotspotAnalyzerService.FormatGbOrMb(report.ScannedBytes)} across {report.TotalFiles:N0} files in {report.ElapsedMs:F0} ms. Top folders: {topFolders}{deltaNote}",
+                    StructuredDataJson: JsonSerializer.Serialize(report, JsonOptions),
+                    PendingProposal: null,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow);
+            });
+
+        // 23. Read-Only Tool: inspect_installed_apps
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "inspect_installed_apps",
+                DisplayName: "Inspect Installed Applications & Sizes",
+                Category: "Analyze / Applications",
+                Description: "Enumerates installed Windows applications from registry uninstall keys, optionally filtered by name/publisher and sorted by estimated size.",
+                Parameters:
+                [
+                    new AgentToolParameter("filter", "string", false, "Optional substring filter for app name or publisher."),
+                    new AgentToolParameter("top_count", "integer", false, "Maximum applications to return (default 20).")
+                ],
+                RequiredPermissions: OperationElevationRequirement.StandardUser,
+                IsModifying: false,
+                Reversibility: OperationReversibility.ReadOnly,
+                RiskLevel: OperationRiskLevel.None,
+                Preconditions: "Windows Registry Uninstall keys.",
+                ExpectedOutputDescription: "List of InstalledApplicationInfo records.",
+                PotentialRisks: []),
+            (args, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                args.TryGetValue("filter", out var filter);
+                var top = args.TryGetValue("top_count", out var ts) && int.TryParse(ts, out var pt) && pt > 0 ? Math.Min(pt, 100) : 20;
+                var apps = _installedAppsService.EnumerateInstalledApps()
+                    .Where(a => string.IsNullOrWhiteSpace(filter) ||
+                                a.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                                a.Publisher.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(a => a.EstimatedSizeBytes ?? 0)
+                    .Take(top)
+                    .ToList();
+                var summaryList = string.Join(", ", apps.Take(6).Select(a =>
+                    a.EstimatedSizeBytes.HasValue
+                        ? $"{a.Name} ({StorageHotspotAnalyzerService.FormatGbOrMb(a.EstimatedSizeBytes.Value)})"
+                        : a.Name));
+                return Task.FromResult(new AgentToolCallResult(
+                    ToolName: "inspect_installed_apps",
+                    Succeeded: true,
+                    IsModifyingProposal: false,
+                    SummaryText: $"Found {apps.Count} matching installed app(s). Top: {summaryList}",
+                    StructuredDataJson: JsonSerializer.Serialize(apps, JsonOptions),
+                    PendingProposal: null,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow));
+            });
+
+        // 24. Modify Proposal Tool: propose_clean_space_hogs
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "propose_clean_space_hogs",
+                DisplayName: "Propose Cleaning Regenerable GPU, Installer & Dev Caches",
+                Category: "Maintenance / Cleanup",
+                Description: "Creates an approval-gated proposal to clean safe, regenerable caches (GPU shader caches, NVIDIA OTA installer leftovers, NuGet/npm/bun/pip/VS Code caches). Never touches virtual disks or personal documents.",
+                Parameters:
+                [
+                    new AgentToolParameter("entry_ids", "string", false, "Optional comma-separated SpaceHogEntry IDs (e.g., nvidia_dxcache,nvidia_ota_artifacts,nuget_packages). Defaults to all safe-cleanable entries.")
+                ],
+                RequiredPermissions: OperationElevationRequirement.StandardUser,
+                IsModifying: true,
+                Reversibility: OperationReversibility.Irreversible,
+                RiskLevel: OperationRiskLevel.Low,
+                Preconditions: "At least one safe-cleanable cache entry must exist.",
+                ExpectedOutputDescription: "OperationProposal with single-use confirmation token.",
+                PotentialRisks: StorageHotspotAnalyzerService.CleanSpaceHogsDescriptor.PotentialRisks),
+            async (args, ct) =>
+            {
+                args.TryGetValue("entry_ids", out var idsRaw);
+                var ids = string.IsNullOrWhiteSpace(idsRaw)
+                    ? null
+                    : idsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var proposal = await _storageHotspotService.ProposeCleanSafeSpaceHogsAsync(ids, ct).ConfigureAwait(false);
+                return new AgentToolCallResult(
+                    ToolName: "propose_clean_space_hogs",
+                    Succeeded: proposal.PrerequisitesMet,
+                    IsModifyingProposal: true,
+                    SummaryText: proposal.PrerequisitesMet
+                        ? $"Prepared cache cleanup proposal: {proposal.ProposedChangeExplanation}"
+                        : $"No eligible cache directories to clean: {proposal.PrerequisiteFailureReason}",
+                    StructuredDataJson: JsonSerializer.Serialize(proposal, JsonOptions),
+                    PendingProposal: proposal,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow);
+            });
+
+        // 25. Read-Only Tool: inspect_runtime_health
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "inspect_runtime_health",
+                DisplayName: "Inspect Essential Windows Runtimes",
+                Category: "Troubleshoot / Repair",
+                Description: "Checks whether Visual C++ 2015-2022 (x64 & x86), .NET Desktop Runtime, and Edge WebView2 are installed.",
+                Parameters: [],
+                RequiredPermissions: OperationElevationRequirement.StandardUser,
+                IsModifying: false,
+                Reversibility: OperationReversibility.ReadOnly,
+                RiskLevel: OperationRiskLevel.None,
+                Preconditions: "None",
+                ExpectedOutputDescription: "List of RuntimeHealthEntry records.",
+                PotentialRisks: []),
+            (_, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                var runtimes = _repairAndDebloatService.InspectInstalledRuntimes();
+                var missing = runtimes.Where(r => !r.IsInstalled).Select(r => r.DisplayName).ToList();
+                return Task.FromResult(new AgentToolCallResult(
+                    ToolName: "inspect_runtime_health",
+                    Succeeded: true,
+                    IsModifyingProposal: false,
+                    SummaryText: missing.Count == 0
+                        ? $"All {runtimes.Count} core runtimes (VC++ x64/x86, .NET Desktop, WebView2) are installed."
+                        : $"Missing runtime(s): {string.Join(", ", missing)}.",
+                    StructuredDataJson: JsonSerializer.Serialize(runtimes, JsonOptions),
+                    PendingProposal: null,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow));
+            });
+
+        // 26. Read-Only Tool: inspect_uwp_bloatware
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "inspect_uwp_bloatware",
+                DisplayName: "Inspect Preinstalled Store / UWP Bloatware",
+                Category: "Applications / Debloat",
+                Description: "Enumerates Microsoft Store (Appx) packages for the current user and highlights removable preinstalled bloatware while marking protected core components.",
+                Parameters: [],
+                RequiredPermissions: OperationElevationRequirement.StandardUser,
+                IsModifying: false,
+                Reversibility: OperationReversibility.ReadOnly,
+                RiskLevel: OperationRiskLevel.None,
+                Preconditions: "Windows Appx package manager.",
+                ExpectedOutputDescription: "List of AppxPackageEntry records.",
+                PotentialRisks: []),
+            async (_, ct) =>
+            {
+                var packages = await _repairAndDebloatService.InspectAppxPackagesAsync(ct).ConfigureAwait(false);
+                var bloat = packages.Where(p => p.IsSuggestedBloat).ToList();
+                return new AgentToolCallResult(
+                    ToolName: "inspect_uwp_bloatware",
+                    Succeeded: true,
+                    IsModifyingProposal: false,
+                    SummaryText: $"Scanned {packages.Count} Store package(s); {bloat.Count} recognized preinstalled bloatware package(s) ({string.Join(", ", bloat.Take(5).Select(b => b.Name))}).",
+                    StructuredDataJson: JsonSerializer.Serialize(packages, JsonOptions),
+                    PendingProposal: null,
+                    ExecutedAtUtc: DateTimeOffset.UtcNow);
+            });
+
+        // 27. Modify Proposal Tool: propose_repair_workflow
+        RegisterTool(
+            new AgentToolDefinition(
+                Name: "propose_repair_workflow",
+                DisplayName: "Propose 1-Click Windows Repair Workflow",
+                Category: "Troubleshoot / Repair",
+                Description: "Creates an approval-gated repair proposal for a supported Windows fix (repair.explorer_icon_cache, repair.network_reset, repair.print_spooler, repair.windows_update_cache, repair.winsxs_cleanup, repair.sfc_scan).",
+                Parameters:
+                [
+                    new AgentToolParameter("repair_id", "string", true, "Repair workflow ID (e.g. repair.explorer_icon_cache, repair.network_reset, repair.print_spooler, repair.windows_update_cache, repair.winsxs_cleanup, repair.sfc_scan).")
+                ],
+                RequiredPermissions: OperationElevationRequirement.AdministratorRequired,
+                IsModifying: true,
+                Reversibility: OperationReversibility.PartiallyReversible,
+                RiskLevel: OperationRiskLevel.Medium,
+                Preconditions: "Valid repair_id; Administrator privileges for system-wide repairs.",
+                ExpectedOutputDescription: "OperationProposal with single-use confirmation token.",
+                PotentialRisks: WindowsRepairAndDebloatService.RepairActionDescriptor.PotentialRisks),
+            (args, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                args.TryGetValue("repair_id", out var repairId);
+                var proposal = _repairAndDebloatService.ProposeRepairAction(repairId ?? string.Empty);
+                return Task.FromResult(new AgentToolCallResult(
+                    ToolName: "propose_repair_workflow",
+                    Succeeded: proposal.PrerequisitesMet,
+                    IsModifyingProposal: true,
+                    SummaryText: proposal.PrerequisitesMet
+                        ? $"Prepared repair workflow proposal: {proposal.ProposedChangeExplanation}"
+                        : $"Repair precondition failed: {proposal.PrerequisiteFailureReason}",
                     StructuredDataJson: JsonSerializer.Serialize(proposal, JsonOptions),
                     PendingProposal: proposal,
                     ExecutedAtUtc: DateTimeOffset.UtcNow));

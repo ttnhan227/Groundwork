@@ -14,12 +14,15 @@ public sealed record AgentPlannedTurn(
     InvestigationReport InvestigationReport,
     IReadOnlyList<OperationProposal> PendingApprovalProposals,
     string DeterministicMarkdownResponse,
-    string GroundedLlmEvidencePrompt);
+    string GroundedLlmEvidencePrompt,
+    IReadOnlyList<string>? ToolTrace = null,
+    string? UsedAiProvider = null,
+    bool UsedLiveLlm = false);
 
 /// <summary>
 /// Coordinates the Groundwork AI Agent lifecycle:
 /// 1. Understands user intent
-/// 2. Selects registered read-only diagnostic tools
+/// 2. Selects registered read-only diagnostic tools (or runs multi-turn LLM tool-calling when configured)
 /// 3. Collects actual live system telemetry
 /// 4. Separates confirmed findings from potential causes
 /// 5. Prepares approval-gated OperationProposals for any requested modifications
@@ -29,17 +32,107 @@ public sealed class AgentPlannerService
 {
     private readonly InvestigationEngineService _investigationEngine;
     private readonly ToolRegistryService _toolRegistry;
+    private readonly AiProviderClientService _aiClient;
 
     public AgentPlannerService(
         InvestigationEngineService? investigationEngine = null,
-        ToolRegistryService? toolRegistry = null)
+        ToolRegistryService? toolRegistry = null,
+        AiProviderClientService? aiClient = null)
     {
         _toolRegistry = toolRegistry ?? new ToolRegistryService();
         _investigationEngine = investigationEngine ?? new InvestigationEngineService(_toolRegistry);
+        _aiClient = aiClient ?? new AiProviderClientService();
     }
 
     public InvestigationEngineService InvestigationEngine => _investigationEngine;
     public ToolRegistryService ToolRegistry => _toolRegistry;
+
+    public async Task<AgentPlannedTurn> RunAssistantTurnAsync(
+        string userQuery,
+        AiProviderConfig? aiConfig = null,
+        IReadOnlyList<(string User, string Assistant)>? conversationHistory = null,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var cleanQuery = string.IsNullOrWhiteSpace(userQuery)
+            ? "Check the health and performance of my computer."
+            : userQuery.Trim();
+
+        if (aiConfig is { IsConfigured: true })
+        {
+            progress?.Report($"Consulting {aiConfig.Provider} ({aiConfig.Model}) with Groundwork tools...");
+            var startedAt = DateTimeOffset.UtcNow;
+            var loop = await _aiClient.RunToolLoopAsync(
+                aiConfig,
+                cleanQuery,
+                _toolRegistry,
+                conversationHistory,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+
+            if (loop.Succeeded && !string.IsNullOrWhiteSpace(loop.FinalAnswerMarkdown))
+            {
+                var invType = InvestigationEngineService.InferInvestigationTypeFromQuery(cleanQuery);
+                var synthFindings = loop.ToolResults
+                    .Select(r => new InvestigationFinding(
+                        FindingCategory.ConfirmedObservation,
+                        r.ToolName,
+                        r.SummaryText,
+                        r.ToolName,
+                        r.Succeeded ? "Confirmed (Live Tool)" : "Tool Error",
+                        r.Succeeded ? "Normal" : "Medium"))
+                    .ToList();
+
+                var synthReport = new InvestigationReport(
+                    ReportId: $"llm-turn-{Guid.NewGuid():N}",
+                    InvestigationType: invType,
+                    Title: $"AI Agent Investigation ({aiConfig.Provider})",
+                    UserQuery: cleanQuery,
+                    ExecutiveSummary: loop.FinalAnswerMarkdown,
+                    ExecutedTools: loop.ToolResults.Select(r => r.ToolName).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                    ConfirmedObservations: synthFindings,
+                    PotentialCauses: [],
+                    UnverifiedHypotheses: [],
+                    RecommendedActions: [],
+                    ToolResults: loop.ToolResults,
+                    StartedAtUtc: startedAt,
+                    CompletedAtUtc: DateTimeOffset.UtcNow);
+
+                return new AgentPlannedTurn(
+                    UserQuery: cleanQuery,
+                    SelectedInvestigationType: invType,
+                    InvestigationReport: synthReport,
+                    PendingApprovalProposals: loop.PendingProposals,
+                    DeterministicMarkdownResponse: loop.FinalAnswerMarkdown,
+                    GroundedLlmEvidencePrompt: loop.FinalAnswerMarkdown,
+                    ToolTrace: loop.ExecutedToolTrace,
+                    UsedAiProvider: aiConfig.Provider,
+                    UsedLiveLlm: true);
+            }
+
+            // Fall back cleanly to deterministic investigation if LLM call failed
+            progress?.Report($"AI provider fallback ({loop.ErrorMessage ?? "unavailable"}); running local Groundwork investigation...");
+            var fallback = await PlanAndInvestigateUserRequestAsync(cleanQuery, cancellationToken).ConfigureAwait(false);
+            var notice = $"> *Note: `{aiConfig.Provider}` was unavailable ({loop.ErrorMessage ?? "error"}); showing Groundwork's local telemetry investigation.*\n\n";
+            return fallback with
+            {
+                DeterministicMarkdownResponse = notice + fallback.DeterministicMarkdownResponse,
+                ToolTrace = fallback.InvestigationReport.ExecutedTools,
+                UsedAiProvider = aiConfig.Provider,
+                UsedLiveLlm = false
+            };
+        }
+
+        progress?.Report("Running local Groundwork diagnostic investigation...");
+        var localTurn = await PlanAndInvestigateUserRequestAsync(cleanQuery, cancellationToken).ConfigureAwait(false);
+        return localTurn with
+        {
+            ToolTrace = localTurn.InvestigationReport.ExecutedTools,
+            UsedAiProvider = "local",
+            UsedLiveLlm = false
+        };
+    }
 
     public async Task<AgentPlannedTurn> PlanAndInvestigateUserRequestAsync(
         string userQuery,

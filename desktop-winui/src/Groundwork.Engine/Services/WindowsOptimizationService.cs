@@ -20,8 +20,33 @@ namespace Groundwork.Engine.Services;
 public sealed class WindowsOptimizationService
 {
     public const string PowerSwitchOperationId = "power.switch_plan";
+    public const string PowerUnlockUltimateOperationId = "power.unlock_ultimate";
+    public const string HibernateToggleOperationId = "power.toggle_hibernation";
     public const string StartupToggleOperationId = "startup.toggle_item";
     public const string SettingToggleOperationId = "settings.toggle_user_setting";
+    public const string TweakPresetOperationId = "settings.apply_preset";
+    private const string UltimatePerformanceSourceGuid = "e9a42b02-d5df-448d-aa00-03f14749eb61";
+
+    public static IReadOnlyDictionary<string, bool> CleanWindows11Preset { get; } = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["customization.classic_context_menu"] = true,
+        ["customization.taskbar_end_task"] = true,
+        ["customization.show_file_extensions"] = true,
+        ["debloat.disable_bing_search"] = true,
+        ["debloat.disable_start_ads"] = true,
+        ["debloat.hide_widgets"] = true,
+        ["debloat.hide_copilot_button"] = true,
+        ["privacy.advertising_id"] = false,
+        ["privacy.tailored_experiences"] = false
+    };
+
+    public static IReadOnlyDictionary<string, bool> GamingLatencyPreset { get; } = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["gaming.game_mode"] = true,
+        ["gaming.game_dvr"] = false,
+        ["performance.background_apps"] = false,
+        ["customization.disable_mouse_accel"] = true
+    };
 
     private const string HkcuRunSubKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string HklmRunSubKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -36,19 +61,37 @@ public sealed class WindowsOptimizationService
     private readonly SafeOperationEngine _safeOperationEngine;
     private readonly string? _customUserStartupDir;
     private readonly string? _customDisabledStartupDir;
+    private readonly string _hkcuSettingsPrefix;
+    private readonly Func<IReadOnlyList<string>, string> _powerCfgRunner;
 
     private sealed record PowerSwitchPayload(string TargetSchemeGuid, string TargetSchemeName, string PreviousSchemeGuid, string PreviousSchemeName);
+    private sealed record UnlockUltimatePayload(string PreviousSchemeGuid, string PreviousSchemeName, string? CreatedSchemeGuid);
     private sealed record StartupTogglePayload(string EntryId, string Name, StartupEntryScope Scope, string CommandOrTarget, bool TargetEnabled, string DisabledBackupPath);
-    private sealed record SettingTogglePayload(string SettingId, string DisplayName, bool TargetEnabled, int? PreviousDwordValue);
+    private sealed record SettingTogglePayload(
+        string SettingId,
+        string DisplayName,
+        bool TargetEnabled,
+        int? PreviousDwordValue,
+        bool? PreviousSubKeyExisted = null,
+        IReadOnlyDictionary<string, int?>? PreviousCompanionDwords = null,
+        IReadOnlyDictionary<string, string?>? PreviousStrings = null);
+    private sealed record TweakPresetPayload(string PresetName, IReadOnlyList<SettingTogglePayload> Items);
+    private sealed record HibernateTogglePayload(bool TargetEnabled, bool PreviousEnabled);
 
     public WindowsOptimizationService(
         SafeOperationEngine? safeOperationEngine = null,
         string? customUserStartupDir = null,
-        string? customDisabledStartupDir = null)
+        string? customDisabledStartupDir = null,
+        string? customHkcuSettingsPrefix = null,
+        Func<IReadOnlyList<string>, string>? customPowerCfgRunner = null)
     {
         _safeOperationEngine = safeOperationEngine ?? new SafeOperationEngine();
         _customUserStartupDir = customUserStartupDir;
         _customDisabledStartupDir = customDisabledStartupDir;
+        _hkcuSettingsPrefix = string.IsNullOrWhiteSpace(customHkcuSettingsPrefix)
+            ? string.Empty
+            : customHkcuSettingsPrefix.Trim().Trim('\\') + "\\";
+        _powerCfgRunner = customPowerCfgRunner ?? DefaultRunPowerCfg;
 
         RegisterOperationHandlers();
     }
@@ -71,6 +114,22 @@ public sealed class WindowsOptimizationService
         VerificationMethodDescription: "Queries powercfg /getactivescheme to confirm the target scheme GUID is active.",
         RollbackMethodDescription: "Restores the previously active power scheme GUID via powercfg /setactive.");
 
+    public static SystemOperationDescriptor UnlockUltimatePerformanceDescriptor { get; } = new(
+        OperationTypeId: PowerUnlockUltimateOperationId,
+        DisplayName: "Unlock & Activate Ultimate Performance Power Plan",
+        Category: "Optimize / Power Management",
+        Description: "Unhides Windows' hidden Ultimate Performance workstation scheme via powercfg /duplicatescheme and activates it.",
+        Reversibility: OperationReversibility.Reversible,
+        RiskLevel: OperationRiskLevel.Low,
+        ElevationRequirement: OperationElevationRequirement.StandardUser,
+        PotentialRisks:
+        [
+            "Eliminates micro-latency power saving states, increasing idle electricity draw and fan speed.",
+            "Note: Laptops locked to Modern Standby (S0 Low Power Idle) firmware may restrict non-Balanced power schemes."
+        ],
+        VerificationMethodDescription: "Verifies Ultimate Performance appears in powercfg /list and is set as active.",
+        RollbackMethodDescription: "Switches back to your previous power plan.");
+
     public static SystemOperationDescriptor StartupToggleDescriptor { get; } = new(
         OperationTypeId: StartupToggleOperationId,
         DisplayName: "Toggle Windows Startup Entry",
@@ -89,7 +148,7 @@ public sealed class WindowsOptimizationService
 
     public static SystemOperationDescriptor SettingToggleDescriptor { get; } = new(
         OperationTypeId: SettingToggleOperationId,
-        DisplayName: "Configure Windows Performance / Privacy Setting",
+        DisplayName: "Configure Windows Performance / Privacy / UI Setting",
         Category: "Optimize / Windows Configuration",
         Description: "Updates a user-scoped Windows configuration value in HKCU and records the previous value for rollback.",
         Reversibility: OperationReversibility.Reversible,
@@ -97,10 +156,42 @@ public sealed class WindowsOptimizationService
         ElevationRequirement: OperationElevationRequirement.StandardUser,
         PotentialRisks:
         [
-            "Visual or Explorer settings may require restarting File Explorer or signing out to take full visual effect."
+            "Explorer or taskbar tweaks may require restarting File Explorer (one click in Groundwork) to show immediately."
         ],
-        VerificationMethodDescription: "Reads back the registry value in HKCU to verify it matches the target configuration.",
-        RollbackMethodDescription: "Writes back the captured pre-change DWORD value (or deletes the value if it did not previously exist).");
+        VerificationMethodDescription: "Reads back the registry key/value in HKCU to verify it matches the target configuration.",
+        RollbackMethodDescription: "Restores the captured pre-change DWORD value or key state.");
+
+    public static SystemOperationDescriptor TweakPresetDescriptor { get; } = new(
+        OperationTypeId: TweakPresetOperationId,
+        DisplayName: "Apply Windows Power Tweak Preset",
+        Category: "Optimize / Windows Configuration",
+        Description: "Applies a curated set of user-scoped Windows tweaks in a single operation and records pre-change values for one-click rollback.",
+        Reversibility: OperationReversibility.Reversible,
+        RiskLevel: OperationRiskLevel.Low,
+        ElevationRequirement: OperationElevationRequirement.StandardUser,
+        PotentialRisks:
+        [
+            "Modifies multiple HKCU Explorer, taskbar, privacy, or mouse settings together.",
+            "Click 'Restart File Explorer' afterward to make shell and context-menu updates visible immediately."
+        ],
+        VerificationMethodDescription: "Re-inspects every included setting ID in HKCU to confirm all targets match the preset.",
+        RollbackMethodDescription: "Restores every modified setting in the preset back to its exact pre-preset value.");
+
+    public static SystemOperationDescriptor HibernateToggleDescriptor { get; } = new(
+        OperationTypeId: HibernateToggleOperationId,
+        DisplayName: "Toggle Windows Hibernation (hiberfil.sys)",
+        Category: "Optimize / Power & Storage",
+        Description: "Enables or disables Windows Hibernation via powercfg /hibernate to reclaim several gigabytes of SSD space on desktops or always-plugged systems.",
+        Reversibility: OperationReversibility.Reversible,
+        RiskLevel: OperationRiskLevel.Medium,
+        ElevationRequirement: OperationElevationRequirement.AdministratorRequired,
+        PotentialRisks:
+        [
+            "Requires Administrator privileges.",
+            "Disabling Hibernation also disables Windows Fast Startup and Hibernate sleep mode, while removing C:\\hiberfil.sys."
+        ],
+        VerificationMethodDescription: "Queries HKLM HibernateEnabled state after running powercfg /hibernate.",
+        RollbackMethodDescription: "Re-enables or disables hibernation back to its previous state via powercfg /hibernate.");
 
     private void RegisterOperationHandlers()
     {
@@ -108,6 +199,16 @@ public sealed class WindowsOptimizationService
             Descriptor: PowerSwitchDescriptor,
             ExecuteAsync: ExecutePowerSwitchPayloadAsync,
             RollbackAsync: RollbackPowerSwitchPayloadAsync));
+
+        _safeOperationEngine.RegisterHandler(new RegisteredOperationHandler(
+            Descriptor: UnlockUltimatePerformanceDescriptor,
+            ExecuteAsync: ExecuteUnlockUltimatePayloadAsync,
+            RollbackAsync: RollbackUnlockUltimatePayloadAsync));
+
+        _safeOperationEngine.RegisterHandler(new RegisteredOperationHandler(
+            Descriptor: HibernateToggleDescriptor,
+            ExecuteAsync: ExecuteHibernateToggleAsync,
+            RollbackAsync: RollbackHibernateToggleAsync));
 
         _safeOperationEngine.RegisterHandler(new RegisteredOperationHandler(
             Descriptor: StartupToggleDescriptor,
@@ -118,6 +219,11 @@ public sealed class WindowsOptimizationService
             Descriptor: SettingToggleDescriptor,
             ExecuteAsync: ExecuteSettingTogglePayloadAsync,
             RollbackAsync: RollbackSettingTogglePayloadAsync));
+
+        _safeOperationEngine.RegisterHandler(new RegisteredOperationHandler(
+            Descriptor: TweakPresetDescriptor,
+            ExecuteAsync: ExecuteTweakPresetAsync,
+            RollbackAsync: RollbackTweakPresetAsync));
     }
 
     // =========================================================================
@@ -312,7 +418,135 @@ public sealed class WindowsOptimizationService
             Verification: verification));
     }
 
-    private static string RunPowerCfg(IReadOnlyList<string> args)
+    public OperationProposal ProposeUnlockUltimatePerformancePlan()
+    {
+        var snapshot = InspectPowerPlans();
+        var existingUltimate = snapshot.Plans.FirstOrDefault(p =>
+            p.Name.Contains("Ultimate Performance", StringComparison.OrdinalIgnoreCase));
+
+        var payload = new UnlockUltimatePayload(
+            PreviousSchemeGuid: snapshot.ActiveSchemeGuid,
+            PreviousSchemeName: snapshot.ActiveSchemeName,
+            CreatedSchemeGuid: existingUltimate?.SchemeGuid);
+        var payloadJson = JsonSerializer.Serialize(payload);
+
+        return _safeOperationEngine.CreateProposal(
+            descriptor: UnlockUltimatePerformanceDescriptor,
+            targetDescription: "Power Plan: Ultimate Performance",
+            inspectedCurrentStateSummary: existingUltimate is not null
+                ? $"Ultimate Performance already exists ({existingUltimate.SchemeGuid}); active plan is '{snapshot.ActiveSchemeName}'."
+                : $"Ultimate Performance is currently hidden; active plan is '{snapshot.ActiveSchemeName}'.",
+            preChangeStateJson: payloadJson,
+            proposedChangeExplanation: existingUltimate is not null
+                ? $"Activates existing Ultimate Performance plan ({existingUltimate.SchemeGuid})."
+                : $"Unhides Windows' Ultimate Performance scheme via 'powercfg /duplicatescheme {UltimatePerformanceSourceGuid}' and activates it.",
+            expectedEffects:
+            [
+                "Minimizes CPU latency and prevents idle frequency throttling on plugged-in desktops/workstations.",
+                "Higher idle power consumption; you can switch back to Balanced at any time."
+            ],
+            payloadJson: payloadJson);
+    }
+
+    private Task<(bool Succeeded, string PostStateSummary, string StatusMessage, OperationVerificationResult Verification)> ExecuteUnlockUltimatePayloadAsync(
+        string payloadJson,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var payload = JsonSerializer.Deserialize<UnlockUltimatePayload>(payloadJson)
+            ?? new UnlockUltimatePayload(string.Empty, string.Empty, null);
+
+        var targetGuid = payload.CreatedSchemeGuid;
+        if (string.IsNullOrWhiteSpace(targetGuid))
+        {
+            var dupOutput = RunPowerCfg(["/duplicatescheme", UltimatePerformanceSourceGuid]);
+            var match = PowerGuidRegex.Match(dupOutput);
+            if (match.Success)
+            {
+                targetGuid = match.Groups[1].Value.Trim();
+            }
+            else
+            {
+                var afterDup = InspectPowerPlans();
+                targetGuid = afterDup.Plans
+                    .FirstOrDefault(p => p.Name.Contains("Ultimate Performance", StringComparison.OrdinalIgnoreCase))
+                    ?.SchemeGuid;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetGuid))
+        {
+            RunPowerCfg(["/setactive", targetGuid]);
+        }
+
+        var after = InspectPowerPlans();
+        var ultimate = after.Plans.FirstOrDefault(p =>
+            p.Name.Contains("Ultimate Performance", StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(targetGuid) && string.Equals(p.SchemeGuid, targetGuid, StringComparison.OrdinalIgnoreCase)));
+        var verified = ultimate is not null && string.Equals(after.ActiveSchemeGuid, ultimate.SchemeGuid, StringComparison.OrdinalIgnoreCase);
+
+        var verification = new OperationVerificationResult(
+            IsVerified: verified,
+            ObservedStateSummary: $"Active scheme is {after.ActiveSchemeName} ({after.ActiveSchemeGuid})",
+            VerificationDetails: verified
+                ? $"Ultimate Performance ({ultimate!.SchemeGuid}) unlocked and active."
+                : "Windows firmware (e.g., Modern Standby S0) or policy did not permit activating a custom Ultimate Performance scheme.",
+            VerifiedAtUtc: DateTimeOffset.UtcNow);
+
+        return Task.FromResult((
+            Succeeded: verified,
+            PostStateSummary: verification.ObservedStateSummary,
+            StatusMessage: verified
+                ? "Unlocked and activated Ultimate Performance power plan."
+                : "Could not unlock/activate Ultimate Performance on this hardware (Balanced mode is hardware-managed).",
+            Verification: verification));
+    }
+
+    private Task<(bool Succeeded, string StatusMessage, OperationVerificationResult Verification)> RollbackUnlockUltimatePayloadAsync(
+        string preChangeStateJson,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var payload = JsonSerializer.Deserialize<UnlockUltimatePayload>(preChangeStateJson);
+        if (payload is null || string.IsNullOrWhiteSpace(payload.PreviousSchemeGuid))
+        {
+            return Task.FromResult((
+                Succeeded: false,
+                StatusMessage: "No previous power scheme GUID was recorded.",
+                Verification: new OperationVerificationResult(false, "Unknown", "Missing prior power scheme GUID.", DateTimeOffset.UtcNow)));
+        }
+
+        RunPowerCfg(["/setactive", payload.PreviousSchemeGuid]);
+
+        // If Ultimate Performance did not exist before Groundwork created it, remove the duplicated scheme.
+        if (string.IsNullOrWhiteSpace(payload.CreatedSchemeGuid))
+        {
+            var currentPlans = InspectPowerPlans().Plans;
+            foreach (var dup in currentPlans.Where(p =>
+                         p.Name.Contains("Ultimate Performance", StringComparison.OrdinalIgnoreCase) &&
+                         !string.Equals(p.SchemeGuid, payload.PreviousSchemeGuid, StringComparison.OrdinalIgnoreCase)))
+            {
+                RunPowerCfg(["/delete", dup.SchemeGuid]);
+            }
+        }
+
+        var after = InspectPowerPlans();
+        var verified = string.Equals(after.ActiveSchemeGuid, payload.PreviousSchemeGuid, StringComparison.OrdinalIgnoreCase);
+        return Task.FromResult((
+            Succeeded: verified,
+            StatusMessage: verified
+                ? $"Restored previous power plan '{payload.PreviousSchemeName}'."
+                : $"Power plan rollback did not verify active GUID '{payload.PreviousSchemeGuid}'.",
+            Verification: new OperationVerificationResult(
+                verified,
+                after.ActiveSchemeName,
+                verified ? "Previous power scheme restored." : "Active power scheme mismatch.",
+                DateTimeOffset.UtcNow)));
+    }
+
+    private string RunPowerCfg(IReadOnlyList<string> args) => _powerCfgRunner(args);
+
+    private static string DefaultRunPowerCfg(IReadOnlyList<string> args)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -1046,204 +1280,404 @@ public sealed class WindowsOptimizationService
     // 3. WINDOWS PERFORMANCE, GAMING & PRIVACY CONFIGURATION
     // =========================================================================
 
-    public IReadOnlyList<WindowsConfigurableSetting> InspectConfigurableSettings()
-    {
-        var settings = new List<WindowsConfigurableSetting>();
+    private sealed record SettingCompanionDword(string SubKey, string ValueName, int EnabledValue, int DisabledValue);
+    private sealed record SettingStringSpec(string SubKey, string ValueName, string EnabledValue, string DisabledValue);
 
-        // 1. Windows Game Mode
-        var gameModeVal = ReadHkcuDword(@"Software\Microsoft\GameBar", "AutoGameModeEnabled", defaultValue: 1);
-        settings.Add(new WindowsConfigurableSetting(
+    private sealed record ConfigurableSettingSpec(
+        string SettingId,
+        string DisplayName,
+        string Category,
+        string SubKey,
+        string ValueName,
+        int DefaultDword,
+        int EnabledDword,
+        int DisabledDword,
+        string EnabledDisplay,
+        string DisabledDisplay,
+        string Explanation,
+        string RecommendationNote,
+        OperationRiskLevel RiskLevel = OperationRiskLevel.Low,
+        OperationElevationRequirement ElevationRequirement = OperationElevationRequirement.StandardUser,
+        bool IsHklmReadOnly = false,
+        bool IsSubKeyPresence = false,
+        IReadOnlyList<SettingCompanionDword>? CompanionDwords = null,
+        IReadOnlyList<SettingStringSpec>? StringValues = null);
+
+    private static readonly IReadOnlyList<ConfigurableSettingSpec> SettingSpecs =
+    [
+        // UI & Context Menu
+        new(
+            SettingId: "customization.classic_context_menu",
+            DisplayName: "Classic Windows 10 Full Right-Click Menu",
+            Category: "UI & Context Menu",
+            SubKey: @"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32",
+            ValueName: string.Empty,
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Classic Full Menu (No 'Show more options' click)",
+            DisabledDisplay: "Windows 11 Compact Menu (Default)",
+            Explanation: "Restores the full right-click context menu in File Explorer and on the Desktop instead of hiding options behind 'Show more options'.",
+            RecommendationNote: "Restart File Explorer after changing so the context menu updates immediately.",
+            IsSubKeyPresence: true),
+        new(
+            SettingId: "customization.taskbar_end_task",
+            DisplayName: "Taskbar Right-Click 'End Task'",
+            Category: "UI & Context Menu",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings",
+            ValueName: "TaskbarEndTask",
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled (Right-click taskbar icon to kill hung apps)",
+            DisabledDisplay: "Hidden (Default)",
+            Explanation: "Adds an 'End task' command directly to the Windows 11 taskbar right-click menu so frozen apps can be closed without opening Task Manager.",
+            RecommendationNote: "Instant power-user time saver; safe and reversible."),
+        new(
+            SettingId: "customization.show_file_extensions",
+            DisplayName: "Show Known File Extensions in File Explorer",
+            Category: "UI & Context Menu",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            ValueName: "HideFileExt",
+            DefaultDword: 1,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Visible (.exe, .pdf, etc. shown)",
+            DisabledDisplay: "Hidden",
+            Explanation: "Displays full file extensions (such as .exe, .bat, .txt) in File Explorer instead of hiding known extensions.",
+            RecommendationNote: "Recommended Enabled for security transparency so executables cannot masquerade as documents."),
+        new(
+            SettingId: "customization.show_hidden_files",
+            DisplayName: "Show Hidden Files & Folders in File Explorer",
+            Category: "UI & Context Menu",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            ValueName: "Hidden",
+            DefaultDword: 2,
+            EnabledDword: 1,
+            DisabledDword: 2,
+            EnabledDisplay: "Visible (AppData & hidden folders shown)",
+            DisabledDisplay: "Hidden (Default)",
+            Explanation: "Controls whether File Explorer displays files and directories marked with the Hidden attribute (such as AppData).",
+            RecommendationNote: "Useful for troubleshooting app configurations and inspecting local caches."),
+        new(
+            SettingId: "customization.taskbar_left_align",
+            DisplayName: "Align Windows 11 Taskbar Icons to Left",
+            Category: "UI & Context Menu",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            ValueName: "TaskbarAl",
+            DefaultDword: 1,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Left-Aligned",
+            DisabledDisplay: "Center-Aligned (Windows 11 Default)",
+            Explanation: "Sets the Windows 11 Taskbar Start button and pinned icons to classic left alignment (0) or centered alignment (1).",
+            RecommendationNote: "Purely visual preference; reversible at any time without restarting."),
+        new(
+            SettingId: "customization.taskbar_seconds",
+            DisplayName: "Show Seconds in Taskbar Clock",
+            Category: "UI & Context Menu",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            ValueName: "ShowSecondsInSystemClock",
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Showing HH:MM:SS",
+            DisabledDisplay: "Hidden (HH:MM Default)",
+            Explanation: "Displays seconds on the system tray clock for precise timing and troubleshooting.",
+            RecommendationNote: "Reversible anytime; slightly increases taskbar clock redraw frequency."),
+
+        // Debloat & Privacy
+        new(
+            SettingId: "debloat.disable_bing_search",
+            DisplayName: "Disable Bing Web Search in Start Menu",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Policies\Microsoft\Windows\Explorer",
+            ValueName: "DisableSearchBoxSuggestions",
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Bing Disabled (Local PC Search Only)",
+            DisabledDisplay: "Bing Web Results Enabled (Default)",
+            Explanation: "Stops Windows Start Menu search from querying Bing web results and showing promoted web cards when searching for local apps and files.",
+            RecommendationNote: "Recommended Enabled for faster, cleaner local search; restart Explorer to apply immediately.",
+            CompanionDwords:
+            [
+                new SettingCompanionDword(@"Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", 0, 1)
+            ]),
+        new(
+            SettingId: "debloat.disable_start_ads",
+            DisplayName: "Block Windows Ads, Tips & Lock Screen Promos",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
+            ValueName: "SystemPaneSuggestionsEnabled",
+            DefaultDword: 1,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Blocked (Ads & Tips Disabled)",
+            DisabledDisplay: "Allowed (Windows Default)",
+            Explanation: "Disables promoted app suggestions in Start, Settings tips, lock screen spotlight fun facts, and 'Welcome Experience' banners.",
+            RecommendationNote: "Recommended Enabled for a distraction-free desktop without losing core functionality.",
+            CompanionDwords:
+            [
+                new SettingCompanionDword(@"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338388Enabled", 0, 1),
+                new SettingCompanionDword(@"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0, 1),
+                new SettingCompanionDword(@"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-353698Enabled", 0, 1)
+            ]),
+        new(
+            SettingId: "debloat.hide_widgets",
+            DisplayName: "Hide Taskbar Widgets / MSN News Feed",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            ValueName: "TaskbarDa",
+            DefaultDword: 1,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Hidden (Clean Taskbar)",
+            DisabledDisplay: "Shown (Default)",
+            Explanation: "Removes the Widgets / MSN Weather & News icon from the Windows 11 taskbar and reduces background feed refreshes.",
+            RecommendationNote: "Safe UI cleanup; reversible anytime."),
+        new(
+            SettingId: "debloat.hide_copilot_button",
+            DisplayName: "Hide Taskbar Copilot Button",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            ValueName: "ShowCopilotButton",
+            DefaultDword: 1,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Hidden",
+            DisabledDisplay: "Shown",
+            Explanation: "Removes the built-in Copilot taskbar icon from the Windows 11 taskbar.",
+            RecommendationNote: "Safe UI cleanup; reversible anytime."),
+        new(
+            SettingId: "privacy.advertising_id",
+            DisplayName: "Personalized Advertising ID",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
+            ValueName: "Enabled",
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled",
+            DisabledDisplay: "Disabled (Private)",
+            Explanation: "Controls whether Windows maintains a unique per-user advertising identifier for apps to serve personalized ads.",
+            RecommendationNote: "Recommended Off to prevent cross-app advertising tracking."),
+        new(
+            SettingId: "privacy.tailored_experiences",
+            DisplayName: "Diagnostic Tailored Experiences",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Privacy",
+            ValueName: "TailoredExperiencesWithDiagnosticDataEnabled",
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled",
+            DisabledDisplay: "Disabled (Private)",
+            Explanation: "Controls whether Microsoft uses diagnostic data to show personalized tips, ads, and recommendations in Windows.",
+            RecommendationNote: "Recommended Off to reduce promotional tips without affecting Windows stability."),
+        new(
+            SettingId: "privacy.activity_history",
+            DisplayName: "Windows Activity History Tracking",
+            Category: "Debloat & Privacy",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Privacy",
+            ValueName: "ActivityHistoryEnabled",
+            DefaultDword: 1,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled",
+            DisabledDisplay: "Disabled (Private)",
+            Explanation: "Controls whether Windows tracks recently used apps, files, and websites in local activity history.",
+            RecommendationNote: "Recommended Off if you prefer private app/file usage while keeping Explorer recent files working."),
+
+        // Gaming & Performance
+        new(
             SettingId: "gaming.game_mode",
             DisplayName: "Windows Game Mode",
             Category: "Gaming & Performance",
-            CurrentStateDisplay: gameModeVal != 0 ? "Enabled (Default)" : "Disabled",
-            IsEnabled: gameModeVal != 0,
-            RegistryPath: @"HKCU\Software\Microsoft\GameBar",
+            SubKey: @"Software\Microsoft\GameBar",
             ValueName: "AutoGameModeEnabled",
-            Explanation: "When enabled, Windows prioritizes foreground game threads and suppresses background Windows Update driver installations and restart notifications during gameplay.",
-            RecommendationNote: "Recommended Enabled for systems used for gaming.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
-
-        // 2. Background Game Recording (Game DVR)
-        var dvrVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", defaultValue: 0);
-        settings.Add(new WindowsConfigurableSetting(
+            DefaultDword: 1,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled (Default)",
+            DisabledDisplay: "Disabled",
+            Explanation: "When enabled, Windows prioritizes foreground game threads and suppresses background Windows Update restarts during gameplay.",
+            RecommendationNote: "Recommended Enabled for systems used for gaming."),
+        new(
             SettingId: "gaming.game_dvr",
             DisplayName: "Background Game DVR Capture",
             Category: "Gaming & Performance",
-            CurrentStateDisplay: dvrVal != 0 ? "Enabled" : "Disabled",
-            IsEnabled: dvrVal != 0,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\GameDVR",
             ValueName: "AppCaptureEnabled",
+            DefaultDword: 0,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled",
+            DisabledDisplay: "Disabled",
             Explanation: "Controls whether Windows Game Bar records gameplay clips in the background using GPU encoding resources.",
-            RecommendationNote: "Disabling avoids background GPU/VRAM overhead if you do not use Xbox Game Bar clip recording.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
-
-        // 3. Visual Transparency Effects
-        var transparencyVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", defaultValue: 1);
-        settings.Add(new WindowsConfigurableSetting(
+            RecommendationNote: "Disabling avoids background GPU/VRAM overhead if you do not use Xbox Game Bar clip recording."),
+        new(
             SettingId: "performance.visual_transparency",
             DisplayName: "Windows Acrylic & Mica Transparency Effects",
-            Category: "Performance & Visuals",
-            CurrentStateDisplay: transparencyVal != 0 ? "Enabled" : "Disabled",
-            IsEnabled: transparencyVal != 0,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            Category: "Gaming & Performance",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
             ValueName: "EnableTransparency",
+            DefaultDword: 1,
+            EnabledDword: 1,
+            DisabledDword: 0,
+            EnabledDisplay: "Enabled",
+            DisabledDisplay: "Disabled",
             Explanation: "Controls translucent window backdrop rendering on the Taskbar, Start menu, and Fluent applications.",
-            RecommendationNote: "Disabling reduces Desktop Window Manager (dwm.exe) GPU composition overhead on integrated GPUs or older laptops.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
-
-        // 4. Background Application Activity
-        var bgDisabledVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled", defaultValue: 0);
-        var bgAppsAllowed = bgDisabledVal == 0;
-        settings.Add(new WindowsConfigurableSetting(
+            RecommendationNote: "Disabling reduces Desktop Window Manager (dwm.exe) GPU composition overhead on older or integrated GPUs."),
+        new(
             SettingId: "performance.background_apps",
             DisplayName: "Background Store / UWP Application Activity",
-            Category: "Performance & Resource Control",
-            CurrentStateDisplay: bgAppsAllowed ? "Enabled (Apps can run in background)" : "Disabled (Restricted)",
-            IsEnabled: bgAppsAllowed,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
+            Category: "Gaming & Performance",
+            SubKey: @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
             ValueName: "GlobalUserDisabled",
-            Explanation: "Controls whether packaged Windows applications can wake up, sync data, and consume CPU/RAM when their windows are closed.",
-            RecommendationNote: "Disabling reduces background RAM usage and idle CPU wakeups on memory-constrained systems.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
-
-        // 5. Hardware-Accelerated GPU Scheduling (HAGS - Read/Inspect with Admin requirement note)
-        var hagsVal = ReadHklmDword(@"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", defaultValue: 2);
-        settings.Add(new WindowsConfigurableSetting(
+            DefaultDword: 0,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Enabled (Apps can run in background)",
+            DisabledDisplay: "Disabled (Restricted)",
+            Explanation: "Controls whether packaged Windows applications can wake up, sync data, and consume CPU/RAM when closed.",
+            RecommendationNote: "Disabling reduces background RAM usage and idle CPU wakeups on memory-constrained systems."),
+        new(
             SettingId: "performance.hags",
             DisplayName: "Hardware-Accelerated GPU Scheduling (HAGS)",
             Category: "Gaming & Performance",
-            CurrentStateDisplay: hagsVal == 2 ? "Enabled (Requires supported GPU)" : "Disabled",
-            IsEnabled: hagsVal == 2,
-            RegistryPath: @"HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
+            SubKey: @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
             ValueName: "HwSchMode",
+            DefaultDword: 2,
+            EnabledDword: 2,
+            DisabledDword: 1,
+            EnabledDisplay: "Enabled (Requires supported GPU)",
+            DisabledDisplay: "Disabled",
             Explanation: "Allows the GPU's dedicated scheduling processor to manage VRAM queues directly, and is required for DLSS 3 Frame Generation on supported GPUs.",
-            RecommendationNote: "Machine-wide graphics setting (requires Administrator privileges and a system restart to change).",
-            Reversibility: OperationReversibility.Reversible,
+            RecommendationNote: "Machine-wide graphics setting (requires Administrator privileges and Windows Settings + reboot to change).",
             RiskLevel: OperationRiskLevel.Medium,
-            ElevationRequirement: OperationElevationRequirement.AdministratorRequired));
+            ElevationRequirement: OperationElevationRequirement.AdministratorRequired,
+            IsHklmReadOnly: true),
+        new(
+            SettingId: "customization.disable_mouse_accel",
+            DisplayName: "Disable Mouse Acceleration (1:1 Raw Pointer)",
+            Category: "Gaming & Performance",
+            SubKey: @"Control Panel\Mouse",
+            ValueName: "MouseSpeed",
+            DefaultDword: 1,
+            EnabledDword: 0,
+            DisabledDword: 1,
+            EnabledDisplay: "Raw 1:1 Input (Pointer Precision Off)",
+            DisabledDisplay: "Windows Mouse Acceleration On (Default)",
+            Explanation: "Turns off Windows 'Enhance pointer precision' so cursor distance matches physical mouse movement consistently in games and precision work.",
+            RecommendationNote: "Applies cleanly per user (signing out/re-opening Mouse Settings reflects the updated curve).",
+            StringValues:
+            [
+                new SettingStringSpec(@"Control Panel\Mouse", "MouseSpeed", "0", "1"),
+                new SettingStringSpec(@"Control Panel\Mouse", "MouseThreshold1", "0", "6"),
+                new SettingStringSpec(@"Control Panel\Mouse", "MouseThreshold2", "0", "10")
+            ])
+    ];
 
-        // 6. Windows Advertising ID
-        var adIdVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled", defaultValue: 0);
-        settings.Add(new WindowsConfigurableSetting(
-            SettingId: "privacy.advertising_id",
-            DisplayName: "Personalized Advertising ID",
-            Category: "Privacy",
-            CurrentStateDisplay: adIdVal != 0 ? "Enabled" : "Disabled (Private)",
-            IsEnabled: adIdVal != 0,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
-            ValueName: "Enabled",
-            Explanation: "Controls whether Windows maintains a unique per-user advertising identifier for apps to serve personalized ads.",
-            RecommendationNote: "Disabling resets the advertising ID and prevents apps from tracking cross-app usage via this identifier.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
+    public IReadOnlyList<WindowsConfigurableSetting> InspectConfigurableSettings()
+    {
+        var results = new List<WindowsConfigurableSetting>(SettingSpecs.Count);
+        foreach (var spec in SettingSpecs)
+        {
+            bool isEnabled;
+            if (spec.IsHklmReadOnly)
+            {
+                isEnabled = ReadHklmDword(spec.SubKey, spec.ValueName, spec.DefaultDword) == spec.EnabledDword;
+            }
+            else if (spec.StringValues is { Count: > 0 })
+            {
+                var firstStr = spec.StringValues[0];
+                var actual = ReadHkcuString(ResolveHkcuPath(firstStr.SubKey), firstStr.ValueName, firstStr.DisabledValue);
+                isEnabled = string.Equals(actual, firstStr.EnabledValue, StringComparison.OrdinalIgnoreCase);
+            }
+            else if (spec.IsSubKeyPresence)
+            {
+                isEnabled = HkcuSubKeyExists(ResolveHkcuPath(spec.SubKey));
+            }
+            else
+            {
+                var raw = ReadHkcuDword(ResolveHkcuPath(spec.SubKey), spec.ValueName, spec.DefaultDword);
+                isEnabled = raw == spec.EnabledDword;
+            }
 
-        // 7. Tailored Experiences with Diagnostic Data
-        var tailoredVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Privacy", "TailoredExperiencesWithDiagnosticDataEnabled", defaultValue: 0);
-        settings.Add(new WindowsConfigurableSetting(
-            SettingId: "privacy.tailored_experiences",
-            DisplayName: "Diagnostic Tailored Experiences",
-            Category: "Privacy",
-            CurrentStateDisplay: tailoredVal != 0 ? "Enabled" : "Disabled (Private)",
-            IsEnabled: tailoredVal != 0,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy",
-            ValueName: "TailoredExperiencesWithDiagnosticDataEnabled",
-            Explanation: "Controls whether Microsoft uses diagnostic data to show personalized tips, ads, and recommendations in Windows.",
-            RecommendationNote: "Safe to disable to reduce promotional tips without affecting Windows stability.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
+            results.Add(new WindowsConfigurableSetting(
+                SettingId: spec.SettingId,
+                DisplayName: spec.DisplayName,
+                Category: spec.Category,
+                CurrentStateDisplay: isEnabled ? spec.EnabledDisplay : spec.DisabledDisplay,
+                IsEnabled: isEnabled,
+                RegistryPath: (spec.IsHklmReadOnly ? @"HKLM\" : @"HKCU\") + spec.SubKey,
+                ValueName: string.IsNullOrEmpty(spec.ValueName) ? "(Default)" : spec.ValueName,
+                Explanation: spec.Explanation,
+                RecommendationNote: spec.RecommendationNote,
+                Reversibility: OperationReversibility.Reversible,
+                RiskLevel: spec.RiskLevel,
+                ElevationRequirement: spec.ElevationRequirement));
+        }
 
-        // 8. Windows Activity History Tracking
-        var activityVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Privacy", "ActivityHistoryEnabled", defaultValue: 1);
-        settings.Add(new WindowsConfigurableSetting(
-            SettingId: "privacy.activity_history",
-            DisplayName: "Windows Activity History Tracking",
-            Category: "Privacy",
-            CurrentStateDisplay: activityVal != 0 ? "Enabled" : "Disabled (Private)",
-            IsEnabled: activityVal != 0,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy",
-            ValueName: "ActivityHistoryEnabled",
-            Explanation: "Controls whether Windows tracks recently used apps, files, and websites in local activity history.",
-            RecommendationNote: "Disabling stops activity history collection while keeping normal File Explorer recent files functional.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
+        return results;
+    }
 
-        // 9. Show File Extensions in File Explorer
-        var hideExtVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", defaultValue: 1);
-        var showExtEnabled = hideExtVal == 0;
-        settings.Add(new WindowsConfigurableSetting(
-            SettingId: "customization.show_file_extensions",
-            DisplayName: "Show Known File Extensions in File Explorer",
-            Category: "Windows Customization & Safety",
-            CurrentStateDisplay: showExtEnabled ? "Visible (.exe, .pdf, etc. shown)" : "Hidden",
-            IsEnabled: showExtEnabled,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
-            ValueName: "HideFileExt",
-            Explanation: "Displays full file extensions (such as .exe, .bat, .txt) in File Explorer instead of hiding known extensions.",
-            RecommendationNote: "Recommended Enabled for security transparency so executable files cannot masquerade as documents.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
+    private SettingTogglePayload CaptureSettingPayload(string settingId, bool targetEnabled, WindowsConfigurableSetting? setting = null)
+    {
+        var spec = SettingSpecs.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+        int? previousRaw = null;
+        bool? previousSubKey = null;
+        Dictionary<string, int?>? previousCompanions = null;
+        Dictionary<string, string?>? previousStrings = null;
 
-        // 10. Show Hidden Files & Folders in File Explorer
-        var hiddenVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", defaultValue: 2);
-        var showHiddenEnabled = hiddenVal == 1;
-        settings.Add(new WindowsConfigurableSetting(
-            SettingId: "customization.show_hidden_files",
-            DisplayName: "Show Hidden Files & Folders in File Explorer",
-            Category: "Windows Customization & Safety",
-            CurrentStateDisplay: showHiddenEnabled ? "Visible (AppData & hidden folders shown)" : "Hidden (Default)",
-            IsEnabled: showHiddenEnabled,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
-            ValueName: "Hidden",
-            Explanation: "Controls whether File Explorer displays files and directories marked with the Hidden attribute (such as AppData).",
-            RecommendationNote: "Useful for troubleshooting application configurations and inspecting local caches.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
+        if (spec is not null && !spec.IsHklmReadOnly)
+        {
+            if (spec.StringValues is { Count: > 0 })
+            {
+                previousStrings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var str in spec.StringValues)
+                {
+                    previousStrings[$"{str.SubKey}|{str.ValueName}"] =
+                        ReadNullableHkcuString(ResolveHkcuPath(str.SubKey), str.ValueName);
+                }
+            }
+            else if (spec.IsSubKeyPresence)
+            {
+                previousSubKey = HkcuSubKeyExists(ResolveHkcuPath(spec.SubKey));
+            }
+            else
+            {
+                previousRaw = ReadNullableHkcuDword(ResolveHkcuPath(spec.SubKey), spec.ValueName);
+                if (spec.CompanionDwords is { Count: > 0 })
+                {
+                    previousCompanions = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var comp in spec.CompanionDwords)
+                    {
+                        previousCompanions[$"{comp.SubKey}|{comp.ValueName}"] =
+                            ReadNullableHkcuDword(ResolveHkcuPath(comp.SubKey), comp.ValueName);
+                    }
+                }
+            }
+        }
 
-        // 11. Windows 11 Taskbar Left Alignment
-        var taskbarAlVal = ReadHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAl", defaultValue: 1);
-        var leftAligned = taskbarAlVal == 0;
-        settings.Add(new WindowsConfigurableSetting(
-            SettingId: "customization.taskbar_left_align",
-            DisplayName: "Align Windows 11 Taskbar Icons to Left",
-            Category: "Windows Customization & Safety",
-            CurrentStateDisplay: leftAligned ? "Left-Aligned" : "Center-Aligned (Windows 11 Default)",
-            IsEnabled: leftAligned,
-            RegistryPath: @"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
-            ValueName: "TaskbarAl",
-            Explanation: "Sets the Windows 11 Taskbar Start button and pinned icons to classic left alignment (0) or centered alignment (1).",
-            RecommendationNote: "Purely visual preference; reversible at any time without restarting.",
-            Reversibility: OperationReversibility.Reversible,
-            RiskLevel: OperationRiskLevel.Low,
-            ElevationRequirement: OperationElevationRequirement.StandardUser));
-
-        return settings;
+        return new SettingTogglePayload(
+            SettingId: setting?.SettingId ?? spec?.SettingId ?? settingId,
+            DisplayName: setting?.DisplayName ?? spec?.DisplayName ?? settingId,
+            TargetEnabled: targetEnabled,
+            PreviousDwordValue: previousRaw,
+            PreviousSubKeyExisted: previousSubKey,
+            PreviousCompanionDwords: previousCompanions,
+            PreviousStrings: previousStrings);
     }
 
     public OperationProposal ProposeToggleSetting(string settingId, bool targetEnabled)
     {
-        var settings = InspectConfigurableSettings();
-        var setting = settings.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+        var spec = SettingSpecs.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+        var setting = InspectConfigurableSettings()
+            .FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
 
-        var previousRaw = setting is not null ? ReadRawSettingValue(setting.SettingId) : null;
-        var payload = new SettingTogglePayload(
-            SettingId: setting?.SettingId ?? settingId,
-            DisplayName: setting?.DisplayName ?? settingId,
-            TargetEnabled: targetEnabled,
-            PreviousDwordValue: previousRaw);
+        var payload = CaptureSettingPayload(settingId, targetEnabled, setting);
         var payloadJson = JsonSerializer.Serialize(payload);
 
         var descriptor = setting is not null
@@ -1269,11 +1703,11 @@ public sealed class WindowsOptimizationService
             payloadJson: payloadJson,
             customPrerequisiteValidator: () =>
             {
-                if (setting is null)
+                if (spec is null || setting is null)
                 {
                     return (false, $"Setting '{settingId}' is not a supported configurable setting.");
                 }
-                if (string.Equals(setting.SettingId, "performance.hags", StringComparison.OrdinalIgnoreCase))
+                if (spec.IsHklmReadOnly)
                 {
                     return (false, "Hardware-Accelerated GPU Scheduling (HAGS) modifies HKLM kernel graphics driver configuration and requires changing via Windows System > Display > Graphics > Default graphics settings followed by a reboot.");
                 }
@@ -1289,7 +1723,7 @@ public sealed class WindowsOptimizationService
         var payload = JsonSerializer.Deserialize<SettingTogglePayload>(payloadJson)
             ?? throw new InvalidOperationException("Invalid setting toggle payload.");
 
-        WriteSettingState(payload.SettingId, payload.TargetEnabled);
+        ApplySettingState(payload.SettingId, payload.TargetEnabled);
         var after = InspectConfigurableSettings()
             .FirstOrDefault(s => string.Equals(s.SettingId, payload.SettingId, StringComparison.OrdinalIgnoreCase));
 
@@ -1320,7 +1754,7 @@ public sealed class WindowsOptimizationService
             ?? throw new InvalidOperationException("Invalid setting rollback payload.");
 
         var previousEnabled = !payload.TargetEnabled;
-        WriteSettingState(payload.SettingId, previousEnabled, payload.PreviousDwordValue);
+        RestoreSettingState(payload, previousEnabled);
 
         var after = InspectConfigurableSettings()
             .FirstOrDefault(s => string.Equals(s.SettingId, payload.SettingId, StringComparison.OrdinalIgnoreCase));
@@ -1342,67 +1776,173 @@ public sealed class WindowsOptimizationService
             Verification: verification));
     }
 
-    private static int? ReadRawSettingValue(string settingId)
-    {
-        return settingId switch
-        {
-            "gaming.game_mode" => ReadNullableHkcuDword(@"Software\Microsoft\GameBar", "AutoGameModeEnabled"),
-            "gaming.game_dvr" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled"),
-            "performance.visual_transparency" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency"),
-            "performance.background_apps" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled"),
-            "privacy.advertising_id" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled"),
-            "privacy.tailored_experiences" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Privacy", "TailoredExperiencesWithDiagnosticDataEnabled"),
-            "privacy.activity_history" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Privacy", "ActivityHistoryEnabled"),
-            "customization.show_file_extensions" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt"),
-            "customization.show_hidden_files" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden"),
-            "customization.taskbar_left_align" => ReadNullableHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAl"),
-            _ => null
-        };
-    }
+    private string ResolveHkcuPath(string subKey) =>
+        string.IsNullOrEmpty(_hkcuSettingsPrefix) ? subKey : _hkcuSettingsPrefix + subKey;
 
-    private static void WriteSettingState(string settingId, bool enabled, int? explicitRawDword = null)
+    private void ApplySettingState(string settingId, bool enabled)
     {
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindows()) return;
+        var spec = SettingSpecs.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+        if (spec is null || spec.IsHklmReadOnly) return;
+
+        if (spec.StringValues is { Count: > 0 })
         {
+            foreach (var str in spec.StringValues)
+            {
+                WriteHkcuString(ResolveHkcuPath(str.SubKey), str.ValueName, enabled ? str.EnabledValue : str.DisabledValue);
+            }
             return;
         }
 
-        switch (settingId)
+        if (spec.IsSubKeyPresence)
         {
-            case "gaming.game_mode":
-                WriteHkcuDword(@"Software\Microsoft\GameBar", "AutoGameModeEnabled", explicitRawDword ?? (enabled ? 1 : 0));
-                break;
-            case "gaming.game_dvr":
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", explicitRawDword ?? (enabled ? 1 : 0));
-                break;
-            case "performance.visual_transparency":
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", explicitRawDword ?? (enabled ? 1 : 0));
-                break;
-            case "performance.background_apps":
-                // GlobalUserDisabled == 0 means background apps are enabled; 1 means disabled
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled", explicitRawDword ?? (enabled ? 0 : 1));
-                break;
-            case "privacy.advertising_id":
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled", explicitRawDword ?? (enabled ? 1 : 0));
-                break;
-            case "privacy.tailored_experiences":
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Privacy", "TailoredExperiencesWithDiagnosticDataEnabled", explicitRawDword ?? (enabled ? 1 : 0));
-                break;
-            case "privacy.activity_history":
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Privacy", "ActivityHistoryEnabled", explicitRawDword ?? (enabled ? 1 : 0));
-                break;
-            case "customization.show_file_extensions":
-                // Note: HideFileExt == 0 means show extensions (enabled = true); HideFileExt == 1 means hide extensions
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", explicitRawDword ?? (enabled ? 0 : 1));
-                break;
-            case "customization.show_hidden_files":
-                // Note: Hidden == 1 means show hidden files (enabled = true); Hidden == 2 means hide hidden files
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", explicitRawDword ?? (enabled ? 1 : 2));
-                break;
-            case "customization.taskbar_left_align":
-                // Note: TaskbarAl == 0 means left-aligned (enabled = true); TaskbarAl == 1 means center-aligned
-                WriteHkcuDword(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAl", explicitRawDword ?? (enabled ? 0 : 1));
-                break;
+            ApplySubKeyPresence(spec.SubKey, present: enabled);
+            return;
+        }
+
+        WriteHkcuDword(ResolveHkcuPath(spec.SubKey), spec.ValueName, enabled ? spec.EnabledDword : spec.DisabledDword);
+        if (spec.CompanionDwords is { Count: > 0 })
+        {
+            foreach (var comp in spec.CompanionDwords)
+            {
+                WriteHkcuDword(ResolveHkcuPath(comp.SubKey), comp.ValueName, enabled ? comp.EnabledValue : comp.DisabledValue);
+            }
+        }
+    }
+
+    private void RestoreSettingState(SettingTogglePayload payload, bool fallbackEnabled)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var spec = SettingSpecs.FirstOrDefault(s => string.Equals(s.SettingId, payload.SettingId, StringComparison.OrdinalIgnoreCase));
+        if (spec is null || spec.IsHklmReadOnly) return;
+
+        if (spec.StringValues is { Count: > 0 })
+        {
+            foreach (var str in spec.StringValues)
+            {
+                var key = $"{str.SubKey}|{str.ValueName}";
+                if (payload.PreviousStrings is not null && payload.PreviousStrings.TryGetValue(key, out var prevStr) && prevStr is not null)
+                {
+                    WriteHkcuString(ResolveHkcuPath(str.SubKey), str.ValueName, prevStr);
+                }
+                else
+                {
+                    DeleteHkcuValue(ResolveHkcuPath(str.SubKey), str.ValueName);
+                }
+            }
+            return;
+        }
+
+        if (spec.IsSubKeyPresence)
+        {
+            ApplySubKeyPresence(spec.SubKey, present: payload.PreviousSubKeyExisted ?? fallbackEnabled);
+            return;
+        }
+
+        if (payload.PreviousDwordValue.HasValue)
+        {
+            WriteHkcuDword(ResolveHkcuPath(spec.SubKey), spec.ValueName, payload.PreviousDwordValue.Value);
+        }
+        else
+        {
+            DeleteHkcuValue(ResolveHkcuPath(spec.SubKey), spec.ValueName);
+        }
+
+        if (spec.CompanionDwords is { Count: > 0 } && payload.PreviousCompanionDwords is not null)
+        {
+            foreach (var comp in spec.CompanionDwords)
+            {
+                var key = $"{comp.SubKey}|{comp.ValueName}";
+                if (payload.PreviousCompanionDwords.TryGetValue(key, out var prevVal) && prevVal.HasValue)
+                {
+                    WriteHkcuDword(ResolveHkcuPath(comp.SubKey), comp.ValueName, prevVal.Value);
+                }
+                else
+                {
+                    DeleteHkcuValue(ResolveHkcuPath(comp.SubKey), comp.ValueName);
+                }
+            }
+        }
+    }
+
+    private void ApplySubKeyPresence(string subKey, bool present)
+    {
+        var fullSubKey = ResolveHkcuPath(subKey);
+        if (present)
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(fullSubKey, writable: true);
+            key?.SetValue(string.Empty, string.Empty, RegistryValueKind.String);
+        }
+        else
+        {
+            var lastSlash = fullSubKey.LastIndexOf('\\');
+            if (lastSlash > 0)
+            {
+                var parentPath = fullSubKey[..lastSlash];
+                var childName = fullSubKey[(lastSlash + 1)..];
+                using var parent = Registry.CurrentUser.OpenSubKey(parentPath, writable: true);
+                parent?.DeleteSubKeyTree(childName, throwOnMissingSubKey: false);
+
+                // Clean up empty CLSID GUID wrapper key when removing Classic Context Menu override
+                var parentSlash = parentPath.LastIndexOf('\\');
+                if (parentSlash > 0 && parentPath.EndsWith("}", StringComparison.Ordinal))
+                {
+                    var grandParentPath = parentPath[..parentSlash];
+                    var guidFolder = parentPath[(parentSlash + 1)..];
+                    using var check = Registry.CurrentUser.OpenSubKey(parentPath, writable: false);
+                    if (check is not null && check.SubKeyCount == 0 && check.ValueCount == 0)
+                    {
+                        using var grandParent = Registry.CurrentUser.OpenSubKey(grandParentPath, writable: true);
+                        grandParent?.DeleteSubKeyTree(guidFolder, throwOnMissingSubKey: false);
+                    }
+                }
+            }
+        }
+    }
+
+    public static bool RestartFileExplorer()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            foreach (var proc in Process.GetProcessesByName("explorer"))
+            {
+                try
+                {
+                    proc.Kill(entireProcessTree: false);
+                    proc.WaitForExit(3000);
+                }
+                catch { }
+                finally
+                {
+                    proc.Dispose();
+                }
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                UseShellExecute = true
+            });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool HkcuSubKeyExists(string subKey)
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(subKey, writable: false);
+            return key is not null;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1458,5 +1998,192 @@ public sealed class WindowsOptimizationService
 
         using var key = Registry.CurrentUser.CreateSubKey(subKey, writable: true);
         key?.SetValue(valueName, value, RegistryValueKind.DWord);
+    }
+
+    private static void DeleteHkcuValue(string subKey, string valueName)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(subKey, writable: true);
+            key?.DeleteValue(valueName, throwOnMissingValue: false);
+        }
+        catch { }
+    }
+
+    private static string ReadHkcuString(string subKey, string valueName, string defaultValue) =>
+        ReadNullableHkcuString(subKey, valueName) ?? defaultValue;
+
+    private static string? ReadNullableHkcuString(string subKey, string valueName)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(subKey, writable: false);
+            return key?.GetValue(valueName)?.ToString();
+        }
+        catch { return null; }
+    }
+
+    private static void WriteHkcuString(string subKey, string valueName, string value)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var key = Registry.CurrentUser.CreateSubKey(subKey, writable: true);
+        key?.SetValue(valueName, value, RegistryValueKind.String);
+    }
+
+    // =========================================================================
+    // 4. BATCH TWEAK PRESETS & HIBERNATION CONTROL
+    // =========================================================================
+
+    public OperationProposal ProposeApplyTweakPreset(string presetName, IReadOnlyDictionary<string, bool> desiredStates)
+    {
+        ArgumentNullException.ThrowIfNull(desiredStates);
+        var current = InspectConfigurableSettings();
+        var items = new List<SettingTogglePayload>();
+        var summaryLines = new List<string>();
+
+        foreach (var (settingId, targetEnabled) in desiredStates)
+        {
+            var setting = current.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+            var spec = SettingSpecs.FirstOrDefault(s => string.Equals(s.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
+            if (spec is null || spec.IsHklmReadOnly || setting is null) continue;
+            items.Add(CaptureSettingPayload(settingId, targetEnabled, setting));
+            summaryLines.Add($"{setting.DisplayName} → {(targetEnabled ? "On" : "Off")}");
+        }
+
+        var payloadJson = JsonSerializer.Serialize(new TweakPresetPayload(presetName, items));
+        return _safeOperationEngine.CreateProposal(
+            descriptor: TweakPresetDescriptor with { DisplayName = $"Apply {presetName}" },
+            targetDescription: $"{presetName} ({items.Count} Windows settings)",
+            inspectedCurrentStateSummary: $"{items.Count} user-scoped tweaks staged for update.",
+            preChangeStateJson: payloadJson,
+            proposedChangeExplanation: $"Applies '{presetName}': {string.Join("; ", summaryLines.Take(4))}{(summaryLines.Count > 4 ? $" (+{summaryLines.Count - 4} more)" : string.Empty)}.",
+            expectedEffects: summaryLines,
+            payloadJson: payloadJson,
+            customPrerequisiteValidator: () => items.Count > 0
+                ? (true, "All preset settings validated.")
+                : (false, "No eligible user-scoped settings in preset."));
+    }
+
+    private Task<(bool Succeeded, string PostStateSummary, string StatusMessage, OperationVerificationResult Verification)> ExecuteTweakPresetAsync(
+        string payloadJson,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var payload = JsonSerializer.Deserialize<TweakPresetPayload>(payloadJson)
+            ?? throw new InvalidOperationException("Invalid preset payload.");
+
+        foreach (var item in payload.Items)
+        {
+            ApplySettingState(item.SettingId, item.TargetEnabled);
+        }
+
+        var after = InspectConfigurableSettings();
+        var verifiedCount = payload.Items.Count(item =>
+            after.FirstOrDefault(s => string.Equals(s.SettingId, item.SettingId, StringComparison.OrdinalIgnoreCase))?.IsEnabled == item.TargetEnabled);
+        var ok = verifiedCount == payload.Items.Count;
+        var summary = ok
+            ? $"Applied '{payload.PresetName}' ({verifiedCount}/{payload.Items.Count} settings verified). Click 'Restart File Explorer' to refresh desktop/menu tweaks."
+            : $"Applied '{payload.PresetName}' ({verifiedCount}/{payload.Items.Count} verified).";
+
+        return Task.FromResult((ok, summary, summary, new OperationVerificationResult(ok, summary, summary, DateTimeOffset.UtcNow)));
+    }
+
+    private Task<(bool Succeeded, string StatusMessage, OperationVerificationResult Verification)> RollbackTweakPresetAsync(
+        string preChangeStateJson,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var payload = JsonSerializer.Deserialize<TweakPresetPayload>(preChangeStateJson)
+            ?? throw new InvalidOperationException("Invalid preset rollback state.");
+
+        foreach (var item in payload.Items)
+        {
+            RestoreSettingState(item, !item.TargetEnabled);
+        }
+
+        var summary = $"Restored all {payload.Items.Count} setting(s) modified by '{payload.PresetName}'.";
+        return Task.FromResult((true, summary, new OperationVerificationResult(true, summary, summary, DateTimeOffset.UtcNow)));
+    }
+
+    public (bool IsEnabled, long HiberfileBytes) InspectHibernationStatus()
+    {
+        var enabled = ReadHklmDword(@"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled", 1) != 0;
+        long bytes = 0;
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                var root = Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
+                var hiberPath = Path.Combine(root, "hiberfil.sys");
+                if (File.Exists(hiberPath))
+                {
+                    bytes = new FileInfo(hiberPath).Length;
+                }
+            }
+            catch { }
+        }
+        return (enabled, bytes);
+    }
+
+    public OperationProposal ProposeToggleHibernation(bool targetEnabled)
+    {
+        var (currentEnabled, hiberBytes) = InspectHibernationStatus();
+        var payloadJson = JsonSerializer.Serialize(new HibernateTogglePayload(targetEnabled, currentEnabled));
+        var sizeText = hiberBytes > 0 ? $"{hiberBytes / (1024.0 * 1024.0 * 1024.0):F1} GB" : "several GB";
+
+        return _safeOperationEngine.CreateProposal(
+            descriptor: HibernateToggleDescriptor,
+            targetDescription: $"Windows Hibernation ({(targetEnabled ? "Enable" : "Disable")} / C:\\hiberfil.sys)",
+            inspectedCurrentStateSummary: currentEnabled
+                ? $"Hibernation Enabled ({(hiberBytes > 0 ? $"{sizeText} reserved in hiberfil.sys" : "active")})"
+                : "Hibernation Disabled (no hiberfil.sys)",
+            preChangeStateJson: payloadJson,
+            proposedChangeExplanation: targetEnabled
+                ? "Runs 'powercfg /hibernate on' to enable Windows Hibernation and Fast Startup."
+                : $"Runs 'powercfg /hibernate off' to reclaim ~{sizeText} of SSD storage immediately.",
+            expectedEffects:
+            [
+                targetEnabled ? "Creates C:\\hiberfil.sys for Hibernate & Fast Startup." : $"Deletes C:\\hiberfil.sys ({sizeText} freed); disables Fast Startup."
+            ],
+            payloadJson: payloadJson);
+    }
+
+    private Task<(bool Succeeded, string PostStateSummary, string StatusMessage, OperationVerificationResult Verification)> ExecuteHibernateToggleAsync(
+        string payloadJson,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var payload = JsonSerializer.Deserialize<HibernateTogglePayload>(payloadJson)
+            ?? throw new InvalidOperationException("Invalid hibernation payload.");
+
+        RunPowerCfg(["/hibernate", payload.TargetEnabled ? "on" : "off"]);
+        var (afterEnabled, afterBytes) = InspectHibernationStatus();
+        var verified = afterEnabled == payload.TargetEnabled;
+        var summary = verified
+            ? (payload.TargetEnabled
+                ? "Enabled Windows Hibernation."
+                : $"Disabled Windows Hibernation and removed hiberfil.sys.")
+            : $"Could not change hibernation state (observed Enabled={afterEnabled}).";
+
+        return Task.FromResult((verified, summary, summary, new OperationVerificationResult(verified, $"HibernateEnabled={afterEnabled}, Bytes={afterBytes}", summary, DateTimeOffset.UtcNow)));
+    }
+
+    private Task<(bool Succeeded, string StatusMessage, OperationVerificationResult Verification)> RollbackHibernateToggleAsync(
+        string preChangeStateJson,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var payload = JsonSerializer.Deserialize<HibernateTogglePayload>(preChangeStateJson)
+            ?? throw new InvalidOperationException("Invalid hibernation rollback state.");
+
+        RunPowerCfg(["/hibernate", payload.PreviousEnabled ? "on" : "off"]);
+        var (afterEnabled, _) = InspectHibernationStatus();
+        var verified = afterEnabled == payload.PreviousEnabled;
+        var summary = verified
+            ? $"Restored Windows Hibernation to {(payload.PreviousEnabled ? "Enabled" : "Disabled")}."
+            : "Could not verify hibernation rollback.";
+        return Task.FromResult((verified, summary, new OperationVerificationResult(verified, summary, summary, DateTimeOffset.UtcNow)));
     }
 }

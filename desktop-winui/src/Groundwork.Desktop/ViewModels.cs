@@ -268,7 +268,19 @@ public sealed class DuplicateGroupCardViewModel
     public string SummaryText { get; set; } = string.Empty;
     public long PotentialWasteBytes { get; set; }
     public string FormattedWaste { get; set; } = string.Empty;
-    public List<DuplicateItemRowViewModel> Files { get; set; } = [];
+    public ObservableCollection<DuplicateItemRowViewModel> Files { get; set; } = [];
+}
+
+public sealed class ManualSpaceHogCardViewModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string LocationPath { get; set; } = string.Empty;
+    public string FormattedSize { get; set; } = string.Empty;
+    public string Guidance { get; set; } = string.Empty;
+    public string CopyCommand { get; set; } = string.Empty;
+    public Visibility CopyCommandVisibility => !string.IsNullOrEmpty(CopyCommand) ? Visibility.Visible : Visibility.Collapsed;
 }
 
 public sealed class DuplicateItemRowViewModel : INotifyPropertyChanged
@@ -371,6 +383,9 @@ public sealed class LeftoverItemRowViewModel : INotifyPropertyChanged
     public string Evidence { get; set; } = string.Empty;
     public string FormattedSize { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+    public bool IsRegistry { get; set; }
+    public string KindBadge => IsRegistry ? $"Reg • {LocationGroup}" : LocationGroup;
+    public Visibility OpenButtonVisibility => IsRegistry ? Visibility.Collapsed : Visibility.Visible;
 }
 
 public sealed class NoteRowViewModel
@@ -807,6 +822,7 @@ public sealed class OverviewAdvisoryRowViewModel
     public string CategoryBadge { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Detail { get; set; } = string.Empty;
+    public string ActionTag { get; set; } = string.Empty;
     public string IconGlyph { get; set; } = "\uE946";
     public string AccentColorHex { get; set; } = "#2DD4BF";
 }
@@ -827,4 +843,55 @@ public sealed class OperationHistoryRowViewModel
     public Visibility RollbackButtonVisibility => CanRollback ? Visibility.Visible : Visibility.Collapsed;
     public Visibility PermanentNoticeVisibility => CanRollback ? Visibility.Collapsed : Visibility.Visible;
 }
+
+public sealed class RuntimeHealthRowViewModel
+{
+    public string RuntimeId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public bool IsInstalled { get; set; }
+    public string DetectedVersion { get; set; } = string.Empty;
+    public string StatusSummary { get; set; } = string.Empty;
+    public string RecommendedWingetId { get; set; } = string.Empty;
+    public string BadgeText => IsInstalled ? "Installed" : "Missing";
+    public Visibility InstallVisibility => !IsInstalled && !string.IsNullOrEmpty(RecommendedWingetId) ? Visibility.Visible : Visibility.Collapsed;
+}
+
+public sealed class RepairWorkflowRowViewModel
+{
+    public string RepairId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string RiskNote { get; set; } = string.Empty;
+    public bool RequiresAdministrator { get; set; }
+    public string PrivilegeBadge => RequiresAdministrator ? "Admin" : "Standard";
+}
+
+public sealed class AppxPackageRowViewModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string PackageFullName { get; set; } = string.Empty;
+    public string Publisher { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
+    public string Classification { get; set; } = string.Empty;
+    public string PlainDescription { get; set; } = string.Empty;
+    public bool IsProtectedSystemPackage { get; set; }
+    public bool IsSuggestedBloat { get; set; }
+    public bool IsSelected { get; set; }
+    public bool CanRemove => !IsProtectedSystemPackage;
+    public string SubtitleLine => $"{Publisher} • v{Version} — {PlainDescription}";
+}
+
+public sealed class EssentialToolRowViewModel
+{
+    public string WingetId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsDetectedInstalled { get; set; }
+    public bool IsSelected { get; set; }
+    public string InstalledVersionDisplay { get; set; } = string.Empty;
+    public string ActionButtonText => IsDetectedInstalled ? "Update / Reinstall" : "Install";
+}
+
 

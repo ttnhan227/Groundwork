@@ -165,6 +165,13 @@ public sealed record InstalledApplicationInfo(
     string IconPngPath = ""
 );
 
+public enum LeftoverScanDepth
+{
+    Safe,
+    Moderate,
+    Advanced
+}
+
 public sealed record LeftoverFileSystemItem(
     string FullPath,
     string Name,
@@ -179,7 +186,9 @@ public sealed record LeftoverFileSystemItem(
 public sealed record LeftoverRegistryItem(
     string KeyPath,
     string Confidence,
-    string Evidence
+    string Evidence,
+    string EntryKind = "Key",
+    string LocationGroup = "Software"
 );
 
 public sealed record AppLeftoverReport(
@@ -193,7 +202,9 @@ public sealed record AppLeftoverReport(
     long TotalReclaimableBytes,
     long HighConfidenceBytes,
     IReadOnlyList<LeftoverFileSystemItem> FileSystemLeftovers,
-    IReadOnlyList<LeftoverRegistryItem> RegistryLeftovers
+    IReadOnlyList<LeftoverRegistryItem> RegistryLeftovers,
+    LeftoverScanDepth ScanDepth = LeftoverScanDepth.Moderate,
+    int InspectedLocationCount = 0
 );
 
 public sealed record UninstallSessionResult(
@@ -217,4 +228,54 @@ public sealed record SystemDiagnosticReport(
     long InstallerLeftoversCount,
     IReadOnlyList<CleanupCandidateItem> DiagnosticCandidates,
     IReadOnlyList<DuplicateGroup> DuplicateGroups
+);
+
+public sealed record StorageHotspotFolder(
+    string Name,
+    string FullPath,
+    long LogicalBytes,
+    double ShareOfRootPercent,
+    int FileCount
+);
+
+public sealed record StorageLargeFileItem(
+    string Name,
+    string FullPath,
+    string Category,
+    long LogicalBytes,
+    long LastWriteUnixSeconds
+);
+
+public sealed record StorageHotspotReport(
+    string RootPath,
+    long ScannedBytes,
+    long TotalFiles,
+    long TotalFolders,
+    double ElapsedMs,
+    long? VolumeUsedBytes,
+    long UnaccountedProtectedBytes,
+    IReadOnlyList<StorageHotspotFolder> TopRootFolders,
+    IReadOnlyList<StorageHotspotFolder> TopSubfolders,
+    IReadOnlyList<StorageLargeFileItem> LargestFiles,
+    int AccessDeniedCount
+);
+
+public sealed record SpaceHogEntry(
+    string Id,
+    string Category,
+    string Title,
+    string LocationPath,
+    long SizeBytes,
+    int ItemCount,
+    string ImpactNote,
+    string SafetyGuidance,
+    bool CanSafeCleanDirectly,
+    string? CleanupToolHint = null
+);
+
+public sealed record SpaceHogReport(
+    IReadOnlyList<SpaceHogEntry> Entries,
+    long TotalIdentifiedBytes,
+    long SafeReclaimableBytes,
+    DateTimeOffset CapturedAtUtc
 );

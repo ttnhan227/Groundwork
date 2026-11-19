@@ -28,6 +28,8 @@ public sealed class AppServices
     public WindowsOptimizationService OptimizationService { get; }
     public DiagnosticsAndTroubleshootingService TroubleshootingService { get; }
     public FileOrganizerService FileOrganizerService { get; }
+    public StorageHotspotAnalyzerService StorageHotspotService { get; }
+    public WindowsRepairAndDebloatService RepairAndDebloatService { get; }
     public ToolRegistryService ToolRegistry { get; }
     public InvestigationEngineService InvestigationEngine { get; }
     public AgentPlannerService AgentPlanner { get; }
@@ -60,6 +62,8 @@ public sealed class AppServices
         OptimizationService = new WindowsOptimizationService(SafeOperationEngine);
         TroubleshootingService = new DiagnosticsAndTroubleshootingService(SafeOperationEngine);
         FileOrganizerService = new FileOrganizerService(SafeOperationEngine);
+        StorageHotspotService = new StorageHotspotAnalyzerService(SafeOperationEngine, Win32Scanner);
+        RepairAndDebloatService = new WindowsRepairAndDebloatService(SafeOperationEngine, InstalledAppsEngine);
         ToolRegistry = new ToolRegistryService(
             HardwareEngine,
             DriveDiscovery,
@@ -67,11 +71,28 @@ public sealed class AppServices
             InstalledAppsEngine,
             OptimizationService,
             TroubleshootingService,
-            FileOrganizerService);
+            FileOrganizerService,
+            StorageHotspotService,
+            RepairAndDebloatService);
         InvestigationEngine = new InvestigationEngineService(ToolRegistry);
         AgentPlanner = new AgentPlannerService(InvestigationEngine, ToolRegistry);
 
         Settings = AppSettingsService.Load();
+    }
+
+    public AiProviderConfig BuildAiProviderConfig()
+    {
+        var provider = (Settings.AiProvider ?? "none").Trim().ToLowerInvariant();
+        return provider switch
+        {
+            "ollama" => new AiProviderConfig("ollama", Settings.OllamaUrl, Settings.OllamaModel, string.Empty),
+            "gemini" => new AiProviderConfig("gemini", Settings.GeminiEndpoint, Settings.GeminiModel, Settings.GeminiApiKey),
+            "openai" => new AiProviderConfig("openai", Settings.OpenAiEndpoint, Settings.OpenAiModel, Settings.OpenAiApiKey),
+            "mistral" => new AiProviderConfig("mistral", Settings.MistralEndpoint, Settings.MistralModel, Settings.MistralApiKey),
+            "anthropic" => new AiProviderConfig("anthropic", Settings.AnthropicEndpoint, Settings.AnthropicModel, Settings.AnthropicApiKey),
+            "custom" => new AiProviderConfig("custom", Settings.CustomEndpoint, Settings.CustomModel, Settings.CustomApiKey),
+            _ => new AiProviderConfig("none", string.Empty, string.Empty, string.Empty)
+        };
     }
 
     public void NotifyStatus(string status)
@@ -139,5 +160,107 @@ public sealed class AppServices
         };
         var res = await dialog.ShowAsync();
         return res == ContentDialogResult.Primary;
+    }
+
+    /// <summary>
+    /// Shared Safe Operation Gate flow for UI actions: checks prerequisites, presents
+    /// SafeOperationGateDialog, executes off the UI thread, and refreshes Undo History.
+    /// </summary>
+    public async Task<OperationExecutionRecord?> ExecuteWithGateAsync(
+        XamlRoot xamlRoot,
+        OperationProposal proposal,
+        string blockedTitle = "Prerequisite Notice",
+        string? runningStatus = null,
+        string? completionTitle = null)
+    {
+        if (!proposal.PrerequisitesMet)
+        {
+            if (proposal.ElevationRequirement == OperationElevationRequirement.AdministratorRequired &&
+                !RepairAndDebloatService.IsCurrentSessionElevated)
+            {
+                bool elevate = await ShowConfirmDialogAsync(
+                    "Administrator Required",
+                    $"{proposal.PrerequisiteFailureReason ?? "This operation requires Administrator privileges."}\n\nRestart Groundwork as Administrator now?",
+                    "Restart as Admin",
+                    "Cancel");
+                if (elevate)
+                {
+                    TryRestartAsAdministrator();
+                }
+                return null;
+            }
+
+            await ShowDialogAsync(blockedTitle, proposal.PrerequisiteFailureReason ?? "Action cannot run in the current session.");
+            return null;
+        }
+
+        var gate = new Dialogs.SafeOperationGateDialog(proposal) { XamlRoot = xamlRoot };
+        if (await gate.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+
+        string statusLine = !string.IsNullOrWhiteSpace(runningStatus)
+            ? runningStatus
+            : $"Executing {proposal.DisplayName}...";
+        NotifyStatus(statusLine);
+
+        var busyPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 14,
+            Padding = new Thickness(4, 8, 4, 8)
+        };
+        busyPanel.Children.Add(new ProgressRing { IsActive = true, Width = 28, Height = 28, VerticalAlignment = VerticalAlignment.Center });
+        busyPanel.Children.Add(new TextBlock
+        {
+            Text = statusLine,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 360,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var busyDialog = new ContentDialog
+        {
+            Title = proposal.DisplayName,
+            Content = busyPanel,
+            XamlRoot = xamlRoot
+        };
+
+        var showBusyTask = busyDialog.ShowAsync().AsTask();
+        OperationExecutionRecord record;
+        try
+        {
+            record = await Task.Run(() => SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
+        }
+        finally
+        {
+            busyDialog.Hide();
+            try { await showBusyTask; } catch { }
+        }
+
+        NotifyOperationHistoryChanged();
+        NotifyStatus(record.StatusMessage);
+        if (!string.IsNullOrWhiteSpace(completionTitle))
+        {
+            await ShowDialogAsync(completionTitle, record.StatusMessage);
+        }
+        return record;
+    }
+
+    public static void TryRestartAsAdministrator()
+    {
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(exe)) return;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = exe,
+                UseShellExecute = true,
+                Verb = "runas"
+            });
+            Application.Current.Exit();
+        }
+        catch { }
     }
 }

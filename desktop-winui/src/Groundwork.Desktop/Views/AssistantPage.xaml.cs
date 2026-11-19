@@ -47,6 +47,15 @@ public sealed partial class AssistantPage : Page
     {
         base.OnNavigatedTo(e);
         UpdateConversationVisibility();
+        RefreshModeBadge();
+    }
+
+    private void RefreshModeBadge()
+    {
+        var cfg = AppServices.Instance.BuildAiProviderConfig();
+        AssistantModeBadge.Text = cfg.IsConfigured
+            ? $"AI: {cfg.Provider} ({cfg.Model})"
+            : "Local Grounded Engine";
     }
 
     private void UpdateConversationVisibility()
@@ -65,9 +74,7 @@ public sealed partial class AssistantPage : Page
     {
         if (sender is Button btn && btn.Content is string prompt)
         {
-            // Remove leading emoji if present
-            string cleaned = prompt.Length > 3 ? prompt.Substring(3).Trim() : prompt;
-            QueryInputBox.Text = cleaned;
+            QueryInputBox.Text = prompt.Trim();
             OnSendQueryClick(sender, e);
         }
     }
@@ -99,13 +106,40 @@ public sealed partial class AssistantPage : Page
 
         try
         {
-            var plannedTurn = await Task.Run(async () =>
+            var aiConfig = AppServices.Instance.BuildAiProviderConfig();
+            var historySnapshot = AppServices.Instance.AgentConversation.ToArray();
+            var progress = new Progress<string>(step =>
             {
-                return await AppServices.Instance.AgentPlanner.PlanAndInvestigateUserRequestAsync(query);
+                DispatcherQueue.TryEnqueue(() => AppServices.Instance.NotifyStatus(step));
             });
 
-            // If an operation is proposed that needs confirmation
-            if (plannedTurn.PendingApprovalProposals.Count > 0)
+            var plannedTurn = await Task.Run(async () =>
+                await AppServices.Instance.AgentPlanner.RunAssistantTurnAsync(
+                    query,
+                    aiConfig,
+                    historySnapshot,
+                    progress));
+
+            bool looksLikeActionRequest =
+                query.Contains("clean", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("delete", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("clear", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("switch", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("change", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("flush", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("disable", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("enable", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("restore point", StringComparison.OrdinalIgnoreCase) ||
+                query.Contains("organize", StringComparison.OrdinalIgnoreCase);
+
+            var traceList = plannedTurn.ToolTrace ?? plannedTurn.InvestigationReport.ExecutedTools;
+            string modeLabel = plannedTurn.UsedLiveLlm ? $"AI ({plannedTurn.UsedAiProvider})" : "Local Telemetry";
+            string toolActivityDesc = traceList.Count > 0
+                ? $"⚙️ {modeLabel}: {string.Join(" → ", traceList)} ✓"
+                : string.Empty;
+
+            // Only pop the approval dialog when the user requested a modifying action or the live LLM explicitly staged one
+            if (plannedTurn.PendingApprovalProposals.Count > 0 && (plannedTurn.UsedLiveLlm || looksLikeActionRequest))
             {
                 var proposal = plannedTurn.PendingApprovalProposals[0];
                 var gate = new SafeOperationGateDialog(
@@ -123,10 +157,12 @@ public sealed partial class AssistantPage : Page
                     {
                         var execRecord = await Task.Run(async () => await AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
                         AppServices.Instance.NotifyOperationHistoryChanged();
+                        var approvedContent = $"Approved and executed: {execRecord.StatusMessage}\n\n{plannedTurn.DeterministicMarkdownResponse}";
+                        AppServices.Instance.AgentConversation.Add((query, approvedContent));
                         Messages.Add(new AssistantChatMessage
                         {
                             IsUser = false,
-                            Content = $"Approved and executed: {execRecord.StatusMessage}\n\n{plannedTurn.DeterministicMarkdownResponse}",
+                            Content = approvedContent,
                             ToolActivity = $"⚙️ Executed {proposal.DisplayName} ✓"
                         });
                         return;
@@ -134,11 +170,7 @@ public sealed partial class AssistantPage : Page
                 }
             }
 
-            int obsCount = plannedTurn.InvestigationReport.ConfirmedObservations.Count + plannedTurn.InvestigationReport.PotentialCauses.Count;
-            string toolActivityDesc = obsCount > 0
-                ? $"⚙️ Grounded investigation ({obsCount} verified telemetry observations) ✓"
-                : string.Empty;
-
+            AppServices.Instance.AgentConversation.Add((query, plannedTurn.DeterministicMarkdownResponse));
             Messages.Add(new AssistantChatMessage
             {
                 IsUser = false,
@@ -166,6 +198,7 @@ public sealed partial class AssistantPage : Page
     private void OnClearConversationClick(object sender, RoutedEventArgs e)
     {
         Messages.Clear();
+        AppServices.Instance.AgentConversation.Clear();
         UpdateConversationVisibility();
         AppServices.Instance.NotifyStatus("Conversation cleared.");
     }

@@ -5,8 +5,7 @@
     xmlns:local="using:Groundwork.Desktop"
     Title="Safe Operation History &amp; Rollback Ledger"
     PrimaryButtonText="Close"
-    DefaultButton="Primary"
-    RequestedTheme="Light">
+    DefaultButton="Primary">
 
     <Grid MinWidth="680" MaxWidth="800" MaxHeight="520">
         <Grid.RowDefinitions>

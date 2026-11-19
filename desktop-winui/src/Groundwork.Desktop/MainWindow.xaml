@@ -3,17 +3,22 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Groundwork.Desktop"
-    Title="Groundwork — Windows System Management &amp; Diagnostics Toolkit">
+    Title="Groundwork">
 
     <Grid x:Name="RootGrid" Background="{ThemeResource GwPageBackgroundBrush}" KeyDown="OnRootGridKeyDown">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="42" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="26" />
         </Grid.RowDefinitions>
 
-        <!-- 1. TOP BRANDED COMMAND BAR (Ink Blue & White Signature Header) -->
-        <Border Grid.Row="0" Background="{ThemeResource GwHeaderBackgroundBrush}" RequestedTheme="Dark" BorderBrush="{ThemeResource GwCardBorderStrongBrush}" BorderThickness="0,0,0,1" Padding="16,6">
+        <!-- 1. UNIFIED NATIVE WORKBENCH COMMAND HEADER -->
+        <Border
+            Grid.Row="0"
+            Background="{ThemeResource GwHeaderBackgroundBrush}"
+            BorderBrush="{ThemeResource GwCardBorderBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="14,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -21,76 +26,120 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Brand Identity -->
-                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="0,0,24,0">
-                    <Image Source="ms-appx:///Assets/icon.png" Width="26" Height="26" VerticalAlignment="Center" />
-                    <TextBlock Text="Groundwork" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
-                    <Border Padding="6,2" CornerRadius="4" Background="#1E3A5F" BorderBrush="#2D5A8C" BorderThickness="1" VerticalAlignment="Center">
-                        <TextBlock Text="v2.0" FontSize="10" FontWeight="SemiBold" Foreground="#93C5FD" />
+                <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                    <Image Source="ms-appx:///Assets/icon.png" Width="20" Height="20" VerticalAlignment="Center" />
+                    <TextBlock Text="Groundwork" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                    <Border Padding="6,2" CornerRadius="4" Background="{ThemeResource GwAccentBgBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+                        <TextBlock Text="PC Suite" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" />
                     </Border>
                 </StackPanel>
 
-                <!-- Top Horizontal Navigation Workspaces -->
-                <NavigationView
-                    x:Name="TopCommandNav"
-                    Grid.Column="1"
-                    PaneDisplayMode="Top"
-                    IsBackButtonVisible="Collapsed"
-                    IsSettingsVisible="False"
-                    SelectionChanged="OnNavigationSelectionChanged"
-                    Background="Transparent">
-                    <NavigationView.MenuItems>
-                        <NavigationViewItem Content="Dashboard" Tag="Dashboard" IsSelected="True">
-                            <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                        <NavigationViewItem Content="Storage &amp; Clean" Tag="Storage">
-                            <NavigationViewItem.Icon><FontIcon Glyph="&#xEDA2;" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                        <NavigationViewItem Content="Performance &amp; Boot" Tag="Optimize">
-                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE945;" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                        <NavigationViewItem Content="Diagnostics &amp; Repair" Tag="Diagnostics">
-                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE90F;" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                        <NavigationViewItem Content="Applications" Tag="Apps">
-                            <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                        <NavigationViewItem Content="AI Assistant" Tag="Assistant">
-                            <NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                    </NavigationView.MenuItems>
-                    <NavigationView.FooterMenuItems>
-                        <NavigationViewItem Content="Settings" Tag="Settings">
-                            <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
-                        </NavigationViewItem>
-                    </NavigationView.FooterMenuItems>
-                </NavigationView>
-
-                <!-- Right Header Actions (Audit History & Quick Rollback) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button
-                        Content="Audit History"
-                        ToolTipService.ToolTip="Safe Operation Rollback Ledger (Audit &amp; Undo)"
+                        x:Name="HeaderThemeBtn"
+                        ToolTipService.ToolTip="Switch Light / Dark theme"
+                        Style="{StaticResource GwCompactButtonStyle}"
+                        Click="OnToggleThemeHeaderClick"
+                        VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE790;" FontSize="12" />
+                            <TextBlock x:Name="HeaderThemeLabel" Text="Dark" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        ToolTipService.ToolTip="View changes and undo actions"
                         Style="{StaticResource GwCompactButtonStyle}"
                         Click="OnOpenHistoryHeaderClick"
                         VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE81C;" FontSize="12" />
+                            <TextBlock Text="Undo History" FontSize="12" />
+                        </StackPanel>
                     </Button>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- 2. MAIN MODULAR CONTENT FRAME -->
-        <Frame x:Name="RootFrame" Grid.Row="1" Background="{ThemeResource GwPageBackgroundBrush}" />
+        <!-- 2. STRUCTURED LEFT NAVIGATION SHELL + CONTENT -->
+        <NavigationView
+            x:Name="TopCommandNav"
+            Grid.Row="1"
+            PaneDisplayMode="Auto"
+            OpenPaneLength="214"
+            CompactPaneLength="50"
+            CompactModeThresholdWidth="780"
+            ExpandedModeThresholdWidth="1060"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            SelectionChanged="OnNavigationSelectionChanged"
+            Background="{ThemeResource GwPageBackgroundBrush}">
+            <NavigationView.Resources>
+                <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{ThemeResource GwSidebarBackgroundColor}" />
+                <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="{ThemeResource GwSidebarBackgroundColor}" />
+            </NavigationView.Resources>
 
-        <!-- 3. BOTTOM STATUS BAR -->
-        <Border Grid.Row="2" Background="{ThemeResource GwHeaderBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="0,1,0,0" Padding="14,4">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Overview" Tag="Dashboard" IsSelected="True">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemHeader Content="DISK &amp; CLEANUP" />
+                <NavigationViewItem Content="File Tree" Tag="FileTree">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B7;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Storage" Tag="Storage">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xEDA2;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemHeader Content="SYSTEM &amp; SOFTWARE" />
+                <NavigationViewItem Content="Tweaks &amp; Boot" Tag="Optimize">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE945;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Repair &amp; Health" Tag="Diagnostics">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE90F;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Apps &amp; Debloat" Tag="Apps">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemHeader Content="INTELLIGENCE" />
+                <NavigationViewItem Content="AI Assistant" Tag="Assistant">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="Settings" Tag="Settings">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <Frame x:Name="RootFrame" Background="{ThemeResource GwPageBackgroundBrush}" />
+        </NavigationView>
+
+        <!-- 3. CLEAN READABLE FOOTER BAR -->
+        <Border
+            Grid.Row="2"
+            Background="{ThemeResource GwCardBackgroundBrush}"
+            BorderBrush="{ThemeResource GwCardBorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="14,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="FooterStatusText" Text="Groundwork v2.0 Ready • All primary systems nominal." FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" x:Name="FooterEngineText" Text="20 Live Tools • 10-Step Safe Operation Engine" FontSize="10" Foreground="{ThemeResource GwTextMutedBrush}" VerticalAlignment="Center" />
+                <TextBlock
+                    x:Name="FooterStatusText"
+                    Text="Ready"
+                    FontSize="11"
+                    Foreground="{ThemeResource GwTextSecondaryBrush}"
+                    TextTrimming="CharacterEllipsis"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Grid.Column="1"
+                    x:Name="FooterEngineText"
+                    Text="Local-First • Reversible Actions"
+                    FontSize="11"
+                    Foreground="{ThemeResource GwTextMutedBrush}"
+                    VerticalAlignment="Center" />
             </Grid>
         </Border>
     </Grid>

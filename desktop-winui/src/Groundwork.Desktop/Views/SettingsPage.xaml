@@ -4,190 +4,179 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Groundwork.Desktop">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16">
-        <StackPanel Spacing="16" MaxWidth="900" HorizontalAlignment="Stretch">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Padding="24,20">
+            <StackPanel Spacing="16" MaxWidth="820" HorizontalAlignment="Stretch">
 
-            <!-- Title -->
-            <StackPanel Spacing="4">
-                <TextBlock Text="Settings &amp; Preferences" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                <TextBlock Text="Manage app theme, privacy boundaries, AI providers, and scan engine options." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-            </StackPanel>
-
-            <!-- 1. APPEARANCE & DISPLAY UNITS -->
-            <TextBlock Text="Appearance &amp; Formatting" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" Margin="0,8,0,0" />
-            <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                <StackPanel Spacing="14">
-                    <!-- Theme Mode -->
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE790;" FontSize="18" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Application Theme" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Switch between Groundwork signature Light (Paper &amp; Ink) and Dark (Control Room) modes." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <ComboBox Grid.Column="2" x:Name="ThemeModeCombo" Width="140" SelectionChanged="OnThemeModeSelectionChanged">
-                            <ComboBoxItem Content="Light" Tag="Light" />
-                            <ComboBoxItem Content="Dark" Tag="Dark" />
-                        </ComboBox>
-                    </Grid>
-
-                    <Rectangle Height="1" Fill="{ThemeResource GwCardBorderBrush}" />
-
-                    <!-- Storage Display Units -->
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xEDA2;" FontSize="18" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Storage Display Units" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Choose between binary (1024 KiB/MiB) and decimal (1000 KB/MB) calculations." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <ComboBox Grid.Column="2" x:Name="SizeUnitCombo" Width="140" SelectionChanged="OnSizeUnitSelectionChanged">
-                            <ComboBoxItem Content="Auto" Tag="Auto" />
-                            <ComboBoxItem Content="Binary (KiB/GiB)" Tag="Binary" />
-                            <ComboBoxItem Content="Decimal (KB/GB)" Tag="Decimal" />
-                        </ComboBox>
-                    </Grid>
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                    <TextBlock Text="Customize appearance, privacy, and optional AI provider." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                 </StackPanel>
-            </Border>
 
-            <!-- 2. PRIVACY & LOCAL-FIRST BOUNDARIES -->
-            <TextBlock Text="Privacy &amp; Local-First Boundaries" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" Margin="0,8,0,0" />
-            <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                <StackPanel Spacing="14">
-                    <!-- Hardware Serial Masking -->
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8D7;" FontSize="18" Foreground="{ThemeResource GwSignalGreenBrush}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Mask Hardware Serial Numbers" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Masks motherboard and disk serial numbers in exported reports to prevent device fingerprinting." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="2" x:Name="MaskSerialsSwitch" Toggled="OnMaskSerialsToggled" />
-                    </Grid>
+                <!-- 1. APPEARANCE -->
+                <TextBlock Text="Appearance" Style="{StaticResource GwSectionHeaderStyle}" Margin="0,4,0,0" />
+                <Border Padding="18,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Theme" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Choose Light or Dark mode." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" x:Name="ThemeModeCombo" Width="160" SelectionChanged="OnThemeModeSelectionChanged">
+                                <ComboBoxItem Content="Light" Tag="Light" />
+                                <ComboBoxItem Content="Dark" Tag="Dark" />
+                            </ComboBox>
+                        </Grid>
 
-                    <Rectangle Height="1" Fill="{ThemeResource GwCardBorderBrush}" />
+                        <Rectangle Height="1" Fill="{ThemeResource GwCardBorderBrush}" />
 
-                    <!-- Local-First Protection Badge -->
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{ThemeResource GwSignalGreenBrush}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock Text="Local Storage &amp; Cryptographic DPAPI Security" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="All telemetry, duplicate indices, and diagnostic logs remain 100% on your PC. Any configured AI API keys are encrypted using Windows DPAPI (CurrentUser)." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- 3. AI PROVIDER CONFIGURATION -->
-            <TextBlock Text="AI Provider &amp; Model Configuration" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" Margin="0,8,0,0" />
-            <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                <StackPanel Spacing="14">
-                    <!-- Provider Selection -->
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8BD;" FontSize="18" Foreground="{ThemeResource GwPurpleBrush}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="AI Engine Provider" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Select local Ollama (100% offline) or an external cloud model." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <ComboBox Grid.Column="2" x:Name="AiProviderCombo" Width="160" SelectionChanged="OnAiProviderSelectionChanged">
-                            <ComboBoxItem Content="None (Direct Only)" Tag="none" />
-                            <ComboBoxItem Content="Ollama (Local)" Tag="ollama" />
-                            <ComboBoxItem Content="Google Gemini" Tag="gemini" />
-                            <ComboBoxItem Content="OpenAI" Tag="openai" />
-                            <ComboBoxItem Content="Mistral AI" Tag="mistral" />
-                            <ComboBoxItem Content="Anthropic" Tag="anthropic" />
-                        </ComboBox>
-                    </Grid>
-
-                    <!-- API Key Entry Box (Encrypted with DPAPI) -->
-                    <Grid x:Name="ApiKeyGrid" ColumnSpacing="14" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="220" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8D7;" FontSize="18" Foreground="{ThemeResource GwAmberBrush}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="API Key (DPAPI Encrypted)" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Key is encrypted at rest using Windows Data Protection API." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <PasswordBox Grid.Column="2" x:Name="ApiKeyPasswordBox" PlaceholderText="Enter API Key..." PasswordChanged="OnApiKeyPasswordChanged" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- 4. ADVANCED ENGINE SETTINGS (COLLAPSIBLE EXPANDER) -->
-            <Expander Header="Advanced Scan Engine Settings" HorizontalAlignment="Stretch" Padding="16,12">
-                <StackPanel Spacing="12">
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Parallel Worker Threads" FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Number of concurrent FindFirstFileExW worker threads (2 to 16)." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <NumberBox Grid.Column="1" x:Name="WorkerThreadsNumberBox" Value="8" Minimum="2" Maximum="16" SpinButtonPlacementMode="Inline" Width="120" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="280" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Global Excluded Paths" FontWeight="Medium" FontSize="12" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <TextBlock Text="Comma-separated directories to skip during full volume scans." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                        </StackPanel>
-                        <TextBox Grid.Column="1" x:Name="ExcludedPathsBox" Text="$Recycle.Bin,System Volume Information" />
-                    </Grid>
-                </StackPanel>
-            </Expander>
-
-            <!-- 5. ABOUT GROUNDWORK -->
-            <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
-                <Grid ColumnSpacing="14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Image Source="ms-appx:///Assets/icon.png" Width="36" Height="36" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Groundwork Toolkit" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                            <Border Padding="6,1" CornerRadius="4" Background="{ThemeResource GwAccentBgBrush}">
-                                <TextBlock Text="v2.0" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" />
-                            </Border>
-                        </StackPanel>
-                        <TextBlock Text="Native WinUI 3 &amp; .NET 10 Windows System Diagnostics, Optimization &amp; Maintenance Toolkit." FontSize="11" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="File Size Units" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Binary (1024) or Decimal (1000)." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" x:Name="SizeUnitCombo" Width="160" SelectionChanged="OnSizeUnitSelectionChanged">
+                                <ComboBoxItem Content="Auto" Tag="Auto" />
+                                <ComboBoxItem Content="Binary (GiB)" Tag="Binary" />
+                                <ComboBoxItem Content="Decimal (GB)" Tag="Decimal" />
+                            </ComboBox>
+                        </Grid>
                     </StackPanel>
-                    <Button Grid.Column="2" Content="Open Logs Folder" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOpenLogsFolderClick" VerticalAlignment="Center" />
-                </Grid>
-            </Border>
+                </Border>
 
-        </StackPanel>
+                <!-- 2. PRIVACY -->
+                <TextBlock Text="Privacy" Style="{StaticResource GwSectionHeaderStyle}" Margin="0,4,0,0" />
+                <Border Padding="18,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Hide Hardware Serials in Exports" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                            <TextBlock Text="Diagnostics stay on this PC. API keys are encrypted with Windows DPAPI." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="MaskSerialsSwitch" MinWidth="0" OnContent="On" OffContent="Off" Toggled="OnMaskSerialsToggled" />
+                    </Grid>
+                </Border>
+
+                <!-- 3. AI ASSISTANT PROVIDER -->
+                <TextBlock Text="AI Assistant" Style="{StaticResource GwSectionHeaderStyle}" Margin="0,4,0,0" />
+                <Border Padding="18,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="AI Provider" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Optional. Works offline without an AI key." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" x:Name="AiProviderCombo" Width="180" SelectionChanged="OnAiProviderSelectionChanged">
+                                <ComboBoxItem Content="Offline Only" Tag="none" />
+                                <ComboBoxItem Content="Ollama (Local)" Tag="ollama" />
+                                <ComboBoxItem Content="Google Gemini" Tag="gemini" />
+                                <ComboBoxItem Content="OpenAI" Tag="openai" />
+                                <ComboBoxItem Content="Mistral AI" Tag="mistral" />
+                                <ComboBoxItem Content="Anthropic" Tag="anthropic" />
+                                <ComboBoxItem Content="Custom (OpenAI API)" Tag="custom" />
+                            </ComboBox>
+                        </Grid>
+
+                        <Grid x:Name="AiModelGrid" ColumnSpacing="14" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Model Name" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Model ID for multi-step assistant queries." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1" x:Name="AiModelTextBox" PlaceholderText="e.g. gemini-2.5-flash" LostFocus="OnAiConfigTextChanged" />
+                        </Grid>
+
+                        <Grid x:Name="AiEndpointGrid" ColumnSpacing="14" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Endpoint URL" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Local Ollama or OpenAI-compatible URL." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1" x:Name="AiEndpointTextBox" PlaceholderText="http://127.0.0.1:11434" LostFocus="OnAiConfigTextChanged" />
+                        </Grid>
+
+                        <Grid x:Name="ApiKeyGrid" ColumnSpacing="14" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="API Key" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Encrypted locally on your Windows account." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <PasswordBox Grid.Column="1" x:Name="ApiKeyPasswordBox" PlaceholderText="Paste API key..." PasswordChanged="OnApiKeyPasswordChanged" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 4. ADVANCED -->
+                <Expander Header="Advanced Scan Settings" HorizontalAlignment="Stretch" Padding="16,12">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Scan Threads" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Parallel workers used for disk scans (2 to 16)." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" x:Name="WorkerThreadsNumberBox" Value="8" Minimum="2" Maximum="16" SpinButtonPlacementMode="Inline" Width="120" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="260" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Excluded Folders" FontWeight="Medium" FontSize="13" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="Comma-separated folder names to skip." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1" x:Name="ExcludedPathsBox" Text="$Recycle.Bin,System Volume Information" />
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 5. ABOUT -->
+                <Border Padding="18,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Image Source="ms-appx:///Assets/icon.png" Width="32" Height="32" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Groundwork v2.0" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                            <TextBlock Text="Native Windows PC Diagnostics &amp; Maintenance Toolkit" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="Open Data Folder" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOpenLogsFolderClick" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+            </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

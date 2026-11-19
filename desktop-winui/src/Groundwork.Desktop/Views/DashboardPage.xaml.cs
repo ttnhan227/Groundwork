@@ -19,6 +19,7 @@ public sealed partial class DashboardPage : Page
     private DispatcherTimer? _liveTimer;
     private long _prevIdleTime;
     private long _prevTotalTime;
+    private double _advisoryDeduction;
 
     public ObservableCollection<ProcessRowViewModel> TopProcesses { get; } = new();
     public ObservableCollection<OverviewAdvisoryRowViewModel> Advisories { get; } = new();
@@ -74,84 +75,97 @@ public sealed partial class DashboardPage : Page
 
     public async Task LoadDashboardAsync(bool force = false)
     {
-        // 1. Fast Device & OS Summary
-        DeviceModelText.Text = $"{Environment.MachineName} • Windows {Environment.OSVersion.Version.Major}";
+        // 1. Fast Device & OS Summary (Windows 11 uses build >= 22000 while reporting Major == 10)
+        var osVer = Environment.OSVersion.Version;
+        string osLabel = osVer.Major >= 10 && osVer.Build >= 22000 ? "Windows 11" : $"Windows {osVer.Major}";
+        DeviceModelText.Text = $"{Environment.MachineName} • {osLabel} (Build {osVer.Build})";
         var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         UptimeText.Text = $"Uptime: {uptime.Days}d {uptime.Hours}h {uptime.Minutes}m";
 
-        // 2. Storage Subsystem Fast Snapshot
-        try
+        // 2-5. Run disk, power, startup, reboot, and network checks off the UI thread
+        await Task.Run(() =>
         {
-            var drives = DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed).ToList();
-            if (drives.Count > 0)
+            string freePctText = "-- Free";
+            double usedPctVal = 0;
+            string capacitySummary = "Drive metrics unavailable";
+            try
             {
-                var primary = drives.FirstOrDefault(d => string.Equals(d.Name, @"C:\", StringComparison.OrdinalIgnoreCase)) ?? drives[0];
-                long total = primary.TotalSize;
-                long free = primary.AvailableFreeSpace;
-                long used = Math.Max(0, total - free);
-                double usedPct = total > 0 ? (used / (double)total) * 100.0 : 0.0;
-                double freePct = 100.0 - usedPct;
-
-                StorageProgressBar.Value = usedPct;
-                StorageFreePercentText.Text = $"{freePct:F0}% Free";
-                StorageCapacitySummaryText.Text = $"{primary.Name} {ByteFormatter.FormatBytes(used)} Used of {ByteFormatter.FormatBytes(total)} ({ByteFormatter.FormatBytes(free)} Free)";
+                var drives = DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed).ToList();
+                if (drives.Count > 0)
+                {
+                    var primary = drives.FirstOrDefault(d => string.Equals(d.Name, @"C:\", StringComparison.OrdinalIgnoreCase)) ?? drives[0];
+                    long total = primary.TotalSize;
+                    long free = primary.AvailableFreeSpace;
+                    long used = Math.Max(0, total - free);
+                    usedPctVal = total > 0 ? (used / (double)total) * 100.0 : 0.0;
+                    double freePct = 100.0 - usedPctVal;
+                    freePctText = $"{freePct:F0}% Free";
+                    capacitySummary = $"{primary.Name} {ByteFormatter.FormatBytes(free)} free of {ByteFormatter.FormatBytes(total)}";
+                }
             }
-        }
-        catch { }
+            catch { }
 
-        // 3. Performance & Boot Snapshot
-        try
-        {
-            var power = AppServices.Instance.OptimizationService.InspectPowerPlans();
-            ActivePowerSchemeBadge.Text = !string.IsNullOrEmpty(power.ActiveSchemeName) ? power.ActiveSchemeName : "Balanced";
-
-            var startupItems = AppServices.Instance.OptimizationService.InspectStartupItems();
-            int enabledCount = startupItems.Count(s => s.IsEnabled);
-            StartupAppsCountText.Text = $"{enabledCount} Apps Launch at Boot ({startupItems.Count} total)";
-        }
-        catch { }
-
-        // 4. Pending Reboot Status
-        try
-        {
-            var health = AppServices.Instance.TroubleshootingService.InspectWindowsRepairAndHealthStatus();
-            if (health.RebootPending)
+            string schemeName = "Balanced";
+            string startupSummary = "Startup apps checked";
+            try
             {
-                PendingRebootBadge.Text = "System Reboot Pending";
-                PendingRebootBadge.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBrush"];
-            }
-            else
-            {
-                PendingRebootBadge.Text = "No Pending System Reboots";
-                PendingRebootBadge.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
-            }
-        }
-        catch { }
+                var power = AppServices.Instance.OptimizationService.InspectPowerPlans();
+                if (!string.IsNullOrEmpty(power.ActiveSchemeName)) schemeName = power.ActiveSchemeName;
 
-        // 5. Network Quick Check
-        try
-        {
-            var adapters = AppServices.Instance.TroubleshootingService.InspectNetworkInterfaces();
-            var active = adapters.FirstOrDefault(a => a.OperationalStatus == "Up");
-            if (active != null)
-            {
-                NetworkStatusBadge.Text = "Connected";
-                string primaryIp = active.IpAddresses.FirstOrDefault(ip => !ip.Contains(':')) ?? active.IpAddresses.FirstOrDefault() ?? "127.0.0.1";
-                NetworkSummaryText.Text = $"{active.Name} • IP: {primaryIp}";
+                var startupItems = AppServices.Instance.OptimizationService.InspectStartupItems();
+                int enabledCount = startupItems.Count(s => s.IsEnabled);
+                startupSummary = $"{enabledCount} enabled at startup ({startupItems.Count} total)";
             }
-            else
+            catch { }
+
+            bool rebootPending = false;
+            try
             {
-                NetworkStatusBadge.Text = "Disconnected";
-                NetworkSummaryText.Text = "No active network interface discovered.";
+                var health = AppServices.Instance.TroubleshootingService.InspectWindowsRepairAndHealthStatus();
+                rebootPending = health.RebootPending;
             }
-        }
-        catch { }
+            catch { }
 
-        // 6. Refresh Processes
-        await RefreshTopProcessesAsync();
+            string netBadge = "Disconnected";
+            string netSummary = "No active network adapter found.";
+            try
+            {
+                var adapters = AppServices.Instance.TroubleshootingService.InspectNetworkInterfaces();
+                var active = adapters.FirstOrDefault(a => a.OperationalStatus == "Up");
+                if (active != null)
+                {
+                    netBadge = "Connected";
+                    string primaryIp = active.IpAddresses.FirstOrDefault(ip => !ip.Contains(':')) ?? active.IpAddresses.FirstOrDefault() ?? "127.0.0.1";
+                    netSummary = $"{active.Name} • {primaryIp}";
+                }
+            }
+            catch { }
 
-        // 7. Advisories Check
-        RefreshAdvisories();
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                StorageProgressBar.Value = usedPctVal;
+                StorageFreePercentText.Text = freePctText;
+                StorageCapacitySummaryText.Text = capacitySummary;
+                ActivePowerSchemeBadge.Text = schemeName;
+                StartupAppsCountText.Text = startupSummary;
+                NetworkStatusBadge.Text = netBadge;
+                NetworkSummaryText.Text = netSummary;
+
+                if (rebootPending)
+                {
+                    PendingRebootBadge.Text = "Restart pending for updates";
+                    PendingRebootBadge.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwAmberBrush"];
+                }
+                else
+                {
+                    PendingRebootBadge.Text = "No pending restarts";
+                    PendingRebootBadge.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["GwSignalGreenBrush"];
+                }
+            });
+        });
+
+        // 6. Refresh Processes & Advisories off the UI thread
+        await Task.WhenAll(RefreshTopProcessesAsync(), RefreshAdvisoriesAsync());
     }
 
     private void UpdateVitals()
@@ -161,14 +175,15 @@ public sealed partial class DashboardPage : Page
 
         LiveCpuMemText.Text = $"CPU: {cpuPercent:F0}% • RAM: {ramPercent:F0}%";
 
-        // Dynamic Health Score: 100 minus pressure deductions
-        double health = 100.0;
-        if (cpuPercent > 80) health -= 15;
-        if (ramPercent > 85) health -= 15;
-        if (StorageProgressBar.Value > 90) health -= 20;
+        // Dynamic Health Score: 100 minus real pressure & advisory deductions
+        double health = 100.0 - _advisoryDeduction;
+        if (cpuPercent > 80) health -= 10;
+        if (ramPercent > 85) health -= 10;
+        if (StorageProgressBar.Value > 90) health -= 10;
 
-        OverallHealthGauge.Value = Math.Max(50, health);
-        OverallHealthGauge.StatusLabel = health >= 85 ? "Optimal" : (health >= 70 ? "Good" : "Attention");
+        health = Math.Clamp(health, 30.0, 100.0);
+        OverallHealthGauge.Value = health;
+        OverallHealthGauge.StatusLabel = health >= 90 ? "Optimal" : (health >= 75 ? "Good" : "Attention");
     }
 
     private double GetCpuUsage()
@@ -251,42 +266,89 @@ public sealed partial class DashboardPage : Page
         });
     }
 
-    private void RefreshAdvisories()
+    private async Task RefreshAdvisoriesAsync()
     {
-        Advisories.Clear();
-
-        // Check storage headroom
-        if (StorageProgressBar.Value > 90)
+        var (items, deduction) = await Task.Run(() =>
         {
-            Advisories.Add(new OverviewAdvisoryRowViewModel
-            {
-                CategoryBadge = "Storage",
-                Title = "Low Storage Headroom on Primary Drive",
-                Detail = "Less than 10% free space remaining. Cleaning junk and cache can free up critical room.",
-                IconGlyph = "\uE7BA"
-            });
-        }
+            var found = new System.Collections.Generic.List<OverviewAdvisoryRowViewModel>();
+            double points = 0;
 
-        // Check pending reboot
-        try
-        {
-            var health = AppServices.Instance.TroubleshootingService.InspectWindowsRepairAndHealthStatus();
-            if (health.RebootPending)
+            try
             {
-                Advisories.Add(new OverviewAdvisoryRowViewModel
+                var cDrive = DriveInfo.GetDrives().FirstOrDefault(d => d.IsReady && string.Equals(d.Name, @"C:\", StringComparison.OrdinalIgnoreCase));
+                if (cDrive != null)
                 {
-                    CategoryBadge = "System",
-                    Title = "Pending System Reboot",
-                    Detail = "A Windows update or driver installation requires a restart to complete servicing.",
-                    IconGlyph = "\uE777"
-                });
+                    double freePct = cDrive.TotalSize > 0 ? (cDrive.AvailableFreeSpace / (double)cDrive.TotalSize) * 100.0 : 100.0;
+                    if (freePct < 20.0 || cDrive.AvailableFreeSpace < 30L * 1024 * 1024 * 1024)
+                    {
+                        points += freePct < 10.0 ? 20 : 14;
+                        found.Add(new OverviewAdvisoryRowViewModel
+                        {
+                            CategoryBadge = "Storage",
+                            Title = $"Low Space on C: ({ByteFormatter.FormatBytes(cDrive.AvailableFreeSpace)} Free)",
+                            Detail = "Open Storage → Junk Cleaner to scan GPU shader caches, NVIDIA leftovers, browser caches, and Docker virtual disks.",
+                            ActionTag = "Storage:cleaner",
+                            IconGlyph = "\uE7BA"
+                        });
+                    }
+                }
             }
-        }
-        catch { }
+            catch { }
 
-        bool hasAdvisories = Advisories.Count > 0;
-        HealthyEmptyStateBorder.Visibility = hasAdvisories ? Visibility.Collapsed : Visibility.Visible;
-        AdvisoriesListView.Visibility = hasAdvisories ? Visibility.Visible : Visibility.Collapsed;
+            try
+            {
+                var broken = AppServices.Instance.OptimizationService.InspectStartupItems().Count(s => s.IsEnabled && !s.TargetExists);
+                if (broken > 0)
+                {
+                    points += 8;
+                    found.Add(new OverviewAdvisoryRowViewModel
+                    {
+                        CategoryBadge = "Startup",
+                        Title = $"{broken} Broken Startup Entry Pointing to Missing App",
+                        Detail = "Open Tweaks & Boot → Startup Apps → Missing Target to disable leftover registry Run entries.",
+                        ActionTag = "Optimize:startup",
+                        IconGlyph = "\uE7BA"
+                    });
+                }
+            }
+            catch { }
+
+            try
+            {
+                var health = AppServices.Instance.TroubleshootingService.InspectWindowsRepairAndHealthStatus();
+                if (health.RebootPending)
+                {
+                    points += 8;
+                    found.Add(new OverviewAdvisoryRowViewModel
+                    {
+                        CategoryBadge = "System",
+                        Title = "Pending System Reboot",
+                        Detail = "A Windows update or driver installation requires a restart to complete servicing.",
+                        ActionTag = "Diagnostics:repair",
+                        IconGlyph = "\uE777"
+                    });
+                }
+            }
+            catch { }
+
+            return (found, points);
+        });
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _advisoryDeduction = deduction;
+            Advisories.Clear();
+            foreach (var item in items) Advisories.Add(item);
+
+            bool hasAdvisories = Advisories.Count > 0;
+            HealthyEmptyStateBorder.Visibility = hasAdvisories ? Visibility.Collapsed : Visibility.Visible;
+            AdvisoriesListView.Visibility = hasAdvisories ? Visibility.Visible : Visibility.Collapsed;
+
+            HeroStatusBadgeText.Text = hasAdvisories ? $"{Advisories.Count} {(Advisories.Count == 1 ? "Issue" : "Issues")} Found" : "Optimal";
+            HeroStatusBadgeBorder.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[hasAdvisories ? "GwAmberBgBrush" : "GwSignalGreenBgBrush"];
+            HeroStatusBadgeText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[hasAdvisories ? "GwAmberBrush" : "GwSignalGreenBrush"];
+            UpdateVitals();
+        });
     }
 
     private async void OnSmartHealthCheckClick(object sender, RoutedEventArgs e)
@@ -317,9 +379,9 @@ public sealed partial class DashboardPage : Page
         await RefreshTopProcessesAsync();
     }
 
-    private void OnRunAdvisoriesScanClick(object sender, RoutedEventArgs e)
+    private async void OnRunAdvisoriesScanClick(object sender, RoutedEventArgs e)
     {
-        RefreshAdvisories();
+        await RefreshAdvisoriesAsync();
         AppServices.Instance.NotifyStatus("System diagnostics refreshed.");
     }
 
@@ -330,11 +392,33 @@ public sealed partial class DashboardPage : Page
 
     private void OnNavigateOptimizeClick(object sender, RoutedEventArgs e)
     {
-        AppServices.Instance.MainWindow?.NavigateToTab("Optimize");
+        AppServices.Instance.MainWindow?.NavigateToTab("Optimize", "startup");
     }
 
     private void OnNavigateDiagnosticsClick(object sender, RoutedEventArgs e)
     {
         AppServices.Instance.MainWindow?.NavigateToTab("Diagnostics");
+    }
+
+    private void OnNavigateTweaksClick(object sender, RoutedEventArgs e)
+    {
+        AppServices.Instance.MainWindow?.NavigateToTab("Optimize", "settings");
+    }
+
+    private void OnNavigateRepairClick(object sender, RoutedEventArgs e)
+    {
+        AppServices.Instance.MainWindow?.NavigateToTab("Diagnostics", "repair");
+    }
+
+    private void OnNavigateBloatwareClick(object sender, RoutedEventArgs e)
+    {
+        AppServices.Instance.MainWindow?.NavigateToTab("Apps", "bloatware");
+    }
+
+    private void OnAdvisoryFixClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string actionTag || string.IsNullOrWhiteSpace(actionTag)) return;
+        var parts = actionTag.Split(':', 2);
+        AppServices.Instance.MainWindow?.NavigateToTab(parts[0], parts.Length > 1 ? parts[1] : null);
     }
 }

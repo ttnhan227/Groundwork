@@ -1494,39 +1494,17 @@ public sealed class DiagnosticsAndTroubleshootingService
             ? _customLocalAppDataDir
             : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-        var (tempBytes, tempCount) = MeasureDirectoryTopAndSubFiles(tempRoot);
+        var (tempBytes, tempCount) = MeasureDirectoryRecursiveSafe(tempRoot);
         var crashDumpsDir = Path.Combine(localAppData, "CrashDumps");
-        var (dumpBytes, dumpCount) = MeasureDirectoryTopAndSubFiles(crashDumpsDir, "*.dmp");
+        var (dumpBytes, dumpCount) = MeasureDirectoryRecursiveSafe(crashDumpsDir, "*.dmp");
 
-        var runningProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(_customLocalAppDataDir))
-        {
-            try
-            {
-                foreach (var p in Process.GetProcesses())
-                {
-                    try
-                    {
-                        if (!string.IsNullOrWhiteSpace(p.ProcessName))
-                        {
-                            runningProcessNames.Add(p.ProcessName);
-                        }
-                    }
-                    catch { }
-                    finally
-                    {
-                        p.Dispose();
-                    }
-                }
-            }
-            catch { }
-        }
+        var runningProcessNames = GetRunningProcessNames();
 
-        var browserDefs = new (string Id, string Name, string ProcessName, string RelativeCacheDir)[]
+        var browserDefs = new (string Id, string Name, string ProcessName, string RelativeUserDataDir)[]
         {
-            ("edge", "Microsoft Edge HTTP/Code Cache", "msedge", Path.Combine("Microsoft", "Edge", "User Data", "Default", "Cache", "Cache_Data")),
-            ("chrome", "Google Chrome HTTP/Code Cache", "chrome", Path.Combine("Google", "Chrome", "User Data", "Default", "Cache", "Cache_Data")),
-            ("brave", "Brave Browser HTTP/Code Cache", "brave", Path.Combine("BraveSoftware", "Brave-Browser", "User Data", "Default", "Cache", "Cache_Data")),
+            ("edge", "Microsoft Edge HTTP/Code Cache", "msedge", Path.Combine("Microsoft", "Edge", "User Data")),
+            ("chrome", "Google Chrome HTTP/Code Cache", "chrome", Path.Combine("Google", "Chrome", "User Data")),
+            ("brave", "Brave Browser HTTP/Code Cache", "brave", Path.Combine("BraveSoftware", "Brave-Browser", "User Data")),
             ("firefox", "Mozilla Firefox Web Cache", "firefox", Path.Combine("Mozilla", "Firefox", "Profiles"))
         };
 
@@ -1534,56 +1512,42 @@ public sealed class DiagnosticsAndTroubleshootingService
         foreach (var b in browserDefs)
         {
             var isRunning = runningProcessNames.Contains(b.ProcessName);
-            if (b.Id == "firefox")
+            var userDataRoot = Path.Combine(localAppData, b.RelativeUserDataDir);
+            if (!Directory.Exists(userDataRoot))
             {
-                var profilesRoot = Path.Combine(localAppData, b.RelativeCacheDir);
-                if (Directory.Exists(profilesRoot))
-                {
-                    try
-                    {
-                        long ffBytes = 0;
-                        var ffFiles = 0;
-                        foreach (var profDir in Directory.EnumerateDirectories(profilesRoot))
-                        {
-                            var cache2Entries = Path.Combine(profDir, "cache2", "entries");
-                            var (cb, cf) = MeasureDirectoryTopAndSubFiles(cache2Entries);
-                            ffBytes += cb;
-                            ffFiles += cf;
-                        }
-                        if (ffFiles > 0)
-                        {
-                            browserCaches.Add(new BrowserCacheDiagnosticEntry(
-                                BrowserId: b.Id,
-                                BrowserName: b.Name,
-                                CacheDirectoryPath: profilesRoot,
-                                CacheSizeBytes: ffBytes,
-                                FileCount: ffFiles,
-                                IsBrowserProcessRunning: isRunning,
-                                SafetyNote: isRunning
-                                    ? "Firefox is currently running; close Firefox before cleaning cache."
-                                    : "Cache-only directory (cache2/entries). Cookies, logins, and history are never touched."));
-                        }
-                    }
-                    catch { }
-                }
                 continue;
             }
 
-            var fullCacheDir = Path.Combine(localAppData, b.RelativeCacheDir);
-            if (Directory.Exists(fullCacheDir))
+            var cacheDirs = CollectBrowserCacheDirectories(b.Id, userDataRoot);
+            if (cacheDirs.Count == 0)
             {
-                var (cBytes, cCount) = MeasureDirectoryTopAndSubFiles(fullCacheDir);
-                browserCaches.Add(new BrowserCacheDiagnosticEntry(
-                    BrowserId: b.Id,
-                    BrowserName: b.Name,
-                    CacheDirectoryPath: fullCacheDir,
-                    CacheSizeBytes: cBytes,
-                    FileCount: cCount,
-                    IsBrowserProcessRunning: isRunning,
-                    SafetyNote: isRunning
-                        ? $"{b.Name} is currently open ({b.ProcessName}.exe); close the browser to clean its cache safely."
-                        : "Cache_Data only. Cookies, saved passwords, bookmarks, and active sessions are preserved."));
+                continue;
             }
+
+            long totalBytes = 0;
+            int totalFiles = 0;
+            foreach (var dir in cacheDirs)
+            {
+                var (cb, cf) = MeasureDirectoryRecursiveSafe(dir);
+                totalBytes += cb;
+                totalFiles += cf;
+            }
+
+            if (totalFiles == 0 && b.Id == "firefox")
+            {
+                continue;
+            }
+
+            browserCaches.Add(new BrowserCacheDiagnosticEntry(
+                BrowserId: b.Id,
+                BrowserName: b.Name,
+                CacheDirectoryPath: cacheDirs.Count == 1 ? cacheDirs[0] : userDataRoot,
+                CacheSizeBytes: totalBytes,
+                FileCount: totalFiles,
+                IsBrowserProcessRunning: isRunning,
+                SafetyNote: isRunning
+                    ? $"{b.Name} is currently open ({b.ProcessName}.exe); close the browser to clean its cache safely."
+                    : "Cache-only directories (Cache_Data, Code Cache, CacheStorage / cache2). Cookies, saved passwords, bookmarks, and sessions are preserved."));
         }
 
         var closedBrowserBytes = browserCaches.Where(b => !b.IsBrowserProcessRunning).Sum(b => b.CacheSizeBytes);
@@ -1598,6 +1562,88 @@ public sealed class DiagnosticsAndTroubleshootingService
             TotalSafeReclaimableBytes: tempBytes + dumpBytes + closedBrowserBytes,
             TotalSafeFileCount: tempCount + dumpCount + closedBrowserCount,
             CapturedAtUtc: DateTimeOffset.UtcNow);
+    }
+
+    private HashSet<string> GetRunningProcessNames()
+    {
+        var runningProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(_customLocalAppDataDir))
+        {
+            return runningProcessNames;
+        }
+
+        try
+        {
+            foreach (var p in Process.GetProcesses())
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(p.ProcessName))
+                    {
+                        runningProcessNames.Add(p.ProcessName);
+                    }
+                }
+                catch { }
+                finally
+                {
+                    p.Dispose();
+                }
+            }
+        }
+        catch { }
+
+        return runningProcessNames;
+    }
+
+    private static List<string> CollectBrowserCacheDirectories(string browserId, string userDataRoot)
+    {
+        var dirs = new List<string>();
+        try
+        {
+            if (browserId == "firefox")
+            {
+                foreach (var profDir in Directory.EnumerateDirectories(userDataRoot))
+                {
+                    var cache2Entries = Path.Combine(profDir, "cache2", "entries");
+                    if (Directory.Exists(cache2Entries))
+                    {
+                        dirs.Add(cache2Entries);
+                    }
+                }
+                return dirs;
+            }
+
+            foreach (var profileDir in Directory.EnumerateDirectories(userDataRoot))
+            {
+                var name = Path.GetFileName(profileDir);
+                if (!string.Equals(name, "Default", StringComparison.OrdinalIgnoreCase) &&
+                    !name.StartsWith("Profile ", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(name, "Guest Profile", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string[] relCachePaths =
+                [
+                    Path.Combine("Cache", "Cache_Data"),
+                    "Code Cache",
+                    "GPUCache",
+                    Path.Combine("Service Worker", "CacheStorage")
+                ];
+
+                foreach (var rel in relCachePaths)
+                {
+                    var candidate = Path.Combine(profileDir, rel);
+                    if (Directory.Exists(candidate))
+                    {
+                        dirs.Add(candidate);
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return dirs;
     }
 
     public OperationProposal ProposeSafeTempAndCacheCleanup(bool includeClosedBrowserCaches = true)
@@ -1625,7 +1671,27 @@ public sealed class DiagnosticsAndTroubleshootingService
         {
             foreach (var bc in summary.BrowserCaches.Where(b => !b.IsBrowserProcessRunning && b.FileCount > 0))
             {
-                targets.Add(bc.CacheDirectoryPath);
+                var relRoot = bc.BrowserId switch
+                {
+                    "edge" => Path.Combine(localAppData, "Microsoft", "Edge", "User Data"),
+                    "chrome" => Path.Combine(localAppData, "Google", "Chrome", "User Data"),
+                    "brave" => Path.Combine(localAppData, "BraveSoftware", "Brave-Browser", "User Data"),
+                    "firefox" => Path.Combine(localAppData, "Mozilla", "Firefox", "Profiles"),
+                    _ => string.Empty
+                };
+
+                var expanded = !string.IsNullOrEmpty(relRoot) && Directory.Exists(relRoot)
+                    ? CollectBrowserCacheDirectories(bc.BrowserId, relRoot)
+                    : [];
+
+                if (expanded.Count > 0)
+                {
+                    targets.AddRange(expanded);
+                }
+                else
+                {
+                    targets.Add(bc.CacheDirectoryPath);
+                }
             }
         }
 
@@ -1634,7 +1700,7 @@ public sealed class DiagnosticsAndTroubleshootingService
         var reclaimCount = summary.UserTempFileCount + summary.CrashDumpFileCount +
             (includeClosedBrowserCaches ? summary.BrowserCaches.Where(b => !b.IsBrowserProcessRunning).Sum(b => b.FileCount) : 0);
 
-        var payload = new SafeTempCleanupPayload(targets, reclaimBytes, reclaimCount);
+        var payload = new SafeTempCleanupPayload(targets.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), reclaimBytes, reclaimCount);
         var payloadJson = JsonSerializer.Serialize(payload);
         var mb = reclaimBytes / (1024.0 * 1024.0);
 
@@ -1643,7 +1709,7 @@ public sealed class DiagnosticsAndTroubleshootingService
             targetDescription: $"User Temp, Crash Dumps & Closed Browser Caches ({reclaimCount} files, {mb:F1} MB)",
             inspectedCurrentStateSummary: $"Temp: {summary.UserTempFileCount} files ({summary.UserTempBytes / (1024.0 * 1024.0):F1} MB), CrashDumps: {summary.CrashDumpFileCount} files, Closed Browser Caches: {summary.BrowserCaches.Count(b => !b.IsBrowserProcessRunning)} browser(s).",
             preChangeStateJson: payloadJson,
-            proposedChangeExplanation: $"Clean {reclaimCount} temporary and cache file(s) (~{mb:F1} MB) across {targets.Count} safe location(s). In-use files and running browsers are automatically skipped.",
+            proposedChangeExplanation: $"Clean {reclaimCount} temporary and cache file(s) (~{mb:F1} MB) across {payload.TargetDirectories.Count} safe location(s). In-use files and running browsers are automatically skipped.",
             expectedEffects:
             [
                 $"Reclaims up to {mb:F1} MB of disk space from scratch and web cache folders.",
@@ -1652,7 +1718,7 @@ public sealed class DiagnosticsAndTroubleshootingService
             payloadJson: payloadJson,
             customPrerequisiteValidator: () =>
             {
-                if (reclaimCount == 0 || targets.Count == 0)
+                if (reclaimCount == 0 || payload.TargetDirectories.Count == 0)
                 {
                     return (false, "No eligible temporary or closed browser cache files were found to clean.");
                 }
@@ -1679,28 +1745,48 @@ public sealed class DiagnosticsAndTroubleshootingService
                 continue;
             }
 
-            try
+            var queue = new Queue<string>();
+            queue.Enqueue(dir);
+            while (queue.Count > 0)
             {
-                foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.TopDirectoryOnly))
+                cancellationToken.ThrowIfCancellationRequested();
+                var currentDir = queue.Dequeue();
+                try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    try
+                    var di = new DirectoryInfo(currentDir);
+                    if ((di.Attributes & FileAttributes.ReparsePoint) != 0)
                     {
-                        var fi = new FileInfo(file);
-                        var len = fi.Length;
-                        fi.Delete();
-                        removedFiles++;
-                        reclaimedBytes += len;
+                        continue;
                     }
-                    catch
+
+                    foreach (var fi in di.EnumerateFiles("*", SearchOption.TopDirectoryOnly))
                     {
-                        skippedLocked++;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        try
+                        {
+                            var len = fi.Length;
+                            fi.Delete();
+                            removedFiles++;
+                            reclaimedBytes += len;
+                        }
+                        catch
+                        {
+                            skippedLocked++;
+                        }
+                    }
+
+                    foreach (var sub in di.EnumerateDirectories("*", SearchOption.TopDirectoryOnly))
+                    {
+                        if ((sub.Attributes & FileAttributes.ReparsePoint) == 0)
+                        {
+                            queue.Enqueue(sub.FullName);
+                        }
                     }
                 }
-            }
-            catch
-            {
-                // Ignore directory access issues.
+                catch
+                {
+                    // Ignore directory access issues.
+                }
             }
         }
 
@@ -1723,7 +1809,7 @@ public sealed class DiagnosticsAndTroubleshootingService
             Verification: verification));
     }
 
-    private static (long Bytes, int Count) MeasureDirectoryTopAndSubFiles(string directoryPath, string searchPattern = "*")
+    private static (long Bytes, int Count) MeasureDirectoryRecursiveSafe(string directoryPath, string searchPattern = "*")
     {
         if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
         {
@@ -1732,20 +1818,40 @@ public sealed class DiagnosticsAndTroubleshootingService
 
         long bytes = 0;
         var count = 0;
-        try
+        var queue = new Queue<string>();
+        queue.Enqueue(directoryPath);
+
+        while (queue.Count > 0)
         {
-            var dirInfo = new DirectoryInfo(directoryPath);
-            foreach (var f in dirInfo.EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly))
+            var current = queue.Dequeue();
+            try
             {
-                try
+                var dirInfo = new DirectoryInfo(current);
+                if ((dirInfo.Attributes & FileAttributes.ReparsePoint) != 0)
                 {
-                    bytes += f.Length;
-                    count++;
+                    continue;
                 }
-                catch { }
+
+                foreach (var f in dirInfo.EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        bytes += f.Length;
+                        count++;
+                    }
+                    catch { }
+                }
+
+                foreach (var sub in dirInfo.EnumerateDirectories("*", SearchOption.TopDirectoryOnly))
+                {
+                    if ((sub.Attributes & FileAttributes.ReparsePoint) == 0)
+                    {
+                        queue.Enqueue(sub.FullName);
+                    }
+                }
             }
+            catch { }
         }
-        catch { }
 
         return (bytes, count);
     }

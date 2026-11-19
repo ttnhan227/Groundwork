@@ -105,3 +105,29 @@ public sealed record InvestigationReport(
     public string CompletedAtDisplay => CompletedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
     public double DurationSeconds => Math.Max(0.01, (CompletedAtUtc - StartedAtUtc).TotalSeconds);
 }
+
+public sealed record AiProviderConfig(
+    string Provider,
+    string Endpoint,
+    string Model,
+    string ApiKey = "")
+{
+    public bool IsConfigured
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Provider) ||
+                string.Equals(Provider, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (string.Equals(Provider, "ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrWhiteSpace(Endpoint) && !string.IsNullOrWhiteSpace(Model);
+            }
+
+            return !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(Model);
+        }
+    }
+}

@@ -85,8 +85,9 @@ public sealed class InvestigationEngineService
             return InvestigationType.Network;
         }
 
-        if (q.Contains("full") || q.Contains("storage") || q.Contains("disk space") || q.Contains("c drive") ||
-            q.Contains("c:") || q.Contains("clean") || q.Contains("free space") || q.Contains("large file"))
+        if (q.Contains("full") || q.Contains("storage") || q.Contains("disk") || q.Contains("c drive") ||
+            q.Contains("c:") || q.Contains("c space") || q.Contains("space") || q.Contains("clean") ||
+            q.Contains("free space") || q.Contains("large file") || q.Contains("appdata") || q.Contains("cache"))
         {
             return InvestigationType.Storage;
         }
@@ -326,11 +327,13 @@ public sealed class InvestigationEngineService
         var volCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_storage_volumes"), ct).ConfigureAwait(false);
         var cleanCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_cleanup_candidates"), ct).ConfigureAwait(false);
         var browserCacheCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_browser_caches"), ct).ConfigureAwait(false);
-        toolResults.AddRange([volCall, cleanCall, browserCacheCall]);
+        var spaceHogsCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_space_hogs"), ct).ConfigureAwait(false);
+        toolResults.AddRange([volCall, cleanCall, browserCacheCall, spaceHogsCall]);
 
         var drives = _toolRegistry.Drives.DiscoverVolumes();
         var diag = await _toolRegistry.Cleanup.PreloadDiagnosticReportAsync(ct).ConfigureAwait(false);
         var cacheSummary = _toolRegistry.Troubleshooting.InspectSafeTempAndBrowserCaches();
+        var spaceHogReport = JsonSerializer.Deserialize<SpaceHogReport>(spaceHogsCall.StructuredDataJson);
 
         foreach (var d in drives)
         {
@@ -373,18 +376,59 @@ public sealed class InvestigationEngineService
             causes.Add(new InvestigationFinding(
                 FindingCategory.PotentialCause,
                 "Accumulated Temporary Files, Browser Caches & Recycle Bin Items",
-                $"Approximately {(tempMb + rbMb + browserCacheMb):F1} MB is currently occupied by temporary build/installer artifacts, web browser caches, and unemptied Recycle Bin items.",
+                $"Approximately {(tempMb + rbMb + browserCacheMb):F1} MB is currently occupied by temporary build/installer artifacts, multi-profile browser caches, and unemptied Recycle Bin items.",
                 "SafeCleanupService Preview",
                 "Confirmed",
                 "Medium"));
         }
 
+        if (spaceHogReport is { Entries.Count: > 0 })
+        {
+            foreach (var hog in spaceHogReport.Entries.Take(10))
+            {
+                var sizeText = StorageHotspotAnalyzerService.FormatGbOrMb(hog.SizeBytes);
+                var severity = hog.SizeBytes >= 5L * 1024 * 1024 * 1024 ? "High" :
+                               (hog.SizeBytes >= 1L * 1024 * 1024 * 1024 ? "Medium" : "Normal");
+
+                confirmed.Add(new InvestigationFinding(
+                    FindingCategory.ConfirmedObservation,
+                    $"{hog.Title}: {sizeText} ({hog.Category})",
+                    $"Path: {hog.LocationPath} ({hog.ItemCount:N0} files). {hog.ImpactNote}",
+                    "StorageHotspotAnalyzerService",
+                    "Confirmed (Live Scan)",
+                    severity));
+
+                if (hog.SizeBytes >= 512L * 1024 * 1024)
+                {
+                    causes.Add(new InvestigationFinding(
+                        FindingCategory.PotentialCause,
+                        $"{hog.Title} Consuming {sizeText}",
+                        $"{hog.ImpactNote} Guidance: {hog.SafetyGuidance}",
+                        hog.LocationPath,
+                        "Confirmed",
+                        severity));
+                }
+            }
+
+            if (spaceHogReport.SafeReclaimableBytes >= 50L * 1024 * 1024)
+            {
+                recommendations.Add(new InvestigationRecommendation(
+                    RecommendationId: "rec-clean-space-hogs",
+                    Title: $"Clean Regenerable GPU, Installer & Dev Caches ({StorageHotspotAnalyzerService.FormatGbOrMb(spaceHogReport.SafeReclaimableBytes)})",
+                    Explanation: "Safely removes regenerable shader caches, NVIDIA OTA payloads, and package caches (NuGet/npm/bun/pip/VS Code) while keeping virtual disks and personal files untouched.",
+                    Reversibility: OperationReversibility.Irreversible,
+                    RiskLevel: OperationRiskLevel.Low,
+                    RequiresUserApproval: true,
+                    AssociatedToolName: "propose_clean_space_hogs"));
+            }
+        }
+
         hypotheses.Add(new InvestigationFinding(
             FindingCategory.UnverifiedHypothesis,
-            "Large Application Caches, Game Installations, or Duplicate Media Files",
-            "Run a full Storage Analyzer scan or Duplicate Finder scan in the Analyze / Maintenance modules to pinpoint multi-gigabyte folders and duplicate archives across user directories.",
-            "Full Volume Tree Scan Pending",
-            "Requires Full Directory Scan",
+            "Protected System Storage (Volume Shadow Copies / System Restore / WindowsApps)",
+            "Standard user-mode scans cannot inspect C:\\System Volume Information or protected WindowsApps directories without administrator elevation. Use Elevated MFT Scan or 'vssadmin list shadowstorage' in an elevated prompt if total drive usage significantly exceeds scanned user/program folders.",
+            "Standard-User Access Boundary",
+            "Requires Elevation",
             "Info"));
 
         recommendations.Add(new InvestigationRecommendation(
@@ -399,13 +443,16 @@ public sealed class InvestigationEngineService
 
         recommendations.Add(new InvestigationRecommendation(
             RecommendationId: "rec-storage-scan",
-            Title: "Run Parallel Win32 Storage Scan on Primary Drive",
-            Explanation: "Builds a complete bottom-up folder size breakdown and identifies the largest individual files consuming disk space.",
+            Title: "Open Full Win32 Folder Tree in Space Analyzer",
+            Explanation: "Explore the interactive folder hierarchy and largest individual files across any drive or user directory.",
             Reversibility: OperationReversibility.ReadOnly,
             RiskLevel: OperationRiskLevel.None,
             RequiresUserApproval: false));
 
-        var summary = $"Inspected {drives.Count} storage volume(s) and found {(tempMb + rbMb):F1} MB of immediately reclaimable Temp/Recycle Bin space.";
+        var hogSummaryText = spaceHogReport is { Entries.Count: > 0 }
+            ? $" Identified {spaceHogReport.Entries.Count} major space hog(s) totaling {StorageHotspotAnalyzerService.FormatGbOrMb(spaceHogReport.TotalIdentifiedBytes)} ({StorageHotspotAnalyzerService.FormatGbOrMb(spaceHogReport.SafeReclaimableBytes)} safe-cleanable)."
+            : string.Empty;
+        var summary = $"Inspected {drives.Count} storage volume(s) and found {(tempMb + rbMb + browserCacheMb):F1} MB in Temp/Browser/Recycle Bin.{hogSummaryText}";
         return new InvestigationReport(
             ReportId: $"inv-stor-{Guid.NewGuid():N}",
             InvestigationType: InvestigationType.Storage,

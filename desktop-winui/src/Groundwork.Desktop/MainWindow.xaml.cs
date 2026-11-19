@@ -83,12 +83,45 @@ public sealed partial class MainWindow : Window
 
     private void SetAppIconAndTitle()
     {
-        this.Title = "Groundwork — Windows System Management & Diagnostics Toolkit";
+        this.Title = "Groundwork — PC Health & Maintenance";
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         if (hwnd != IntPtr.Zero)
         {
             _subclassProc = WindowSubclass;
             SetWindowSubclass(hwnd, _subclassProc, UIntPtr.Zero, UIntPtr.Zero);
+
+            try
+            {
+                var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+                var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+                if (appWindow != null)
+                {
+                    var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
+                        windowId,
+                        Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
+                    if (displayArea != null)
+                    {
+                        var work = displayArea.WorkArea;
+                        int w = Math.Min(1360, (int)(work.Width * 0.9));
+                        int h = Math.Min(860, (int)(work.Height * 0.9));
+                        int x = work.X + (work.Width - w) / 2;
+                        int y = work.Y + (work.Height - h) / 2;
+                        appWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                    }
+
+                    if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter overlapped)
+                    {
+                        overlapped.Maximize();
+                    }
+
+                    string icoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
+                    if (File.Exists(icoPath))
+                    {
+                        appWindow.SetIcon(icoPath);
+                    }
+                }
+            }
+            catch { }
 
             try
             {
@@ -109,13 +142,11 @@ public sealed partial class MainWindow : Window
 
     public void ApplyTheme(string? theme)
     {
-        if (string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase))
+        bool isDark = string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase);
+        RootGrid.RequestedTheme = isDark ? ElementTheme.Dark : ElementTheme.Light;
+        if (HeaderThemeLabel != null)
         {
-            RootGrid.RequestedTheme = ElementTheme.Dark;
-        }
-        else
-        {
-            RootGrid.RequestedTheme = ElementTheme.Light;
+            HeaderThemeLabel.Text = isDark ? "Light" : "Dark";
         }
     }
 
@@ -185,12 +216,17 @@ public sealed partial class MainWindow : Window
                 pageType = typeof(DashboardPage);
                 navTag = "Dashboard";
                 break;
-            case "storage" or "analyze":
+            case "filetree" or "tree" or "analyze":
                 pageType = typeof(StoragePage);
-                navTag = "Storage";
+                navTag = "FileTree";
                 navParam ??= "analyzer";
                 break;
-            case "cleanup" or "maintenance" or "cleaner":
+            case "storage" when string.Equals(subView, "analyzer", StringComparison.OrdinalIgnoreCase):
+                pageType = typeof(StoragePage);
+                navTag = "FileTree";
+                navParam = "analyzer";
+                break;
+            case "storage" or "cleanup" or "maintenance" or "cleaner":
                 pageType = typeof(StoragePage);
                 navTag = "Storage";
                 navParam ??= "cleaner";
@@ -203,10 +239,12 @@ public sealed partial class MainWindow : Window
             case "optimize" or "performance" or "boot":
                 pageType = typeof(OptimizePage);
                 navTag = "Optimize";
+                navParam ??= "settings";
                 break;
             case "diagnostics":
                 pageType = typeof(DiagnosticsPage);
                 navTag = "Diagnostics";
+                navParam ??= "repair";
                 break;
             case "hardware":
                 pageType = typeof(DiagnosticsPage);
@@ -226,6 +264,7 @@ public sealed partial class MainWindow : Window
             case "apps" or "applications":
                 pageType = typeof(ApplicationsPage);
                 navTag = "Apps";
+                navParam ??= "bloatware";
                 break;
             case "assistant" or "agent":
                 pageType = typeof(AssistantPage);
@@ -270,6 +309,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void OnToggleThemeHeaderClick(object sender, RoutedEventArgs e)
+    {
+        var s = AppServices.Instance.Settings;
+        s.ThemeMode = string.Equals(s.ThemeMode, "Dark", StringComparison.OrdinalIgnoreCase) ? "Light" : "Dark";
+        AppSettingsService.Save(s);
+        ApplyTheme(s.ThemeMode);
+    }
+
     private async void OnOpenHistoryHeaderClick(object sender, RoutedEventArgs e)
     {
         if (this.Content?.XamlRoot != null)
@@ -289,11 +336,12 @@ public sealed partial class MainWindow : Window
             switch (e.Key)
             {
                 case Windows.System.VirtualKey.Number1: NavigateToTab("Dashboard"); break;
-                case Windows.System.VirtualKey.Number2: NavigateToTab("Storage"); break;
-                case Windows.System.VirtualKey.Number3: NavigateToTab("Optimize"); break;
-                case Windows.System.VirtualKey.Number4: NavigateToTab("Diagnostics"); break;
-                case Windows.System.VirtualKey.Number5: NavigateToTab("Apps"); break;
-                case Windows.System.VirtualKey.Number6: NavigateToTab("Assistant"); break;
+                case Windows.System.VirtualKey.Number2: NavigateToTab("FileTree"); break;
+                case Windows.System.VirtualKey.Number3: NavigateToTab("Storage"); break;
+                case Windows.System.VirtualKey.Number4: NavigateToTab("Optimize"); break;
+                case Windows.System.VirtualKey.Number5: NavigateToTab("Diagnostics"); break;
+                case Windows.System.VirtualKey.Number6: NavigateToTab("Apps"); break;
+                case Windows.System.VirtualKey.Number7: NavigateToTab("Assistant"); break;
             }
         }
     }
@@ -358,19 +406,35 @@ public sealed partial class MainWindow : Window
             await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "03_hardware_specs.png"));
             File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 03_hardware_specs.png\n");
 
-            // 4. Optimize
+            // 4. Optimize (Startup, Power Mode, Windows Tweaks)
             NavigateToTab("Optimize", "startup");
             if (RootFrame.Content is OptimizePage op) await op.LoadOptimizeStateAsync();
             await Task.Delay(800);
             await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "04_optimize.png"));
             File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 04_optimize.png\n");
 
-            // 5. Troubleshoot / Network
+            NavigateToTab("Optimize", "power");
+            await Task.Delay(500);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "04b_optimize_power.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 04b_optimize_power.png\n");
+
+            NavigateToTab("Optimize", "settings");
+            await Task.Delay(500);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "04c_optimize_tweaks.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 04c_optimize_tweaks.png\n");
+
+            // 5. Troubleshoot / Network + Errors & Repair
             NavigateToTab("Diagnostics", "network");
             if (RootFrame.Content is DiagnosticsPage diagPage2) await diagPage2.LoadNetworkStateAsync();
             await Task.Delay(800);
             await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "05_troubleshoot.png"));
             File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 05_troubleshoot.png\n");
+
+            NavigateToTab("Diagnostics", "repair");
+            if (RootFrame.Content is DiagnosticsPage diagRepair) await diagRepair.LoadRepairTabAsync();
+            await Task.Delay(700);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "05b_repair_toolkit.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 05b_repair_toolkit.png\n");
 
             // 6. Storage Cleanup
             NavigateToTab("Storage", "cleaner");
@@ -390,12 +454,30 @@ public sealed partial class MainWindow : Window
             await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "07_organize_history.png"));
             File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 07_organize_history.png\n");
 
-            // 8. Installed Apps
-            NavigateToTab("Apps");
+            // 8. Installed Apps + Store Bloatware + Essential Tools
+            NavigateToTab("Apps", "installed");
             if (RootFrame.Content is ApplicationsPage ap) await ap.LoadAppsAsync();
             await Task.Delay(800);
             await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "08_installed_apps.png"));
             File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 08_installed_apps.png\n");
+
+            if (RootFrame.Content is ApplicationsPage apBloat)
+            {
+                apBloat.ShowSegment("bloatware");
+                await apBloat.LoadBloatwareAsync();
+            }
+            await Task.Delay(700);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "08b_apps_bloatware.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 08b_apps_bloatware.png\n");
+
+            if (RootFrame.Content is ApplicationsPage apTools)
+            {
+                apTools.ShowSegment("essentials");
+                await apTools.LoadEssentialToolsAsync();
+            }
+            await Task.Delay(700);
+            await CaptureCurrentViewToPngAsync(Path.Combine(outDir, "08c_apps_essentials.png"));
+            File.AppendAllText(Path.Combine(outDir, "capture_log.txt"), "Captured 08c_apps_essentials.png\n");
 
             // 9. AI Assistant Standby
             NavigateToTab("Assistant");
