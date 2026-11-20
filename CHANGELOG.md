@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.1.0] - 2026-11-19
+## [2.0.0] - 2026-11-19
 
 ### Product Evolution — Intelligent Windows System Companion, Power Tweaks, Repair Toolkit & Store Debloater
 

@@ -74,7 +74,7 @@ Every candidate Windows utility capability is evaluated by practical user value,
 3. **Smart File Organizer with One-Click Rollback (`organize.directory`)**: Categorizes loose files and records full move manifests in `OperationHistoryService` for one-click Undo.
 
 ### 4.3 Advanced Capabilities (Supported & Scoped)
-1. **NTFS Master File Table (MFT) Inspection (`Groundwork.MftHelper`)**: Optional elevated volume metadata helper with automatic fallback to the multi-threaded Win32 `FindFirstFileExW` directory walker.
+1. **Elevated Storage Scan Helper (`Groundwork.MftHelper`, Experimental)**: Optional UAC-elevated helper process for scanning restricted directories via the parallel Win32 `FindFirstFileExW` directory walker; direct NTFS `$MFT` `$DATA` size parsing is experimental and not yet enabled in production scans.
 2. **Monitored Application Uninstallation & Bounded Leftover Cleanup**: Launches official vendor uninstallers, waits for process completion, and scans bounded `AppData`/`ProgramData`/Registry paths for residual files.
 
 ### 4.4 Deferred Capabilities (Explicitly Excluded for Safety & Reliability)

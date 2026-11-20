@@ -8,6 +8,10 @@ using Groundwork.Engine.Services;
 
 namespace Groundwork.MftHelper;
 
+/// <summary>
+/// Experimental elevated scan helper. Currently delegates to <see cref="Win32StorageScanner"/>
+/// via <see cref="NtfsMftScanner.ScanWithFallbackAsync"/> until NTFS $MFT $DATA size parsing is implemented.
+/// </summary>
 public static class Program
 {
     public static async Task<int> Main(string[] args)

@@ -40,7 +40,7 @@ public sealed class StorageHotspotAnalyzerService
         DisplayName: "Move Selected Items to Recycle Bin",
         Category: "Maintenance / Cleanup",
         Description: "Moves user-selected duplicates, large files, or app leftovers to the Windows Recycle Bin with full path/symlink boundary validation.",
-        Reversibility: OperationReversibility.ReadOnly,
+        Reversibility: OperationReversibility.PartiallyReversible,
         RiskLevel: OperationRiskLevel.Low,
         ElevationRequirement: OperationElevationRequirement.StandardUser,
         PotentialRisks:

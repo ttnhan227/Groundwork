@@ -167,10 +167,11 @@ export function DocsPage({
         <p className="text-sm font-semibold text-[var(--ink-muted)] mb-4">
           Groundwork guide
         </p>
-        <nav className="space-y-2">
+        <nav aria-label="Documentation sections" className="space-y-2">
           {Object.entries(guides).map(([id, item]) => (
             <button
               key={id}
+              type="button"
               aria-current={active === id ? "page" : undefined}
               onClick={() => setActive(id)}
               className={`w-full text-left rounded-lg px-4 py-3 text-sm ${active === id ? "bg-[var(--ink-blue-subtle)] text-[var(--ink-blue)] font-semibold" : "text-[var(--ink-secondary)] hover:bg-[var(--surface)]"}`}
@@ -184,7 +185,7 @@ export function DocsPage({
           className="inline-flex gap-2 items-center mt-8 text-sm text-[var(--ink-blue)]"
         >
           Developer setup
-          <ArrowRight size={14} />
+          <ArrowRight size={14} aria-hidden="true" />
         </a>
       </aside>
       <main className="flex-1 max-w-3xl">

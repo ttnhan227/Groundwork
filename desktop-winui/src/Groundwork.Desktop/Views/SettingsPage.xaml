@@ -169,7 +169,7 @@
                         </Grid.ColumnDefinitions>
                         <Image Source="ms-appx:///Assets/icon.png" Width="32" Height="32" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Groundwork v1.1.0" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                            <TextBlock Text="Groundwork v2.0.0" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
                             <TextBlock Text="Native Windows PC Diagnostics &amp; Maintenance Toolkit" FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
                         </StackPanel>
                         <Button Grid.Column="2" Content="Open Data Folder" Style="{StaticResource GwSecondaryButtonStyle}" Click="OnOpenLogsFolderClick" VerticalAlignment="Center" />

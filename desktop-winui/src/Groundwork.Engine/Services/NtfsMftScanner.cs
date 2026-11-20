@@ -13,6 +13,10 @@ using Groundwork.Engine.Models;
 
 namespace Groundwork.Engine.Services;
 
+/// <summary>
+/// Coordinates optional UAC-elevated storage scanning via <c>Groundwork.MftHelper</c> with automatic fallback
+/// to the parallel Win32 <see cref="Win32StorageScanner"/>. Direct NTFS USN/$MFT enumeration is experimental.
+/// </summary>
 public sealed class NtfsMftScanner
 {
     private const uint GENERIC_READ = 0x80000000;
@@ -129,8 +133,10 @@ public sealed class NtfsMftScanner
     }
 
     /// <summary>
-    /// Directly enumerates NTFS Master File Table records via FSCTL_ENUM_USN_DATA on \\.\X: when elevated.
+    /// Experimental: enumerates NTFS USN records via FSCTL_ENUM_USN_DATA on \\.\X: when elevated.
+    /// Does not yet parse $MFT $DATA attribute sizes, so production scans use <see cref="Win32StorageScanner"/>.
     /// </summary>
+    [Obsolete("Experimental: USN enumeration does not parse $MFT $DATA file sizes yet; use Win32StorageScanner.", error: false)]
     public unsafe IReadOnlyList<(ulong FileRef, ulong ParentRef, string Name, bool IsDir)>? TryEnumerateNtfsUsnRecords(
         string driveColon,
         CancellationToken cancellationToken = default)
