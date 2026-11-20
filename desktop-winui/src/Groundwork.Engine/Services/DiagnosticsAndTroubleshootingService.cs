@@ -578,21 +578,11 @@ public sealed class DiagnosticsAndTroubleshootingService
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "ipconfig.exe",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
+                FileName = "ipconfig.exe"
             };
             psi.ArgumentList.Add("/flushdns");
 
-            using var proc = Process.Start(psi);
-            if (proc is not null)
-            {
-                output = await proc.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-                await proc.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                exitCode = proc.ExitCode;
-            }
+            (exitCode, output, _) = await RunProcessAsync(psi, TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
         }
 
         var ok = exitCode == 0;
@@ -820,27 +810,15 @@ public sealed class DiagnosticsAndTroubleshootingService
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "netsh.exe",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
+                FileName = "netsh.exe"
             };
             foreach (var arg in args)
             {
                 psi.ArgumentList.Add(arg);
             }
 
-            using var proc = Process.Start(psi);
-            if (proc is null)
-            {
-                return (-1, "Could not start netsh.exe.");
-            }
-
-            var output = proc.StandardOutput.ReadToEnd();
-            var err = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(5000);
-            return (proc.ExitCode, string.IsNullOrWhiteSpace(output) ? err : output);
+            var (exitCode, output, err) = RunProcessAsync(psi, TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            return (exitCode, string.IsNullOrWhiteSpace(output) ? err : output);
         }
         catch (Exception ex)
         {
@@ -872,11 +850,7 @@ public sealed class DiagnosticsAndTroubleshootingService
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "wevtutil.exe",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
+                    FileName = "wevtutil.exe"
                 };
                 psi.ArgumentList.Add("qe");
                 psi.ArgumentList.Add(logName);
@@ -885,14 +859,7 @@ public sealed class DiagnosticsAndTroubleshootingService
                 psi.ArgumentList.Add("/rd:true");
                 psi.ArgumentList.Add("/f:RenderedXml");
 
-                using var proc = Process.Start(psi);
-                if (proc is null)
-                {
-                    continue;
-                }
-
-                var rawXml = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit(4000);
+                var (_, rawXml, _) = RunProcessAsync(psi, TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
 
                 if (string.IsNullOrWhiteSpace(rawXml))
                 {
@@ -1345,11 +1312,7 @@ public sealed class DiagnosticsAndTroubleshootingService
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "powershell.exe",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
+                    FileName = "powershell.exe"
                 };
                 psi.ArgumentList.Add("-NoProfile");
                 psi.ArgumentList.Add("-NonInteractive");
@@ -1357,15 +1320,9 @@ public sealed class DiagnosticsAndTroubleshootingService
                 var safeDesc = payload.Description.Replace("'", "''");
                 psi.ArgumentList.Add($"Checkpoint-Computer -Description '{safeDesc}' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop");
 
-                using var proc = Process.Start(psi);
-                if (proc is not null)
-                {
-                    var stdout = await proc.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-                    var stderr = await proc.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-                    await proc.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                    ok = proc.ExitCode == 0;
-                    details = string.IsNullOrWhiteSpace(stderr) ? stdout.Trim() : stderr.Trim();
-                }
+                var (exitCode, stdout, stderr) = await RunProcessAsync(psi, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+                ok = exitCode == 0;
+                details = string.IsNullOrWhiteSpace(stderr) ? stdout.Trim() : stderr.Trim();
             }
             catch (Exception ex)
             {
@@ -1446,23 +1403,13 @@ public sealed class DiagnosticsAndTroubleshootingService
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "dism.exe",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
+                FileName = "dism.exe"
             };
             psi.ArgumentList.Add("/Online");
             psi.ArgumentList.Add("/Cleanup-Image");
             psi.ArgumentList.Add("/CheckHealth");
 
-            using var proc = Process.Start(psi);
-            if (proc is not null)
-            {
-                output = await proc.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-                await proc.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                exitCode = proc.ExitCode;
-            }
+            (exitCode, output, _) = await RunProcessAsync(psi, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
         }
 
         var (_, summary) = ParseDismCheckHealthOutput(output);
@@ -1798,7 +1745,8 @@ public sealed class DiagnosticsAndTroubleshootingService
             IsVerified: ok,
             ObservedStateSummary: $"Removed {removedFiles} file(s) ({mb:F2} MB reclaimed); {skippedLocked} active/locked file(s) skipped.",
             VerificationDetails: $"Post-cleanup remaining unlocked temp files: {afterSummary.UserTempFileCount}.",
-            VerifiedAtUtc: DateTimeOffset.UtcNow);
+            VerifiedAtUtc: DateTimeOffset.UtcNow,
+            BytesReclaimed: reclaimedBytes);
 
         return Task.FromResult((
             Succeeded: ok,
@@ -1854,5 +1802,65 @@ public sealed class DiagnosticsAndTroubleshootingService
         }
 
         return (bytes, count);
+    }
+
+    internal static async Task<(int ExitCode, string StdOut, string StdErr)> RunProcessAsync(
+        ProcessStartInfo psi,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        psi.UseShellExecute = false;
+        psi.RedirectStandardOutput = true;
+        psi.RedirectStandardError = true;
+        psi.CreateNoWindow = true;
+
+        using var proc = Process.Start(psi);
+        if (proc is null)
+        {
+            return (-1, string.Empty, $"Could not start {psi.FileName}.");
+        }
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
+
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+        var stderrTask = proc.StandardError.ReadToEndAsync(timeoutCts.Token);
+
+        try
+        {
+            await proc.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            return (proc.ExitCode, stdoutTask.Result, stderrTask.Result);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                if (!proc.HasExited)
+                {
+                    proc.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+                // Best-effort process tree termination on timeout or cancellation.
+            }
+
+            try
+            {
+                await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Drain/observe stream tasks after process termination.
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            throw new TimeoutException($"Process '{psi.FileName}' timed out after {timeout.TotalSeconds:F1}s.");
+        }
     }
 }

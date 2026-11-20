@@ -511,4 +511,24 @@ public sealed class OperationalVerificationEngineTests : IDisposable
         Assert.DoesNotContain("inspect_network_health", result.InvestigationReport.ExecutedTools);
         Assert.DoesNotContain("inspect_windows_services", result.InvestigationReport.ExecutedTools);
     }
+
+    [Fact]
+    public void HardwareSpecsEngineService_TryParseCimDateTime_ParsesWmiCimTimestampsAndRejectsInvalid()
+    {
+        var expectedLocal = new DateTime(2026, 11, 20, 9, 30, 15, DateTimeKind.Local);
+        string cimTimestamp = System.Management.ManagementDateTimeConverter.ToDmtfDateTime(expectedLocal);
+
+        bool parsedOk = HardwareSpecsEngineService.TryParseCimDateTime(cimTimestamp, out var parsed);
+        Assert.True(parsedOk);
+        Assert.Equal(expectedLocal.Year, parsed.Year);
+        Assert.Equal(expectedLocal.Month, parsed.Month);
+        Assert.Equal(expectedLocal.Day, parsed.Day);
+        Assert.Equal(expectedLocal.Hour, parsed.Hour);
+        Assert.Equal(expectedLocal.Minute, parsed.Minute);
+        Assert.Equal(expectedLocal.Second, parsed.Second);
+
+        Assert.False(HardwareSpecsEngineService.TryParseCimDateTime(null, out _));
+        Assert.False(HardwareSpecsEngineService.TryParseCimDateTime("   ", out _));
+        Assert.False(HardwareSpecsEngineService.TryParseCimDateTime("not-a-cim-date", out _));
+    }
 }

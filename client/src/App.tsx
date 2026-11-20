@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navbar } from "./components/site/Navbar";
 import { Footer } from "./components/site/Footer";
-import { AppLink } from "./components/common/AppLink";
 import { LandingPage } from "./pages/LandingPage";
 import { DownloadPage } from "./pages/DownloadPage";
 import { DocsPage } from "./pages/DocsPage";
@@ -92,12 +91,6 @@ export default function App() {
       <a className="product-skip" href="#main-content">
         Skip to content
       </a>
-      <div className="product-announcement">
-        Groundwork for macOS is in development.{" "}
-        <AppLink to="/about" navigate={navigate}>
-          View the roadmap
-        </AppLink>
-      </div>
       <Navbar currentRoute={currentPath} navigate={navigate} />
       <main
         id="main-content"

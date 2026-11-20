@@ -6,6 +6,8 @@
    ========================================================================== */
 
 :root {
+  color-scheme: light dark;
+
   /* ================= CORE PALETTE ================= */
   --paper: #f6f8fa;
   --paper-subtle: #eef2f6;
@@ -31,6 +33,7 @@
 
   /* Human Accent: ink-blue */
   --ink-blue: #22569e;
+  --on-ink-blue: #ffffff;
   --ink-blue-hover: #18457f;
   --ink-blue-subtle: #e9f0f7;
   --ink-blue-border: #a9bfd6;
@@ -152,65 +155,67 @@
 }
 
 /* ================= DARK MODE ================= */
-html[data-theme="dark"],
-[data-theme="dark"] {
-  --paper: #0b1020;
-  --paper-subtle: #121a2d;
-  --surface: #151e31;
-  --surface-hover: #1b2740;
-  --surface-active: #23314e;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0b1020;
+    --paper-subtle: #121a2d;
+    --surface: #151e31;
+    --surface-hover: #1b2740;
+    --surface-active: #23314e;
 
-  --ink: #f2f5fa;
-  --ink-secondary: #bdc7d8;
-  --ink-muted: #8e9bb0;
-  --ink-faint: #647188;
+    --ink: #f2f5fa;
+    --ink-secondary: #bdc7d8;
+    --ink-muted: #8e9bb0;
+    --ink-faint: #647188;
 
-  --hairline: #26334b;
-  --hairline-subtle: #1d2940;
-  --hairline-strong: #3b4b68;
+    --hairline: #26334b;
+    --hairline-subtle: #1d2940;
+    --hairline-strong: #3b4b68;
 
-  --control-room: #070b16;
-  --control-room-hover: #101626;
-  --control-room-foreground: #ffffff;
-  --control-room-muted: #94a3b8;
+    --control-room: #070b16;
+    --control-room-hover: #101626;
+    --control-room-foreground: #ffffff;
+    --control-room-muted: #94a3b8;
 
-  /* Human Accent Dark: luminous ink-blue */
-  --ink-blue: #6f91ff;
-  --ink-blue-hover: #91a9ff;
-  --ink-blue-subtle: rgba(111, 145, 255, 0.15);
-  --ink-blue-border: rgba(111, 145, 255, 0.35);
-  --ink-blue-faint: rgba(111, 145, 255, 0.1);
+    /* Human Accent Dark: luminous ink-blue */
+    --ink-blue: #6f91ff;
+    --on-ink-blue: #0b1020;
+    --ink-blue-hover: #91a9ff;
+    --ink-blue-subtle: rgba(111, 145, 255, 0.15);
+    --ink-blue-border: rgba(111, 145, 255, 0.35);
+    --ink-blue-faint: rgba(111, 145, 255, 0.1);
 
-  --signal: #b7eb35;
+    --signal: #b7eb35;
 
-  /* Agent Accent Dark: luminous ink-sepia */
-  --ink-sepia: #b497ff;
-  --ink-sepia-hover: #c5b0ff;
-  --ink-sepia-subtle: rgba(180, 151, 255, 0.15);
-  --ink-sepia-border: rgba(180, 151, 255, 0.32);
-  --ink-sepia-faint: rgba(180, 151, 255, 0.08);
+    /* Agent Accent Dark: luminous ink-sepia */
+    --ink-sepia: #b497ff;
+    --ink-sepia-hover: #c5b0ff;
+    --ink-sepia-subtle: rgba(180, 151, 255, 0.15);
+    --ink-sepia-border: rgba(180, 151, 255, 0.32);
+    --ink-sepia-faint: rgba(180, 151, 255, 0.08);
 
-  /* Semantic Feedback Dark */
-  --success: #4e9a75;
-  --success-bg: rgba(78, 154, 117, 0.15);
-  --success-border: rgba(78, 154, 117, 0.3);
+    /* Semantic Feedback Dark */
+    --success: #4e9a75;
+    --success-bg: rgba(78, 154, 117, 0.15);
+    --success-border: rgba(78, 154, 117, 0.3);
 
-  --warning: #cfa04e;
-  --warning-bg: rgba(207, 160, 78, 0.15);
-  --warning-border: rgba(207, 160, 78, 0.3);
+    --warning: #cfa04e;
+    --warning-bg: rgba(207, 160, 78, 0.15);
+    --warning-border: rgba(207, 160, 78, 0.3);
 
-  --danger: #d45f56;
-  --danger-bg: rgba(212, 95, 86, 0.15);
-  --danger-border: rgba(212, 95, 86, 0.3);
+    --danger: #d45f56;
+    --danger-bg: rgba(212, 95, 86, 0.15);
+    --danger-border: rgba(212, 95, 86, 0.3);
 
-  --info: #64a3c2;
-  --info-bg: rgba(100, 163, 194, 0.15);
-  --info-border: rgba(100, 163, 194, 0.3);
+    --info: #64a3c2;
+    --info-bg: rgba(100, 163, 194, 0.15);
+    --info-border: rgba(100, 163, 194, 0.3);
 
-  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-popover:
-    0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-modal:
-    0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+    --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-popover:
+      0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-modal:
+      0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  }
 }

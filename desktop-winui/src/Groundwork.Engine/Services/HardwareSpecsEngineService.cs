@@ -104,7 +104,8 @@ public sealed class HardwareSpecsEngineService
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT Name, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode IS NOT NULL AND ConfigManagerErrorCode <> 0");
-            foreach (ManagementObject device in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject device in results)
             {
                 using (device)
                 {
@@ -139,7 +140,8 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher($"SELECT {propertyName} FROM {className} WHERE {filter}");
-            foreach (ManagementObject item in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject item in results)
             {
                 using (item)
                 {
@@ -164,7 +166,8 @@ public sealed class HardwareSpecsEngineService
             using var searcher = new ManagementObjectSearcher(
                 "SELECT UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine");
             double? maximum = null;
-            foreach (ManagementObject engine in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject engine in results)
             {
                 using (engine)
                 {
@@ -255,30 +258,34 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed, SocketDesignation, L2CacheSize, L3CacheSize, Architecture, VirtualizationFirmwareEnabled FROM Win32_Processor");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                name = mo["Name"]?.ToString()?.Trim() ?? name;
-                manufacturer = mo["Manufacturer"]?.ToString()?.Trim() ?? manufacturer;
-                if (mo["NumberOfCores"] != null && int.TryParse(mo["NumberOfCores"].ToString(), out int c)) cores = c;
-                if (mo["NumberOfLogicalProcessors"] != null && int.TryParse(mo["NumberOfLogicalProcessors"].ToString(), out int lp)) logical = lp;
-                if (mo["MaxClockSpeed"] != null && uint.TryParse(mo["MaxClockSpeed"].ToString(), out uint clk)) maxClockMHz = clk;
-                socket = mo["SocketDesignation"]?.ToString()?.Trim() ?? socket;
-                if (mo["L2CacheSize"] != null && uint.TryParse(mo["L2CacheSize"].ToString(), out uint l2)) l2KB = l2;
-                if (mo["L3CacheSize"] != null && uint.TryParse(mo["L3CacheSize"].ToString(), out uint l3)) l3KB = l3;
-                if (mo["Architecture"] != null && int.TryParse(mo["Architecture"].ToString(), out int cpuArchitecture))
+                using (mo)
                 {
-                    arch = cpuArchitecture switch
+                    name = mo["Name"]?.ToString()?.Trim() ?? name;
+                    manufacturer = mo["Manufacturer"]?.ToString()?.Trim() ?? manufacturer;
+                    if (mo["NumberOfCores"] != null && int.TryParse(mo["NumberOfCores"].ToString(), out int c)) cores = c;
+                    if (mo["NumberOfLogicalProcessors"] != null && int.TryParse(mo["NumberOfLogicalProcessors"].ToString(), out int lp)) logical = lp;
+                    if (mo["MaxClockSpeed"] != null && uint.TryParse(mo["MaxClockSpeed"].ToString(), out uint clk)) maxClockMHz = clk;
+                    socket = mo["SocketDesignation"]?.ToString()?.Trim() ?? socket;
+                    if (mo["L2CacheSize"] != null && uint.TryParse(mo["L2CacheSize"].ToString(), out uint l2)) l2KB = l2;
+                    if (mo["L3CacheSize"] != null && uint.TryParse(mo["L3CacheSize"].ToString(), out uint l3)) l3KB = l3;
+                    if (mo["Architecture"] != null && int.TryParse(mo["Architecture"].ToString(), out int cpuArchitecture))
                     {
-                        0 => "x86",
-                        5 => "ARM",
-                        6 => "Itanium",
-                        9 => "x64",
-                        12 => "ARM64",
-                        _ => "Unknown"
-                    };
+                        arch = cpuArchitecture switch
+                        {
+                            0 => "x86",
+                            5 => "ARM",
+                            6 => "Itanium",
+                            9 => "x64",
+                            12 => "ARM64",
+                            _ => "Unknown"
+                        };
+                    }
+                    if (mo["VirtualizationFirmwareEnabled"] is bool firmwareVirtualization) virt = firmwareVirtualization;
+                    break;
                 }
-                if (mo["VirtualizationFirmwareEnabled"] is bool firmwareVirtualization) virt = firmwareVirtualization;
-                break;
             }
         }
         catch { }
@@ -319,13 +326,17 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT Manufacturer, Product, SerialNumber, Version FROM Win32_BaseBoard");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                mfg = mo["Manufacturer"]?.ToString()?.Trim() ?? mfg;
-                product = mo["Product"]?.ToString()?.Trim() ?? product;
-                serial = mo["SerialNumber"]?.ToString()?.Trim() ?? serial;
-                version = mo["Version"]?.ToString()?.Trim() ?? version;
-                break;
+                using (mo)
+                {
+                    mfg = mo["Manufacturer"]?.ToString()?.Trim() ?? mfg;
+                    product = mo["Product"]?.ToString()?.Trim() ?? product;
+                    serial = mo["SerialNumber"]?.ToString()?.Trim() ?? serial;
+                    version = mo["Version"]?.ToString()?.Trim() ?? version;
+                    break;
+                }
             }
         }
         catch { }
@@ -339,19 +350,23 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var biosSearcher = new ManagementObjectSearcher("SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate, SMBIOSMajorVersion, SMBIOSMinorVersion FROM Win32_BIOS");
-            foreach (ManagementObject mo in biosSearcher.Get())
+            using var biosResults = biosSearcher.Get();
+            foreach (ManagementObject mo in biosResults)
             {
-                biosVendor = mo["Manufacturer"]?.ToString()?.Trim() ?? biosVendor;
-                biosVer = mo["SMBIOSBIOSVersion"]?.ToString()?.Trim() ?? biosVer;
-                if (mo["ReleaseDate"] != null)
+                using (mo)
                 {
-                    biosDate = FormatWmiDate(mo["ReleaseDate"].ToString());
+                    biosVendor = mo["Manufacturer"]?.ToString()?.Trim() ?? biosVendor;
+                    biosVer = mo["SMBIOSBIOSVersion"]?.ToString()?.Trim() ?? biosVer;
+                    if (mo["ReleaseDate"] != null)
+                    {
+                        biosDate = FormatWmiDate(mo["ReleaseDate"].ToString());
+                    }
+                    if (mo["SMBIOSMajorVersion"] != null)
+                    {
+                        smbios = $"{mo["SMBIOSMajorVersion"]}.{mo["SMBIOSMinorVersion"] ?? 0}";
+                    }
+                    break;
                 }
-                if (mo["SMBIOSMajorVersion"] != null)
-                {
-                    smbios = $"{mo["SMBIOSMajorVersion"]}.{mo["SMBIOSMinorVersion"] ?? 0}";
-                }
-                break;
             }
         }
         catch { }
@@ -391,37 +406,41 @@ public sealed class HardwareSpecsEngineService
         {
             using var searcher = new ManagementObjectSearcher("SELECT Name, DriverVersion, DriverDate, AdapterRAM, VideoProcessor, CurrentHorizontalResolution, CurrentVerticalResolution, CurrentRefreshRate FROM Win32_VideoController");
             bool isFirst = true;
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                string name = mo["Name"]?.ToString()?.Trim() ?? "Display Adapter";
-                string driverVer = mo["DriverVersion"]?.ToString()?.Trim() ?? "N/A";
-                string driverDate = FormatWmiDate(mo["DriverDate"]?.ToString());
-                string videoProc = mo["VideoProcessor"]?.ToString()?.Trim() ?? "N/A";
-
-                long ramBytes = 0;
-                if (mo["AdapterRAM"] != null && long.TryParse(mo["AdapterRAM"].ToString(), out long r))
+                using (mo)
                 {
-                    ramBytes = r;
-                }
+                    string name = mo["Name"]?.ToString()?.Trim() ?? "Display Adapter";
+                    string driverVer = mo["DriverVersion"]?.ToString()?.Trim() ?? "N/A";
+                    string driverDate = FormatWmiDate(mo["DriverDate"]?.ToString());
+                    string videoProc = mo["VideoProcessor"]?.ToString()?.Trim() ?? "N/A";
 
-                string res = "N/A";
-                if (mo["CurrentHorizontalResolution"] != null && mo["CurrentVerticalResolution"] != null)
-                {
-                    string refresh = mo["CurrentRefreshRate"] != null ? $" @ {mo["CurrentRefreshRate"]} Hz" : "";
-                    res = $"{mo["CurrentHorizontalResolution"]} x {mo["CurrentVerticalResolution"]}{refresh}";
-                }
+                    long ramBytes = 0;
+                    if (mo["AdapterRAM"] != null && long.TryParse(mo["AdapterRAM"].ToString(), out long r))
+                    {
+                        ramBytes = r;
+                    }
 
-                list.Add(new GpuSpecsInfo(
-                    Name: name,
-                    DriverVersion: driverVer,
-                    DriverDate: driverDate,
-                    DedicatedMemoryBytes: ramBytes,
-                    FormattedDedicatedMemory: ramBytes > 0 ? FormatBytes(ramBytes) : "Shared System Memory",
-                    ResolutionAndRefreshRate: res,
-                    VideoProcessor: videoProc,
-                    IsPrimary: isFirst && res != "N/A"
-                ));
-                isFirst = false;
+                    string res = "N/A";
+                    if (mo["CurrentHorizontalResolution"] != null && mo["CurrentVerticalResolution"] != null)
+                    {
+                        string refresh = mo["CurrentRefreshRate"] != null ? $" @ {mo["CurrentRefreshRate"]} Hz" : "";
+                        res = $"{mo["CurrentHorizontalResolution"]} x {mo["CurrentVerticalResolution"]}{refresh}";
+                    }
+
+                    list.Add(new GpuSpecsInfo(
+                        Name: name,
+                        DriverVersion: driverVer,
+                        DriverDate: driverDate,
+                        DedicatedMemoryBytes: ramBytes,
+                        FormattedDedicatedMemory: ramBytes > 0 ? FormatBytes(ramBytes) : "Shared System Memory",
+                        ResolutionAndRefreshRate: res,
+                        VideoProcessor: videoProc,
+                        IsPrimary: isFirst && res != "N/A"
+                    ));
+                    isFirst = false;
+                }
             }
         }
         catch { }
@@ -455,53 +474,57 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT Capacity, Speed, Manufacturer, PartNumber, DeviceLocator, FormFactor, MemoryType, SMBIOSMemoryType FROM Win32_PhysicalMemory");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                long cap = 0;
-                if (mo["Capacity"] != null && long.TryParse(mo["Capacity"].ToString(), out long c)) cap = c;
-
-                uint spd = 0;
-                if (mo["Speed"] != null && uint.TryParse(mo["Speed"].ToString(), out uint s)) spd = s;
-                if (spd > configSpeed) configSpeed = spd;
-
-                string mfg = mo["Manufacturer"]?.ToString()?.Trim() ?? "Unknown";
-                string part = mo["PartNumber"]?.ToString()?.Trim() ?? "N/A";
-                string locator = mo["DeviceLocator"]?.ToString()?.Trim() ?? $"Slot {modules.Count + 1}";
-
-                int smbiosType = 0;
-                if (mo["SMBIOSMemoryType"] != null && int.TryParse(mo["SMBIOSMemoryType"].ToString(), out int smt)) smbiosType = smt;
-
-                string type = smbiosType switch
+                using (mo)
                 {
-                    24 => "DDR3",
-                    26 => "DDR4",
-                    30 => "LPDDR4",
-                    34 => "DDR5",
-                    35 => "LPDDR5",
-                    _ => "Unknown"
-                };
-                if (type != "Unknown")
-                {
-                    memType = memType == "Unknown" || memType == type ? type : "Mixed";
+                    long cap = 0;
+                    if (mo["Capacity"] != null && long.TryParse(mo["Capacity"].ToString(), out long c)) cap = c;
+
+                    uint spd = 0;
+                    if (mo["Speed"] != null && uint.TryParse(mo["Speed"].ToString(), out uint s)) spd = s;
+                    if (spd > configSpeed) configSpeed = spd;
+
+                    string mfg = mo["Manufacturer"]?.ToString()?.Trim() ?? "Unknown";
+                    string part = mo["PartNumber"]?.ToString()?.Trim() ?? "N/A";
+                    string locator = mo["DeviceLocator"]?.ToString()?.Trim() ?? $"Slot {modules.Count + 1}";
+
+                    int smbiosType = 0;
+                    if (mo["SMBIOSMemoryType"] != null && int.TryParse(mo["SMBIOSMemoryType"].ToString(), out int smt)) smbiosType = smt;
+
+                    string type = smbiosType switch
+                    {
+                        24 => "DDR3",
+                        26 => "DDR4",
+                        30 => "LPDDR4",
+                        34 => "DDR5",
+                        35 => "LPDDR5",
+                        _ => "Unknown"
+                    };
+                    if (type != "Unknown")
+                    {
+                        memType = memType == "Unknown" || memType == type ? type : "Mixed";
+                    }
+
+                    string formFactor = mo["FormFactor"]?.ToString() switch
+                    {
+                        "8" => "DIMM",
+                        "12" => "SODIMM",
+                        _ => "Unknown"
+                    };
+
+                    modules.Add(new MemoryModuleInfo(
+                        BankLocator: locator,
+                        CapacityBytes: cap,
+                        FormattedCapacity: FormatBytes(cap),
+                        SpeedMHz: spd,
+                        Manufacturer: mfg,
+                        PartNumber: part,
+                        FormFactor: formFactor,
+                        MemoryType: type
+                    ));
                 }
-
-                string formFactor = mo["FormFactor"]?.ToString() switch
-                {
-                    "8" => "DIMM",
-                    "12" => "SODIMM",
-                    _ => "Unknown"
-                };
-
-                modules.Add(new MemoryModuleInfo(
-                    BankLocator: locator,
-                    CapacityBytes: cap,
-                    FormattedCapacity: FormatBytes(cap),
-                    SpeedMHz: spd,
-                    Manufacturer: mfg,
-                    PartNumber: part,
-                    FormFactor: formFactor,
-                    MemoryType: type
-                ));
             }
         }
         catch { }
@@ -510,13 +533,17 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var slotSearcher = new ManagementObjectSearcher("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray");
-            foreach (ManagementObject mo in slotSearcher.Get())
+            using var slotResults = slotSearcher.Get();
+            foreach (ManagementObject mo in slotResults)
             {
-                if (mo["MemoryDevices"] != null && int.TryParse(mo["MemoryDevices"].ToString(), out int devCount))
+                using (mo)
                 {
-                    totalSlots += devCount;
+                    if (mo["MemoryDevices"] != null && int.TryParse(mo["MemoryDevices"].ToString(), out int devCount))
+                    {
+                        totalSlots += devCount;
+                    }
+                    break;
                 }
-                break;
             }
         }
         catch { }
@@ -543,60 +570,66 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT Model, InterfaceType, Size, MediaType, SerialNumber, Partitions, Status, DeviceID FROM Win32_DiskDrive");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                string model = mo["Model"]?.ToString()?.Trim() ?? "Unknown";
-                string iface = mo["InterfaceType"]?.ToString()?.Trim() ?? "Unknown";
-                string media = mo["MediaType"]?.ToString()?.Trim() ?? "Unknown";
-                string serial = mo["SerialNumber"]?.ToString()?.Trim() ?? "N/A";
-                string status = mo["Status"]?.ToString()?.Trim() ?? "Unknown";
-
-                long size = 0;
-                if (mo["Size"] != null && long.TryParse(mo["Size"].ToString(), out long sz)) size = sz;
-
-                int partitions = 0;
-                if (mo["Partitions"] != null && int.TryParse(mo["Partitions"].ToString(), out int p)) partitions = p;
-
-                if (mask && !string.IsNullOrWhiteSpace(serial) && serial.Length > 4)
+                using (mo)
                 {
-                    serial = serial[..2] + new string('*', Math.Max(2, serial.Length - 4)) + serial[^2..];
-                }
+                    string model = mo["Model"]?.ToString()?.Trim() ?? "Unknown";
+                    string iface = mo["InterfaceType"]?.ToString()?.Trim() ?? "Unknown";
+                    string media = mo["MediaType"]?.ToString()?.Trim() ?? "Unknown";
+                    string serial = mo["SerialNumber"]?.ToString()?.Trim() ?? "N/A";
+                    string status = mo["Status"]?.ToString()?.Trim() ?? "Unknown";
 
-                string associatedVolumes = "Unknown";
-                try
-                {
-                    var letters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (ManagementObject partition in mo.GetRelated("Win32_DiskPartition"))
+                    long size = 0;
+                    if (mo["Size"] != null && long.TryParse(mo["Size"].ToString(), out long sz)) size = sz;
+
+                    int partitions = 0;
+                    if (mo["Partitions"] != null && int.TryParse(mo["Partitions"].ToString(), out int p)) partitions = p;
+
+                    if (mask && !string.IsNullOrWhiteSpace(serial) && serial.Length > 4)
                     {
-                        using (partition)
+                        serial = serial[..2] + new string('*', Math.Max(2, serial.Length - 4)) + serial[^2..];
+                    }
+
+                    string associatedVolumes = "Unknown";
+                    try
+                    {
+                        var letters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                        using var partitionResults = mo.GetRelated("Win32_DiskPartition");
+                        foreach (ManagementObject partition in partitionResults)
                         {
-                            foreach (ManagementObject logicalDisk in partition.GetRelated("Win32_LogicalDisk"))
+                            using (partition)
                             {
-                                using (logicalDisk)
+                                using var logicalDiskResults = partition.GetRelated("Win32_LogicalDisk");
+                                foreach (ManagementObject logicalDisk in logicalDiskResults)
                                 {
-                                    if (logicalDisk["DeviceID"] is string deviceId && !string.IsNullOrWhiteSpace(deviceId))
+                                    using (logicalDisk)
                                     {
-                                        letters.Add(deviceId);
+                                        if (logicalDisk["DeviceID"] is string deviceId && !string.IsNullOrWhiteSpace(deviceId))
+                                        {
+                                            letters.Add(deviceId);
+                                        }
                                     }
                                 }
                             }
                         }
+                        associatedVolumes = letters.Count > 0 ? string.Join(", ", letters) : "No drive-letter volumes reported";
                     }
-                    associatedVolumes = letters.Count > 0 ? string.Join(", ", letters) : "No drive-letter volumes reported";
-                }
-                catch { }
+                    catch { }
 
-                list.Add(new PhysicalDiskSpecsInfo(
-                    Model: model,
-                    InterfaceType: iface,
-                    MediaType: media,
-                    SizeBytes: size,
-                    FormattedSize: FormatBytes(size),
-                    SerialNumber: serial,
-                    PartitionsCount: partitions,
-                    Status: status,
-                    AssociatedVolumes: associatedVolumes
-                ));
+                    list.Add(new PhysicalDiskSpecsInfo(
+                        Model: model,
+                        InterfaceType: iface,
+                        MediaType: media,
+                        SizeBytes: size,
+                        FormattedSize: FormatBytes(size),
+                        SerialNumber: serial,
+                        PartitionsCount: partitions,
+                        Status: status,
+                        AssociatedVolumes: associatedVolumes
+                    ));
+                }
             }
         }
         catch { }
@@ -618,22 +651,30 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT Caption, Version, BuildNumber, OSArchitecture, LastBootUpTime, InstallDate, RegisteredUser FROM Win32_OperatingSystem");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                caption = mo["Caption"]?.ToString()?.Trim() ?? caption;
-                ver = mo["Version"]?.ToString()?.Trim() ?? ver;
-                build = mo["BuildNumber"]?.ToString()?.Trim() ?? build;
-                arch = mo["OSArchitecture"]?.ToString()?.Trim() ?? arch;
-                user = mo["RegisteredUser"]?.ToString()?.Trim() ?? user;
-                if (mo["InstallDate"] != null)
+                using (mo)
                 {
-                    installDate = FormatWmiDate(mo["InstallDate"].ToString());
+                    caption = mo["Caption"]?.ToString()?.Trim() ?? caption;
+                    ver = mo["Version"]?.ToString()?.Trim() ?? ver;
+                    build = mo["BuildNumber"]?.ToString()?.Trim() ?? build;
+                    arch = mo["OSArchitecture"]?.ToString()?.Trim() ?? arch;
+                    user = mo["RegisteredUser"]?.ToString()?.Trim() ?? user;
+                    if (mo["InstallDate"] != null)
+                    {
+                        installDate = FormatWmiDate(mo["InstallDate"].ToString());
+                    }
+                    if (TryParseCimDateTime(mo["LastBootUpTime"]?.ToString(), out var bootTime))
+                    {
+                        var candidateUptime = DateTime.Now - bootTime;
+                        if (candidateUptime >= TimeSpan.Zero)
+                        {
+                            uptime = candidateUptime;
+                        }
+                    }
+                    break;
                 }
-                if (mo["LastBootUpTime"] != null && DateTime.TryParse(mo["LastBootUpTime"].ToString(), out var bootTime))
-                {
-                    uptime = DateTime.Now - bootTime;
-                }
-                break;
             }
         }
         catch { }
@@ -659,51 +700,55 @@ public sealed class HardwareSpecsEngineService
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT Name, AdapterType, Speed, MACAddress, NetConnectionStatus, PhysicalAdapter FROM Win32_NetworkAdapter WHERE NetConnectionStatus IS NOT NULL AND PhysicalAdapter = True");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                string name = mo["Name"]?.ToString()?.Trim() ?? "Network Adapter";
-                string type = mo["AdapterType"]?.ToString()?.Trim() ?? "Ethernet / Wi-Fi";
-                string mac = mo["MACAddress"]?.ToString()?.Trim() ?? "N/A";
-
-                long speed = 0;
-                if (mo["Speed"] != null && long.TryParse(mo["Speed"].ToString(), out long spd)) speed = spd;
-
-                int connStatus = 0;
-                if (mo["NetConnectionStatus"] != null && int.TryParse(mo["NetConnectionStatus"].ToString(), out int cs)) connStatus = cs;
-
-                string statusLabel = connStatus switch
+                using (mo)
                 {
-                    2 => "Connected",
-                    0 => "Disconnected",
-                    1 => "Connecting",
-                    7 => "Media Disconnected",
-                    _ => "Available"
-                };
+                    string name = mo["Name"]?.ToString()?.Trim() ?? "Network Adapter";
+                    string type = mo["AdapterType"]?.ToString()?.Trim() ?? "Ethernet / Wi-Fi";
+                    string mac = mo["MACAddress"]?.ToString()?.Trim() ?? "N/A";
 
-                bool hasValidLinkSpeed = connStatus == 2 && speed > 0 && speed <= 1_000_000_000_000L;
-                if (!hasValidLinkSpeed)
-                {
-                    speed = 0;
+                    long speed = 0;
+                    if (mo["Speed"] != null && long.TryParse(mo["Speed"].ToString(), out long spd)) speed = spd;
+
+                    int connStatus = 0;
+                    if (mo["NetConnectionStatus"] != null && int.TryParse(mo["NetConnectionStatus"].ToString(), out int cs)) connStatus = cs;
+
+                    string statusLabel = connStatus switch
+                    {
+                        2 => "Connected",
+                        0 => "Disconnected",
+                        1 => "Connecting",
+                        7 => "Media Disconnected",
+                        _ => "Available"
+                    };
+
+                    bool hasValidLinkSpeed = connStatus == 2 && speed > 0 && speed <= 1_000_000_000_000L;
+                    if (!hasValidLinkSpeed)
+                    {
+                        speed = 0;
+                    }
+
+                    string formattedSpeed = hasValidLinkSpeed
+                        ? $"{speed / 1_000_000.0:F0} Mbps"
+                        : (connStatus == 2 ? "Auto-Negotiate" : "No Active Link");
+
+                    if (mask && mac.Length > 6)
+                    {
+                        mac = mac[..5] + ":**:**:**";
+                    }
+
+                    list.Add(new NetworkAdapterSpecsInfo(
+                        Name: name,
+                        AdapterType: type,
+                        SpeedBitsPerSecond: speed,
+                        FormattedSpeed: formattedSpeed,
+                        MacAddress: mac,
+                        Status: statusLabel,
+                        DriverVersion: "Native NDIS"
+                    ));
                 }
-
-                string formattedSpeed = hasValidLinkSpeed
-                    ? $"{speed / 1_000_000.0:F0} Mbps"
-                    : (connStatus == 2 ? "Auto-Negotiate" : "No Active Link");
-
-                if (mask && mac.Length > 6)
-                {
-                    mac = mac[..5] + ":**:**:**";
-                }
-
-                list.Add(new NetworkAdapterSpecsInfo(
-                    Name: name,
-                    AdapterType: type,
-                    SpeedBitsPerSecond: speed,
-                    FormattedSpeed: formattedSpeed,
-                    MacAddress: mac,
-                    Status: statusLabel,
-                    DriverVersion: "Native NDIS"
-                ));
             }
         }
         catch { }
@@ -722,29 +767,33 @@ public sealed class HardwareSpecsEngineService
             };
 
             using var searcher = new ManagementObjectSearcher("SELECT DeviceName, Manufacturer, DriverVersion, DriverDate, DeviceClass, IsSigned FROM Win32_PnPSignedDriver WHERE DeviceName IS NOT NULL");
-            foreach (ManagementObject mo in searcher.Get())
+            using var results = searcher.Get();
+            foreach (ManagementObject mo in results)
             {
-                string devClass = mo["DeviceClass"]?.ToString()?.Trim() ?? "System";
-                if (!allowedClasses.Contains(devClass)) continue;
+                using (mo)
+                {
+                    string devClass = mo["DeviceClass"]?.ToString()?.Trim() ?? "System";
+                    if (!allowedClasses.Contains(devClass)) continue;
 
-                string devName = mo["DeviceName"]?.ToString()?.Trim() ?? "";
-                if (string.IsNullOrWhiteSpace(devName)) continue;
+                    string devName = mo["DeviceName"]?.ToString()?.Trim() ?? "";
+                    if (string.IsNullOrWhiteSpace(devName)) continue;
 
-                string mfg = mo["Manufacturer"]?.ToString()?.Trim() ?? "Microsoft";
-                string ver = mo["DriverVersion"]?.ToString()?.Trim() ?? "N/A";
-                string date = FormatWmiDate(mo["DriverDate"]?.ToString());
-                bool isSigned = mo["IsSigned"] != null && bool.TryParse(mo["IsSigned"].ToString(), out bool s) && s;
+                    string mfg = mo["Manufacturer"]?.ToString()?.Trim() ?? "Microsoft";
+                    string ver = mo["DriverVersion"]?.ToString()?.Trim() ?? "N/A";
+                    string date = FormatWmiDate(mo["DriverDate"]?.ToString());
+                    bool isSigned = mo["IsSigned"] != null && bool.TryParse(mo["IsSigned"].ToString(), out bool s) && s;
 
-                list.Add(new DriverSpecsInfo(
-                    DeviceName: devName,
-                    Manufacturer: mfg,
-                    DriverVersion: ver,
-                    DriverDate: date,
-                    DeviceClass: devClass,
-                    IsSigned: isSigned
-                ));
+                    list.Add(new DriverSpecsInfo(
+                        DeviceName: devName,
+                        Manufacturer: mfg,
+                        DriverVersion: ver,
+                        DriverDate: date,
+                        DeviceClass: devClass,
+                        IsSigned: isSigned
+                    ));
 
-                if (list.Count >= 75) break;
+                    if (list.Count >= 75) break;
+                }
             }
         }
         catch { }
@@ -778,6 +827,25 @@ public sealed class HardwareSpecsEngineService
             return generalDt.ToString("yyyy-MM-dd");
         }
         return wmiDate;
+    }
+
+    internal static bool TryParseCimDateTime(string? cimDateTime, out DateTime parsed)
+    {
+        parsed = default;
+        if (string.IsNullOrWhiteSpace(cimDateTime))
+        {
+            return false;
+        }
+
+        try
+        {
+            parsed = ManagementDateTimeConverter.ToDateTime(cimDateTime.Trim());
+            return true;
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentOutOfRangeException or ArgumentException)
+        {
+            return false;
+        }
     }
 
     public string ExportReportAsText(HardwareSystemReport report)

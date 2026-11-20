@@ -692,7 +692,8 @@ public sealed class StorageHotspotAnalyzerService
             IsVerified: ok,
             ObservedStateSummary: summary,
             VerificationDetails: $"Targeted {payload.TargetDirectories.Count} cache directory/directories.",
-            VerifiedAtUtc: DateTimeOffset.UtcNow);
+            VerifiedAtUtc: DateTimeOffset.UtcNow,
+            BytesReclaimed: reclaimedBytes);
 
         return Task.FromResult((
             Succeeded: ok,
@@ -794,7 +795,7 @@ public sealed class StorageHotspotAnalyzerService
             ok,
             summary,
             summary,
-            new OperationVerificationResult(ok, $"{afterItems} items remaining", summary, DateTimeOffset.UtcNow)));
+            new OperationVerificationResult(ok, $"{afterItems} items remaining", summary, DateTimeOffset.UtcNow, BytesReclaimed: reclaimed)));
     }
 
     private static bool IsUnsafeDeleteRoot(string path)

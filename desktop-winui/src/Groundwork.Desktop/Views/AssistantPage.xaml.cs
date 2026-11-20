@@ -139,34 +139,26 @@ public sealed partial class AssistantPage : Page
                 : string.Empty;
 
             // Only pop the approval dialog when the user requested a modifying action or the live LLM explicitly staged one
-            if (plannedTurn.PendingApprovalProposals.Count > 0 && (plannedTurn.UsedLiveLlm || looksLikeActionRequest))
+            if (plannedTurn.PendingApprovalProposals.Count > 0 && (plannedTurn.UsedLiveLlm || looksLikeActionRequest) && this.XamlRoot != null)
             {
                 var proposal = plannedTurn.PendingApprovalProposals[0];
-                var gate = new SafeOperationGateDialog(
-                    proposal.DisplayName,
-                    proposal.ProposedChangeExplanation,
-                    proposal.TargetDescription,
-                    proposal.Reversibility == OperationReversibility.Reversible,
-                    string.Join("; ", proposal.PotentialRisks));
+                var execRecord = await AppServices.Instance.ExecuteWithGateAsync(
+                    this.XamlRoot,
+                    proposal,
+                    "Prerequisite Notice",
+                    $"Executing {proposal.DisplayName}...");
 
-                if (this.XamlRoot != null)
+                if (execRecord != null)
                 {
-                    gate.XamlRoot = this.XamlRoot;
-                    var res = await gate.ShowAsync();
-                    if (res == ContentDialogResult.Primary)
+                    var approvedContent = $"Approved and executed: {execRecord.StatusMessage}\n\n{plannedTurn.DeterministicMarkdownResponse}";
+                    AppServices.Instance.AgentConversation.Add((query, approvedContent));
+                    Messages.Add(new AssistantChatMessage
                     {
-                        var execRecord = await Task.Run(async () => await AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-                        AppServices.Instance.NotifyOperationHistoryChanged();
-                        var approvedContent = $"Approved and executed: {execRecord.StatusMessage}\n\n{plannedTurn.DeterministicMarkdownResponse}";
-                        AppServices.Instance.AgentConversation.Add((query, approvedContent));
-                        Messages.Add(new AssistantChatMessage
-                        {
-                            IsUser = false,
-                            Content = approvedContent,
-                            ToolActivity = $"⚙️ Executed {proposal.DisplayName} ✓"
-                        });
-                        return;
-                    }
+                        IsUser = false,
+                        Content = approvedContent,
+                        ToolActivity = $"⚙️ Executed {proposal.DisplayName} ✓"
+                    });
+                    return;
                 }
             }
 

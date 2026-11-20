@@ -5,21 +5,6 @@
    Replaces legacy monolithic CSS with clean, token-based utility classes.
    ========================================================================== */
 
-/* Reduced Motion & Dark Theme */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-[data-theme="dark"],
-html[data-theme="dark"] {
-  color-scheme: dark;
-}
-
 /* Interface sizing */
 :root {
   --interface-scale: 1;
@@ -43,52 +28,6 @@ html[data-theme="dark"] {
   flex-shrink: 0;
 }
 
-.notebook-nav {
-  height: 48px;
-  background-color: var(--surface);
-  border-bottom: 1px solid var(--hairline);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-}
-
-.notebook-library-container {
-  max-width: 1024px;
-  margin: 0 auto;
-}
-
-.notebook-workspace-3col,
-.research-workspace-3col {
-  display: flex;
-  height: 100%;
-  width: 100%;
-}
-
-.notebook-card {
-  background-color: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  transition: all 0.15s ease;
-}
-.notebook-card:hover {
-  border-color: var(--hairline-strong);
-  box-shadow: var(--shadow-popover);
-}
-
-.notebook-template-card {
-  background-color: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  transition: all 0.15s ease;
-}
-.notebook-template-card:hover {
-  border-color: var(--hairline-strong);
-  box-shadow: var(--shadow-card);
-}
-
 /* Button & Control Primitives */
 .btn-primary-gradient {
   display: inline-flex;
@@ -99,7 +38,7 @@ html[data-theme="dark"] {
   padding: 0 14px;
   border-radius: var(--radius-sm);
   background-color: var(--ink-blue);
-  color: #ffffff;
+  color: var(--on-ink-blue);
   font-size: 13px;
   font-weight: 500;
   border: 1px solid transparent;
@@ -211,7 +150,9 @@ html[data-theme="dark"] {
 }
 
 .soundwave-active {
-  animation: soundwave 1.2s ease-in-out infinite;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: soundwave 1.2s ease-in-out infinite;
+  }
 }
 
 /* Lightweight enter animations (replaces missing tailwindcss-animate) */
@@ -237,14 +178,18 @@ html[data-theme="dark"] {
   animation-fill-mode: both;
 }
 .fade-in {
-  animation-name: gw-fade-in;
-  animation-duration: 150ms;
-  animation-timing-function: ease-out;
+  @media (prefers-reduced-motion: no-preference) {
+    animation-name: gw-fade-in;
+    animation-duration: 150ms;
+    animation-timing-function: ease-out;
+  }
 }
 .zoom-in-95 {
-  animation-name: gw-zoom-in-95;
-  animation-duration: 150ms;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  @media (prefers-reduced-motion: no-preference) {
+    animation-name: gw-zoom-in-95;
+    animation-duration: 150ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
 .duration-150 {
   animation-duration: 150ms;
@@ -260,7 +205,7 @@ html[data-theme="dark"] {
   text-align: center;
   padding: 10px 20px;
   background: var(--ink-blue);
-  color: white;
+  color: var(--on-ink-blue);
   font-size: 0.875rem;
 }
 .product-announcement a {
@@ -270,7 +215,7 @@ html[data-theme="dark"] {
   margin-left: 5px;
 }
 .product-announcement a:focus-visible {
-  outline-color: #ffffff;
+  outline-color: currentColor;
 }
 .product-navbar {
   background: var(--surface);
@@ -336,36 +281,6 @@ html[data-theme="dark"] {
   background: var(--ink-blue-subtle);
   padding: 55px 24px 60px;
 }
-.product-hero {
-  max-width: 1040px;
-  margin: auto;
-  display: grid;
-  grid-template-columns: 1.25fr 1fr;
-  gap: 60px;
-  align-items: center;
-}
-.product-hero-copy {
-  text-align: center;
-}
-.product-hero h1 {
-  font-size: 56px;
-  font-weight: 600;
-  letter-spacing: -2px;
-  line-height: 1.15;
-}
-.product-platform {
-  color: var(--ink-secondary);
-  font-size: 14px;
-  margin-top: 12px;
-}
-.product-hero h2 {
-  font-size: 26px;
-  line-height: 1.35;
-  margin: 26px 0 18px;
-}
-.product-hero-copy > p {
-  line-height: 1.7;
-}
 .product-hero-note {
   margin-top: 18px;
   font-size: 0.875rem;
@@ -377,18 +292,6 @@ html[data-theme="dark"] {
   justify-content: center;
   flex-wrap: wrap;
   margin-top: 28px;
-}
-.product-hero-brand {
-  color: var(--ink-blue);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-}
-.product-hero-brand span {
-  font-size: 14px;
-  color: var(--ink-secondary);
 }
 .product-local-message {
   max-width: 780px;
@@ -483,8 +386,11 @@ html[data-theme="dark"] {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 45px 38px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.product-benefit-grid article {
+.product-benefit-grid li {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -603,20 +509,6 @@ html[data-theme="dark"] {
     padding-block: 8px;
     text-align: left;
   }
-  .product-hero {
-    grid-template-columns: 1fr;
-    gap: 35px;
-  }
-  .product-hero-brand svg {
-    width: 110px;
-    height: 110px;
-  }
-  .product-hero h1 {
-    font-size: 44px;
-  }
-  .product-hero h2 {
-    font-size: 23px;
-  }
   .product-benefit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -644,12 +536,6 @@ html[data-theme="dark"] {
   .product-benefits {
     padding: 45px 24px;
   }
-}
-
-.product-hero-brand > .brand-symbol {
-  width: auto;
-  height: auto;
-  color: var(--ink-blue);
 }
 
 .product-first-glance {
@@ -853,5 +739,25 @@ html[data-theme="dark"] {
 /* Keep the footer at the viewport bottom without covering page content. */
 .product-site { display:flex; flex-direction:column; min-height:100dvh; }
 .product-site > main { flex:1 0 auto; width:100%; }
-.product-site > .product-navbar,.product-site > .product-announcement,.product-site > .product-footer { flex-shrink:0; }
+.product-site > .product-header,.product-site > .product-footer { flex-shrink:0; }
 .product-inner { min-height:0; }
+
+@media (forced-colors: active) {
+  .product-announcement {
+    border-bottom: 1px solid CanvasText;
+  }
+  .btn-primary-gradient {
+    border: 1px solid ButtonText;
+  }
+  .product-slide-dots button {
+    border: 1px solid ButtonText;
+  }
+  .product-slide-dots button[aria-pressed="true"] {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .product-nav-links a[aria-current="page"] {
+    text-decoration: underline;
+    outline: 1px solid transparent;
+  }
+}

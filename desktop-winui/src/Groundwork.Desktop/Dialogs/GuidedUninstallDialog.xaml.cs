@@ -49,13 +49,14 @@ public sealed class UninstallTraceRowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
-public sealed partial class GuidedUninstallDialog : ContentDialog
+public sealed partial class GuidedUninstallDialog : ContentDialog, IDisposable
 {
     private enum WizardStage { Confirm, Monitoring, ScanMode, Scanning, Registry, Files, Complete }
 
     private readonly InstalledApplicationInfo _app;
     private readonly CancellationTokenSource _monitorCts = new();
     private readonly ManualResetEventSlim _manualContinueSignal = new(false);
+    private bool _disposed;
 
     private WizardStage _stage = WizardStage.Confirm;
     private LeftoverScanDepth _selectedDepth = LeftoverScanDepth.Moderate;
@@ -90,7 +91,33 @@ public sealed partial class GuidedUninstallDialog : ContentDialog
             SkipBuiltInCheckBox.IsChecked = true;
         }
 
+        this.Closed += (_, _) => Dispose();
         UpdateStageChrome(WizardStage.Confirm);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
+        try
+        {
+            _monitorCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        try
+        {
+            _manualContinueSignal.Set();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        _monitorCts.Dispose();
+        _manualContinueSignal.Dispose();
     }
 
     private void UpdateStageChrome(WizardStage stage)
@@ -300,8 +327,11 @@ public sealed partial class GuidedUninstallDialog : ContentDialog
 
     private void OnCancelActionClick(object sender, RoutedEventArgs e)
     {
-        _monitorCts.Cancel();
-        _manualContinueSignal.Set();
+        if (!_disposed)
+        {
+            _monitorCts.Cancel();
+            _manualContinueSignal.Set();
+        }
         this.Hide();
     }
 

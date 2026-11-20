@@ -102,7 +102,7 @@ export function LandingPage({
       <section className="product-benefits" aria-labelledby="benefits-title">
         <p className="product-eyebrow">Features &amp; benefits</p>
         <h2 id="benefits-title">Why use Groundwork?</h2>
-        <div className="product-benefit-grid">
+        <ul className="product-benefit-grid" role="list">
           {[
             {
               icon: Cpu,
@@ -145,13 +145,13 @@ export function LandingPage({
               text: "Every modification validates prerequisites, captures original state, requires a single-use approval token, sends deletions to the Recycle Bin, and records rollback metadata.",
             },
           ].map((item) => (
-            <article key={item.title}>
-              <item.icon size={34} />
+            <li key={item.title}>
+              <item.icon size={34} aria-hidden="true" />
               <h3>{item.title}</h3>
               <p>{item.text}</p>
-            </article>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
       <section className="product-bottom-cta">
         <h2>Ready to explore, analyze, and clean up your PC?</h2>

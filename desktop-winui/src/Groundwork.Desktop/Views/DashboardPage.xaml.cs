@@ -62,6 +62,12 @@ public sealed partial class DashboardPage : Page
         StartLiveTelemetry();
     }
 
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        _liveTimer?.Stop();
+    }
+
     private void StartLiveTelemetry()
     {
         if (_liveTimer == null)
@@ -234,27 +240,39 @@ public sealed partial class DashboardPage : Page
         {
             try
             {
-                var procs = Process.GetProcesses()
-                    .Where(p => !string.IsNullOrEmpty(p.ProcessName))
-                    .OrderByDescending(p =>
-                    {
-                        try { return p.WorkingSet64; } catch { return 0; }
-                    })
-                    .Take(6)
-                    .Select(p =>
-                    {
-                        long ws = 0;
-                        int threads = 0;
-                        try { ws = p.WorkingSet64; threads = p.Threads.Count; } catch { }
-                        return new ProcessRowViewModel
+                var allProcs = Process.GetProcesses();
+                List<ProcessRowViewModel> procs;
+                try
+                {
+                    procs = allProcs
+                        .Where(p => !string.IsNullOrEmpty(p.ProcessName))
+                        .OrderByDescending(p =>
                         {
-                            ProcessId = p.Id,
-                            ProcessName = p.ProcessName,
-                            WorkingSetDisplay = ByteFormatter.FormatBytes(ws),
-                            ThreadCount = threads
-                        };
-                    })
-                    .ToList();
+                            try { return p.WorkingSet64; } catch { return 0; }
+                        })
+                        .Take(6)
+                        .Select(p =>
+                        {
+                            long ws = 0;
+                            int threads = 0;
+                            try { ws = p.WorkingSet64; threads = p.Threads.Count; } catch { }
+                            return new ProcessRowViewModel
+                            {
+                                ProcessId = p.Id,
+                                ProcessName = p.ProcessName,
+                                WorkingSetDisplay = ByteFormatter.FormatBytes(ws),
+                                ThreadCount = threads
+                            };
+                        })
+                        .ToList();
+                }
+                finally
+                {
+                    foreach (var proc in allProcs)
+                    {
+                        proc.Dispose();
+                    }
+                }
 
                 DispatcherQueue.TryEnqueue(() =>
                 {

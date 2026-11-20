@@ -109,7 +109,8 @@ public sealed record OperationVerificationResult(
     bool IsVerified,
     string ObservedStateSummary,
     string VerificationDetails,
-    DateTimeOffset VerifiedAtUtc);
+    DateTimeOffset VerifiedAtUtc,
+    long BytesReclaimed = 0);
 
 /// <summary>
 /// Persistent audit record of an executed operation and its verification/rollback state (Steps 7–10).
@@ -134,6 +135,7 @@ public sealed record OperationExecutionRecord(
     DateTimeOffset? RolledBackAtUtc,
     DateTimeOffset ExecutedAtUtc)
 {
+    public long BytesReclaimed => Verification.BytesReclaimed;
     public string ExecutedAtDisplay => ExecutedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
     public string ReversibilityDisplay => Reversibility switch
     {

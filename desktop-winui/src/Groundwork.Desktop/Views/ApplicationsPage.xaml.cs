@@ -177,7 +177,7 @@ public sealed partial class ApplicationsPage : Page
 
         try
         {
-            var wizard = new Dialogs.GuidedUninstallDialog(_selectedApp.RawModel) { XamlRoot = this.XamlRoot };
+            using var wizard = new Dialogs.GuidedUninstallDialog(_selectedApp.RawModel) { XamlRoot = this.XamlRoot };
             await wizard.ShowAsync();
             if (wizard.DidModifySystem)
             {

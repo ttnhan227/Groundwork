@@ -247,6 +247,57 @@ public sealed class AppServices
         return record;
     }
 
+    public sealed record BatchGateExecutionResult(
+        int SucceededCount,
+        int FailedCount,
+        int CancelledOrBlockedCount,
+        long TotalBytesReclaimed,
+        IReadOnlyList<OperationExecutionRecord> Records);
+
+    /// <summary>
+    /// Executes multiple proposals sequentially through SafeOperationGateDialog,
+    /// summing actual BytesReclaimed and tracking failed/cancelled operations.
+    /// </summary>
+    public async Task<BatchGateExecutionResult> ExecuteBatchWithGateAsync(
+        XamlRoot xamlRoot,
+        IReadOnlyList<OperationProposal> proposals,
+        string blockedTitle = "Prerequisite Notice")
+    {
+        var records = new List<OperationExecutionRecord>();
+        int succeeded = 0;
+        int failed = 0;
+        int cancelledOrBlocked = 0;
+        long totalBytesReclaimed = 0;
+
+        foreach (var proposal in proposals)
+        {
+            var record = await ExecuteWithGateAsync(xamlRoot, proposal, blockedTitle, completionTitle: null);
+            if (record is null)
+            {
+                cancelledOrBlocked++;
+                continue;
+            }
+
+            records.Add(record);
+            if (record.Succeeded)
+            {
+                succeeded++;
+                totalBytesReclaimed += record.BytesReclaimed;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        return new BatchGateExecutionResult(
+            SucceededCount: succeeded,
+            FailedCount: failed,
+            CancelledOrBlockedCount: cancelledOrBlocked,
+            TotalBytesReclaimed: totalBytesReclaimed,
+            Records: records);
+    }
+
     public static void TryRestartAsAdministrator()
     {
         try

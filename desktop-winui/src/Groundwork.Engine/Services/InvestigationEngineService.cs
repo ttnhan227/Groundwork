@@ -137,11 +137,11 @@ public sealed class InvestigationEngineService
 
         toolResults.AddRange([hwCall, procCall, powerCall, startupCall, repairCall]);
 
-        var hw = await _toolRegistry.Hardware.GetHardwareReportAsync(maskSensitiveData: false, ct: ct).ConfigureAwait(false);
-        var procs = _toolRegistry.Troubleshooting.InspectProcesses(10);
-        var power = _toolRegistry.Optimization.InspectPowerPlans();
-        var startups = _toolRegistry.Optimization.InspectStartupItems();
-        var repair = _toolRegistry.Troubleshooting.InspectWindowsRepairAndHealthStatus();
+        var hw = DeserializeToolPayload<HardwareSystemReport>(hwCall);
+        var procs = DeserializeToolPayload<ProcessResourceSnapshot>(procCall);
+        var power = DeserializeToolPayload<PowerManagementSnapshot>(powerCall);
+        var startups = DeserializeToolPayload<IReadOnlyList<StartupItemEntry>>(startupCall);
+        var repair = DeserializeToolPayload<WindowsRepairAndHealthStatus>(repairCall);
 
         var cpuLoad = hw.LiveDiagnostics.CpuUtilizationPercent ?? 0.0;
 
@@ -330,10 +330,10 @@ public sealed class InvestigationEngineService
         var spaceHogsCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_space_hogs"), ct).ConfigureAwait(false);
         toolResults.AddRange([volCall, cleanCall, browserCacheCall, spaceHogsCall]);
 
-        var drives = _toolRegistry.Drives.DiscoverVolumes();
-        var diag = await _toolRegistry.Cleanup.PreloadDiagnosticReportAsync(ct).ConfigureAwait(false);
-        var cacheSummary = _toolRegistry.Troubleshooting.InspectSafeTempAndBrowserCaches();
-        var spaceHogReport = JsonSerializer.Deserialize<SpaceHogReport>(spaceHogsCall.StructuredDataJson);
+        var drives = DeserializeToolPayload<IReadOnlyList<VolumeMetadata>>(volCall);
+        var diag = DeserializeToolPayload<SystemDiagnosticReport>(cleanCall);
+        var cacheSummary = DeserializeToolPayload<SafeTempAndCacheCleanupSummary>(browserCacheCall);
+        var spaceHogReport = DeserializeToolPayload<SpaceHogReport>(spaceHogsCall);
 
         foreach (var d in drives)
         {
@@ -483,7 +483,7 @@ public sealed class InvestigationEngineService
         var netCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_network_health"), ct).ConfigureAwait(false);
         toolResults.Add(netCall);
 
-        var netReport = await _toolRegistry.Troubleshooting.RunNetworkTroubleshootingAsync(null, ct).ConfigureAwait(false);
+        var netReport = DeserializeToolPayload<NetworkTroubleshootingReport>(netCall);
         var upAdapters = netReport.ActiveInterfaces.Where(i => string.Equals(i.OperationalStatus, "Up", StringComparison.OrdinalIgnoreCase)).ToList();
 
         confirmed.Add(new InvestigationFinding(
@@ -657,10 +657,10 @@ public sealed class InvestigationEngineService
         var evtCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_event_log_errors"), ct).ConfigureAwait(false);
         toolResults.AddRange([hwCall, repairCall, svcCall, evtCall]);
 
-        var hw = await _toolRegistry.Hardware.GetHardwareReportAsync(maskSensitiveData: false, ct: ct).ConfigureAwait(false);
-        var repair = _toolRegistry.Troubleshooting.InspectWindowsRepairAndHealthStatus();
-        var services = _toolRegistry.Troubleshooting.InspectKeyWindowsServices();
-        var events = _toolRegistry.Troubleshooting.InspectRecentEventLogErrors(25);
+        var hw = DeserializeToolPayload<HardwareSystemReport>(hwCall);
+        var repair = DeserializeToolPayload<WindowsRepairAndHealthStatus>(repairCall);
+        var services = DeserializeToolPayload<IReadOnlyList<WindowsServiceDiagnosticEntry>>(svcCall);
+        var events = DeserializeToolPayload<IReadOnlyList<EventLogDiagnosticEntry>>(evtCall);
 
         var secureBootState = hw.Motherboard.IsSecureBootEnabled switch
         {
@@ -793,7 +793,7 @@ public sealed class InvestigationEngineService
         CancellationToken ct)
     {
         var startupCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_startup_items"), ct).ConfigureAwait(false);
-        var items = _toolRegistry.Optimization.InspectStartupItems();
+        var items = DeserializeToolPayload<IReadOnlyList<StartupItemEntry>>(startupCall);
 
         var confirmed = new List<InvestigationFinding>();
         var causes = new List<InvestigationFinding>();
@@ -883,7 +883,7 @@ public sealed class InvestigationEngineService
         CancellationToken ct)
     {
         var hwCall = await _toolRegistry.ExecuteToolAsync(new AgentToolCallRequest("inspect_hardware_and_os"), ct).ConfigureAwait(false);
-        var hw = await _toolRegistry.Hardware.GetHardwareReportAsync(maskSensitiveData: false, ct: ct).ConfigureAwait(false);
+        var hw = DeserializeToolPayload<HardwareSystemReport>(hwCall);
 
         var secureBootText = hw.Motherboard.IsSecureBootEnabled switch
         {
@@ -1081,5 +1081,16 @@ public sealed class InvestigationEngineService
     {
         ArgumentNullException.ThrowIfNull(report);
         return JsonSerializer.Serialize(report, PrettyJsonOptions);
+    }
+
+    private static T DeserializeToolPayload<T>(AgentToolCallResult result)
+    {
+        if (string.IsNullOrWhiteSpace(result.StructuredDataJson))
+        {
+            throw new InvalidOperationException($"Tool '{result.ToolName}' returned empty StructuredDataJson.");
+        }
+
+        return JsonSerializer.Deserialize<T>(result.StructuredDataJson)
+            ?? throw new InvalidOperationException($"Failed to deserialize StructuredDataJson from tool '{result.ToolName}' as {typeof(T).Name}.");
     }
 }

@@ -30,6 +30,9 @@ public sealed partial class MainWindow : Window
     private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, UIntPtr dwRefData);
 
     [DllImport("comctl32.dll", ExactSpelling = true)]
+    private static extern bool RemoveWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+    [DllImport("comctl32.dll", ExactSpelling = true)]
     private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
     private delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData);
@@ -49,6 +52,7 @@ public sealed partial class MainWindow : Window
 
     private const uint WM_GETMINMAXINFO = 0x0024;
     private SubclassProc? _subclassProc;
+    private IntPtr _subclassedHwnd;
 
     private IntPtr WindowSubclass(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
@@ -60,6 +64,16 @@ public sealed partial class MainWindow : Window
             Marshal.StructureToPtr(mmi, lParam, true);
         }
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+    }
+
+    private void OnMainWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_subclassedHwnd != IntPtr.Zero && _subclassProc is not null)
+        {
+            RemoveWindowSubclass(_subclassedHwnd, _subclassProc, UIntPtr.Zero);
+            _subclassedHwnd = IntPtr.Zero;
+            _subclassProc = null;
+        }
     }
 
     public MainWindow()
@@ -88,7 +102,11 @@ public sealed partial class MainWindow : Window
         if (hwnd != IntPtr.Zero)
         {
             _subclassProc = WindowSubclass;
-            SetWindowSubclass(hwnd, _subclassProc, UIntPtr.Zero, UIntPtr.Zero);
+            if (SetWindowSubclass(hwnd, _subclassProc, UIntPtr.Zero, UIntPtr.Zero))
+            {
+                _subclassedHwnd = hwnd;
+                this.Closed += OnMainWindowClosed;
+            }
 
             try
             {

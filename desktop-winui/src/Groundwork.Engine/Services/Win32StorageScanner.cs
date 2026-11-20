@@ -13,6 +13,7 @@ namespace Groundwork.Engine.Services;
 
 public sealed class Win32StorageScanner
 {
+    internal int LastWorkerParticipationCount { get; private set; }
     private const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
     private const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400;
     private const uint FILE_ATTRIBUTE_OFFLINE = 0x00001000;
@@ -174,6 +175,7 @@ public sealed class Win32StorageScanner
 
         var accessDenied = new ConcurrentBag<string>();
         var workQueue = new ConcurrentQueue<(int FolderIdx, string Path)>();
+        int pendingWork = 1;
         workQueue.Enqueue((0, normalizedRoot));
 
         long filesScanned = 0;
@@ -187,13 +189,14 @@ public sealed class Win32StorageScanner
         var excludedDirectoryNames = options?.ExcludedDirectoryNames ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var excludedPaths = options?.ExcludedPaths ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var excludedExtensions = options?.ExcludedExtensions ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        int activeWorkers = 0;
 
         var allWorkerTopFiles = new ConcurrentBag<PriorityQueue<ScannedEntry, long>>();
         var allWorkerCategories = new ConcurrentBag<Dictionary<string, (long Count, long Bytes)>>();
         var allRetainedChunks = new ConcurrentQueue<List<ScannedEntry>>();
 
-        using var workSignal = new AutoResetEvent(false);
+        using var workAvailable = new SemaphoreSlim(1);
+        using var completionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        int workersThatProcessedWork = 0;
 
         Parallel.For(0, maxDegree, new ParallelOptions { CancellationToken = cancellationToken }, _ =>
         {
@@ -203,35 +206,34 @@ public sealed class Win32StorageScanner
             var threadTopFiles = new PriorityQueue<ScannedEntry, long>(topN + 1);
             var threadCategoryTotals = new Dictionary<string, (long Count, long Bytes)>(StringComparer.OrdinalIgnoreCase);
             var currentRetainedChunk = retainAllEntries ? new List<ScannedEntry>(4096) : null;
-            var spin = new SpinWait();
+            bool workerProcessedAny = false;
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 if (!workQueue.TryDequeue(out var current))
                 {
-                    if (Volatile.Read(ref activeWorkers) == 0 && workQueue.IsEmpty)
+                    if (Volatile.Read(ref pendingWork) == 0)
                     {
-                        Thread.MemoryBarrier();
-                        if (Volatile.Read(ref activeWorkers) == 0 && workQueue.IsEmpty)
-                        {
-                            workSignal.Set();
-                            break;
-                        }
+                        break;
                     }
 
-                    if (spin.Count < 10)
+                    try
                     {
-                        spin.SpinOnce();
+                        workAvailable.Wait(completionCts.Token);
                     }
-                    else
+                    catch (OperationCanceledException)
                     {
-                        workSignal.WaitOne(5);
+                        break;
                     }
                     continue;
                 }
 
-                spin.Reset();
-                Interlocked.Increment(ref activeWorkers);
+                if (!workerProcessedAny)
+                {
+                    workerProcessedAny = true;
+                    Interlocked.Increment(ref workersThatProcessedWork);
+                }
+
                 try
                 {
                     localFiles.Clear();
@@ -374,6 +376,7 @@ public sealed class Win32StorageScanner
                     if (localSubfolderNames.Count > 0)
                     {
                         int startIdx = folderTable.Allocate(localSubfolderNames.Count);
+                        Interlocked.Add(ref pendingWork, localSubfolderNames.Count);
                         for (int j = 0; j < localSubfolderNames.Count; j++)
                         {
                             int subId = startIdx + j;
@@ -394,7 +397,7 @@ public sealed class Win32StorageScanner
                             folderTable[subId] = subNode;
                             workQueue.Enqueue((subId, subInfo.FullPath));
                         }
-                        workSignal.Set();
+                        workAvailable.Release(localSubfolderNames.Count);
                     }
 
                     long currentFiles = Interlocked.Add(ref filesScanned, localFiles.Count);
@@ -423,8 +426,10 @@ public sealed class Win32StorageScanner
                 }
                 finally
                 {
-                    Interlocked.Decrement(ref activeWorkers);
-                    workSignal.Set();
+                    if (Interlocked.Decrement(ref pendingWork) == 0)
+                    {
+                        completionCts.Cancel();
+                    }
                 }
             }
 
@@ -437,6 +442,7 @@ public sealed class Win32StorageScanner
         });
 
         cancellationToken.ThrowIfCancellationRequested();
+        LastWorkerParticipationCount = workersThatProcessedWork;
 
         int totalFolders = folderTable.Count;
 

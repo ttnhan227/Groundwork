@@ -216,10 +216,12 @@ public sealed partial class DiagnosticsPage : Page
         try
         {
             var proposal = AppServices.Instance.TroubleshootingService.ProposeFlushDnsCache();
-            var result = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-            AppServices.Instance.NotifyOperationHistoryChanged();
-            AppServices.Instance.NotifyStatus(result.StatusMessage);
-            await AppServices.Instance.ShowDialogAsync("DNS Cache", result.StatusMessage);
+            await AppServices.Instance.ExecuteWithGateAsync(
+                this.XamlRoot,
+                proposal,
+                "Administrator Required",
+                "Flushing DNS resolver cache...",
+                "DNS Cache");
         }
         catch (Exception ex)
         {
@@ -294,18 +296,12 @@ public sealed partial class DiagnosticsPage : Page
                 new AgentToolCallRequest(rec.AssociatedToolName, rec.ToolArguments)));
             if (toolRes.PendingProposal is { } prop)
             {
-                if (!prop.PrerequisitesMet)
-                {
-                    await AppServices.Instance.ShowDialogAsync("Prerequisite Notice", prop.PrerequisiteFailureReason ?? "Cannot execute in current session.");
-                    return;
-                }
-                var gate = new Dialogs.SafeOperationGateDialog(prop) { XamlRoot = this.XamlRoot };
-                if (await gate.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    var record = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(prop.ConfirmationToken));
-                    AppServices.Instance.NotifyOperationHistoryChanged();
-                    await AppServices.Instance.ShowDialogAsync("Action Complete", record.StatusMessage);
-                }
+                await AppServices.Instance.ExecuteWithGateAsync(
+                    this.XamlRoot,
+                    prop,
+                    "Prerequisite Notice",
+                    $"Executing {prop.DisplayName}...",
+                    "Action Complete");
             }
             else
             {
@@ -511,10 +507,12 @@ public sealed partial class DiagnosticsPage : Page
         try
         {
             var proposal = AppServices.Instance.TroubleshootingService.ProposeVerifySystemHealth();
-            var result = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-            AppServices.Instance.NotifyOperationHistoryChanged();
-            await AppServices.Instance.ShowDialogAsync("DISM Component Store Health", result.StatusMessage);
-            AppServices.Instance.NotifyStatus("DISM health verification completed.");
+            await AppServices.Instance.ExecuteWithGateAsync(
+                this.XamlRoot,
+                proposal,
+                "Administrator Required",
+                "Verifying Windows Component Store health (DISM)...",
+                "DISM Component Store Health");
         }
         catch (Exception ex)
         {

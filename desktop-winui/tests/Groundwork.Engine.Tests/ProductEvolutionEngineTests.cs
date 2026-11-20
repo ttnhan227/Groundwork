@@ -624,4 +624,25 @@ public sealed class ProductEvolutionEngineTests : IDisposable
         Assert.True(healthy);
         Assert.Contains("No component store corruption detected", msg);
     }
+
+    [Fact]
+    public async Task DiagnosticsAndTroubleshootingService_RunProcessAsync_DrainsNoisyStdoutAndStderrConcurrentlyWithoutDeadlock()
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell.exe"
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("$out = 'O' * 8192; $err = 'E' * 8192; 1..16 | ForEach-Object { [Console]::Out.WriteLine($out); [Console]::Error.WriteLine($err) }");
+
+        var (exitCode, stdout, stderr) = await DiagnosticsAndTroubleshootingService.RunProcessAsync(
+            psi,
+            TimeSpan.FromSeconds(15));
+
+        Assert.Equal(0, exitCode);
+        Assert.True(stdout.Length >= 8192 * 16, $"Expected >= {8192 * 16} stdout chars, got {stdout.Length}");
+        Assert.True(stderr.Length >= 8192 * 16, $"Expected >= {8192 * 16} stderr chars, got {stderr.Length}");
+    }
 }

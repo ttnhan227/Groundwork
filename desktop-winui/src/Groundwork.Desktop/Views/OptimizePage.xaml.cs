@@ -402,14 +402,17 @@ public sealed partial class OptimizePage : Page
             try
             {
                 var proposal = AppServices.Instance.OptimizationService.ProposeToggleStartupItem(entryId, desiredState);
-                var result = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-                if (result.Succeeded)
+                var result = await AppServices.Instance.ExecuteWithGateAsync(
+                    this.XamlRoot,
+                    proposal,
+                    "Prerequisite Notice",
+                    $"Updating startup item {entryId}...");
+                if (result != null && result.Succeeded)
                 {
                     if (ts.DataContext is StartupItemRowViewModel itemVm)
                     {
                         itemVm.IsEnabled = desiredState;
                     }
-                    AppServices.Instance.NotifyOperationHistoryChanged();
                     AppServices.Instance.NotifyStatus($"Startup application {entryId} updated: {(desiredState ? "Enabled" : "Disabled")}.");
                 }
                 else
@@ -417,7 +420,10 @@ public sealed partial class OptimizePage : Page
                     _isUpdatingUi = true;
                     ts.IsOn = !desiredState;
                     _isUpdatingUi = false;
-                    await AppServices.Instance.ShowDialogAsync("Action Failed", result.StatusMessage ?? "Could not modify startup item.");
+                    if (result != null)
+                    {
+                        await AppServices.Instance.ShowDialogAsync("Action Failed", result.StatusMessage ?? "Could not modify startup item.");
+                    }
                 }
             }
             catch (Exception ex)
@@ -450,14 +456,17 @@ public sealed partial class OptimizePage : Page
         try
         {
             var proposal = AppServices.Instance.OptimizationService.ProposeSwitchPowerPlan(guid);
-            var result = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-            if (result.Succeeded)
+            var result = await AppServices.Instance.ExecuteWithGateAsync(
+                this.XamlRoot,
+                proposal,
+                "Prerequisite Notice",
+                $"Switching active power scheme to {friendlyName}...");
+            if (result != null && result.Succeeded)
             {
-                AppServices.Instance.NotifyOperationHistoryChanged();
                 AppServices.Instance.NotifyStatus($"Active power scheme switched to {friendlyName}.");
                 await LoadOptimizeStateAsync();
             }
-            else
+            else if (result != null)
             {
                 await AppServices.Instance.ShowDialogAsync("Switch Failed", result.StatusMessage ?? "Power scheme could not be activated.");
             }
@@ -481,22 +490,17 @@ public sealed partial class OptimizePage : Page
             try
             {
                 var proposal = AppServices.Instance.OptimizationService.ProposeToggleSetting(settingId, desired);
-                if (!proposal.PrerequisitesMet)
-                {
-                    _isUpdatingUi = true;
-                    ts.IsOn = !desired;
-                    _isUpdatingUi = false;
-                    await AppServices.Instance.ShowDialogAsync("Prerequisite Notice", proposal.PrerequisiteFailureReason ?? "Setting cannot be modified here.");
-                    return;
-                }
-                var result = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-                if (result.Succeeded)
+                var result = await AppServices.Instance.ExecuteWithGateAsync(
+                    this.XamlRoot,
+                    proposal,
+                    "Prerequisite Notice",
+                    $"Updating setting {settingId}...");
+                if (result != null && result.Succeeded)
                 {
                     if (ts.DataContext is ConfigurableSettingRowViewModel settingVm)
                     {
                         settingVm.IsEnabled = desired;
                     }
-                    AppServices.Instance.NotifyOperationHistoryChanged();
                     AppServices.Instance.NotifyStatus($"Configured setting {settingId}: {(desired ? "Enabled" : "Disabled")}.");
                 }
                 else
@@ -504,7 +508,10 @@ public sealed partial class OptimizePage : Page
                     _isUpdatingUi = true;
                     ts.IsOn = !desired;
                     _isUpdatingUi = false;
-                    await AppServices.Instance.ShowDialogAsync("Configuration Failed", result.StatusMessage ?? "Setting could not be changed.");
+                    if (result != null)
+                    {
+                        await AppServices.Instance.ShowDialogAsync("Configuration Failed", result.StatusMessage ?? "Setting could not be changed.");
+                    }
                 }
             }
             catch (Exception ex)

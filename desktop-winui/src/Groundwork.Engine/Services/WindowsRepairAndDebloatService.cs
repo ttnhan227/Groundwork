@@ -775,6 +775,17 @@ public sealed class WindowsRepairAndDebloatService
             return false;
         }
 
+        var segments = subPath.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 2)
+        {
+            return false;
+        }
+
+        if (segments[0].Equals("WOW6432Node", StringComparison.OrdinalIgnoreCase) && segments.Length < 3)
+        {
+            return false;
+        }
+
         // Specific leaf Uninstall remnant subkeys (must include non-empty subkey name)
         foreach (var uninstPrefix in new[]
         {

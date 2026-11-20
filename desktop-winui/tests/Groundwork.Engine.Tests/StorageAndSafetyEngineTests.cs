@@ -127,6 +127,75 @@ public sealed class StorageAndSafetyEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task Win32StorageScanner_EightWorkersOnNarrowRoot_UsesMultipleWorkersAndCountsAllEntries()
+    {
+        string bottleneck = Path.Combine(_tempRoot, "NarrowRoot");
+        Directory.CreateDirectory(bottleneck);
+
+        const int branchCount = 24;
+        const int filesPerBranch = 4;
+        const int fileSize = 512;
+
+        for (int b = 0; b < branchCount; b++)
+        {
+            string branchDir = Path.Combine(bottleneck, $"Branch_{b:D2}");
+            string leafDir = Path.Combine(branchDir, "Leaf");
+            Directory.CreateDirectory(leafDir);
+
+            for (int f = 0; f < filesPerBranch; f++)
+            {
+                string targetDir = f < 2 ? branchDir : leafDir;
+                await File.WriteAllBytesAsync(Path.Combine(targetDir, $"file_{f}.dat"), new byte[fileSize]);
+            }
+        }
+
+        var emptySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var scanner = new Win32StorageScanner();
+        var options = new StorageScanOptions(
+            WorkerCount: 8,
+            ExcludedDirectoryNames: emptySet,
+            ExcludedPaths: emptySet,
+            ExcludedExtensions: emptySet);
+
+        for (int iteration = 0; iteration < 3; iteration++)
+        {
+            var result = await scanner.ScanAsync(_tempRoot, retainAllEntries: true, options: options);
+
+            Assert.Equal(branchCount * filesPerBranch, result.TotalFiles);
+            Assert.Equal(1 + 1 + (branchCount * 2), result.TotalFolders);
+            Assert.Equal((long)branchCount * filesPerBranch * fileSize, result.TotalLogicalBytes);
+            Assert.True(
+                scanner.LastWorkerParticipationCount > 1,
+                $"Expected multiple workers on narrow root (iteration {iteration}), actual={scanner.LastWorkerParticipationCount}");
+        }
+    }
+
+    [Fact]
+    public async Task Win32StorageScanner_CancellationToken_CancelsCleanly()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            string dir = Path.Combine(_tempRoot, $"CancelDir_{i}");
+            Directory.CreateDirectory(dir);
+            await File.WriteAllBytesAsync(Path.Combine(dir, "payload.bin"), new byte[256]);
+        }
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var emptySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new Win32StorageScanner().ScanAsync(
+                _tempRoot,
+                cancellationToken: cts.Token,
+                options: new StorageScanOptions(
+                    WorkerCount: 8,
+                    ExcludedDirectoryNames: emptySet,
+                    ExcludedPaths: emptySet,
+                    ExcludedExtensions: emptySet)));
+    }
+
+    [Fact]
     public async Task DuplicateEngine_UsesThreeStagePipeline_SkipsHardLinksAndCloudPlaceholders()
     {
         // 1. True duplicate pair (same size, same head/tail, same SHA-256)

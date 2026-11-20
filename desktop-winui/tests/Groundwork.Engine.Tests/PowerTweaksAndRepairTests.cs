@@ -425,6 +425,12 @@ public sealed class PowerTweaksAndRepairTests : IDisposable
             Assert.True(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\SampleApp"));
             Assert.True(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Run::SampleAppAutoStart"));
             Assert.True(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKCU\Software\Classes\sampleappurl"));
+            Assert.False(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKCU\Software\Microsoft"));
+            Assert.False(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKCU\Software\VendorOnly"));
+            Assert.False(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKLM\Software\WOW6432Node"));
+            Assert.False(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKLM\Software\WOW6432Node\VendorOnly"));
+            Assert.True(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKCU\Software\Vendor\SampleApp"));
+            Assert.True(WindowsRepairAndDebloatService.IsSafeLeftoverRegistryKey(@"HKLM\Software\WOW6432Node\Vendor\SampleApp"));
 
             if (OperatingSystem.IsWindows())
             {

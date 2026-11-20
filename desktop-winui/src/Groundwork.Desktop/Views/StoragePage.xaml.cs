@@ -313,12 +313,14 @@ public sealed partial class StoragePage : Page
         {
             var root = _lastDriveScanResult?.RootPath ?? Path.GetPathRoot(fullPath) ?? Path.GetDirectoryName(fullPath) ?? string.Empty;
             var proposal = AppServices.Instance.StorageHotspotService.ProposeRecycleItems([fullPath], [root], "Space Map Large File");
-            var gate = new Dialogs.SafeOperationGateDialog(proposal) { XamlRoot = this.XamlRoot };
-            if (await gate.ShowAsync() == ContentDialogResult.Primary)
+            var record = await AppServices.Instance.ExecuteWithGateAsync(
+                this.XamlRoot,
+                proposal,
+                "Prerequisite Notice",
+                "Moving file to Recycle Bin...",
+                "Moved to Recycle Bin");
+            if (record?.Succeeded == true)
             {
-                var record = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-                AppServices.Instance.NotifyOperationHistoryChanged();
-                await AppServices.Instance.ShowDialogAsync("Moved to Recycle Bin", record.StatusMessage);
                 var item = LargestFiles.FirstOrDefault(f => string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
                 if (item != null) LargestFiles.Remove(item);
             }
@@ -612,29 +614,13 @@ public sealed partial class StoragePage : Page
             return;
         }
 
-        long totalBytes = selectedCategories.Sum(c => c.SizeBytes);
-        bool confirm = await AppServices.Instance.ShowConfirmDialogAsync(
-            "Confirm Storage Cleanup",
-            $"Are you sure you want to clean {ByteFormatter.FormatBytes(totalBytes)} across {selectedCategories.Count} categories?\n\nThis will safely remove expired cache files and recycle bin items.",
-            "Clean Files",
-            "Cancel");
-
-        if (!confirm) return;
-
         ExecuteCleanBtn.IsEnabled = false;
         try
         {
-            long cleanedBytes = 0;
+            var proposals = new List<OperationProposal>();
             if (selectedCategories.Any(c => c.CategoryId is "temp" or "dumps" or "browser"))
             {
-                var proposal = AppServices.Instance.TroubleshootingService.ProposeSafeTempAndCacheCleanup(includeClosedBrowserCaches: true);
-                if (proposal.PrerequisitesMet)
-                {
-                    await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-                    cleanedBytes += selectedCategories
-                        .Where(c => c.CategoryId is "temp" or "dumps" or "browser")
-                        .Sum(c => c.SizeBytes);
-                }
+                proposals.Add(AppServices.Instance.TroubleshootingService.ProposeSafeTempAndCacheCleanup(includeClosedBrowserCaches: true));
             }
 
             var hogIds = selectedCategories
@@ -643,29 +629,25 @@ public sealed partial class StoragePage : Page
                 .ToList();
             if (hogIds.Count > 0)
             {
-                var hogProposal = await AppServices.Instance.StorageHotspotService.ProposeCleanSafeSpaceHogsAsync(hogIds);
-                if (hogProposal.PrerequisitesMet)
-                {
-                    await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(hogProposal.ConfirmationToken));
-                    cleanedBytes += selectedCategories
-                        .Where(c => c.CategoryId.StartsWith("hog:", StringComparison.Ordinal))
-                        .Sum(c => c.SizeBytes);
-                }
+                proposals.Add(await AppServices.Instance.StorageHotspotService.ProposeCleanSafeSpaceHogsAsync(hogIds));
             }
 
             if (selectedCategories.Any(c => c.CategoryId == "recyclebin"))
             {
-                var rbProposal = AppServices.Instance.StorageHotspotService.ProposeEmptyRecycleBin();
-                if (rbProposal.PrerequisitesMet)
-                {
-                    await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(rbProposal.ConfirmationToken));
-                    cleanedBytes += selectedCategories.FirstOrDefault(c => c.CategoryId == "recyclebin")?.SizeBytes ?? 0;
-                }
+                proposals.Add(AppServices.Instance.StorageHotspotService.ProposeEmptyRecycleBin());
             }
 
-            AppServices.Instance.NotifyOperationHistoryChanged();
-            await AppServices.Instance.ShowDialogAsync("Cleanup Complete", $"Successfully cleaned {ByteFormatter.FormatBytes(cleanedBytes)}.");
-            await ScanJunkAsync();
+            var batch = await AppServices.Instance.ExecuteBatchWithGateAsync(this.XamlRoot, proposals, "Cleanup Notice");
+            if (batch.SucceededCount > 0 || batch.FailedCount > 0)
+            {
+                string summary = $"Successfully reclaimed {ByteFormatter.FormatBytes(batch.TotalBytesReclaimed)} across {batch.SucceededCount} operation(s).";
+                if (batch.FailedCount > 0)
+                {
+                    summary += $"\n{batch.FailedCount} operation(s) failed or could not remove locked files.";
+                }
+                await AppServices.Instance.ShowDialogAsync("Cleanup Complete", summary);
+                await ScanJunkAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -757,22 +739,24 @@ public sealed partial class StoragePage : Page
     {
         if (_currentOrganizationPlan == null || _currentOrganizationPlan.Candidates.Count == 0) return;
 
-        bool confirm = await AppServices.Instance.ShowConfirmDialogAsync(
-            "Execute File Organization",
-            $"Organize {_currentOrganizationPlan.Candidates.Count} files in {OrganizerFolderBox.Text} into categorized subfolders?\n\nThis operation is 100% reversible with 1-click Undo in Audit History.",
-            "Organize Now",
-            "Cancel");
-
-        if (!confirm) return;
-
         ExecuteOrganizeBtn.IsEnabled = false;
         try
         {
             var proposal = AppServices.Instance.FileOrganizerService.ProposeOrganizeFolder(_currentOrganizationPlan.RootFolderPath);
-            var result = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-            AppServices.Instance.NotifyOperationHistoryChanged();
-            await AppServices.Instance.ShowDialogAsync("Organization Complete", $"{result.StatusMessage}\nYou can undo this anytime from Audit History.");
-            OrganizationPlanItems.Clear();
+            var result = await AppServices.Instance.ExecuteWithGateAsync(
+                this.XamlRoot,
+                proposal,
+                "Prerequisite Notice",
+                $"Organizing files in {_currentOrganizationPlan.RootFolderPath}...");
+            if (result != null && result.Succeeded)
+            {
+                await AppServices.Instance.ShowDialogAsync("Organization Complete", $"{result.StatusMessage}\nYou can undo this anytime from Audit History.");
+                OrganizationPlanItems.Clear();
+            }
+            else if (result != null)
+            {
+                await AppServices.Instance.ShowDialogAsync("Organization Error", result.StatusMessage);
+            }
         }
         catch (Exception ex)
         {
@@ -899,12 +883,14 @@ public sealed partial class StoragePage : Page
         try
         {
             var proposal = AppServices.Instance.StorageHotspotService.ProposeRecycleItems(selectedPaths, [root], "Duplicate Files");
-            var gate = new Dialogs.SafeOperationGateDialog(proposal) { XamlRoot = this.XamlRoot };
-            if (await gate.ShowAsync() == ContentDialogResult.Primary)
+            var record = await AppServices.Instance.ExecuteWithGateAsync(
+                this.XamlRoot,
+                proposal,
+                "Prerequisite Notice",
+                "Moving duplicate files to Recycle Bin...",
+                "Duplicates Recycled");
+            if (record?.Succeeded == true)
             {
-                var record = await Task.Run(() => AppServices.Instance.SafeOperationEngine.ExecuteApprovedProposalAsync(proposal.ConfirmationToken));
-                AppServices.Instance.NotifyOperationHistoryChanged();
-                await AppServices.Instance.ShowDialogAsync("Duplicates Recycled", record.StatusMessage);
                 OnScanDuplicatesClick(sender, e);
             }
         }

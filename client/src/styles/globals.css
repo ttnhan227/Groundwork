@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
-.site-primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 20px; background: var(--ink-blue); color: white; border-radius: 10px; font-weight: 600; text-decoration: none; transition: background 150ms; }
+.site-primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 20px; background: var(--ink-blue); color: var(--on-ink-blue); border-radius: 10px; font-weight: 600; text-decoration: none; transition: background 150ms; }
 .site-primary:hover { background: var(--ink-blue-hover); }
 .site-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 20px; background: var(--surface); color: var(--ink); border: 1px solid var(--control-border); border-radius: 10px; font-weight: 500; text-decoration: none; }
 .site-secondary:hover { border-color: var(--ink-blue); }
@@ -13,113 +13,60 @@
    - "Wet ink settling & drying" signature animation
    ========================================================================== */
 
-/* Global Box-Sizing & Word-Wrap Reset */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  background-color: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  font-size-adjust: from-font;
-  line-height: var(--leading-normal);
-  overflow-wrap: break-word;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
-
-::selection {
-  background: var(--ink-sepia-subtle);
-  color: var(--ink);
-}
-
-.groundwork-notebook-hero {
-  position: relative;
-  min-height: 670px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--hairline-strong);
-  background-color: #eee6d7;
-  background-image: url("/brand-notebook-art.png");
-  background-position: center;
-  background-size: cover;
-}
-
-.groundwork-notebook-hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, rgba(242, 237, 226, 0.18), transparent 62%);
-}
-
-.groundwork-notebook-page {
-  position: relative;
-  z-index: 1;
-  width: min(520px, calc(100% - 32px));
-  margin-left: clamp(16px, 10vw, 150px);
-  padding: clamp(28px, 5vw, 58px);
-  border: 1px solid rgba(188, 176, 158, 0.75);
-  border-radius: 18px;
-  background: rgba(255, 250, 240, 0.92);
-  box-shadow: 0 24px 65px -34px rgba(17, 32, 56, 0.48);
-  backdrop-filter: blur(3px);
-}
-
-.groundwork-notebook-rule {
-  height: 3px;
-  width: 82px;
-  margin-top: 24px;
-  background: var(--ink-blue);
-}
-
-@media (max-width: 720px) {
-  .groundwork-notebook-hero {
-    min-height: 720px;
-    background-position: 58% center;
-  }
-
-  .groundwork-notebook-page {
-    margin: 72px auto 0;
-  }
-}
-
-/* Universal Text & Link Overflow Protection */
-:where(a, code) {
-  overflow-wrap: anywhere;
-}
-
-/* Reduced motion accessibility */
-@media (prefers-reduced-motion: reduce) {
+/* Base element defaults layered below components and utilities */
+@layer base {
   *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  *::before,
+  *::after {
+    box-sizing: border-box;
   }
-}
-[data-reduced-motion="true"] *,
-[data-reduced-motion="true"] ::before,
-[data-reduced-motion="true"] ::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-size-adjust: from-font;
+    line-height: var(--leading-normal);
+    overflow-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--ink-sepia-subtle);
+    color: var(--ink);
+  }
+
+  /* Universal Text & Link Overflow Protection */
+  :where(a, code) {
+    overflow-wrap: anywhere;
+  }
+
+  /* Focus Rings */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--ink-blue);
+    outline-offset: 2px;
+  }
+
+  main[tabindex="-1"]:focus:not(:focus-visible) {
+    outline: none;
+  }
 }
 
 /* Typography Role Helpers */
@@ -167,7 +114,9 @@ body {
   background-color: var(--ink-sepia-subtle);
   border-radius: var(--radius-xs);
   padding: 1px 3px;
-  animation: inkSettle 1.2s ease-out infinite alternate;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: inkSettle 1.2s ease-out infinite alternate;
+  }
 }
 
 .agent-proposed-block {
@@ -199,27 +148,9 @@ body {
 }
 
 .ink-dried {
-  animation: inkDryTransition 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Minimal Tactile Scrollbars */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--hairline-strong) transparent;
-}
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--hairline-strong);
-  border-radius: var(--radius-full);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-muted);
+  @media (prefers-reduced-motion: no-preference) {
+    animation: inkDryTransition 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
 }
 
 /* Minimal Hover-Revealed Chrome (Notion-style) */
@@ -234,23 +165,11 @@ body {
   pointer-events: auto;
 }
 
-/* Focus Rings */
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--ink-blue);
-  outline-offset: 2px;
-}
-main[tabindex="-1"]:focus:not(:focus-visible) {
-  outline: none;
-}
-
 /* Standard animation utilities */
 .spin {
-  animation: spin 1s linear infinite;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: spin 1s linear infinite;
+  }
 }
 @keyframes spin {
   from {
@@ -258,5 +177,19 @@ main[tabindex="-1"]:focus:not(:focus-visible) {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (forced-colors: active) {
+  .site-primary {
+    border: 1px solid ButtonText;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline-color: Highlight;
   }
 }
