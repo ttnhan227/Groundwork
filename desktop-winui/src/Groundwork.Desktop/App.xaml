@@ -82,6 +82,8 @@
 
                     <Color x:Key="GwTextMutedColor">#76849B</Color>
                     <SolidColorBrush x:Key="GwTextMutedBrush" Color="{StaticResource GwTextMutedColor}" />
+
+                    <SolidColorBrush x:Key="GwOnAccentBrush" Color="#FFFFFF" />
                 </ResourceDictionary>
 
                 <!-- LIGHT THEME (Windows 11 Crisp Neutral Studio Palette) -->
@@ -157,6 +159,82 @@
 
                     <Color x:Key="GwTextMutedColor">#737B8B</Color>
                     <SolidColorBrush x:Key="GwTextMutedBrush" Color="{StaticResource GwTextMutedColor}" />
+
+                    <SolidColorBrush x:Key="GwOnAccentBrush" Color="#FFFFFF" />
+                </ResourceDictionary>
+
+                <!-- HIGH CONTRAST THEME (Windows System Accessibility Colors) -->
+                <ResourceDictionary x:Key="HighContrast">
+                    <Color x:Key="GwPageBackgroundColor">Black</Color>
+                    <SolidColorBrush x:Key="GwPageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwHeaderBackgroundColor">Black</Color>
+                    <SolidColorBrush x:Key="GwHeaderBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwSidebarBackgroundColor">Black</Color>
+                    <SolidColorBrush x:Key="GwSidebarBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwCardBackgroundColor">Black</Color>
+                    <SolidColorBrush x:Key="GwCardBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwCardBackgroundHoverColor">Black</Color>
+                    <SolidColorBrush x:Key="GwCardBackgroundHoverBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwSubtleSurfaceColor">Black</Color>
+                    <SolidColorBrush x:Key="GwSubtleSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwCardBorderColor">White</Color>
+                    <SolidColorBrush x:Key="GwCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwCardBorderStrongColor">White</Color>
+                    <SolidColorBrush x:Key="GwCardBorderStrongBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwAccentColor">Yellow</Color>
+                    <SolidColorBrush x:Key="GwAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+
+                    <Color x:Key="GwAccentHoverColor">Yellow</Color>
+                    <SolidColorBrush x:Key="GwAccentHoverBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+
+                    <Color x:Key="GwAccentBgColor">Black</Color>
+                    <SolidColorBrush x:Key="GwAccentBgBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwSignalGreenColor">Lime</Color>
+                    <SolidColorBrush x:Key="GwSignalGreenBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwSignalGreenBgColor">Black</Color>
+                    <SolidColorBrush x:Key="GwSignalGreenBgBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwTealColor">Cyan</Color>
+                    <SolidColorBrush x:Key="GwTealBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwTealBgColor">Black</Color>
+                    <SolidColorBrush x:Key="GwTealBgBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwPurpleColor">Magenta</Color>
+                    <SolidColorBrush x:Key="GwPurpleBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwPurpleBgColor">Black</Color>
+                    <SolidColorBrush x:Key="GwPurpleBgBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwAmberColor">Yellow</Color>
+                    <SolidColorBrush x:Key="GwAmberBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwAmberBgColor">Black</Color>
+                    <SolidColorBrush x:Key="GwAmberBgBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+                    <Color x:Key="GwDangerColor">Red</Color>
+                    <SolidColorBrush x:Key="GwDangerBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+
+                    <Color x:Key="GwTextPrimaryColor">White</Color>
+                    <SolidColorBrush x:Key="GwTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwTextSecondaryColor">White</Color>
+                    <SolidColorBrush x:Key="GwTextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+                    <Color x:Key="GwTextMutedColor">Gray</Color>
+                    <SolidColorBrush x:Key="GwTextMutedBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+
+                    <SolidColorBrush x:Key="GwOnAccentBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
@@ -236,7 +314,7 @@
             <!-- Groundwork Action Button Styles -->
             <Style x:Key="GwPrimaryButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="{ThemeResource GwAccentBrush}" />
-                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="Foreground" Value="{ThemeResource GwOnAccentBrush}" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="FontSize" Value="12.5" />
                 <Setter Property="CornerRadius" Value="5" />
@@ -283,7 +361,7 @@
 
             <Style x:Key="GwDangerButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="{ThemeResource GwDangerBrush}" />
-                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="Foreground" Value="{ThemeResource GwOnAccentBrush}" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="FontSize" Value="12.5" />
                 <Setter Property="CornerRadius" Value="5" />

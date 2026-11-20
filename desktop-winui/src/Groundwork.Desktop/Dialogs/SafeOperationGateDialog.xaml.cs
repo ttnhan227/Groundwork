@@ -12,9 +12,9 @@ public sealed partial class SafeOperationGateDialog : ContentDialog
         OperationDescText.Text = description;
         TargetText.Text = target;
         ReversibilityText.Text = isReversible ? "Reversible via Rollback Ledger" : "Permanent Operation (Irreversible)";
-        ReversibilityText.Foreground = isReversible 
-            ? (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["GwSignalGreenBrush"]
-            : (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["GwDangerBrush"];
+        ReversibilityText.Foreground = MainWindow.ResolveThemeBrush(
+            this,
+            isReversible ? "GwSignalGreenBrush" : "GwDangerBrush");
         RisksText.Text = string.IsNullOrWhiteSpace(risks) ? "No abnormal risks identified." : risks;
     }
 

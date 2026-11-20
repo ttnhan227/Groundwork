@@ -160,12 +160,43 @@ public sealed partial class MainWindow : Window
 
     public void ApplyTheme(string? theme)
     {
+        bool highContrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
         bool isDark = string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase);
-        RootGrid.RequestedTheme = isDark ? ElementTheme.Dark : ElementTheme.Light;
+        RootGrid.RequestedTheme = highContrast
+            ? ElementTheme.Default
+            : (isDark ? ElementTheme.Dark : ElementTheme.Light);
         if (HeaderThemeLabel != null)
         {
             HeaderThemeLabel.Text = isDark ? "Light" : "Dark";
         }
+    }
+
+    /// <summary>
+    /// Resolves a theme-aware brush from the active element's ActualTheme (or HighContrast)
+    /// rather than Application.Current.RequestedTheme.
+    /// </summary>
+    public static Microsoft.UI.Xaml.Media.Brush ResolveThemeBrush(FrameworkElement? scope, string resourceKey)
+    {
+        string themeKey;
+        if (new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast)
+        {
+            themeKey = "HighContrast";
+        }
+        else
+        {
+            var effectiveTheme = scope?.ActualTheme ?? Current?.RootGrid?.ActualTheme ?? ElementTheme.Light;
+            themeKey = effectiveTheme == ElementTheme.Dark ? "Dark" : "Light";
+        }
+
+        if (Application.Current.Resources.ThemeDictionaries.TryGetValue(themeKey, out var dictObj) &&
+            dictObj is ResourceDictionary dict &&
+            dict.TryGetValue(resourceKey, out var val) &&
+            val is Microsoft.UI.Xaml.Media.Brush themedBrush)
+        {
+            return themedBrush;
+        }
+
+        return (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[resourceKey];
     }
 
     private void InitializeStartup()

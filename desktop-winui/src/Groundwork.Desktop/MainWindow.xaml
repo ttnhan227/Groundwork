@@ -7,9 +7,9 @@
 
     <Grid x:Name="RootGrid" Background="{ThemeResource GwPageBackgroundBrush}" KeyDown="OnRootGridKeyDown">
         <Grid.RowDefinitions>
-            <RowDefinition Height="42" />
+            <RowDefinition Height="Auto" MinHeight="42" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="26" />
+            <RowDefinition Height="Auto" MinHeight="26" />
         </Grid.RowDefinitions>
 
         <!-- 1. UNIFIED NATIVE WORKBENCH COMMAND HEADER -->

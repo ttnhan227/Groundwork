@@ -27,6 +27,7 @@ public sealed partial class HealthGauge : UserControl
     public HealthGauge()
     {
         this.InitializeComponent();
+        this.ActualThemeChanged += (_, _) => UpdateRingColor(Value);
     }
 
     private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -35,21 +36,22 @@ public sealed partial class HealthGauge : UserControl
         {
             gauge.ValueRing.Value = Math.Clamp(val, 0, 100);
             gauge.ScoreText.Text = $"{Math.Round(val)}%";
-            
-            // Adjust color dynamically
-            if (val >= 80)
-            {
-                gauge.ValueRing.Foreground = (Brush)Application.Current.Resources["GwSignalGreenBrush"];
-            }
-            else if (val >= 50)
-            {
-                gauge.ValueRing.Foreground = (Brush)Application.Current.Resources["GwAmberBrush"];
-            }
-            else
-            {
-                gauge.ValueRing.Foreground = (Brush)Application.Current.Resources["GwDangerBrush"];
-            }
+            gauge.UpdateRingColor(val);
+            gauge.UpdateAutomationName();
         }
+    }
+
+    private void UpdateRingColor(double val)
+    {
+        string key = val >= 80 ? "GwSignalGreenBrush" : (val >= 50 ? "GwAmberBrush" : "GwDangerBrush");
+        ValueRing.Foreground = MainWindow.ResolveThemeBrush(this, key);
+    }
+
+    private void UpdateAutomationName()
+    {
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+            this,
+            $"PC Health {Math.Round(Value)} percent, {StatusLabel}");
     }
 
     private static void OnLabelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -57,6 +59,7 @@ public sealed partial class HealthGauge : UserControl
         if (d is HealthGauge gauge && e.NewValue is string lbl)
         {
             gauge.LabelText.Text = lbl;
+            gauge.UpdateAutomationName();
         }
     }
 }

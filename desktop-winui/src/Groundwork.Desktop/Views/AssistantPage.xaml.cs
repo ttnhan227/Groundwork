@@ -22,13 +22,13 @@ public sealed class AssistantChatMessage
     public Visibility ToolActivityVisibility => !string.IsNullOrEmpty(ToolActivity) ? Visibility.Visible : Visibility.Collapsed;
 
     public HorizontalAlignment BubbleAlignment => IsUser ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-    public Brush BubbleBackground => IsUser
-        ? (Brush)Application.Current.Resources["GwAccentBgBrush"]
-        : (Brush)Application.Current.Resources["GwCardBackgroundHoverBrush"];
-    public Brush SenderColor => IsUser
-        ? (Brush)Application.Current.Resources["GwAccentBrush"]
-        : (Brush)Application.Current.Resources["GwTealBrush"];
-    public Brush ContentColor => (Brush)Application.Current.Resources["GwTextPrimaryBrush"];
+    public Brush BubbleBackground => MainWindow.ResolveThemeBrush(
+        null,
+        IsUser ? "GwAccentBgBrush" : "GwCardBackgroundHoverBrush");
+    public Brush SenderColor => MainWindow.ResolveThemeBrush(
+        null,
+        IsUser ? "GwAccentBrush" : "GwTealBrush");
+    public Brush ContentColor => MainWindow.ResolveThemeBrush(null, "GwTextPrimaryBrush");
 }
 
 public sealed partial class AssistantPage : Page

@@ -7,7 +7,7 @@
     CloseButtonText=""
     DefaultButton="None">
 
-    <Grid Width="820" MinHeight="520" MaxHeight="660" RowSpacing="0">
+    <Grid MaxWidth="820" MinWidth="560" MinHeight="440" MaxHeight="560" RowSpacing="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
