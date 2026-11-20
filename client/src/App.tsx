@@ -7,6 +7,7 @@ import { DocsPage } from "./pages/DocsPage";
 import { ChangelogPage } from "./pages/ChangelogPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { ProductInfoPage } from "./pages/ProductInfoPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 
 const ROUTE_TITLES: Record<string, string> = {
   "/": "Groundwork — Windows storage analyzer, duplicate cleaner and hardware inspector",
@@ -27,7 +28,7 @@ function normalizePath(pathname: string): string {
 
 function getTitleForPath(path: string): string {
   if (path.startsWith("/docs")) return ROUTE_TITLES["/docs"];
-  return ROUTE_TITLES[path] ?? ROUTE_TITLES["/"];
+  return ROUTE_TITLES[path] ?? "Page not found (404) — Groundwork";
 }
 
 export default function App() {
@@ -83,7 +84,10 @@ export default function App() {
     if (currentPath === "/privacy") {
       return <PrivacyPage />;
     }
-    return <LandingPage navigate={navigate} />;
+    if (currentPath === "/") {
+      return <LandingPage navigate={navigate} />;
+    }
+    return <NotFoundPage navigate={navigate} />;
   };
 
   return (

@@ -1,4 +1,5 @@
 import { ArrowRight, ExternalLink } from "lucide-react";
+import { AppLink } from "../components/common/AppLink";
 
 const repository = "https://github.com/ttnhan227/Groundwork";
 export function ProductInfoPage({
@@ -57,10 +58,11 @@ export function ProductInfoPage({
               path: "/privacy",
             },
           ].map((item) => (
-            <button
+            <AppLink
               key={item.path}
-              onClick={() => navigate(item.path)}
-              className="text-left border border-[var(--hairline)] rounded-xl bg-[var(--surface)] p-6 hover:border-[var(--ink-blue)]"
+              to={item.path}
+              navigate={navigate}
+              className="block text-left border border-[var(--hairline)] rounded-xl bg-[var(--surface)] p-6 hover:border-[var(--ink-blue)]"
             >
               <h2 className="font-semibold text-lg flex justify-between items-center gap-3">
                 {item.title}
@@ -69,7 +71,7 @@ export function ProductInfoPage({
               <p className="mt-3 text-[var(--ink-secondary)] leading-relaxed">
                 {item.text}
               </p>
-            </button>
+            </AppLink>
           ))}
           <article className="sm:col-span-2 border-t border-[var(--hairline)] pt-6 mt-3">
             <h2 className="text-xl font-semibold">Developer resources</h2>
