@@ -9,7 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ttnhan227/Groundwork/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/ttnhan227/Groundwork/release.yml?branch=main&amp;label=Release&amp;style=flat-square" alt="Release status" /></a>
+  <a href="https://github.com/ttnhan227/Groundwork/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ttnhan227/Groundwork/ci.yml?branch=main&amp;label=CI&amp;style=flat-square" alt="CI status" /></a>
+  <a href="https://github.com/ttnhan227/Groundwork/releases/latest"><img src="https://img.shields.io/github/v/release/ttnhan227/Groundwork?label=Release&amp;style=flat-square" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&amp;logo=dotnet&amp;logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/Windows-WinUI_3-0078D4?style=flat-square&amp;logo=windows&amp;logoColor=white" alt="WinUI 3 Fluent" />
   <img src="https://img.shields.io/badge/Platform-Windows_10%2F11_x64-00ADEF?style=flat-square" alt="Windows 10/11 x64" />
