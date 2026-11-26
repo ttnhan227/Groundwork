@@ -643,9 +643,10 @@
 .product-ai-card {
   background: var(--surface);
   border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 40px 36px;
-  box-shadow: 0 4px 20px rgb(20 40 65 / 4%);
+  border-top: 3px solid var(--ink-blue);
+  border-radius: 6px;
+  padding: 36px 32px;
+  box-shadow: none;
 }
 .product-ai-header h2 {
   font-size: 1.875rem;
@@ -676,6 +677,8 @@
   gap: 8px;
 }
 .ai-pillar-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;

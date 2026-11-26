@@ -9,13 +9,13 @@
             <StackPanel Spacing="16" MaxWidth="820" HorizontalAlignment="Stretch">
 
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                    <TextBlock Text="Customize appearance, privacy, and optional AI provider." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                    <TextBlock Text="Settings" Style="{StaticResource GwPanelTitleStyle}" />
+                    <TextBlock Text="Customize appearance, privacy, and optional AI provider." Style="{StaticResource GwPanelSubtitleStyle}" />
                 </StackPanel>
 
                 <!-- 1. APPEARANCE -->
                 <TextBlock Text="Appearance" Style="{StaticResource GwSectionHeaderStyle}" Margin="0,4,0,0" />
-                <Border Padding="18,14" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                <Border Padding="18,14" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
                     <StackPanel Spacing="14">
                         <Grid ColumnSpacing="14">
                             <Grid.ColumnDefinitions>

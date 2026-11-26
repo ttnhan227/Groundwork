@@ -410,12 +410,18 @@ public sealed class OperationalVerificationEngineTests : IDisposable
     public void OperationHistoryService_CorruptedJsonFile_RecoversGracefullyWithoutCrashing()
     {
         var historyFile = Path.Combine(_tempRoot, "corrupted_history.json");
-        File.WriteAllText(historyFile, "{ corrupted invalid json content [[[ [[[");
+        const string corruptPayload = "{ corrupted invalid json content [[[ [[[";
+        File.WriteAllText(historyFile, corruptPayload);
 
         var history = new OperationHistoryService(historyFile);
         var records = history.LoadRecords();
         Assert.NotNull(records);
         Assert.Empty(records); // Clean fallback rather than unhandled JSON crash
+
+        var backups = Directory.GetFiles(_tempRoot, "corrupted_history.json.corrupt-*.bak");
+        Assert.Single(backups);
+        Assert.Equal(corruptPayload, File.ReadAllText(backups[0]));
+        Assert.False(File.Exists(historyFile));
     }
 
     // =========================================================================

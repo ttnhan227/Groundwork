@@ -60,7 +60,7 @@
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
                             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                <TextBlock Text="PC Overview" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
+                                <TextBlock Text="PC Overview" Style="{StaticResource GwPanelTitleStyle}" />
                                 <Border x:Name="HeroStatusBadgeBorder" Padding="8,2" CornerRadius="4" Background="{ThemeResource GwSignalGreenBgBrush}" VerticalAlignment="Center">
                                     <TextBlock x:Name="HeroStatusBadgeText" Text="Checking" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwSignalGreenBrush}" />
                                 </Border>
@@ -69,16 +69,14 @@
                             <TextBlock
                                 x:Name="HeroSubtitleText"
                                 Text="Quick snapshot of storage, startup speed, and system health."
-                                FontSize="13"
-                                Foreground="{ThemeResource GwTextSecondaryBrush}"
-                                TextWrapping="Wrap" />
+                                Style="{StaticResource GwPanelSubtitleStyle}" />
 
                             <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,2,0,0">
                                 <TextBlock x:Name="DeviceModelText" Text="Windows PC" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" />
                                 <TextBlock Text="•" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" />
-                                <TextBlock x:Name="UptimeText" Text="Uptime: --" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                <TextBlock x:Name="UptimeText" Text="Uptime: --" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" />
                                 <TextBlock Text="•" FontSize="12" Foreground="{ThemeResource GwTextMutedBrush}" />
-                                <TextBlock x:Name="LiveCpuMemText" Text="CPU: --% • RAM: --%" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" />
+                                <TextBlock x:Name="LiveCpuMemText" Text="CPU: --% • RAM: --%" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" />
                             </StackPanel>
                         </StackPanel>
 
@@ -110,12 +108,12 @@
                         x:Name="PillarCard1"
                         Grid.Column="0"
                         Grid.Row="0"
-                        Padding="18,16"
-                        CornerRadius="10"
+                        Padding="14,12"
+                        CornerRadius="6"
                         Background="{ThemeResource GwCardBackgroundBrush}"
                         BorderBrush="{ThemeResource GwCardBorderBrush}"
                         BorderThickness="1">
-                        <Grid RowSpacing="12">
+                        <Grid RowSpacing="10">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
@@ -124,21 +122,21 @@
 
                             <Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xEDA2;" FontSize="16" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Text="Storage" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                                    <FontIcon Glyph="&#xEDA2;" FontSize="15" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Storage" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock x:Name="StorageFreePercentText" Text="-- Free" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock x:Name="StorageFreePercentText" Text="-- Free" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
 
-                            <StackPanel Grid.Row="1" Spacing="8" VerticalAlignment="Center">
-                                <ProgressBar x:Name="StorageProgressBar" Value="0" Maximum="100" Height="8" CornerRadius="4" Foreground="{ThemeResource GwAccentBrush}" />
-                                <TextBlock x:Name="StorageCapacitySummaryText" Text="Checking drives..." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
+                            <StackPanel Grid.Row="1" Spacing="6" VerticalAlignment="Center">
+                                <ProgressBar x:Name="StorageProgressBar" Value="0" Maximum="100" Height="6" CornerRadius="2" Foreground="{ThemeResource GwAccentBrush}" />
+                                <TextBlock x:Name="StorageCapacitySummaryText" Text="Checking drives..." FontFamily="Consolas" FontSize="11.5" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Button
                                 Grid.Row="2"
                                 Content="Analyze &amp; Clean →"
-                                Style="{StaticResource GwSecondaryButtonStyle}"
+                                Style="{StaticResource GwCompactButtonStyle}"
                                 HorizontalAlignment="Stretch"
                                 Click="OnNavigateStorageClick" />
                         </Grid>
@@ -149,12 +147,12 @@
                         x:Name="PillarCard2"
                         Grid.Column="1"
                         Grid.Row="0"
-                        Padding="18,16"
-                        CornerRadius="10"
+                        Padding="14,12"
+                        CornerRadius="6"
                         Background="{ThemeResource GwCardBackgroundBrush}"
                         BorderBrush="{ThemeResource GwCardBorderBrush}"
                         BorderThickness="1">
-                        <Grid RowSpacing="12">
+                        <Grid RowSpacing="10">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
@@ -163,21 +161,21 @@
 
                             <Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE945;" FontSize="16" Foreground="{ThemeResource GwAmberBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Text="Speed &amp; Boot" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                                    <FontIcon Glyph="&#xE945;" FontSize="15" Foreground="{ThemeResource GwAmberBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Speed &amp; Boot" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock x:Name="ActivePowerSchemeBadge" Text="Balanced" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock x:Name="ActivePowerSchemeBadge" Text="Balanced" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwAmberBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
 
-                            <StackPanel Grid.Row="1" Spacing="6" VerticalAlignment="Center">
-                                <TextBlock x:Name="StartupAppsCountText" Text="Checking startup apps..." FontSize="13" FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
-                                <TextBlock Text="Disable slow startup apps or switch power modes." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
+                            <StackPanel Grid.Row="1" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="StartupAppsCountText" Text="Checking startup apps..." FontSize="12.5" FontWeight="Medium" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="Disable slow startup apps or switch power modes." Style="{StaticResource GwPanelSubtitleStyle}" />
                             </StackPanel>
 
                             <Button
                                 Grid.Row="2"
                                 Content="Manage Startup →"
-                                Style="{StaticResource GwSecondaryButtonStyle}"
+                                Style="{StaticResource GwCompactButtonStyle}"
                                 HorizontalAlignment="Stretch"
                                 Click="OnNavigateOptimizeClick" />
                         </Grid>
@@ -188,12 +186,12 @@
                         x:Name="PillarCard3"
                         Grid.Column="2"
                         Grid.Row="0"
-                        Padding="18,16"
-                        CornerRadius="10"
+                        Padding="14,12"
+                        CornerRadius="6"
                         Background="{ThemeResource GwCardBackgroundBrush}"
                         BorderBrush="{ThemeResource GwCardBorderBrush}"
                         BorderThickness="1">
-                        <Grid RowSpacing="12">
+                        <Grid RowSpacing="10">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
@@ -202,35 +200,35 @@
 
                             <Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE90F;" FontSize="16" Foreground="{ThemeResource GwTealBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Text="Health &amp; Network" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                                    <FontIcon Glyph="&#xE90F;" FontSize="15" Foreground="{ThemeResource GwTealBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Health &amp; Network" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock x:Name="NetworkStatusBadge" Text="Checking" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock x:Name="NetworkStatusBadge" Text="Checking" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
 
-                            <StackPanel Grid.Row="1" Spacing="6" VerticalAlignment="Center">
-                                <TextBlock x:Name="NetworkSummaryText" Text="Checking network..." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
+                            <StackPanel Grid.Row="1" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="NetworkSummaryText" Text="Checking network..." FontFamily="Consolas" FontSize="11.5" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
                                 <TextBlock x:Name="PendingRebootBadge" Text="Checking Windows updates..." FontSize="12" FontWeight="Medium" Foreground="{ThemeResource GwSignalGreenBrush}" />
                             </StackPanel>
 
                             <Button
                                 Grid.Row="2"
                                 Content="Run Diagnostics →"
-                                Style="{StaticResource GwSecondaryButtonStyle}"
+                                Style="{StaticResource GwCompactButtonStyle}"
                                 HorizontalAlignment="Stretch"
                                 Click="OnNavigateDiagnosticsClick" />
                         </Grid>
                     </Border>
                 </Grid>
 
-                <!-- QUICK WINDOWS TOOLKIT LAUNCHERS -->
+                <!-- COMPACT DIAGNOSTIC COMMAND STRIP -->
                 <Border
-                    Padding="14,12"
-                    CornerRadius="10"
-                    Background="{ThemeResource GwCardBackgroundBrush}"
+                    Padding="12,8"
+                    CornerRadius="6"
+                    Background="{ThemeResource GwSubtleSurfaceBrush}"
                     BorderBrush="{ThemeResource GwCardBorderBrush}"
                     BorderThickness="1">
-                    <Grid ColumnSpacing="10">
+                    <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -238,28 +236,26 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock
-                            Text="Windows Toolkit"
-                            FontSize="12"
-                            FontWeight="SemiBold"
-                            Foreground="{ThemeResource GwTextSecondaryBrush}"
+                            Text="TOOLKIT"
+                            Style="{StaticResource GwSectionHeaderStyle}"
                             VerticalAlignment="Center"
-                            Margin="2,0,6,0" />
+                            Margin="2,0,8,0" />
                         <Button
                             Grid.Column="1"
                             Content="Windows 11 Tweaks &amp; Debloat →"
-                            Style="{StaticResource GwSecondaryButtonStyle}"
+                            Style="{StaticResource GwCompactButtonStyle}"
                             HorizontalAlignment="Stretch"
                             Click="OnNavigateTweaksClick" />
                         <Button
                             Grid.Column="2"
                             Content="1-Click Repairs &amp; Runtimes →"
-                            Style="{StaticResource GwSecondaryButtonStyle}"
+                            Style="{StaticResource GwCompactButtonStyle}"
                             HorizontalAlignment="Stretch"
                             Click="OnNavigateRepairClick" />
                         <Button
                             Grid.Column="3"
                             Content="Store Bloatware &amp; winget →"
-                            Style="{StaticResource GwSecondaryButtonStyle}"
+                            Style="{StaticResource GwCompactButtonStyle}"
                             HorizontalAlignment="Stretch"
                             Click="OnNavigateBloatwareClick" />
                     </Grid>

@@ -125,7 +125,7 @@
                                                     </Border>
                                                 </StackPanel>
                                                 <TextBlock Text="{x:Bind Publisher}" FontSize="11.5" Foreground="{ThemeResource GwTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{x:Bind CommandOrTarget}" FontSize="10.5" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind CommandOrTarget}" FontFamily="Consolas" FontSize="10.5" Foreground="{ThemeResource GwTextMutedBrush}" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
                                             <Border Grid.Column="2" Padding="7,2" CornerRadius="3" Background="{ThemeResource GwAccentBgBrush}" HorizontalAlignment="Left" VerticalAlignment="Center">

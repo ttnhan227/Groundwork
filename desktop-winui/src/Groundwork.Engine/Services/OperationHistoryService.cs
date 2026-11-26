@@ -146,7 +146,26 @@ public sealed class OperationHistoryService
         }
         catch
         {
+            BackupCorruptHistoryFile();
             return [];
+        }
+    }
+
+    private void BackupCorruptHistoryFile()
+    {
+        try
+        {
+            if (!File.Exists(_historyFilePath))
+            {
+                return;
+            }
+
+            string backupPath = $"{_historyFilePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.bak";
+            File.Move(_historyFilePath, backupPath, overwrite: true);
+        }
+        catch
+        {
+            // Best-effort backup of corrupt history file.
         }
     }
 

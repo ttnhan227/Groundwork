@@ -14,15 +14,15 @@
             </Grid.RowDefinitions>
 
             <!-- HEADER -->
-            <Border Grid.Row="0" Margin="0,0,0,12" Padding="16,12" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+            <Border Grid.Row="0" Margin="0,0,0,12" Padding="16,12" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="AI Assistant" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" />
-                        <TextBlock Text="Ask what's slowing down your PC or using up disk space." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" />
+                        <TextBlock Text="Diagnostic Console &amp; Assistant" Style="{StaticResource GwCardTitleStyle}" />
+                        <TextBlock Text="Query live Windows telemetry, storage bottlenecks, and event logs." Style="{StaticResource GwPanelSubtitleStyle}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Border Padding="8,4" CornerRadius="4" Background="{ThemeResource GwAccentBgBrush}" VerticalAlignment="Center">
@@ -33,19 +33,19 @@
                 </Grid>
             </Border>
 
-            <!-- CHAT AREA -->
-            <Border Grid.Row="1" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1" Padding="16">
+            <!-- DIAGNOSTIC OUTPUT AREA -->
+            <Border Grid.Row="1" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1" Padding="16">
                 <Grid>
-                    <StackPanel x:Name="StandbyWelcomePanel" Visibility="Visible" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16" MaxWidth="540">
-                        <Border Width="48" Height="48" CornerRadius="24" Background="{ThemeResource GwAccentBgBrush}" HorizontalAlignment="Center">
-                            <FontIcon Glyph="&#xE8BD;" FontSize="22" Foreground="{ThemeResource GwAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <StackPanel x:Name="StandbyWelcomePanel" Visibility="Visible" VerticalAlignment="Top" HorizontalAlignment="Stretch" Spacing="14">
+                        <Border Padding="12,10" CornerRadius="4" Background="{ThemeResource GwSubtleSurfaceBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="SYSTEM DIAGNOSTIC READY" Style="{StaticResource GwSectionHeaderStyle}" />
+                                <TextBlock Text="Inspects live Windows state via ToolRegistryService first; all modifying actions require Safe Operation approval." Style="{StaticResource GwPanelSubtitleStyle}" />
+                            </StackPanel>
                         </Border>
-                        <StackPanel Spacing="4" HorizontalAlignment="Center">
-                            <TextBlock Text="How can I help with your PC?" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Checks real Windows data first, and always asks before making changes." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-                        </StackPanel>
 
-                        <Grid ColumnSpacing="8" RowSpacing="8" Margin="0,4,0,0">
+                        <TextBlock Text="INVESTIGATION PROMPTS" Style="{StaticResource GwSectionHeaderStyle}" />
+                        <Grid ColumnSpacing="8" RowSpacing="8">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -68,14 +68,16 @@
                                 <Border
                                     Margin="0,6"
                                     Padding="14,12"
-                                    CornerRadius="10"
+                                    CornerRadius="6"
                                     Background="{x:Bind BubbleBackground}"
+                                    BorderBrush="{ThemeResource GwCardBorderBrush}"
+                                    BorderThickness="1"
                                     HorizontalAlignment="{x:Bind BubbleAlignment}"
                                     MaxWidth="780">
                                     <StackPanel Spacing="6">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <TextBlock Text="{x:Bind SenderName}" FontWeight="SemiBold" FontSize="12" Foreground="{x:Bind SenderColor}" />
-                                            <TextBlock Text="{x:Bind Timestamp}" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" />
+                                            <TextBlock Text="{x:Bind Timestamp}" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource GwTextMutedBrush}" />
                                         </StackPanel>
 
                                         <Border
@@ -84,7 +86,7 @@
                                             CornerRadius="4"
                                             Background="{ThemeResource GwCardBackgroundBrush}"
                                             HorizontalAlignment="Left">
-                                            <TextBlock Text="{x:Bind ToolActivity}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Bind ToolActivity}" FontFamily="Consolas" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTealBrush}" TextWrapping="Wrap" />
                                         </Border>
 
                                         <TextBlock Text="{x:Bind Content}" FontSize="13" LineHeight="19" Foreground="{x:Bind ContentColor}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
@@ -97,7 +99,7 @@
             </Border>
 
             <!-- INPUT BAR -->
-            <Border Grid.Row="2" Margin="0,12,0,0" Padding="10" CornerRadius="10" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
+            <Border Grid.Row="2" Margin="0,12,0,0" Padding="10" CornerRadius="6" Background="{ThemeResource GwCardBackgroundBrush}" BorderBrush="{ThemeResource GwCardBorderBrush}" BorderThickness="1">
                 <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

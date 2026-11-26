@@ -22,7 +22,7 @@
 
 ---
 
-## 📌 Overview & Core Promise
+## Overview & Core Promise
 
 **Understand your PC. Investigate problems. Optimize with confidence. Maintain control.**
 
@@ -49,7 +49,7 @@
 
 ---
 
-## 🛡️ Safe Operation Framework (10-Step Lifecycle)
+## Safe Operation Framework (10-Step Lifecycle)
 
 Every modifying action in Groundwork passes through `SafeOperationEngine` and `PolicyEngine`:
 1. **Inspect** current system state
@@ -65,7 +65,7 @@ Every modifying action in Groundwork passes through `SafeOperationEngine` and `P
 
 ---
 
-## 🛠️ Building & Testing from Source
+## Building & Testing from Source
 
 ### Prerequisites
 - Windows 10 (Build 19041+) or Windows 11 (x64)
@@ -84,7 +84,7 @@ dotnet run --project desktop-winui/src/Groundwork.Desktop/Groundwork.Desktop.csp
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - [AGENTS.md](AGENTS.md) — Engineering principles, agent architecture, and module overview
 - [docs/PRODUCT_SPECIFICATION.md](docs/PRODUCT_SPECIFICATION.md) — Product specification and interaction model

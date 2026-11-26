@@ -361,7 +361,7 @@ public sealed class SafeCleanupService
                 }
 
                 long size = Directory.Exists(full)
-                    ? new DirectoryInfo(full).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
+                    ? CalculateDirectoryBytesSafe(full)
                     : new FileInfo(full).Length;
 
                 totalBytes += size;
@@ -438,7 +438,7 @@ public sealed class SafeCleanupService
                 }
 
                 long size = isDir
-                    ? new DirectoryInfo(full).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
+                    ? CalculateDirectoryBytesSafe(full)
                     : new FileInfo(full).Length;
 
                 if (proposal.Mode == "recycle")
@@ -530,6 +530,56 @@ public sealed class SafeCleanupService
     public static bool MoveToRecycleBin(string fullPath)
     {
         return SendToRecycleBinWindows(fullPath);
+    }
+
+    private static long CalculateDirectoryBytesSafe(string directoryPath)
+    {
+        long total = 0;
+        var stack = new Stack<string>();
+        stack.Push(directoryPath);
+
+        while (stack.Count > 0)
+        {
+            string current = stack.Pop();
+            try
+            {
+                var attrs = File.GetAttributes(current);
+                if (attrs.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    continue;
+                }
+
+                var dirInfo = new DirectoryInfo(current);
+                foreach (var file in dirInfo.EnumerateFiles("*", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        if (!file.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                        {
+                            total += file.Length;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore inaccessible files during size estimation.
+                    }
+                }
+
+                foreach (var subDir in dirInfo.EnumerateDirectories("*", SearchOption.TopDirectoryOnly))
+                {
+                    if (!subDir.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                    {
+                        stack.Push(subDir.FullName);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore inaccessible directories during size estimation.
+            }
+        }
+
+        return total;
     }
 
     private static bool SendToRecycleBinWindows(string fullPath)

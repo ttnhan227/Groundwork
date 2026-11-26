@@ -279,6 +279,36 @@ public sealed class StorageAndSafetyEngineTests : IDisposable
     }
 
     [Fact]
+    public void SafeCleanupService_SkipsReparsePointDirectoriesDuringRecursiveEnumeration()
+    {
+        string targetFolder = Path.Combine(_tempRoot, "cleanup_target_dir");
+        string externalFolder = Path.Combine(_tempRoot, "external_secret_dir");
+        Directory.CreateDirectory(targetFolder);
+        Directory.CreateDirectory(externalFolder);
+
+        string insideFile = Path.Combine(targetFolder, "temp.log");
+        string externalFile = Path.Combine(externalFolder, "outside.bin");
+        File.WriteAllBytes(insideFile, new byte[128]);
+        File.WriteAllBytes(externalFile, new byte[4096]);
+
+        string junctionPath = Path.Combine(targetFolder, "junction_to_external");
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $"/c mklink /J \"{junctionPath}\" \"{externalFolder}\"",
+            CreateNoWindow = true,
+            UseShellExecute = false
+        };
+        using var proc = System.Diagnostics.Process.Start(psi);
+        proc!.WaitForExit();
+        Assert.Equal(0, proc.ExitCode);
+
+        var svc = new SafeCleanupService();
+        var proposal = svc.ProposeCleanup([targetFolder], [_tempRoot], mode: "permanent");
+        Assert.Equal(128, proposal.TotalBytes);
+    }
+
+    [Fact]
     public async Task InstalledAppsEngine_ParsesCommandsSafely_MonitorsUninstall_AndFindsLeftovers()
     {
         var appsEngine = new InstalledAppsEngineService();

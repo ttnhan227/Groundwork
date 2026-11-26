@@ -18,16 +18,16 @@
         <Border
             Grid.Row="0"
             Padding="14,12"
-            CornerRadius="8"
+            CornerRadius="6"
             Background="{ThemeResource GwAccentBgBrush}"
             BorderBrush="{ThemeResource GwAccentBrush}"
             BorderThickness="1">
             <StackPanel Spacing="6">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{ThemeResource GwAccentBrush}" VerticalAlignment="Center" />
-                    <TextBlock x:Name="OperationTitleText" Text="Proposed System Change" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource GwTextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="OperationTitleText" Text="Proposed System Change" Style="{StaticResource GwCardTitleStyle}" VerticalAlignment="Center" />
                 </StackPanel>
-                <TextBlock x:Name="OperationDescText" Text="Explanation of proposed change..." FontSize="12" Foreground="{ThemeResource GwTextSecondaryBrush}" TextWrapping="Wrap" />
+                <TextBlock x:Name="OperationDescText" Text="Explanation of proposed change..." Style="{StaticResource GwPanelSubtitleStyle}" />
             </StackPanel>
         </Border>
 
@@ -35,7 +35,7 @@
         <Border
             Grid.Row="1"
             Padding="14,12"
-            CornerRadius="8"
+            CornerRadius="6"
             Background="{ThemeResource GwCardBackgroundHoverBrush}"
             BorderBrush="{ThemeResource GwCardBorderBrush}"
             BorderThickness="1">
@@ -46,7 +46,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Target:" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource GwTextSecondaryBrush}" />
-                    <TextBlock Grid.Column="1" x:Name="TargetText" Text="System State" FontSize="11" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Column="1" x:Name="TargetText" Text="System State" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource GwTextPrimaryBrush}" TextWrapping="Wrap" />
                 </Grid>
 
                 <Grid>
